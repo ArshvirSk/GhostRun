@@ -18,6 +18,7 @@ export default function RootLayout() {
         <Stack.Screen name="lobby/[id]" />
         <Stack.Screen name="target/[id]" />
         <Stack.Screen name="game/[id]" />
+        <Stack.Screen name="result/[id]" />
       </Stack>
     </>
   );

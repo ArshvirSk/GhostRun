@@ -362,6 +362,9 @@ export default function GameScreen() {
       router.replace({ pathname: '/lobby/[id]', params: { id: gameId } });
     } else if (state.game.status === 'target_selection') {
       router.replace({ pathname: '/target/[id]', params: { id: gameId } });
+    } else if (state.game.status === 'ended') {
+      // The live screen stops here; the recap owns the finished round.
+      router.replace({ pathname: '/result/[id]', params: { id: gameId } });
     }
   }, [gameId, router, state]);
 
