@@ -141,21 +141,21 @@ sequenceDiagram
 sequenceDiagram
   participant RP as Runner phone
   participant DB as Supabase
-  participant CR as pg_cron
   participant HP as Hunter phone
 
   loop every 5-10 s (foreground service)
     RP->>DB: submit_position(lat,lng,acc,...)
-    DB->>DB: advance_game(), upsert position, boundary + arrival checks
+    DB->>DB: advance_game(), upsert position, trail + boundary warning
     DB-->>RP: {phase, server_time, next_ping_at, in_bounds, winner}
   end
 
-  CR->>DB: advance_all_games() every 30 s
-  DB->>DB: now >= next_ping_at ?
-  DB->>DB: copy latest runner positions into pings (with age)
-  DB-->>HP: realtime: new pings + event ping_released
-  DB-->>RP: realtime: event ping_released (runners see what hunters learn)
-  HP->>HP: render marker "seen just now", fades with age
+  opt next_ping_at has passed (any member read; the live screen reads at the boundary)
+    HP->>DB: get_game_state()
+    DB->>DB: copy active runner positions into pings (with age)
+    DB-->>HP: snapshot with the new pings
+    DB-->>RP: realtime: ping_released (runners see what hunters learn)
+    HP->>HP: render marker "seen just now", fades with age
+  end
 ```
 
 ## 8. Tag flow
@@ -213,7 +213,7 @@ sequenceDiagram
 | Runner, live | Same plus ping markers (what hunters know) | SOS | Time left, next ping in, hunters unlocked |
 | Hunter, head start | Area, self, teammates (map greyed) | SOS | "Unlocking in 02:10" |
 | Hunter, live | Area, self, teammates, ping markers with age, tag ring | **TAG**, SOS | Time left, next ping in, runners remaining |
-| Tagged runner | Teammates only (spectator) | Leave | "You were tagged by X" |
+| Tagged runner | Teammates only (spectator) | Leave | "You were tagged" |
 | Any, boundary breach | Red edge, banner "Return to area (0:25)" | none | Countdown to penalty |
 | Any, connection lost | Banner "Reconnecting..." and last known state | none | Auto-resync via `get_game_state` |
 
@@ -274,8 +274,10 @@ Also handled:
 flowchart LR
   A[game_ended] --> B[Stop location tracking + clear active game]
   B --> C[Result: winner, reason, stats]
-  C --> D[Reveal target + all final positions]
-  D --> E[Replay: trails, tags, pings with timeline scrubber]
+  C --> D[Reveal target + final positions + recorded trails]
+  D --> E[Replay: tags, pings, timeline scrubber]
   C --> F[Play again -> lobby, same players + settings]
   C --> G[Home]
 ```
+
+The result screen (`app/result/[id].tsx`) owns the ended phase. It loads `get_game_state` for the winner, final positions and target, then calls `get_game_trails` for the recorded routes. That RPC is member-only and refuses to run unless the game is `ended`; the `trail_points` RLS policy applies the same gate. The live screen replaces itself with the result as soon as it sees `ended`, and the result stops any surviving location task on mount.
