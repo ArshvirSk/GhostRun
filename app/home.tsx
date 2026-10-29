@@ -1,4 +1,5 @@
 import { Camera, Map, UserLocation } from '@maplibre/maplibre-react-native';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
@@ -11,6 +12,7 @@ const MAP_STYLE = process.env.EXPO_PUBLIC_MAP_STYLE_URL || DEFAULT_MAP_STYLE;
 type Profile = { display_name: string; color: string };
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileError, setProfileError] = useState('');
   const [permission, setPermission] = useState<Location.LocationPermissionResponse | null>(null);
@@ -125,9 +127,23 @@ export default function HomeScreen() {
 
       <View style={styles.bottomCard}>
         <Text style={styles.bottomTitle}>Ready when your crew is.</Text>
-        <Text style={styles.bottomText}>
-          Game creation and joining arrive in the next milestone.
-        </Text>
+        <Text style={styles.bottomText}>Create a lobby or join your crew with a code.</Text>
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/create')}
+            style={styles.primaryAction}
+          >
+            <Text style={styles.primaryActionText}>Create game</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/join')}
+            style={styles.secondaryAction}
+          >
+            <Text style={styles.secondaryActionText}>Join game</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -204,4 +220,23 @@ const styles = StyleSheet.create({
   },
   bottomTitle: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
   bottomText: { color: '#475569', fontSize: 14, lineHeight: 20, marginTop: 5 },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  primaryAction: {
+    alignItems: 'center',
+    backgroundColor: '#1D4ED8',
+    borderRadius: 11,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  primaryActionText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  secondaryAction: {
+    alignItems: 'center',
+    backgroundColor: '#DBEAFE',
+    borderRadius: 11,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  secondaryActionText: { color: '#1D4ED8', fontSize: 15, fontWeight: '800' },
 });
