@@ -486,6 +486,14 @@ async function main() {
     (await host.from('trail_points').select('*').eq('game_id', phaseGameId)).data,
     'members cannot read trails during the live round',
   );
+  const liveReplay = await rpc<{ tags: unknown[]; pings: unknown[] }>(host, 'get_game_replay', {
+    game_id: phaseGameId,
+  });
+  expect(
+    Boolean(liveReplay.error),
+    'the replay is unavailable while the round is live',
+    'call unexpectedly succeeded',
+  );
 
   const runnerSnapshot = await rpc<Record<string, unknown>>(host, 'get_game_state', {
     game_id: phaseGameId,
@@ -811,6 +819,54 @@ async function main() {
   expectEmpty(
     (await outsider.from('trail_points').select('*').eq('game_id', phaseGameId)).data,
     'outsiders cannot read trails after the round ends',
+  );
+
+  // The replay adds the timestamped tag and ping history on top of the trails.
+  const replay = await rpc<{
+    tags: {
+      hunter_id: string;
+      runner_id: string;
+      hunter_name: string;
+      runner_name: string;
+      distance_m: number;
+      tagged_at: string;
+    }[];
+    pings: {
+      player_id: string;
+      display_name: string;
+      color: string;
+      longitude: number;
+      latitude: number;
+      released_at: string;
+    }[];
+  }>(host, 'get_game_replay', { game_id: phaseGameId });
+  const replayTags = replay.data?.tags ?? [];
+  expect(
+    replayTags.length === 1 &&
+      replayTags[0].hunter_id === phaseHunterPlayer.data.id &&
+      replayTags[0].runner_id === phaseHostPlayer.data.id &&
+      replayTags[0].hunter_name === 'Hunter' &&
+      replayTags[0].runner_name === 'Host',
+    'the replay returns the tag with both display names',
+    JSON.stringify(replay.error?.message ?? replayTags),
+  );
+  const replayPings = replay.data?.pings ?? [];
+  expect(
+    replayPings.length > 0 &&
+      replayPings.every(
+        (ping) =>
+          Number.isFinite(ping.longitude) &&
+          Number.isFinite(ping.latitude) &&
+          typeof ping.released_at === 'string',
+      ),
+    'the replay returns released pings with coordinates',
+    JSON.stringify(replay.error?.message ?? replayPings.slice(0, 2)),
+  );
+  const outsiderReplay = await rpc(outsider, 'get_game_replay', { game_id: phaseGameId });
+  expect(
+    Boolean(outsiderReplay.error),
+    'outsiders cannot request the replay',
+    'call unexpectedly succeeded',
   );
 
   // Target arrival: a Classic runner standing on the saved target wins.
