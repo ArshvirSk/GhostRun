@@ -548,6 +548,14 @@ export default function ResultScreen() {
 
         <Pressable
           accessibilityRole="button"
+          onPress={() => router.push({ pathname: '/replay/[id]', params: { id: gameId } })}
+          style={styles.replayButton}
+        >
+          <Text style={styles.replayText}>Watch replay</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.replace('/home')}
           style={styles.primaryButton}
         >
@@ -650,12 +658,22 @@ const styles = StyleSheet.create({
   playerMeta: { color: '#475569', fontSize: 12, fontWeight: '800' },
   playerWinner: { color: '#047857' },
   playerTagged: { color: '#B91C1C' },
+  replayButton: {
+    alignItems: 'center',
+    borderColor: '#1D4ED8',
+    borderRadius: 13,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: 18,
+    minHeight: 50,
+  },
+  replayText: { color: '#1D4ED8', fontSize: 15, fontWeight: '900' },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: '#0F172A',
     borderRadius: 13,
     justifyContent: 'center',
-    marginTop: 18,
+    marginTop: 10,
     minHeight: 50,
   },
   primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },

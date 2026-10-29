@@ -48,7 +48,7 @@
 
 **Reason:** The live screen's job is over once the round ends, so the recap gets its own screen and camera. Trails are larger than the rest of the snapshot and are read once, so they do not belong in every `get_game_state` poll. The RPC is security definer because PostGIS coordinates are awkward to select through PostgREST, and the explicit status check keeps the secrecy rule in one server-side place.
 
-**Trade-off:** The result makes one extra round trip after the state snapshot. The RPC caps the response at 30,000 points as a payload guard. Play again and the replay scrubber are still future work; the result screen stops location tracking and sends the player home.
+**Trade-off:** The result makes one extra round trip after the state snapshot. The RPC caps the response at 30,000 points as a payload guard. Play again is still future work; the result screen stops location tracking and sends the player home.
 
 ## 2026-10-30 — Tagging and arrival are server-authoritative endings
 
@@ -57,3 +57,11 @@
 **Reason:** The round should be decided by what players actually do, not only by a clock. Keeping range, freshness and winner checks inside Postgres prevents a modified client from tagging from across the map or ending a round at will. Omitting distance and direction from failures preserves the inference game.
 
 **Trade-off:** A successful tag does not start a cooldown, so a hunter standing among several runners can tag again immediately (the next runner must still be fresh and in range); only a failed tag starts the timer. Spectators see pings and teammate positions, but the screen does not yet name who tagged them; the `runner_tagged` event is the source for that feed.
+
+## 2026-10-30 — Replay scrubs tags, pings and trails from server data
+
+**Decision:** The result screen links to `replay/[id]`. The replay loads `get_game_state` for the round, `get_game_trails` for routes, and `get_game_replay` for every tag and released ping. `get_game_replay` is member-only and ended-only. The scrubber runs from `live_at` to `ended_at` (or `ends_at` when time expired), truncating trails, positions and pings at the playhead. Tags and pings are drawn as timeline markers; play advances at 1× or 10×.
+
+**Reason:** The replay should show what the server recorded, not reconstruct gameplay from live state. One ended-only RPC keeps the tag and ping history complete and gives the screen display names, colors and coordinates without exposing raw PostGIS rows. Truncating client-side is cheap because the data is terminal and already bounded.
+
+**Trade-off:** A tag record stores the distance between players, not the tag coordinates, so the map places a tag at the runner's last trail point at or before the tag; the exact spot can be up to one trail interval away. Playback is local rather than a shared synchronized stream, and the result's replay button is the only entry point beyond a deep link.

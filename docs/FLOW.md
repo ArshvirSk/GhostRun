@@ -281,3 +281,5 @@ flowchart LR
 ```
 
 The result screen (`app/result/[id].tsx`) owns the ended phase. It loads `get_game_state` for the winner, final positions and target, then calls `get_game_trails` for the recorded routes. That RPC is member-only and refuses to run unless the game is `ended`; the `trail_points` RLS policy applies the same gate. The live screen replaces itself with the result as soon as it sees `ended`, and the result stops any surviving location task on mount.
+
+The result's “Watch replay” opens `app/replay/[id].tsx`. The replay loads `get_game_replay` for every tag and released ping, reuses `get_game_trails`, and scrubs `live_at` to the finish. Trails, positions and pings stop at the playhead; tags and pings appear as timeline markers, and playback runs at 1× or 10×. Both recap RPCs are member-only and ended-only.
