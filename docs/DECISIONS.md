@@ -81,3 +81,11 @@
 **Reason:** The hosted project has anonymous sign-ins disabled, so the previous onboarding could not create any player. Email/password is self-contained (no OAuth provider or extra SDK), keeps the profile step, and lets a crew return on a new install.
 
 **Trade-off:** New accounts need a confirmation email until "Confirm email" is turned off or custom SMTP is configured, so first-run onboarding may pause at "Check your inbox". Existing anonymous sessions keep working until they sign out, but those accounts have no email and cannot be recovered afterwards; there is no account-linking migration.
+
+## 2026-10-30 — Recovery links return to a dedicated reset screen
+
+**Decision:** The auth screen offers "Forgot password?" and, for unconfirmed accounts, resends the confirmation with `auth.resend({ type: 'signup' })`. A reset request calls `resetPasswordForEmail` with `redirectTo: Linking.createURL('/reset-password')`. `app/reset-password.tsx` parses implicit (`#access_token`, `#refresh_token`) and PKCE (`?code`) payloads with `src/lib/authLink.ts`, establishes the session, and updates the password in place before routing to Home or Welcome.
+
+**Reason:** Email is the only identity the app has, so a reset link that lands on the wrong screen or fails silently would lock a player out. Handling both link formats keeps the screen working whether the project uses the implicit or PKCE flow.
+
+**Trade-off:** The redirect must be allowlisted for each environment, so a project without `ghost-run://reset-password` (or the Expo development URL) rejects the send. Resends share the mailer's rate limits with sign-up, and the recovery session signs the player straight in instead of forcing a second login.
