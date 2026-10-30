@@ -144,7 +144,8 @@ create table games (
   winner text check (winner in ('runners','hunters')),
   end_reason text,                -- target_reached | all_tagged | time_up | cancelled
   created_at timestamptz not null default now(),
-  ended_at timestamptz
+  ended_at timestamptz,
+  rematch_game_id uuid references games(id) on delete set null  -- fresh lobby opened from this round
 );
 create unique index games_code_active_uq on games(code)
   where status not in ('ended','cancelled');
@@ -300,6 +301,7 @@ All are `SECURITY DEFINER`, `set search_path = public, extensions`, and validate
 | `trigger_sos(game_id)` | member | Emits an `all` event with the player's last position |
 | `get_game_state(game_id)` returns jsonb | member | Full snapshot for (re)connect: game, players, own/team positions (all after ended), recent pings, target if runner or ended, last 50 events, server time |
 | `get_game_trails(game_id)` returns jsonb | member | Ended games only. Every recorded trail point with coordinates for the result map |
+| `rematch_game(game_id)` returns table(game_id, code) | member | Ended games only, idempotent. Opens one fresh lobby with the copied mode, area and settings and the same non-left players and sides; sets `games.rematch_game_id` |
 | `get_game_replay(game_id)` returns jsonb | member | Ended games only. Every tag and released ping with names, coordinates and timestamps for the replay scrubber |
 | `cleanup_old_games()` | cron daily | Deletes games ended over 30 days ago |
 
