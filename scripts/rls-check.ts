@@ -2,7 +2,7 @@
  * End-to-end access check for the lobby, target-selection, round-start and live
  * location rules.
  *
- * Creates three anonymous players (host/runner, hunter, outsider) against the
+ * Creates three throwaway players (host/runner, hunter, outsider) against the
  * configured Supabase project, plays the lobby through target selection and the
  * countdown, uploads live positions, waits for a scheduled ping round, tags the
  * last runner, and wins a separate Classic round by reaching the target. It
@@ -13,13 +13,18 @@
  *   EXPO_PUBLIC_SUPABASE_URL=... EXPO_PUBLIC_SUPABASE_ANON_KEY=... \
  *     npx tsx scripts/rls-check.ts
  *
- * The app signs players in anonymously, so this script uses anonymous sign-ins by
- * default. If Anonymous sign-ins are disabled in the project, set
- * SUPABASE_SERVICE_ROLE_KEY so the script can mint confirmed throwaway accounts
- * through the admin API instead. The service-role key is read from the
+ * Players sign in the way the app does: anonymously. If the project has Anonymous
+ * sign-ins disabled, the script creates email/password test users through the
+ * public sign-up endpoint instead (this needs email confirmations turned off so
+ * sign-up returns a session). Setting SUPABASE_SERVICE_ROLE_KEY is the strongest
+ * option: it mints pre-confirmed accounts through the admin API, whatever the
+ * project's sign-in settings are. The service-role key is read from the
  * environment only: never commit it or embed it in the app.
+ *
+ * Test accounts are left behind after a run; the public sign-up path cannot
+ * delete them.
  */
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type AuthError, type SupabaseClient } from '@supabase/supabase-js';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
@@ -72,13 +77,20 @@ async function withProfile(client: SupabaseClient, displayName: string) {
   return client;
 }
 
+function throwawayAccount(displayName: string) {
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  return {
+    email: `rls-${displayName.toLowerCase()}-${suffix}@ghostrun.test`,
+    password: `rls-${Math.random().toString(36).slice(2)}-${suffix}`,
+  };
+}
+
 /** Throwaway confirmed account, minted with the service-role key (server side only). */
 async function adminClient(displayName: string): Promise<SupabaseClient> {
   const admin = createClient(url!, serviceRoleKey!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const email = `rls-${displayName.toLowerCase()}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@ghostrun.test`;
-  const password = `rls-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+  const { email, password } = throwawayAccount(displayName);
   const { error: createError } = await admin.auth.admin.createUser({
     email,
     password,
@@ -92,17 +104,76 @@ async function adminClient(displayName: string): Promise<SupabaseClient> {
   return withProfile(client, displayName);
 }
 
-async function anonymousClient(displayName: string): Promise<SupabaseClient> {
-  if (serviceRoleKey) return adminClient(displayName);
+function isAnonymousDisabled(error: AuthError) {
+  return (
+    error.code === 'anonymous_provider_disabled' ||
+    /anonymous sign-?ins? (are|is) disabled/i.test(error.message)
+  );
+}
+
+/**
+ * Public email/password account, for projects where anonymous sign-ins are off.
+ * Sign-up must return a session, so "Confirm email" has to be disabled; otherwise
+ * there is no way to confirm the address without the service-role key.
+ */
+async function emailPasswordClient(displayName: string): Promise<SupabaseClient> {
   const client = publicClient();
-  const { error: authError } = await client.auth.signInAnonymously();
-  if (authError) {
+  const { email, password } = throwawayAccount(displayName);
+  const { data, error } = await client.auth.signUp({ email, password });
+  if (error) {
+    if (
+      error.code === 'email_provider_disabled' ||
+      error.code === 'signup_disabled' ||
+      /email signups? (are|is) disabled/i.test(error.message)
+    ) {
+      throw new Error(
+        'Anonymous and email sign-ins are both disabled, so the checker cannot create test users. ' +
+          'Enable email sign-ins, or set SUPABASE_SERVICE_ROLE_KEY.',
+      );
+    }
+    if (error.code === 'email_address_invalid') {
+      throw new Error(
+        `The project is sending a confirmation email, and Supabase rejects test addresses such as ${email}. ` +
+          'Turn off "Confirm email" in Supabase Auth so sign-up returns a session, or set ' +
+          'SUPABASE_SERVICE_ROLE_KEY so the checker can create pre-confirmed users.',
+      );
+    }
+    if (error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit') {
+      throw new Error(
+        `The confirmation email for ${email} could not be sent: ${error.message}. ` +
+          'Turn off "Confirm email" in Supabase Auth, or set SUPABASE_SERVICE_ROLE_KEY.',
+      );
+    }
+    throw new Error(`Test account sign-up failed for ${displayName}: ${error.message}`);
+  }
+  if (!data.session) {
     throw new Error(
-      `Anonymous sign-in failed for ${displayName}: ${authError.message}. ` +
-        'Enable Anonymous sign-ins in Supabase Auth (the app needs it too), or set SUPABASE_SERVICE_ROLE_KEY.',
+      'Anonymous sign-ins are disabled and email confirmation is required, so the new test user ' +
+        'has no session. Turn off "Confirm email" in Supabase Auth, or set ' +
+        'SUPABASE_SERVICE_ROLE_KEY so the checker can confirm accounts itself.',
     );
   }
+  pass(`created email/password test user for ${displayName}`, email);
   return withProfile(client, displayName);
+}
+
+let emailPasswordMode = false;
+
+async function anonymousClient(displayName: string): Promise<SupabaseClient> {
+  if (serviceRoleKey) return adminClient(displayName);
+  if (emailPasswordMode) return emailPasswordClient(displayName);
+  const client = publicClient();
+  const { error: authError } = await client.auth.signInAnonymously();
+  if (!authError) return withProfile(client, displayName);
+  if (isAnonymousDisabled(authError)) {
+    emailPasswordMode = true;
+    console.warn('Anonymous sign-ins are disabled; using email/password test users instead.');
+    return emailPasswordClient(displayName);
+  }
+  throw new Error(
+    `Anonymous sign-in failed for ${displayName}: ${authError.message}. ` +
+      'Enable Anonymous sign-ins in Supabase Auth (the app needs it too), or set SUPABASE_SERVICE_ROLE_KEY.',
+  );
 }
 
 async function rpc<T>(client: SupabaseClient, fn: string, args: Record<string, unknown>) {
@@ -869,6 +940,108 @@ async function main() {
     'call unexpectedly succeeded',
   );
 
+  // Rematch: a finished round hands the same crew and settings a fresh lobby.
+  const phaseGameRow = await host
+    .from('games')
+    .select(
+      'code, mode, area_radius_m, head_start_s, duration_s, ping_interval_s, tag_radius_m, target_radius_m, boundary_grace_s, boundary_penalty',
+    )
+    .eq('id', phaseGameId)
+    .single();
+  if (!phaseGameRow.data) throw new Error('Could not read the finished phase game.');
+
+  const rematch = await rpc<{ game_id: string; code: string }[]>(host, 'rematch_game', {
+    game_id: phaseGameId,
+  });
+  const rematchGameId = rematch.data?.[0]?.game_id;
+  const rematchCode = rematch.data?.[0]?.code;
+  expect(
+    Boolean(rematchGameId) &&
+      rematchGameId !== phaseGameId &&
+      rematchCode !== phaseGameRow.data.code &&
+      /^[A-HJ-NP-Z2-9]{4}$/.test(rematchCode ?? ''),
+    'a finished round can open a fresh rematch lobby',
+    JSON.stringify(rematch.data ?? rematch.error?.message),
+  );
+  if (!rematchGameId) throw new Error('Rematch did not return a game id.');
+
+  const repeatRematch = await rpc<{ game_id: string; code: string }[]>(hunter, 'rematch_game', {
+    game_id: phaseGameId,
+  });
+  expect(
+    repeatRematch.data?.[0]?.game_id === rematchGameId,
+    'a second play-again press returns the same lobby',
+    JSON.stringify(repeatRematch.data ?? repeatRematch.error?.message),
+  );
+
+  const outsiderRematch = await rpc(outsider, 'rematch_game', { game_id: phaseGameId });
+  expect(
+    Boolean(outsiderRematch.error),
+    'outsiders cannot start a rematch',
+    'call unexpectedly succeeded',
+  );
+
+  const rematchRow = await hunter
+    .from('games')
+    .select(
+      'status, host_id, mode, area_radius_m, head_start_s, duration_s, ping_interval_s, tag_radius_m, target_radius_m, boundary_grace_s, boundary_penalty',
+    )
+    .eq('id', rematchGameId)
+    .single();
+  const rematchGame = rematchRow.data as Record<string, unknown> | null;
+  expect(
+    rematchGame?.status === 'lobby' &&
+      rematchGame.host_id === hostUserId &&
+      rematchGame.mode === phaseGameRow.data.mode &&
+      rematchGame.area_radius_m === phaseGameRow.data.area_radius_m &&
+      rematchGame.head_start_s === phaseGameRow.data.head_start_s &&
+      rematchGame.duration_s === phaseGameRow.data.duration_s &&
+      rematchGame.ping_interval_s === phaseGameRow.data.ping_interval_s &&
+      rematchGame.tag_radius_m === phaseGameRow.data.tag_radius_m &&
+      rematchGame.target_radius_m === phaseGameRow.data.target_radius_m &&
+      rematchGame.boundary_grace_s === phaseGameRow.data.boundary_grace_s &&
+      rematchGame.boundary_penalty === phaseGameRow.data.boundary_penalty,
+    'the rematch copies the mode, area and round settings',
+    JSON.stringify(rematchRow.error?.message ?? rematchGame),
+  );
+
+  const rematchRoster = await hunter
+    .from('players')
+    .select('user_id, team, status, is_ready')
+    .eq('game_id', rematchGameId);
+  const rematchPlayers = rematchRoster.data ?? [];
+  expect(
+    rematchPlayers.length === 2 &&
+      rematchPlayers.every((player) => player.status === 'active' && player.is_ready === false) &&
+      rematchPlayers.some((player) => player.user_id === hostUserId && player.team === 'runner') &&
+      rematchPlayers.some((player) => player.user_id === hunterUserId && player.team === 'hunter'),
+    'the rematch keeps the crew and sides, reset and ready to choose again',
+    JSON.stringify(rematchRoster.error?.message ?? rematchPlayers),
+  );
+
+  const linkedRematch = await host
+    .from('games')
+    .select('rematch_game_id')
+    .eq('id', phaseGameId)
+    .single();
+  expect(
+    linkedRematch.data?.rematch_game_id === rematchGameId,
+    'the finished game points every player at its rematch',
+    String(linkedRematch.error?.message ?? linkedRematch.data?.rematch_game_id),
+  );
+
+  const earlyRematch = await rpc(host, 'rematch_game', { game_id: rematchGameId });
+  expect(
+    Boolean(earlyRematch.error),
+    'a rematch waits for its own round to finish',
+    'call unexpectedly succeeded',
+  );
+
+  expectEmpty(
+    (await outsider.from('games').select('*').eq('id', rematchGameId)).data,
+    'outsiders cannot read the rematch lobby',
+  );
+
   // Target arrival: a Classic runner standing on the saved target wins.
   const arrivalCreated = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
     mode: 'classic_chase',
@@ -1010,6 +1183,7 @@ async function main() {
     await rpc(client, 'leave_game', { game_id: gameId });
     await rpc(client, 'leave_game', { game_id: phaseGameId });
     await rpc(client, 'leave_game', { game_id: arrivalGameId });
+    await rpc(client, 'leave_game', { game_id: rematchGameId });
   }
 
   console.log('\n--- summary ---');
