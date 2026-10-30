@@ -1,4 +1,4 @@
-import type { AuthError } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -13,33 +13,14 @@ import {
   View,
 } from 'react-native';
 
+import { authErrorMessage } from '../src/lib/authErrors';
 import { isSupabaseConfigured, supabase } from '../src/lib/supabase';
 
-type Mode = 'sign_in' | 'sign_up';
+type Mode = 'sign_in' | 'sign_up' | 'reset';
 
-function authErrorMessage(error: AuthError): string {
-  switch (error.code) {
-    case 'invalid_credentials':
-      return 'Email or password is incorrect.';
-    case 'email_not_confirmed':
-      return 'Confirm your email address first. Check your inbox for the link.';
-    case 'email_exists':
-    case 'user_already_exists':
-      return 'An account already exists for this email. Sign in instead.';
-    case 'weak_password':
-      return 'Choose a password with at least 6 characters.';
-    case 'over_email_send_rate_limit':
-    case 'over_request_rate_limit':
-      return 'Too many attempts right now. Wait a moment, then try again.';
-    case 'signup_disabled':
-    case 'email_provider_disabled':
-      return 'Email sign-ups are disabled for this project.';
-    case 'email_address_invalid':
-      return 'That email address is not accepted. Try another one.';
-    default:
-      return error.message;
-  }
-}
+type Pending =
+  | { kind: 'confirm'; email: string; reason: 'signup' | 'unconfirmed' }
+  | { kind: 'reset'; email: string };
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -49,7 +30,9 @@ export default function AuthScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [sentTo, setSentTo] = useState('');
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<{ ok: boolean; message: string } | null>(null);
 
   async function routeAfterAuth() {
     const client = supabase;
@@ -82,17 +65,36 @@ export default function AuthScreen() {
       setErrorMessage('Enter a valid email address.');
       return;
     }
+
+    setBusy(true);
+    setErrorMessage('');
+    setResendStatus(null);
+
+    if (mode === 'reset') {
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        // Must be present in the project's allowed redirect URLs.
+        redirectTo: Linking.createURL('/reset-password'),
+      });
+      if (error) {
+        setErrorMessage(authErrorMessage(error));
+        setBusy(false);
+        return;
+      }
+      setPending({ kind: 'reset', email: cleanEmail });
+      setBusy(false);
+      return;
+    }
+
     if (password.length < 6) {
       setErrorMessage('Choose a password with at least 6 characters.');
+      setBusy(false);
       return;
     }
     if (mode === 'sign_up' && password !== confirmPassword) {
       setErrorMessage('The passwords do not match.');
+      setBusy(false);
       return;
     }
-
-    setBusy(true);
-    setErrorMessage('');
 
     if (mode === 'sign_up') {
       const { data, error } = await supabase.auth.signUp({
@@ -105,7 +107,7 @@ export default function AuthScreen() {
         return;
       }
       if (!data.session) {
-        setSentTo(cleanEmail);
+        setPending({ kind: 'confirm', email: cleanEmail, reason: 'signup' });
         setPassword('');
         setConfirmPassword('');
         setBusy(false);
@@ -121,7 +123,11 @@ export default function AuthScreen() {
       password,
     });
     if (error) {
-      setErrorMessage(authErrorMessage(error));
+      if (error.code === 'email_not_confirmed') {
+        setPending({ kind: 'confirm', email: cleanEmail, reason: 'unconfirmed' });
+      } else {
+        setErrorMessage(authErrorMessage(error));
+      }
       setBusy(false);
       return;
     }
@@ -130,10 +136,25 @@ export default function AuthScreen() {
     setBusy(false);
   }
 
+  async function resendConfirmation() {
+    if (!supabase || pending?.kind !== 'confirm' || resending) return;
+
+    setResending(true);
+    setResendStatus(null);
+    const { error } = await supabase.auth.resend({ type: 'signup', email: pending.email });
+    setResending(false);
+    if (error) {
+      setResendStatus({ ok: false, message: authErrorMessage(error) });
+      return;
+    }
+    setResendStatus({ ok: true, message: 'Confirmation email sent again. Check your inbox.' });
+  }
+
   function switchMode(next: Mode) {
     setMode(next);
     setErrorMessage('');
-    setSentTo('');
+    setPending(null);
+    setResendStatus(null);
     setPassword('');
     setConfirmPassword('');
   }
@@ -141,19 +162,48 @@ export default function AuthScreen() {
   const canSubmit =
     isSupabaseConfigured &&
     email.trim().length > 0 &&
-    password.length >= 6 &&
-    (mode === 'sign_in' || confirmPassword.length > 0) &&
+    (mode === 'reset' ||
+      (password.length >= 6 && (mode === 'sign_in' || confirmPassword.length > 0))) &&
     !busy;
 
-  if (sentTo !== '') {
+  if (pending) {
+    const confirming = pending.kind === 'confirm';
     return (
       <View style={styles.screen}>
         <View style={styles.content}>
           <Text style={styles.eyebrow}>CHECK YOUR INBOX</Text>
-          <Text style={styles.title}>Confirm your email</Text>
-          <Text style={styles.subtitle}>
-            We sent a confirmation link to {sentTo}. Open it, then come back and sign in.
+          <Text style={styles.title}>
+            {confirming ? 'Confirm your email' : 'Reset your password'}
           </Text>
+          <Text style={styles.subtitle}>
+            {confirming
+              ? pending.reason === 'signup'
+                ? `We sent a confirmation link to ${pending.email}. Open it, then sign in.`
+                : `This account still needs confirmation. Check your inbox at ${pending.email}, or send the link again.`
+              : `We sent a password reset link to ${pending.email}. Open it on this device to choose a new password.`}
+          </Text>
+
+          {resendStatus ? (
+            <Text style={resendStatus.ok ? styles.okText : styles.error}>
+              {resendStatus.message}
+            </Text>
+          ) : null}
+
+          {confirming ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={resending}
+              onPress={() => void resendConfirmation()}
+              style={styles.secondaryButton}
+            >
+              {resending ? (
+                <ActivityIndicator color="#1D4ED8" />
+              ) : (
+                <Text style={styles.secondaryButtonText}>Resend confirmation email</Text>
+              )}
+            </Pressable>
+          ) : null}
+
           <Pressable
             accessibilityRole="button"
             onPress={() => switchMode('sign_in')}
@@ -174,12 +224,18 @@ export default function AuthScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.eyebrow}>GHOSTRUN ID</Text>
         <Text style={styles.title}>
-          {mode === 'sign_in' ? 'Welcome back' : 'Create your account'}
+          {mode === 'sign_in'
+            ? 'Welcome back'
+            : mode === 'sign_up'
+              ? 'Create your account'
+              : 'Reset your password'}
         </Text>
         <Text style={styles.subtitle}>
           {mode === 'sign_in'
             ? 'Sign in with the email and password you used to join your crew.'
-            : 'Use an email and password so your games survive a reinstall.'}
+            : mode === 'sign_up'
+              ? 'Use an email and password so your games survive a reinstall.'
+              : "Enter your email and we'll send a link to choose a new password."}
         </Text>
 
         <Text style={styles.label}>Email</Text>
@@ -197,18 +253,32 @@ export default function AuthScreen() {
           value={email}
         />
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          accessibilityLabel="Password"
-          autoCapitalize="none"
-          autoComplete={mode === 'sign_in' ? 'current-password' : 'new-password'}
-          onChangeText={setPassword}
-          placeholder="At least 6 characters"
-          placeholderTextColor="#64748B"
-          secureTextEntry
-          style={styles.input}
-          value={password}
-        />
+        {mode !== 'reset' && (
+          <>
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              accessibilityLabel="Password"
+              autoCapitalize="none"
+              autoComplete={mode === 'sign_in' ? 'current-password' : 'new-password'}
+              onChangeText={setPassword}
+              placeholder="At least 6 characters"
+              placeholderTextColor="#64748B"
+              secureTextEntry
+              style={styles.input}
+              value={password}
+            />
+
+            {mode === 'sign_in' && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => switchMode('reset')}
+                style={styles.forgotButton}
+              >
+                <Text style={styles.forgotText}>Forgot password?</Text>
+              </Pressable>
+            )}
+          </>
+        )}
 
         {mode === 'sign_up' && (
           <>
@@ -251,7 +321,11 @@ export default function AuthScreen() {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text style={styles.buttonText}>
-              {mode === 'sign_in' ? 'Sign in' : 'Create account'}
+              {mode === 'sign_in'
+                ? 'Sign in'
+                : mode === 'sign_up'
+                  ? 'Create account'
+                  : 'Send reset link'}
             </Text>
           )}
         </Pressable>
@@ -264,7 +338,9 @@ export default function AuthScreen() {
           <Text style={styles.switchText}>
             {mode === 'sign_in'
               ? 'New to GhostRun? Create an account'
-              : 'Already have an account? Sign in'}
+              : mode === 'sign_up'
+                ? 'Already have an account? Sign in'
+                : 'Back to sign in'}
           </Text>
         </Pressable>
       </ScrollView>
@@ -289,7 +365,10 @@ const styles = StyleSheet.create({
     minHeight: 54,
     paddingHorizontal: 16,
   },
+  forgotButton: { alignSelf: 'flex-end', marginTop: 10, paddingVertical: 4 },
+  forgotText: { color: '#1D4ED8', fontSize: 14, fontWeight: '700' },
   error: { color: '#B91C1C', fontSize: 14, lineHeight: 20, marginTop: 14 },
+  okText: { color: '#047857', fontSize: 14, lineHeight: 20, marginTop: 14 },
   button: {
     alignItems: 'center',
     backgroundColor: '#1D4ED8',
@@ -300,6 +379,15 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: '#94A3B8' },
   buttonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
-  switchButton: { alignItems: 'center', marginTop: 20, minHeight: 44, justifyContent: 'center' },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#DBEAFE',
+    borderRadius: 14,
+    justifyContent: 'center',
+    marginTop: 18,
+    minHeight: 52,
+  },
+  secondaryButtonText: { color: '#1D4ED8', fontSize: 16, fontWeight: '800' },
+  switchButton: { alignItems: 'center', justifyContent: 'center', marginTop: 20, minHeight: 44 },
   switchText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
 });
