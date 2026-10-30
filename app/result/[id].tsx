@@ -186,7 +186,7 @@ export default function ResultScreen() {
     if (!supabase || !gameId || rematchBusy) return;
     setRematchBusy(true);
     setRematchError('');
-    const { data, error } = await supabase.rpc('rematch_game', { game_id: gameId });
+    const { data, error } = await supabase.rpc('rematch_game', { p_game_id: gameId });
     if (!mountedRef.current) return;
     if (error) {
       setRematchBusy(false);

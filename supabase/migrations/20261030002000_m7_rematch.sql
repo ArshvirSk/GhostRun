@@ -6,7 +6,7 @@ alter table public.games
 
 create index if not exists games_rematch_idx on public.games(rematch_game_id);
 
-create or replace function public.rematch_game(game_id uuid)
+create or replace function public.rematch_game(p_game_id uuid)
 returns table (game_id uuid, code text)
 language plpgsql
 security definer
@@ -25,7 +25,7 @@ begin
 
   -- Serialise presses: two players hitting play again must get one lobby.
   select * into source_game from public.games g
-    where g.id = rematch_game.game_id
+    where g.id = p_game_id
     for update;
   if not found then raise exception 'Game not found.'; end if;
   if not exists (
