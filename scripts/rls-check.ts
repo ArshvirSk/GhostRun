@@ -951,7 +951,7 @@ async function main() {
   if (!phaseGameRow.data) throw new Error('Could not read the finished phase game.');
 
   const rematch = await rpc<{ game_id: string; code: string }[]>(host, 'rematch_game', {
-    game_id: phaseGameId,
+    p_game_id: phaseGameId,
   });
   const rematchGameId = rematch.data?.[0]?.game_id;
   const rematchCode = rematch.data?.[0]?.code;
@@ -966,7 +966,7 @@ async function main() {
   if (!rematchGameId) throw new Error('Rematch did not return a game id.');
 
   const repeatRematch = await rpc<{ game_id: string; code: string }[]>(hunter, 'rematch_game', {
-    game_id: phaseGameId,
+    p_game_id: phaseGameId,
   });
   expect(
     repeatRematch.data?.[0]?.game_id === rematchGameId,
@@ -974,7 +974,7 @@ async function main() {
     JSON.stringify(repeatRematch.data ?? repeatRematch.error?.message),
   );
 
-  const outsiderRematch = await rpc(outsider, 'rematch_game', { game_id: phaseGameId });
+  const outsiderRematch = await rpc(outsider, 'rematch_game', { p_game_id: phaseGameId });
   expect(
     Boolean(outsiderRematch.error),
     'outsiders cannot start a rematch',
@@ -1030,7 +1030,7 @@ async function main() {
     String(linkedRematch.error?.message ?? linkedRematch.data?.rematch_game_id),
   );
 
-  const earlyRematch = await rpc(host, 'rematch_game', { game_id: rematchGameId });
+  const earlyRematch = await rpc(host, 'rematch_game', { p_game_id: rematchGameId });
   expect(
     Boolean(earlyRematch.error),
     'a rematch waits for its own round to finish',

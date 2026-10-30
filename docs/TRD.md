@@ -301,7 +301,7 @@ All are `SECURITY DEFINER`, `set search_path = public, extensions`, and validate
 | `trigger_sos(game_id)` | member | Emits an `all` event with the player's last position |
 | `get_game_state(game_id)` returns jsonb | member | Full snapshot for (re)connect: game, players, own/team positions (all after ended), recent pings, target if runner or ended, last 50 events, server time |
 | `get_game_trails(game_id)` returns jsonb | member | Ended games only. Every recorded trail point with coordinates for the result map |
-| `rematch_game(game_id)` returns table(game_id, code) | member | Ended games only, idempotent. Opens one fresh lobby with the copied mode, area and settings and the same non-left players and sides; sets `games.rematch_game_id` |
+| `rematch_game(p_game_id)` returns table(game_id, code) | member | Ended games only, idempotent. Opens one fresh lobby with the copied mode, area and settings and the same non-left players and sides; sets `games.rematch_game_id` |
 | `get_game_replay(game_id)` returns jsonb | member | Ended games only. Every tag and released ping with names, coordinates and timestamps for the replay scrubber |
 | `cleanup_old_games()` | cron daily | Deletes games ended over 30 days ago |
 
