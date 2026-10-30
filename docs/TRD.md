@@ -343,7 +343,7 @@ If sub-minute schedules are unavailable on the plan, use `* * * * *` and rely on
 - `supabase.auth.signUp` or `signInWithPassword` on the auth screen, then `upsert_profile` on first run.
 - Persist the session with AsyncStorage. Email sign-in must be enabled; confirmation emails need a working SMTP setup.
 - `resetPasswordForEmail` sends a link back to `ghost-run://reset-password`; that URL must be in the project's redirect allowlist. `app/reset-password.tsx` accepts implicit or PKCE tokens via `src/lib/authLink.ts`, then calls `updateUser({ password })`.
-- `auth.resend({ type: 'signup', email })` resends the confirmation for an unconfirmed account. The screen enforces a 60-second cooldown between sends.
+- `auth.resend({ type: 'signup', email })` resends the confirmation for an unconfirmed account. The screen enforces a 60-second cooldown between sends, persisted per email in AsyncStorage.
 
 ### 7.2 Realtime
 - One channel per game with `postgres_changes` filters on `games`, `players`, `player_positions`, `pings`, `tags` and `events` (all `game_id=eq.<id>`).

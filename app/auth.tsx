@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import { authErrorMessage } from '../src/lib/authErrors';
+import { getResendCooldown, setResendCooldown } from '../src/lib/resendCooldown';
 import { isSupabaseConfigured, supabase } from '../src/lib/supabase';
 
 type Mode = 'sign_in' | 'sign_up' | 'reset';
@@ -117,9 +118,11 @@ export default function AuthScreen() {
         return;
       }
       if (!data.session) {
+        const until = Date.now() + RESEND_COOLDOWN_S * 1000;
         setPending({ kind: 'confirm', email: cleanEmail, reason: 'signup' });
-        setCooldownUntil(Date.now() + RESEND_COOLDOWN_S * 1000);
+        setCooldownUntil(until);
         setNow(Date.now());
+        void setResendCooldown(cleanEmail, until);
         setPassword('');
         setConfirmPassword('');
         setBusy(false);
@@ -136,7 +139,10 @@ export default function AuthScreen() {
     });
     if (error) {
       if (error.code === 'email_not_confirmed') {
+        const until = await getResendCooldown(cleanEmail);
         setPending({ kind: 'confirm', email: cleanEmail, reason: 'unconfirmed' });
+        setCooldownUntil(until);
+        setNow(Date.now());
       } else {
         setErrorMessage(authErrorMessage(error));
       }
@@ -155,8 +161,10 @@ export default function AuthScreen() {
     setResendStatus(null);
     const { error } = await supabase.auth.resend({ type: 'signup', email: pending.email });
     setResending(false);
-    setCooldownUntil(Date.now() + RESEND_COOLDOWN_S * 1000);
+    const until = Date.now() + RESEND_COOLDOWN_S * 1000;
+    setCooldownUntil(until);
     setNow(Date.now());
+    void setResendCooldown(pending.email, until);
     if (error) {
       setResendStatus({ ok: false, message: authErrorMessage(error) });
       return;
