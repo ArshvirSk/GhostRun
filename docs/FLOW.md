@@ -38,6 +38,8 @@ flowchart TD
   R --> U
 ```
 
+**Account recovery:** the auth screen can send a password-reset link with `resetPasswordForEmail`, or resend the confirmation email with `auth.resend({ type: 'signup' })` when an account is still unconfirmed. The reset link returns to `reset-password`, which reads the session tokens through `src/lib/authLink.ts`, sets the session and calls `updateUser({ password })`. The project's redirect allowlist must include `ghost-run://reset-password` (or the Expo development URL) for the link to return to the app.
+
 ## 2. First-run and permissions flow
 
 ```mermaid
