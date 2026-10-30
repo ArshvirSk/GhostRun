@@ -15,7 +15,7 @@ flowchart LR
     ST[Zustand store]
   end
   subgraph SB["Supabase (hosted)"]
-    AUTH[Auth - anonymous sign-in]
+    AUTH[Auth - email + password]
     DB[(Postgres + PostGIS)]
     RPC[RPC functions - SECURITY DEFINER]
     RLS{{Row Level Security}}
@@ -43,7 +43,7 @@ flowchart LR
 | Notifications (v1) | `expo-notifications` **local** notifications | Remote push (FCM) deferred to v1.1 to avoid Firebase setup |
 | State | Zustand | Plus plain `supabase-js` calls. No heavy data-fetching library needed |
 | Storage | `@react-native-async-storage/async-storage` | Supabase session, active game id, small offline queue |
-| Backend | Supabase (hosted project) | Auth (anonymous), Postgres + PostGIS, Realtime, pg_cron |
+| Backend | Supabase (hosted project) | Auth (email + password), Postgres + PostGIS, Realtime, pg_cron |
 | Server logic | PL/pgSQL RPC functions | Atomic, PostGIS-native, no cold starts. **No Edge Functions needed in v1** |
 | Build and distribution | EAS Build (`preview` profile, `buildType: apk`) | Share the APK link or QR with friends |
 | Tooling | Supabase CLI (linked to hosted project), Node 20+ | See "No Docker" below |
@@ -283,7 +283,7 @@ All are `SECURITY DEFINER`, `set search_path = public, extensions`, and validate
 
 | Function | Caller | Purpose |
 |---|---|---|
-| `upsert_profile(name text, color text)` | any | Create or update own profile after anonymous sign-in |
+| `upsert_profile(name text, color text)` | any | Create or update own profile after sign-in |
 | `create_game(mode, lat, lng, radius_m, settings jsonb)` | any | Creates game and code, adds caller as host player |
 | `join_game(code text)` returns uuid | any | Joins a lobby (max 20 players). Fails if not in `lobby` |
 | `set_team(game_id, player_id, team)` | self or host | Lobby only |
@@ -340,8 +340,8 @@ If sub-minute schedules are unavailable on the plan, use `* * * * *` and rely on
 ## 7. Client design
 
 ### 7.1 Auth and session
-- `supabase.auth.signInAnonymously()` on first launch, then `upsert_profile`.
-- Persist the session with AsyncStorage. Anonymous sign-in must be enabled in the Supabase dashboard.
+- `supabase.auth.signUp` or `signInWithPassword` on the auth screen, then `upsert_profile` on first run.
+- Persist the session with AsyncStorage. Email sign-in must be enabled; confirmation emails need a working SMTP setup.
 
 ### 7.2 Realtime
 - One channel per game with `postgres_changes` filters on `games`, `players`, `player_positions`, `pings`, `tags` and `events` (all `game_id=eq.<id>`).

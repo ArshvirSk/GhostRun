@@ -9,9 +9,11 @@
 ```mermaid
 flowchart TD
   A[Launch] --> B{Session exists?}
-  B -- No --> C[Welcome: display name + colour]
-  C --> D[Anonymous sign-in + profile]
-  B -- Yes --> E{Active game in progress?}
+  B -- No --> AUTH[Auth: email + password]
+  AUTH --> C[Welcome: display name + colour]
+  B -- Yes, no profile --> C
+  C --> D[Save profile]
+  B -- Yes, profile --> E{Active game in progress?}
   D --> F[Permissions + safety notice]
   F --> G[Home]
   E -- Yes --> R[Resume: sync state, route to game or lobby]
