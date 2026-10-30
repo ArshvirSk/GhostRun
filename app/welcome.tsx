@@ -48,14 +48,9 @@ export default function WelcomeScreen() {
     }
 
     if (!sessionData.session) {
-      const { error: signInError } = await client.auth.signInAnonymously();
-      if (signInError) {
-        setErrorMessage(
-          `Anonymous sign-in failed. Check that it is enabled in Supabase Auth. ${signInError.message}`,
-        );
-        setSubmitting(false);
-        return;
-      }
+      setSubmitting(false);
+      router.replace('/auth');
+      return;
     }
 
     const { error: profileError } = await client.rpc('upsert_profile', {
@@ -82,7 +77,7 @@ export default function WelcomeScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.eyebrow}>REAL-WORLD CHASE</Text>
         <Text style={styles.title}>Welcome to GhostRun</Text>
-        <Text style={styles.subtitle}>Pick a name and colour. No email or password needed.</Text>
+        <Text style={styles.subtitle}>Pick a name and colour for your player.</Text>
 
         <Text style={styles.label}>Display name</Text>
         <TextInput
