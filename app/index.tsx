@@ -21,7 +21,7 @@ export default function IndexScreen() {
     }
 
     if (!data.session) {
-      router.replace('/welcome');
+      router.replace('/auth');
       return;
     }
 
