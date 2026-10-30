@@ -1,6 +1,6 @@
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -22,6 +22,8 @@ type Pending =
   | { kind: 'confirm'; email: string; reason: 'signup' | 'unconfirmed' }
   | { kind: 'reset'; email: string };
 
+const RESEND_COOLDOWN_S = 60;
+
 export default function AuthScreen() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('sign_in');
@@ -33,6 +35,14 @@ export default function AuthScreen() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [resending, setResending] = useState(false);
   const [resendStatus, setResendStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (cooldownUntil <= now) return;
+    const timer = setTimeout(() => setNow(Date.now()), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldownUntil, now]);
 
   async function routeAfterAuth() {
     const client = supabase;
@@ -108,6 +118,8 @@ export default function AuthScreen() {
       }
       if (!data.session) {
         setPending({ kind: 'confirm', email: cleanEmail, reason: 'signup' });
+        setCooldownUntil(Date.now() + RESEND_COOLDOWN_S * 1000);
+        setNow(Date.now());
         setPassword('');
         setConfirmPassword('');
         setBusy(false);
@@ -137,12 +149,14 @@ export default function AuthScreen() {
   }
 
   async function resendConfirmation() {
-    if (!supabase || pending?.kind !== 'confirm' || resending) return;
+    if (!supabase || pending?.kind !== 'confirm' || resending || Date.now() < cooldownUntil) return;
 
     setResending(true);
     setResendStatus(null);
     const { error } = await supabase.auth.resend({ type: 'signup', email: pending.email });
     setResending(false);
+    setCooldownUntil(Date.now() + RESEND_COOLDOWN_S * 1000);
+    setNow(Date.now());
     if (error) {
       setResendStatus({ ok: false, message: authErrorMessage(error) });
       return;
@@ -155,6 +169,8 @@ export default function AuthScreen() {
     setErrorMessage('');
     setPending(null);
     setResendStatus(null);
+    setCooldownUntil(0);
+    setNow(Date.now());
     setPassword('');
     setConfirmPassword('');
   }
@@ -165,6 +181,7 @@ export default function AuthScreen() {
     (mode === 'reset' ||
       (password.length >= 6 && (mode === 'sign_in' || confirmPassword.length > 0))) &&
     !busy;
+  const resendCooldown = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
 
   if (pending) {
     const confirming = pending.kind === 'confirm';
@@ -192,14 +209,22 @@ export default function AuthScreen() {
           {confirming ? (
             <Pressable
               accessibilityRole="button"
-              disabled={resending}
+              accessibilityState={{ disabled: resending || resendCooldown > 0 }}
+              disabled={resending || resendCooldown > 0}
               onPress={() => void resendConfirmation()}
-              style={styles.secondaryButton}
+              style={[
+                styles.secondaryButton,
+                (resending || resendCooldown > 0) && styles.secondaryButtonDisabled,
+              ]}
             >
               {resending ? (
                 <ActivityIndicator color="#1D4ED8" />
               ) : (
-                <Text style={styles.secondaryButtonText}>Resend confirmation email</Text>
+                <Text style={styles.secondaryButtonText}>
+                  {resendCooldown > 0
+                    ? `Resend in ${resendCooldown}s`
+                    : 'Resend confirmation email'}
+                </Text>
               )}
             </Pressable>
           ) : null}
@@ -387,6 +412,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     minHeight: 52,
   },
+  secondaryButtonDisabled: { opacity: 0.6 },
   secondaryButtonText: { color: '#1D4ED8', fontSize: 16, fontWeight: '800' },
   switchButton: { alignItems: 'center', justifyContent: 'center', marginTop: 20, minHeight: 44 },
   switchText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
