@@ -73,3 +73,11 @@
 **Reason:** The result screen already knows the crew and settings, so a rematch should not require sharing another code or picking teams again. Making the RPC idempotent and locking the source row means two players pressing play again at once cannot create two lobbies. Letting any member press avoids a dead end when the host has stepped away.
 
 **Trade-off:** Every non-left player is pulled into the new lobby, including one who quit mid-round and was recorded as tagged; they can leave again. Preserving sides also means a lopsided rematch stays lopsided until the host changes teams. A player who goes home before the rematch is created is still on the roster but gets no automatic redirect, because Home has no active-lobby resume yet.
+
+## 2026-10-30 — Email and password replace anonymous onboarding
+
+**Decision:** `app/auth.tsx` signs players up or in with an email and password. Sign-up then opens the existing welcome screen for display name, colour and the safety acknowledgement; sign-in goes straight to Home when a profile exists and to Welcome when it does not. Home gains a sign-out action. The app no longer calls `signInAnonymously`.
+
+**Reason:** The hosted project has anonymous sign-ins disabled, so the previous onboarding could not create any player. Email/password is self-contained (no OAuth provider or extra SDK), keeps the profile step, and lets a crew return on a new install.
+
+**Trade-off:** New accounts need a confirmation email until "Confirm email" is turned off or custom SMTP is configured, so first-run onboarding may pause at "Check your inbox". Existing anonymous sessions keep working until they sign out, but those accounts have no email and cannot be recovered afterwards; there is no account-linking migration.

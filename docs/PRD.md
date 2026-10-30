@@ -71,7 +71,7 @@ Priority: **P0** = required for first playtest, **P1** = needed for a good game,
 ### 5.1 Onboarding and identity
 | ID | Feature | Pri |
 |---|---|---|
-| F-01 | Anonymous sign-in with a display name and colour (no email or password) | P0 |
+| F-01 | Email/password sign-in with a display name and colour | P0 |
 | F-02 | Location permission flow: foreground first, then background ("Allow all the time"), with plain explanations | P0 |
 | F-03 | Battery-optimisation guidance screen (per major Android brand) | P1 |
 | F-04 | Safety and privacy notice shown before first game | P0 |
@@ -145,7 +145,7 @@ Priority: **P0** = required for first playtest, **P1** = needed for a good game,
 
 ## 8. Screens (summary)
 
-Welcome and name, Permissions, Home (create / join), Create game, Lobby, Target selection, Pre-game countdown, In-game map (hunter and runner variants), Spectator, Result, Replay, Settings and help. Detailed navigation and states are in `FLOW.md`.
+Sign in, Welcome and name, Permissions, Home (create / join), Create game, Lobby, Target selection, Pre-game countdown, In-game map (hunter and runner variants), Spectator, Result, Replay, Settings and help. Detailed navigation and states are in `FLOW.md`.
 
 ## 9. Safety, privacy, legal
 
