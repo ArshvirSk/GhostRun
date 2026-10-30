@@ -13,13 +13,14 @@
  *   EXPO_PUBLIC_SUPABASE_URL=... EXPO_PUBLIC_SUPABASE_ANON_KEY=... \
  *     npx tsx scripts/rls-check.ts
  *
- * Players sign in the way the app does: anonymously. If the project has Anonymous
- * sign-ins disabled, the script creates email/password test users through the
- * public sign-up endpoint instead (this needs email confirmations turned off so
- * sign-up returns a session). Setting SUPABASE_SERVICE_ROLE_KEY is the strongest
- * option: it mints pre-confirmed accounts through the admin API, whatever the
- * project's sign-in settings are. The service-role key is read from the
- * environment only: never commit it or embed it in the app.
+ * The app signs players in with email/password; the checker still prefers
+ * anonymous sign-ins when a project allows them because they need no mailbox. If
+ * Anonymous sign-ins are disabled, it creates email/password test users through
+ * the public sign-up endpoint instead (this needs email confirmations turned off
+ * so sign-up returns a session). Setting SUPABASE_SERVICE_ROLE_KEY is the
+ * strongest option: it mints pre-confirmed accounts through the admin API,
+ * whatever the project's sign-in settings are. The service-role key is read from
+ * the environment only: never commit it or embed it in the app.
  *
  * Test accounts are left behind after a run; the public sign-up path cannot
  * delete them.
