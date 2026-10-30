@@ -48,7 +48,7 @@
 
 **Reason:** The live screen's job is over once the round ends, so the recap gets its own screen and camera. Trails are larger than the rest of the snapshot and are read once, so they do not belong in every `get_game_state` poll. The RPC is security definer because PostGIS coordinates are awkward to select through PostgREST, and the explicit status check keeps the secrecy rule in one server-side place.
 
-**Trade-off:** The result makes one extra round trip after the state snapshot. The RPC caps the response at 30,000 points as a payload guard. Play again is still future work; the result screen stops location tracking and sends the player home.
+**Trade-off:** The result makes one extra round trip after the state snapshot. The RPC caps the response at 30,000 points as a payload guard. Play again was still future work at that point; it now opens a fresh lobby (see below).
 
 ## 2026-10-30 — Tagging and arrival are server-authoritative endings
 
@@ -65,3 +65,11 @@
 **Reason:** The replay should show what the server recorded, not reconstruct gameplay from live state. One ended-only RPC keeps the tag and ping history complete and gives the screen display names, colors and coordinates without exposing raw PostGIS rows. Truncating client-side is cheap because the data is terminal and already bounded.
 
 **Trade-off:** A tag record stores the distance between players, not the tag coordinates, so the map places a tag at the runner's last trail point at or before the tag; the exact spot can be up to one trail interval away. Playback is local rather than a shared synchronized stream, and the result's replay button is the only entry point beyond a deep link.
+
+## 2026-10-30 — Play again opens one fresh lobby for the whole crew
+
+**Decision:** `rematch_game(game_id)` is callable by any active member of an `ended` game, not only the host. The first press creates a new lobby with a new code and copies the mode, play area and every round setting. It inserts every player from the finished game whose status is not `left`, keeps their side, resets them to `active` with `is_ready = false`, and keeps the original host if they are still in the crew (otherwise the caller hosts). The old game stores the new id in `games.rematch_game_id`; later presses return that same lobby, and the result screen polls that pointer and replaces itself with the lobby for every player. A rematch cannot start until the source round is `ended`.
+
+**Reason:** The result screen already knows the crew and settings, so a rematch should not require sharing another code or picking teams again. Making the RPC idempotent and locking the source row means two players pressing play again at once cannot create two lobbies. Letting any member press avoids a dead end when the host has stepped away.
+
+**Trade-off:** Every non-left player is pulled into the new lobby, including one who quit mid-round and was recorded as tagged; they can leave again. Preserving sides also means a lopsided rematch stays lopsided until the host changes teams. A player who goes home before the rematch is created is still on the roster but gets no automatic redirect, because Home has no active-lobby resume yet.

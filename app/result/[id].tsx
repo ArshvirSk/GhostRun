@@ -63,6 +63,7 @@ type RoundResultState = {
     ended_at: string | null;
     tag_radius_m: number;
     target_radius_m: number;
+    rematch_game_id: string | null;
     area: LngLat & { radius_m: number };
   };
   players: GamePlayer[];
@@ -105,7 +106,10 @@ export default function ResultScreen() {
   const [loadingTrails, setLoadingTrails] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [trailError, setTrailError] = useState('');
+  const [rematchBusy, setRematchBusy] = useState(false);
+  const [rematchError, setRematchError] = useState('');
   const mountedRef = useRef(true);
+  const leavingRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -176,6 +180,60 @@ export default function ResultScreen() {
     } else if (phase === 'cancelled') {
       router.replace('/home');
     }
+  }, [gameId, router, state]);
+
+  async function playAgain() {
+    if (!supabase || !gameId || rematchBusy) return;
+    setRematchBusy(true);
+    setRematchError('');
+    const { data, error } = await supabase.rpc('rematch_game', { game_id: gameId });
+    if (!mountedRef.current) return;
+    if (error) {
+      setRematchBusy(false);
+      setRematchError(error.message);
+      return;
+    }
+    const created = (Array.isArray(data) ? data[0] : data) as { game_id?: string } | null;
+    if (!created?.game_id) {
+      setRematchBusy(false);
+      setRematchError('The server did not return the rematch lobby. Please try again.');
+      return;
+    }
+    leavingRef.current = true;
+    router.replace({ pathname: '/lobby/[id]', params: { id: created.game_id } });
+  }
+
+  // A rematch is created for the whole crew at once, so players who stay on the
+  // result follow the finished game's pointer into the fresh lobby.
+  useEffect(() => {
+    if (!supabase || !gameId || state?.game.status !== 'ended') return;
+    const rematchId = state.game.rematch_game_id;
+    if (rematchId) {
+      if (!leavingRef.current) {
+        leavingRef.current = true;
+        router.replace({ pathname: '/lobby/[id]', params: { id: rematchId } });
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const follow = async () => {
+      const { data } = await supabase!
+        .from('games')
+        .select('rematch_game_id')
+        .eq('id', gameId)
+        .maybeSingle();
+      const nextId = (data as { rematch_game_id: string | null } | null)?.rematch_game_id;
+      if (cancelled || leavingRef.current || !nextId) return;
+      leavingRef.current = true;
+      router.replace({ pathname: '/lobby/[id]', params: { id: nextId } });
+    };
+
+    const timer = setInterval(() => void follow(), 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [gameId, router, state]);
 
   const playerById = useMemo(
@@ -548,6 +606,29 @@ export default function ResultScreen() {
 
         <Pressable
           accessibilityRole="button"
+          disabled={rematchBusy}
+          onPress={() => void playAgain()}
+          style={styles.playAgainButton}
+        >
+          {rematchBusy ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.playAgainText}>Play again</Text>
+          )}
+        </Pressable>
+        <Text style={styles.playAgainHint}>
+          {game.mode === 'classic_chase'
+            ? 'Same crew, sides and settings. A runner picks a new target in the fresh lobby.'
+            : 'Same crew, sides and settings. The fresh lobby starts a new Tag Hunt.'}
+        </Text>
+        {rematchError !== '' && (
+          <Text accessibilityRole="alert" style={styles.error}>
+            {rematchError}
+          </Text>
+        )}
+
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.push({ pathname: '/replay/[id]', params: { id: gameId } })}
           style={styles.replayButton}
         >
@@ -557,9 +638,9 @@ export default function ResultScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={() => router.replace('/home')}
-          style={styles.primaryButton}
+          style={styles.homeLink}
         >
-          <Text style={styles.primaryText}>Back to home</Text>
+          <Text style={styles.homeLinkText}>Back to home</Text>
         </Pressable>
 
         <Text style={styles.footer}>
@@ -658,25 +739,28 @@ const styles = StyleSheet.create({
   playerMeta: { color: '#475569', fontSize: 12, fontWeight: '800' },
   playerWinner: { color: '#047857' },
   playerTagged: { color: '#B91C1C' },
+  playAgainButton: {
+    alignItems: 'center',
+    backgroundColor: '#1D4ED8',
+    borderRadius: 13,
+    justifyContent: 'center',
+    marginTop: 18,
+    minHeight: 50,
+  },
+  playAgainText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  playAgainHint: { color: '#64748B', fontSize: 11, lineHeight: 17, marginTop: 7 },
   replayButton: {
     alignItems: 'center',
     borderColor: '#1D4ED8',
     borderRadius: 13,
     borderWidth: 1,
     justifyContent: 'center',
-    marginTop: 18,
-    minHeight: 50,
-  },
-  replayText: { color: '#1D4ED8', fontSize: 15, fontWeight: '900' },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#0F172A',
-    borderRadius: 13,
-    justifyContent: 'center',
     marginTop: 10,
     minHeight: 50,
   },
-  primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  replayText: { color: '#1D4ED8', fontSize: 15, fontWeight: '900' },
+  homeLink: { alignItems: 'center', justifyContent: 'center', marginTop: 4, minHeight: 44 },
+  homeLinkText: { color: '#475569', fontSize: 15, fontWeight: '700' },
   footer: { color: '#94A3B8', fontSize: 11, lineHeight: 17, marginTop: 14 },
   linkButton: { alignItems: 'center', justifyContent: 'center', marginTop: 16, minHeight: 44 },
   linkText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
