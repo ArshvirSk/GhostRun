@@ -18,6 +18,7 @@ export default function HomeScreen() {
   const [permission, setPermission] = useState<Location.LocationPermissionResponse | null>(null);
   const [permissionError, setPermissionError] = useState('');
   const [requesting, setRequesting] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -53,6 +54,18 @@ export default function HomeScreen() {
       mounted = false;
     };
   }, []);
+
+  async function signOut() {
+    if (!supabase || signingOut) return;
+    setSigningOut(true);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setProfileError(error.message);
+      setSigningOut(false);
+      return;
+    }
+    router.replace('/auth');
+  }
 
   async function requestLocation() {
     setRequesting(true);
@@ -123,6 +136,18 @@ export default function HomeScreen() {
             </Text>
           )}
         </View>
+        <Pressable
+          accessibilityRole="button"
+          disabled={signingOut}
+          onPress={() => void signOut()}
+          style={styles.signOut}
+        >
+          {signingOut ? (
+            <ActivityIndicator color="#1D4ED8" size="small" />
+          ) : (
+            <Text style={styles.signOutText}>Sign out</Text>
+          )}
+        </Pressable>
       </View>
 
       <View style={styles.bottomCard}>
@@ -205,6 +230,8 @@ const styles = StyleSheet.create({
   brand: { color: '#1D4ED8', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
   welcome: { color: '#0F172A', fontSize: 16, fontWeight: '800', marginTop: 3 },
   profileError: { color: '#B91C1C', fontSize: 11, marginTop: 4 },
+  signOut: { justifyContent: 'center', marginLeft: 8, minHeight: 40, paddingHorizontal: 6 },
+  signOutText: { color: '#1D4ED8', fontSize: 13, fontWeight: '800' },
   bottomCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
