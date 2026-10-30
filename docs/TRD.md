@@ -371,6 +371,7 @@ Triggered from realtime `events`: ping released, runner tagged, boundary warning
 - **Dev menu (debug builds only):** simulate position (tap on map to teleport), fake mock-location flag, force `advance_game`, show server clock offset.
 - **`scripts/sim`:** Node script that signs in N anonymous users, creates and joins a game, assigns teams, starts it, and walks each fake player along waypoints, so the entire server logic can be tested at a desk.
 - **`scripts/rls-check.ts`:** logs in as a hunter, runner and outsider and asserts the secrecy matrix below.
+- **`npm run test:cooldown`:** checks the persisted resend guard (expiry, normalization, pruning, corrupt data and write failures) against an in-memory store.
 
 ## 8. Testing
 
