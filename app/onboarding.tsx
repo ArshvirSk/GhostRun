@@ -168,18 +168,51 @@ export default function OnboardingScreen() {
             key={slide.title}
             style={[styles.slidePage, { width: screenWidth, height: screenHeight }]}
           >
-            {/* Dedicated Hero Image Viewport (fully fitted on screen, uncropped) */}
-            <View style={styles.imageViewport}>
+            {/* Full-Screen Ambient Base: guarantees edge-to-edge full coverage with matching city visuals */}
+            <Image
+              accessibilityLabel=""
+              blurRadius={16}
+              fadeDuration={0}
+              resizeMode="cover"
+              source={slide.image}
+              style={[StyleSheet.absoluteFill, styles.ambientBg]}
+            />
+            <View style={[StyleSheet.absoluteFill, styles.ambientOverlay]} />
+
+            {/* Sharp Fitted Illustration: full screen width, true aspect ratio, uncropped callouts */}
+            <View pointerEvents="none" style={styles.fgImageContainer}>
               <Image
                 accessibilityLabel={slide.title}
                 fadeDuration={0}
                 resizeMode="contain"
                 source={slide.image}
-                style={styles.slideImage}
+                style={[styles.fgImage, { width: screenWidth, height: screenWidth * (1672 / 941) }]}
               />
             </View>
 
-            {/* Bottom Content Area */}
+            {/* Top Scrim Gradient for Status Bar & Header Legibility */}
+            <LinearGradient
+              colors={['rgba(8, 12, 22, 0.9)', 'rgba(8, 12, 22, 0.35)', 'transparent']}
+              locations={[0, 0.65, 1]}
+              pointerEvents="none"
+              style={styles.topScrim}
+            />
+
+            {/* Bottom Cinematic Gradient Fade behind Text and Controls */}
+            <LinearGradient
+              colors={[
+                'transparent',
+                'rgba(8, 12, 22, 0.35)',
+                'rgba(8, 12, 22, 0.8)',
+                'rgba(8, 12, 22, 0.96)',
+                '#080C16',
+              ]}
+              locations={[0, 0.3, 0.65, 0.88, 1]}
+              pointerEvents="none"
+              style={styles.bottomGradient}
+            />
+
+            {/* Bottom Content Area Anchored over Gradient */}
             <View style={styles.slideContent}>
               <View style={[styles.badge, { borderColor: slide.badgeColor }]}>
                 <View style={[styles.badgeDot, { backgroundColor: slide.badgeColor }]} />
@@ -303,26 +336,46 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   slidePage: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingBottom: 130,
-    paddingTop: 96,
+    justifyContent: 'flex-end',
+    position: 'relative',
   },
-  imageViewport: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    width: '100%',
-  },
-  slideImage: {
+  ambientBg: {
     height: '100%',
     width: '100%',
   },
+  ambientOverlay: {
+    backgroundColor: 'rgba(8, 12, 22, 0.45)',
+  },
+  fgImageContainer: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fgImage: {
+    maxWidth: '100%',
+  },
+  topScrim: {
+    height: 140,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  bottomGradient: {
+    bottom: 0,
+    height: '42%',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
   slideContent: {
+    paddingBottom: 130,
     paddingHorizontal: 24,
-    paddingTop: 8,
+    zIndex: 10,
   },
   badge: {
     alignItems: 'center',
