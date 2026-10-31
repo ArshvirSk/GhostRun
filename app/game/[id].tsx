@@ -1,6 +1,6 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../../src/lib/map';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -81,6 +81,15 @@ type RoundPing = {
   released_at: string;
 };
 
+type GameEvent = {
+  id: number;
+  game_id: string;
+  type: string;
+  audience: string;
+  payload: Record<string, any>;
+  created_at: string;
+};
+
 type RoundState = {
   server_time: string;
   game: {
@@ -112,6 +121,7 @@ type RoundState = {
   positions: RoundPosition[];
   pings: RoundPing[];
   target: LngLat | null;
+  events?: GameEvent[];
 };
 
 type SharingState = 'idle' | 'starting' | 'on' | 'denied' | 'error';
@@ -139,6 +149,56 @@ function earliest(...timestamps: (string | null | undefined)[]) {
     .filter(Number.isFinite);
   if (values.length === 0) return null;
   return new Date(Math.min(...values)).toISOString();
+}
+
+function formatEvent(
+  event: GameEvent,
+  serverNow: number,
+): { icon: string; text: string; time: string } {
+  const payload = event.payload ?? {};
+  let icon = '📢';
+  let text = event.type.replace(/_/g, ' ');
+
+  if (event.type === 'tag') {
+    icon = '🎯';
+    const hunter = payload.hunter_name || 'Hunter';
+    const runner = payload.runner_name || 'Runner';
+    text = `${hunter} tagged ${runner}`;
+  } else if (event.type === 'boundary_penalty') {
+    icon = '⚠️';
+    const runner = payload.display_name || 'A runner';
+    text = `${runner} out of bounds (+ping)`;
+  } else if (event.type === 'game_started') {
+    icon = '⏱️';
+    text = 'Countdown started';
+  } else if (event.type === 'head_start_began') {
+    icon = '🏃';
+    text = 'Head start began';
+  } else if (event.type === 'live_began') {
+    icon = '⚡';
+    text = 'Round is live!';
+  } else if (event.type === 'target_set') {
+    icon = '📍';
+    text = 'Secret target confirmed';
+  } else if (event.type === 'player_joined') {
+    icon = '👋';
+    text = `${payload.display_name || 'Player'} joined`;
+  } else if (event.type === 'player_left') {
+    icon = '🚪';
+    text = payload.kicked ? 'A player was kicked' : `${payload.display_name || 'Player'} left`;
+  } else if (event.type === 'game_ended') {
+    icon = '🏁';
+    text = `Round ended · ${payload.winner === 'runners' ? 'Runners' : 'Hunters'} won`;
+  } else if (event.type === 'game_cancelled') {
+    icon = '🛑';
+    text = 'Round cancelled by host';
+  } else if (event.type === 'sos') {
+    icon = '🆘';
+    text = `${payload.display_name || 'Player'} sent SOS alert!`;
+  }
+
+  const ageS = Math.max(0, (serverNow - Date.parse(event.created_at)) / 1000);
+  return { icon, text, time: formatAge(ageS) };
 }
 
 export default function GameScreen() {
@@ -422,6 +482,9 @@ export default function GameScreen() {
   const activePlayers = players.filter((player) => player.status === 'active');
   const runnersRemaining = activePlayers.filter((player) => player.team === 'runner').length;
   const serverNow = now + serverOffset;
+  const events = useMemo(() => {
+    return (state?.events ?? []).slice().sort((a, b) => b.id - a.id);
+  }, [state?.events]);
 
   const ownFix: LngLat | null =
     fix !== null
@@ -871,6 +934,24 @@ export default function GameScreen() {
           <Text style={styles.sectionHint}>Location sharing stopped when the round ended.</Text>
         )}
 
+        {events.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>ACTIVITY FEED</Text>
+            <View style={styles.eventFeed}>
+              {events.slice(0, 8).map((evt) => {
+                const formatted = formatEvent(evt, serverNow);
+                return (
+                  <View key={evt.id} style={styles.eventRow}>
+                    <Text style={styles.eventIcon}>{formatted.icon}</Text>
+                    <Text style={styles.eventText}>{formatted.text}</Text>
+                    <Text style={styles.eventTime}>{formatted.time}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
+
         <Text style={styles.sectionLabel}>PLAYERS · {activePlayers.length}</Text>
         {players.map((player) => (
           <View key={player.id} style={styles.playerRow}>
@@ -1022,6 +1103,23 @@ const styles = StyleSheet.create({
   secondaryText: { color: '#1D4ED8', fontSize: 13, fontWeight: '800' },
   linkButtonInline: { justifyContent: 'center', minHeight: 34 },
   inlineSpinner: { alignSelf: 'flex-start', marginTop: 8 },
+  eventFeed: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  eventRow: {
+    alignItems: 'center',
+    borderBottomColor: '#F1F5F9',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    paddingVertical: 8,
+  },
+  eventIcon: { fontSize: 14, marginRight: 8 },
+  eventText: { color: '#334155', flex: 1, fontSize: 13, fontWeight: '700' },
+  eventTime: { color: '#94A3B8', fontSize: 11, fontWeight: '700', marginLeft: 6 },
   sectionLabel: {
     color: '#475569',
     fontSize: 11,
