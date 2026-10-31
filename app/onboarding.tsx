@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -249,7 +250,7 @@ export default function OnboardingScreen() {
               pressed && activeIndex > 0 && styles.buttonPressed,
             ]}
           >
-            <Text style={styles.prevButtonText}>‹</Text>
+            <Ionicons color="#FFFFFF" name="chevron-back" size={24} />
           </Pressable>
 
           <Pressable
@@ -262,9 +263,16 @@ export default function OnboardingScreen() {
               pressed && styles.buttonPressed,
             ]}
           >
-            <Text style={styles.nextButtonText}>
-              {activeIndex === SLIDES.length - 1 ? 'Start Running  ⚡' : 'Continue  ➔'}
-            </Text>
+            <View style={styles.nextButtonContent}>
+              <Text style={styles.nextButtonText}>
+                {activeIndex === SLIDES.length - 1 ? 'Start Running' : 'Continue'}
+              </Text>
+              <Ionicons
+                color="#FFFFFF"
+                name={activeIndex === SLIDES.length - 1 ? 'flash' : 'arrow-forward'}
+                size={18}
+              />
+            </View>
           </Pressable>
         </View>
       </View>
@@ -462,6 +470,12 @@ const styles = StyleSheet.create({
   nextButtonFinal: {
     backgroundColor: '#10B981',
     shadowColor: '#10B981',
+  },
+  nextButtonContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
   },
   nextButtonText: {
     color: '#FFFFFF',

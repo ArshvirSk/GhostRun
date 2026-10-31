@@ -1,4 +1,5 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../../src/lib/map';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -180,49 +181,72 @@ function earliest(...timestamps: (string | null | undefined)[]) {
   return new Date(Math.min(...values)).toISOString();
 }
 
+type EventIconInfo = {
+  name: any;
+  family: 'ionicons' | 'mci';
+  color: string;
+};
+
+function getEventIcon(type: string): EventIconInfo {
+  switch (type) {
+    case 'tag':
+      return { name: 'target', family: 'mci', color: '#EF4444' };
+    case 'boundary_penalty':
+      return { name: 'warning', family: 'ionicons', color: '#F59E0B' };
+    case 'game_started':
+      return { name: 'timer-outline', family: 'ionicons', color: '#3B82F6' };
+    case 'head_start_began':
+      return { name: 'run-fast', family: 'mci', color: '#10B981' };
+    case 'live_began':
+      return { name: 'flash', family: 'ionicons', color: '#EAB308' };
+    case 'target_set':
+      return { name: 'location', family: 'ionicons', color: '#EC4899' };
+    case 'player_joined':
+      return { name: 'person-add', family: 'ionicons', color: '#3B82F6' };
+    case 'player_left':
+      return { name: 'log-out-outline', family: 'ionicons', color: '#64748B' };
+    case 'game_ended':
+      return { name: 'flag-checkered', family: 'mci', color: '#10B981' };
+    case 'game_cancelled':
+      return { name: 'stop-circle-outline', family: 'ionicons', color: '#EF4444' };
+    case 'sos':
+      return { name: 'alarm-light', family: 'mci', color: '#DC2626' };
+    default:
+      return { name: 'megaphone-outline', family: 'ionicons', color: '#64748B' };
+  }
+}
+
 function formatEvent(
   event: GameEvent,
   serverNow: number,
-): { icon: string; text: string; time: string } {
+): { icon: EventIconInfo; text: string; time: string } {
   const payload = event.payload ?? {};
-  let icon = '📢';
   let text = event.type.replace(/_/g, ' ');
 
   if (event.type === 'tag') {
-    icon = '🎯';
     const hunter = payload.hunter_name || 'Hunter';
     const runner = payload.runner_name || 'Runner';
     text = `${hunter} tagged ${runner}`;
   } else if (event.type === 'boundary_penalty') {
-    icon = '⚠️';
     const runner = payload.display_name || 'A runner';
     text = `${runner} out of bounds (+ping)`;
   } else if (event.type === 'game_started') {
-    icon = '⏱️';
     text = 'Countdown started';
   } else if (event.type === 'head_start_began') {
-    icon = '🏃';
     text = 'Head start began';
   } else if (event.type === 'live_began') {
-    icon = '⚡';
     text = 'Round is live!';
   } else if (event.type === 'target_set') {
-    icon = '📍';
     text = 'Secret target confirmed';
   } else if (event.type === 'player_joined') {
-    icon = '👋';
     text = `${payload.display_name || 'Player'} joined`;
   } else if (event.type === 'player_left') {
-    icon = '🚪';
     text = payload.kicked ? 'A player was kicked' : `${payload.display_name || 'Player'} left`;
   } else if (event.type === 'game_ended') {
-    icon = '🏁';
     text = `Round ended · ${payload.winner === 'runners' ? 'Runners' : 'Hunters'} won`;
   } else if (event.type === 'game_cancelled') {
-    icon = '🛑';
     text = 'Round cancelled by host';
   } else if (event.type === 'sos') {
-    icon = '🆘';
     const loc =
       payload.latitude && payload.longitude
         ? ` (${Number(payload.latitude).toFixed(3)}, ${Number(payload.longitude).toFixed(3)})`
@@ -231,7 +255,7 @@ function formatEvent(
   }
 
   const ageS = Math.max(0, (serverNow - Date.parse(event.created_at)) / 1000);
-  return { icon, text, time: formatAge(ageS) };
+  return { icon: getEventIcon(event.type), text, time: formatAge(ageS) };
 }
 
 export default function GameScreen() {
@@ -521,7 +545,7 @@ export default function GameScreen() {
         (payload: { new?: { type?: string; payload?: { display_name?: string } } }) => {
           if (payload.new?.type === 'sos') {
             notify(
-              '🚨 SOS EMERGENCY ALERT',
+              'SOS EMERGENCY ALERT',
               `${payload.new.payload?.display_name || 'A player'} needs immediate help!`,
               [0, 500, 200, 500],
             );
@@ -1110,7 +1134,11 @@ export default function GameScreen() {
                 onPress={() => void toggleMuted()}
                 style={styles.compactMuteButton}
               >
-                <Text style={styles.compactMuteText}>{muted ? '🔕' : '🔔'}</Text>
+                <Ionicons
+                  color={muted ? '#94A3B8' : '#3B82F6'}
+                  name={muted ? 'notifications-off' : 'notifications'}
+                  size={14}
+                />
               </Pressable>
               <Text style={styles.compactChevron}>▾</Text>
             </View>
@@ -1128,7 +1156,14 @@ export default function GameScreen() {
                   onPress={() => void toggleMuted()}
                   style={styles.muteButton}
                 >
-                  <Text style={styles.muteButtonText}>{muted ? '🔕 Muted' : '🔔 Alerts'}</Text>
+                  <View style={styles.muteButtonContent}>
+                    <Ionicons
+                      color={muted ? '#94A3B8' : '#3B82F6'}
+                      name={muted ? 'notifications-off' : 'notifications'}
+                      size={14}
+                    />
+                    <Text style={styles.muteButtonText}>{muted ? 'Muted' : 'Alerts'}</Text>
+                  </View>
                 </Pressable>
                 <Text style={styles.hudChevron}>▴</Text>
               </View>
@@ -1161,11 +1196,14 @@ export default function GameScreen() {
 
         {isOutOfBounds && (
           <View style={[styles.boundaryWarning, hudCompact && styles.boundaryWarningCompact]}>
-            <Text style={styles.boundaryWarningTitle}>
-              {remainingGraceS > 0
-                ? `⚠️ Out of bounds! (${remainingGraceS}s grace)`
-                : '⚠️ Boundary grace expired!'}
-            </Text>
+            <View style={styles.boundaryWarningHeader}>
+              <Ionicons color="#EF4444" name="warning" size={16} />
+              <Text style={styles.boundaryWarningTitle}>
+                {remainingGraceS > 0
+                  ? `Out of bounds! (${remainingGraceS}s grace)`
+                  : 'Boundary grace expired!'}
+              </Text>
+            </View>
             {!hudCompact && (
               <Text style={styles.boundaryWarningSub}>
                 {remainingGraceS > 0
@@ -1311,7 +1349,21 @@ export default function GameScreen() {
                     const formatted = formatEvent(evt, serverNow);
                     return (
                       <View key={evt.id} style={styles.eventRow}>
-                        <Text style={styles.eventIcon}>{formatted.icon}</Text>
+                        <View style={styles.eventIconWrap}>
+                          {formatted.icon.family === 'mci' ? (
+                            <MaterialCommunityIcons
+                              color={formatted.icon.color}
+                              name={formatted.icon.name}
+                              size={15}
+                            />
+                          ) : (
+                            <Ionicons
+                              color={formatted.icon.color}
+                              name={formatted.icon.name}
+                              size={15}
+                            />
+                          )}
+                        </View>
                         <Text style={styles.eventText}>{formatted.text}</Text>
                         <Text style={styles.eventTime}>{formatted.time}</Text>
                       </View>
@@ -1325,11 +1377,13 @@ export default function GameScreen() {
             {players.map((player) => (
               <View key={player.id} style={styles.playerRow}>
                 <View style={[styles.playerDot, { backgroundColor: player.color }]} />
-                <Text style={styles.playerName}>
-                  {player.display_name}
-                  {player.user_id === game!.host_id ? '  ♛' : ''}
-                  {player.id === myPlayerId ? '  (you)' : ''}
-                </Text>
+                <View style={styles.playerNameRow}>
+                  <Text style={styles.playerName}>{player.display_name}</Text>
+                  {player.user_id === game!.host_id && (
+                    <MaterialCommunityIcons color="#EAB308" name="crown" size={14} />
+                  )}
+                  {player.id === myPlayerId && <Text style={styles.playerYou}>(you)</Text>}
+                </View>
                 <Text
                   style={[
                     styles.playerMeta,
@@ -1379,13 +1433,16 @@ export default function GameScreen() {
                     sosSent && styles.sosButtonSent,
                   ]}
                 >
-                  <Text style={styles.sosButtonText}>
-                    {sosSent
-                      ? '🆘 SOS SENT · DIALER OPENED'
-                      : sosHolding
-                        ? 'HOLDING... RELEASE TO CANCEL'
-                        : '🆘 HOLD FOR SOS (2s)'}
-                  </Text>
+                  <View style={styles.sosButtonContent}>
+                    <MaterialCommunityIcons color="#FFFFFF" name="alarm-light" size={18} />
+                    <Text style={styles.sosButtonText}>
+                      {sosSent
+                        ? 'SOS SENT · DIALER OPENED'
+                        : sosHolding
+                          ? 'HOLDING... RELEASE TO CANCEL'
+                          : 'HOLD FOR SOS (2s)'}
+                    </Text>
+                  </View>
                 </Pressable>
                 <Text style={styles.sosHint}>
                   Broadcasts your position to everyone and launches emergency services dialer.
@@ -1535,6 +1592,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
+  muteButtonContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
   muteButtonText: {
     color: '#475569',
     fontSize: 11,
@@ -1554,6 +1616,11 @@ const styles = StyleSheet.create({
   boundaryWarningCompact: {
     marginTop: 6,
     paddingVertical: 4,
+  },
+  boundaryWarningHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
   boundaryWarningTitle: {
     color: '#B91C1C',
@@ -1696,7 +1763,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 8,
   },
-  eventIcon: { fontSize: 14, marginRight: 8 },
+  eventIconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    width: 20,
+  },
   eventText: { color: '#334155', flex: 1, fontSize: 13, fontWeight: '700' },
   eventTime: { color: '#94A3B8', fontSize: 11, fontWeight: '700', marginLeft: 6 },
   sectionLabel: {
@@ -1716,7 +1788,15 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
   playerDot: { borderRadius: 5, height: 10, width: 10 },
-  playerName: { color: '#0F172A', flex: 1, fontSize: 13, fontWeight: '700', marginLeft: 8 },
+  playerNameRow: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 5,
+    marginLeft: 8,
+  },
+  playerName: { color: '#0F172A', fontSize: 13, fontWeight: '700' },
+  playerYou: { color: '#64748B', fontSize: 11, fontWeight: '600' },
   playerMeta: { color: '#94A3B8', fontSize: 12, fontWeight: '700' },
   playerRunner: { color: '#059669' },
   playerTagged: { color: '#B91C1C' },
@@ -1754,6 +1834,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 46,
     paddingHorizontal: 16,
+  },
+  sosButtonContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
   },
   sosButtonHolding: {
     backgroundColor: '#DC2626',

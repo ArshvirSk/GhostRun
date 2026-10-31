@@ -1,4 +1,5 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../../src/lib/map';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -577,11 +578,13 @@ export default function ResultScreen() {
             <View key={player.id} style={styles.playerRow}>
               <View style={[styles.playerDot, { backgroundColor: player.color }]} />
               <View style={styles.playerText}>
-                <Text style={styles.playerName}>
-                  {player.display_name}
-                  {player.user_id === game.host_id ? '  ♛' : ''}
-                  {player.id === state.my_player_id ? '  (you)' : ''}
-                </Text>
+                <View style={styles.playerNameRow}>
+                  <Text style={styles.playerName}>{player.display_name}</Text>
+                  {player.user_id === game.host_id && (
+                    <MaterialCommunityIcons color="#EAB308" name="crown" size={13} />
+                  )}
+                  {player.id === state.my_player_id && <Text style={styles.playerYou}>(you)</Text>}
+                </View>
                 <Text style={styles.playerSub}>
                   {teamLabel(player.team)} ·{' '}
                   {position ? 'Final position recorded' : 'No final position'}
@@ -734,7 +737,9 @@ const styles = StyleSheet.create({
   },
   playerDot: { borderRadius: 5, height: 10, width: 10 },
   playerText: { flex: 1, marginLeft: 8 },
+  playerNameRow: { alignItems: 'center', flexDirection: 'row', gap: 5 },
   playerName: { color: '#0F172A', fontSize: 13, fontWeight: '700' },
+  playerYou: { color: '#64748B', fontSize: 11, fontWeight: '600' },
   playerSub: { color: '#94A3B8', fontSize: 11, fontWeight: '600', marginTop: 2 },
   playerMeta: { color: '#475569', fontSize: 12, fontWeight: '800' },
   playerWinner: { color: '#047857' },
