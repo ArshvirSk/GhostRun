@@ -4,15 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
+  LayoutAnimation,
   Linking,
+  PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  UIManager,
   Vibration,
   View,
 } from 'react-native';
-
 import {
   circleRing,
   distanceM,
@@ -34,6 +37,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
 import { supabase } from '../../src/lib/supabase';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 try {
   Notifications.setNotificationHandler({
@@ -269,6 +276,52 @@ export default function GameScreen() {
 
   const [sosHolding, setSosHolding] = useState(false);
   const [sosSent, setSosSent] = useState(false);
+
+  const [hudCompact, setHudCompact] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+
+  // Show full round details on initial load or whenever the game status/phase changes,
+  // then smoothly shorten the top bar after ~6 seconds so focus remains on the map.
+  useEffect(() => {
+    const expandTimer = setTimeout(() => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setHudCompact(false);
+    }, 0);
+    const compactTimer = setTimeout(() => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setHudCompact(true);
+    }, 6000);
+    return () => {
+      clearTimeout(expandTimer);
+      clearTimeout(compactTimer);
+    };
+  }, [state?.game?.status]);
+
+  const toggleHud = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setHudCompact((prev) => !prev);
+  }, []);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 8,
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy < -20) {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setSheetExpanded(true);
+          } else if (gesture.dy > 20) {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setSheetExpanded(false);
+          } else {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setSheetExpanded((prev) => !prev);
+          }
+        },
+      }),
+    [],
+  );
 
   async function triggerSos() {
     if (!supabase || !gameId) return;
@@ -835,7 +888,18 @@ export default function GameScreen() {
 
   return (
     <View style={styles.screen}>
-      <MapLibreMap attribution mapStyle={MAP_STYLE} style={StyleSheet.absoluteFill}>
+      <MapLibreMap
+        attribution
+        mapStyle={MAP_STYLE}
+        onPress={() => {
+          if (sheetExpanded || !hudCompact) {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setSheetExpanded(false);
+            setHudCompact(true);
+          }
+        }}
+        style={StyleSheet.absoluteFill}
+      >
         <Camera
           initialViewState={{
             center: [game!.area.longitude, game!.area.latitude],
@@ -952,244 +1016,338 @@ export default function GameScreen() {
         )}
       </MapLibreMap>
 
-      <View style={styles.hud}>
-        <View style={styles.hudHeaderRow}>
-          <Text style={[styles.eyebrow, { color: accent }]}>
-            {eyebrow} · {game!.code}
-          </Text>
-          <Pressable
-            accessibilityLabel={muted ? 'Unmute alerts' : 'Mute alerts'}
-            accessibilityRole="button"
-            onPress={() => void toggleMuted()}
-            style={styles.muteButton}
-          >
-            <Text style={styles.muteButtonText}>{muted ? '🔕 Muted' : '🔔 Alerts'}</Text>
-          </Pressable>
-        </View>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
+      <Pressable
+        accessibilityLabel={hudCompact ? 'Expand round details' : 'Minimize round details'}
+        accessibilityRole="button"
+        onPress={toggleHud}
+        style={[styles.hud, hudCompact && styles.hudCompact]}
+      >
+        {hudCompact ? (
+          <View style={styles.compactHudRow}>
+            <View style={styles.compactLeft}>
+              <View style={[styles.compactStatusDot, { backgroundColor: accent }]} />
+              <Text style={styles.compactEyebrow}>{eyebrow}</Text>
+              {timerValue !== null && game!.status !== 'ended' && game!.status !== 'cancelled' && (
+                <Text style={styles.compactTimer}>{formatClock(timerValue)}</Text>
+              )}
+            </View>
 
-        {isOutOfBounds && (
-          <View style={styles.boundaryWarning}>
-            <Text style={styles.boundaryWarningTitle}>{"⚠️ You've left the play area"}</Text>
-            <Text style={styles.boundaryWarningSub}>
-              {remainingGraceS > 0
-                ? `${remainingGraceS}s grace remaining before boundary penalty`
-                : 'Grace period expired — your position may be revealed!'}
-            </Text>
+            <View style={styles.compactRight}>
+              {isLive && nextPingIn !== null && (
+                <View style={styles.compactChip}>
+                  <Text style={styles.compactChipLabel}>PING</Text>
+                  <Text style={styles.compactChipValue}>{formatClock(nextPingIn)}</Text>
+                </View>
+              )}
+              {isLive && (
+                <View style={styles.compactChip}>
+                  <Text style={styles.compactChipLabel}>RUNNERS</Text>
+                  <Text style={styles.compactChipValue}>{runnersRemaining}</Text>
+                </View>
+              )}
+              <Pressable
+                accessibilityLabel={muted ? 'Unmute alerts' : 'Mute alerts'}
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => void toggleMuted()}
+                style={styles.compactMuteButton}
+              >
+                <Text style={styles.compactMuteText}>{muted ? '🔕' : '🔔'}</Text>
+              </Pressable>
+              <Text style={styles.compactChevron}>▾</Text>
+            </View>
           </View>
+        ) : (
+          <>
+            <View style={styles.hudHeaderRow}>
+              <Text style={[styles.eyebrow, { color: accent }]}>
+                {eyebrow} · {game!.code}
+              </Text>
+              <View style={styles.hudHeaderActions}>
+                <Pressable
+                  accessibilityLabel={muted ? 'Unmute alerts' : 'Mute alerts'}
+                  accessibilityRole="button"
+                  onPress={() => void toggleMuted()}
+                  style={styles.muteButton}
+                >
+                  <Text style={styles.muteButtonText}>{muted ? '🔕 Muted' : '🔔 Alerts'}</Text>
+                </Pressable>
+                <Text style={styles.hudChevron}>▴</Text>
+              </View>
+            </View>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
+
+            <View style={styles.statsRow}>
+              {timerValue !== null && game!.status !== 'ended' && game!.status !== 'cancelled' && (
+                <View style={styles.stat}>
+                  <Text style={styles.statLabel}>{timerLabel}</Text>
+                  <Text style={styles.statValue}>{formatClock(timerValue)}</Text>
+                </View>
+              )}
+              {isLive && nextPingIn !== null && (
+                <View style={styles.stat}>
+                  <Text style={styles.statLabel}>NEXT PING</Text>
+                  <Text style={styles.statSmall}>{formatClock(nextPingIn)}</Text>
+                </View>
+              )}
+              {isLive && (
+                <View style={styles.stat}>
+                  <Text style={styles.statLabel}>RUNNERS</Text>
+                  <Text style={styles.statSmall}>{runnersRemaining}</Text>
+                </View>
+              )}
+            </View>
+          </>
         )}
 
-        <View style={styles.statsRow}>
-          {timerValue !== null && game!.status !== 'ended' && game!.status !== 'cancelled' && (
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>{timerLabel}</Text>
-              <Text style={styles.statValue}>{formatClock(timerValue)}</Text>
-            </View>
-          )}
-          {isLive && nextPingIn !== null && (
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>NEXT PING</Text>
-              <Text style={styles.statSmall}>{formatClock(nextPingIn)}</Text>
-            </View>
-          )}
-          {isLive && (
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>RUNNERS</Text>
-              <Text style={styles.statSmall}>{runnersRemaining}</Text>
-            </View>
-          )}
-        </View>
+        {isOutOfBounds && (
+          <View style={[styles.boundaryWarning, hudCompact && styles.boundaryWarningCompact]}>
+            <Text style={styles.boundaryWarningTitle}>
+              {remainingGraceS > 0
+                ? `⚠️ Out of bounds! (${remainingGraceS}s grace)`
+                : '⚠️ Boundary grace expired!'}
+            </Text>
+            {!hudCompact && (
+              <Text style={styles.boundaryWarningSub}>
+                {remainingGraceS > 0
+                  ? `${remainingGraceS}s grace remaining before boundary penalty`
+                  : 'Grace period expired — your position may be revealed!'}
+              </Text>
+            )}
+          </View>
+        )}
 
         {errorMessage !== '' && (
           <Text accessibilityRole="alert" style={styles.error}>
             {errorMessage}
           </Text>
         )}
-      </View>
+      </Pressable>
 
-      <ScrollView style={styles.sheet} contentContainerStyle={styles.sheetContent}>
-        {isLive && !isRunner && !taggedSelf && (
-          <>
+      {tagMessage !== '' && !sheetExpanded && (
+        <View style={styles.tagToast}>
+          <Text style={styles.tagToastText}>{tagMessage}</Text>
+        </View>
+      )}
+
+      <View style={[styles.sheet, sheetExpanded ? styles.sheetExpanded : styles.sheetCollapsed]}>
+        <View {...panResponder.panHandlers} style={styles.sheetHandleRow}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.dockBar}>
+            <View style={styles.dockInfo}>
+              <Text style={styles.dockTitle}>
+                {sheetExpanded
+                  ? 'Activity, Players & Controls'
+                  : `Activity & Players (${activePlayers.length})`}
+              </Text>
+              <Text style={styles.dockHint}>
+                {sheetExpanded ? '▼ Tap or swipe down to minimize' : '▲ Tap or swipe up to expand'}
+              </Text>
+            </View>
+            {isLive && !isRunner && !taggedSelf && !sheetExpanded && (
+              <Pressable
+                accessibilityRole="button"
+                disabled={busy !== ''}
+                onPress={() => void attemptTag()}
+                style={[styles.quickTagButton, busy !== '' && styles.disabled]}
+              >
+                {busy === 'tag' ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.quickTagText}>TAG (20m)</Text>
+                )}
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        {sheetExpanded && (
+          <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetContent}>
+            {isLive && !isRunner && !taggedSelf && (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy !== ''}
+                  onPress={() => void attemptTag()}
+                  style={[styles.tagButton, busy !== '' && styles.disabled]}
+                >
+                  {busy === 'tag' ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.tagText}>TAG A RUNNER</Text>
+                  )}
+                </Pressable>
+                <Text style={styles.tagHint}>
+                  Get within {game!.tag_radius_m} m of a runner and tap. Both positions must be
+                  fresh.
+                </Text>
+                {tagMessage !== '' && <Text style={styles.tagMessage}>{tagMessage}</Text>}
+              </>
+            )}
+
+            {!taggedSelf && (inPlay || game!.status === 'countdown') && (
+              <View style={styles.locationCard}>
+                <View
+                  style={[
+                    styles.locationDot,
+                    { backgroundColor: sharing === 'on' ? '#059669' : '#B45309' },
+                  ]}
+                />
+                <View style={styles.locationDetails}>
+                  <Text style={styles.locationTitle}>{sharingTitle}</Text>
+                  <Text style={styles.locationBody}>{sharingBody}</Text>
+                  {sharing !== 'on' && sharing !== 'starting' && (
+                    <View style={styles.locationActions}>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => void beginSharing()}
+                        style={styles.secondaryButton}
+                      >
+                        <Text style={styles.secondaryText}>Share location</Text>
+                      </Pressable>
+                      {sharing === 'denied' && (
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => void openLocationSettings()}
+                          style={styles.linkButtonInline}
+                        >
+                          <Text style={styles.linkText}>Open settings</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
+                  {sharing === 'starting' && (
+                    <ActivityIndicator color="#1D4ED8" size="small" style={styles.inlineSpinner} />
+                  )}
+                </View>
+              </View>
+            )}
+
+            {taggedSelf && game!.status === 'live' && (
+              <Text style={styles.sectionHint}>
+                You are spectating. Location sharing stopped when you were tagged.
+              </Text>
+            )}
+
+            {(game!.status === 'ended' || game!.status === 'cancelled') && (
+              <Text style={styles.sectionHint}>Location sharing stopped when the round ended.</Text>
+            )}
+
+            {events.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>ACTIVITY FEED</Text>
+                <View style={styles.eventFeed}>
+                  {events.slice(0, 8).map((evt) => {
+                    const formatted = formatEvent(evt, serverNow);
+                    return (
+                      <View key={evt.id} style={styles.eventRow}>
+                        <Text style={styles.eventIcon}>{formatted.icon}</Text>
+                        <Text style={styles.eventText}>{formatted.text}</Text>
+                        <Text style={styles.eventTime}>{formatted.time}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            <Text style={styles.sectionLabel}>PLAYERS · {activePlayers.length}</Text>
+            {players.map((player) => (
+              <View key={player.id} style={styles.playerRow}>
+                <View style={[styles.playerDot, { backgroundColor: player.color }]} />
+                <Text style={styles.playerName}>
+                  {player.display_name}
+                  {player.user_id === game!.host_id ? '  ♛' : ''}
+                  {player.id === myPlayerId ? '  (you)' : ''}
+                </Text>
+                <Text
+                  style={[
+                    styles.playerMeta,
+                    player.status === 'tagged' && styles.playerTagged,
+                    player.team === 'runner' && player.status !== 'tagged' && styles.playerRunner,
+                  ]}
+                >
+                  {player.status === 'tagged'
+                    ? 'Tagged'
+                    : player.team === 'runner'
+                      ? 'Runner'
+                      : player.team === 'hunter'
+                        ? 'Hunter'
+                        : 'No team'}
+                </Text>
+              </View>
+            ))}
+
+            {isLive && (
+              <Text style={styles.sectionHint}>
+                {isRunner
+                  ? `Rings show what hunters have been told about runner positions.${
+                      newestPingAge !== null
+                        ? ` Latest: ${formatAge(newestPingAge)}.`
+                        : ' No ping released yet.'
+                    }`
+                  : `Rings are runner snapshots, not live positions.${
+                      newestPingAge !== null
+                        ? ` Latest: ${formatAge(newestPingAge)}.`
+                        : ' No ping released yet.'
+                    } Older rings fade.`}
+              </Text>
+            )}
+
+            {(inPlay || game!.status === 'countdown') && (
+              <View style={styles.sosContainer}>
+                <Pressable
+                  accessibilityLabel="Hold for 2 seconds to activate emergency SOS"
+                  accessibilityRole="button"
+                  delayLongPress={2000}
+                  onLongPress={() => void triggerSos()}
+                  onPressIn={() => setSosHolding(true)}
+                  onPressOut={() => setSosHolding(false)}
+                  style={[
+                    styles.sosButton,
+                    sosHolding && styles.sosButtonHolding,
+                    sosSent && styles.sosButtonSent,
+                  ]}
+                >
+                  <Text style={styles.sosButtonText}>
+                    {sosSent
+                      ? '🆘 SOS SENT · DIALER OPENED'
+                      : sosHolding
+                        ? 'HOLDING... RELEASE TO CANCEL'
+                        : '🆘 HOLD FOR SOS (2s)'}
+                  </Text>
+                </Pressable>
+                <Text style={styles.sosHint}>
+                  Broadcasts your position to everyone and launches emergency services dialer.
+                </Text>
+              </View>
+            )}
+
             <Pressable
               accessibilityRole="button"
               disabled={busy !== ''}
-              onPress={() => void attemptTag()}
-              style={[styles.tagButton, busy !== '' && styles.disabled]}
+              onPress={() => void leaveGame()}
+              style={[styles.primaryButton, { backgroundColor: accent }]}
             >
-              {busy === 'tag' ? (
+              {busy === 'leave' ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.tagText}>TAG A RUNNER</Text>
+                <Text style={styles.primaryText}>
+                  {game!.status === 'ended' || game!.status === 'cancelled'
+                    ? 'Back to home'
+                    : 'Leave round'}
+                </Text>
               )}
             </Pressable>
-            <Text style={styles.tagHint}>
-              Get within {game!.tag_radius_m} m of a runner and tap. Both positions must be fresh.
+
+            <Text style={styles.footer}>
+              All timers use the server clock. Pings are released on a server schedule; older rings
+              are less reliable.
             </Text>
-            {tagMessage !== '' && <Text style={styles.tagMessage}>{tagMessage}</Text>}
-          </>
+          </ScrollView>
         )}
-
-        {!taggedSelf && (inPlay || game!.status === 'countdown') && (
-          <View style={styles.locationCard}>
-            <View
-              style={[
-                styles.locationDot,
-                { backgroundColor: sharing === 'on' ? '#059669' : '#B45309' },
-              ]}
-            />
-            <View style={styles.locationDetails}>
-              <Text style={styles.locationTitle}>{sharingTitle}</Text>
-              <Text style={styles.locationBody}>{sharingBody}</Text>
-              {sharing !== 'on' && sharing !== 'starting' && (
-                <View style={styles.locationActions}>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => void beginSharing()}
-                    style={styles.secondaryButton}
-                  >
-                    <Text style={styles.secondaryText}>Share location</Text>
-                  </Pressable>
-                  {sharing === 'denied' && (
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => void openLocationSettings()}
-                      style={styles.linkButtonInline}
-                    >
-                      <Text style={styles.linkText}>Open settings</Text>
-                    </Pressable>
-                  )}
-                </View>
-              )}
-              {sharing === 'starting' && (
-                <ActivityIndicator color="#1D4ED8" size="small" style={styles.inlineSpinner} />
-              )}
-            </View>
-          </View>
-        )}
-
-        {taggedSelf && game!.status === 'live' && (
-          <Text style={styles.sectionHint}>
-            You are spectating. Location sharing stopped when you were tagged.
-          </Text>
-        )}
-
-        {(game!.status === 'ended' || game!.status === 'cancelled') && (
-          <Text style={styles.sectionHint}>Location sharing stopped when the round ended.</Text>
-        )}
-
-        {events.length > 0 && (
-          <>
-            <Text style={styles.sectionLabel}>ACTIVITY FEED</Text>
-            <View style={styles.eventFeed}>
-              {events.slice(0, 8).map((evt) => {
-                const formatted = formatEvent(evt, serverNow);
-                return (
-                  <View key={evt.id} style={styles.eventRow}>
-                    <Text style={styles.eventIcon}>{formatted.icon}</Text>
-                    <Text style={styles.eventText}>{formatted.text}</Text>
-                    <Text style={styles.eventTime}>{formatted.time}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </>
-        )}
-
-        <Text style={styles.sectionLabel}>PLAYERS · {activePlayers.length}</Text>
-        {players.map((player) => (
-          <View key={player.id} style={styles.playerRow}>
-            <View style={[styles.playerDot, { backgroundColor: player.color }]} />
-            <Text style={styles.playerName}>
-              {player.display_name}
-              {player.user_id === game!.host_id ? '  ♛' : ''}
-              {player.id === myPlayerId ? '  (you)' : ''}
-            </Text>
-            <Text
-              style={[
-                styles.playerMeta,
-                player.status === 'tagged' && styles.playerTagged,
-                player.team === 'runner' && player.status !== 'tagged' && styles.playerRunner,
-              ]}
-            >
-              {player.status === 'tagged'
-                ? 'Tagged'
-                : player.team === 'runner'
-                  ? 'Runner'
-                  : player.team === 'hunter'
-                    ? 'Hunter'
-                    : 'No team'}
-            </Text>
-          </View>
-        ))}
-
-        {isLive && (
-          <Text style={styles.sectionHint}>
-            {isRunner
-              ? `Rings show what hunters have been told about runner positions.${
-                  newestPingAge !== null
-                    ? ` Latest: ${formatAge(newestPingAge)}.`
-                    : ' No ping released yet.'
-                }`
-              : `Rings are runner snapshots, not live positions.${
-                  newestPingAge !== null
-                    ? ` Latest: ${formatAge(newestPingAge)}.`
-                    : ' No ping released yet.'
-                } Older rings fade.`}
-          </Text>
-        )}
-
-        {(inPlay || game!.status === 'countdown') && (
-          <View style={styles.sosContainer}>
-            <Pressable
-              accessibilityLabel="Hold for 2 seconds to activate emergency SOS"
-              accessibilityRole="button"
-              delayLongPress={2000}
-              onLongPress={() => void triggerSos()}
-              onPressIn={() => setSosHolding(true)}
-              onPressOut={() => setSosHolding(false)}
-              style={[
-                styles.sosButton,
-                sosHolding && styles.sosButtonHolding,
-                sosSent && styles.sosButtonSent,
-              ]}
-            >
-              <Text style={styles.sosButtonText}>
-                {sosSent
-                  ? '🆘 SOS SENT · DIALER OPENED'
-                  : sosHolding
-                    ? 'HOLDING... RELEASE TO CANCEL'
-                    : '🆘 HOLD FOR SOS (2s)'}
-              </Text>
-            </Pressable>
-            <Text style={styles.sosHint}>
-              Broadcasts your position to everyone and launches emergency services dialer.
-            </Text>
-          </View>
-        )}
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={busy !== ''}
-          onPress={() => void leaveGame()}
-          style={[styles.primaryButton, { backgroundColor: accent }]}
-        >
-          {busy === 'leave' ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.primaryText}>
-              {game!.status === 'ended' || game!.status === 'cancelled'
-                ? 'Back to home'
-                : 'Leave round'}
-            </Text>
-          )}
-        </Pressable>
-
-        <Text style={styles.footer}>
-          All timers use the server clock. Pings are released on a server schedule; older rings are
-          less reliable.
-        </Text>
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -1207,17 +1365,100 @@ const styles = StyleSheet.create({
   hud: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    elevation: 3,
-    left: 16,
-    padding: 16,
+    elevation: 4,
+    left: 14,
+    padding: 14,
     position: 'absolute',
-    right: 16,
+    right: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
     top: 48,
+  },
+  hudCompact: {
+    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  compactHudRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  compactLeft: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  compactStatusDot: {
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  compactEyebrow: {
+    color: '#0F172A',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  compactTimer: {
+    color: '#1D4ED8',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  compactRight: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  compactChip: {
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 6,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  compactChipLabel: {
+    color: '#64748B',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  compactChipValue: {
+    color: '#0F172A',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  compactMuteButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  compactMuteText: {
+    fontSize: 14,
+  },
+  compactChevron: {
+    color: '#94A3B8',
+    fontSize: 14,
+    fontWeight: '800',
+    marginLeft: 2,
   },
   hudHeaderRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  hudHeaderActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  hudChevron: {
+    color: '#94A3B8',
+    fontSize: 14,
+    fontWeight: '800',
   },
   muteButton: {
     backgroundColor: '#F1F5F9',
@@ -1241,9 +1482,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     padding: 10,
   },
+  boundaryWarningCompact: {
+    marginTop: 6,
+    paddingVertical: 4,
+  },
   boundaryWarningTitle: {
     color: '#B91C1C',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
   },
   boundaryWarningSub: {
@@ -1260,15 +1505,94 @@ const styles = StyleSheet.create({
   error: { color: '#B91C1C', fontSize: 13, lineHeight: 19, marginTop: 12 },
   sheet: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     bottom: 0,
+    elevation: 8,
     left: 0,
-    maxHeight: '38%',
     position: 'absolute',
     right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
-  sheetContent: { padding: 20, paddingBottom: 30 },
+  sheetCollapsed: {
+    maxHeight: 74,
+  },
+  sheetExpanded: {
+    maxHeight: '58%',
+  },
+  sheetHandleRow: {
+    alignItems: 'center',
+    paddingBottom: 6,
+    paddingTop: 8,
+  },
+  sheetHandle: {
+    backgroundColor: '#CBD5E1',
+    borderRadius: 2,
+    height: 4,
+    marginBottom: 6,
+    width: 36,
+  },
+  dockBar: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  dockInfo: {
+    flex: 1,
+  },
+  dockTitle: {
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  dockHint: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  quickTagButton: {
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
+    borderRadius: 9,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 14,
+  },
+  quickTagText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  sheetScroll: {
+    flex: 1,
+  },
+  sheetContent: { padding: 18, paddingBottom: 30 },
+  tagToast: {
+    alignSelf: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 20,
+    bottom: 84,
+    elevation: 9,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    position: 'absolute',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  tagToastText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   locationCard: {
     alignItems: 'flex-start',
     backgroundColor: '#F1F5F9',
