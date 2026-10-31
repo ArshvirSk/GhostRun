@@ -266,6 +266,7 @@ export default function GameScreen() {
   const [state, setState] = useState<RoundState | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [serverOffset, setServerOffset] = useState(0);
+  const serverNow = now + serverOffset;
   const offsetRef = useRef(0);
   const advancingRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -432,9 +433,15 @@ export default function GameScreen() {
   }
 
   const notify = useCallback((title: string, body: string, vibratePattern?: number | number[]) => {
+    if (vibratePattern) {
+      try {
+        Vibration.vibrate(vibratePattern);
+      } catch {
+        // Ignored if vibration not supported
+      }
+    }
     if (mutedRef.current) return;
     try {
-      if (vibratePattern) Vibration.vibrate(vibratePattern);
       void Notifications.scheduleNotificationAsync({
         content: { title, body },
         trigger: null,
@@ -472,17 +479,29 @@ export default function GameScreen() {
     if (!state?.pings || state?.game?.status !== 'live') return;
     const latestPing = state.pings[0];
     if (!latestPing) return;
+    const isFresh = Math.max(0, (serverNow - Date.parse(latestPing.released_at)) / 1000) <= 6;
     if (prevPingIdRef.current !== null && latestPing.id !== prevPingIdRef.current) {
+      try {
+        Vibration.vibrate([0, 500, 200, 500]);
+      } catch {
+        // ignore
+      }
       notify(
-        'Ping released',
+        'Radar Ping Released',
         latestPing.reason === 'boundary'
           ? 'Boundary violation ping released.'
-          : 'Scheduled runner position ping released.',
-        300,
+          : 'Runner position ping released.',
+        [0, 500, 200, 500],
       );
+    } else if (prevPingIdRef.current === null && isFresh) {
+      try {
+        Vibration.vibrate([0, 500, 200, 500]);
+      } catch {
+        // ignore
+      }
     }
     prevPingIdRef.current = latestPing.id;
-  }, [state?.pings, state?.game, notify]);
+  }, [state?.pings, state?.game, notify, serverNow]);
 
   useEffect(() => {
     sharingRef.current = sharing;
@@ -532,7 +551,21 @@ export default function GameScreen() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pings', filter: `game_id=eq.${gameId}` },
-        () => void loadState(),
+        (payload: { new?: { id?: number; reason?: string } }) => {
+          try {
+            Vibration.vibrate([0, 500, 200, 500]);
+          } catch {
+            // ignore
+          }
+          notify(
+            'Radar Ping Released',
+            payload.new?.reason === 'boundary'
+              ? 'Runner out of bounds ping!'
+              : 'Runner location ping detected!',
+            [0, 500, 200, 500],
+          );
+          void loadState();
+        },
       )
       .on(
         'postgres_changes',
@@ -748,7 +781,6 @@ export default function GameScreen() {
   const isRunner = myTeam === 'runner';
   const activePlayers = players.filter((player) => player.status === 'active');
   const runnersRemaining = activePlayers.filter((player) => player.team === 'runner').length;
-  const serverNow = now + serverOffset;
   const events = useMemo(() => {
     return (state?.events ?? []).slice().sort((a, b) => b.id - a.id);
   }, [state?.events]);
@@ -790,10 +822,14 @@ export default function GameScreen() {
   const elapsedGraceS = outOfBoundsSince !== null ? Math.floor((now - outOfBoundsSince) / 1000) : 0;
   const remainingGraceS = Math.max(0, boundaryGraceS - elapsedGraceS);
 
+  const PING_VISIBILITY_DURATION_S = 10;
+
   const pingFeatures: PointFeature[] = (state?.pings ?? [])
     .filter(
       (ping): ping is RoundPing & { longitude: number; latitude: number } =>
-        ping.longitude !== null && ping.latitude !== null,
+        ping.longitude !== null &&
+        ping.latitude !== null &&
+        Math.max(0, (serverNow - Date.parse(ping.released_at)) / 1000) <= PING_VISIBILITY_DURATION_S,
     )
     .map((ping) => {
       const releasedAgo = Math.max(0, (serverNow - Date.parse(ping.released_at)) / 1000);
@@ -1049,18 +1085,39 @@ export default function GameScreen() {
         {pingFeatures.length > 0 && (
           <GeoJSONSource id="pings" data={pingsData}>
             <Layer
-              id="ping-points"
+              id="ping-halo"
               type="circle"
               paint={{
-                'circle-radius': 8,
+                'circle-radius': 22,
                 'circle-color': [
                   'case',
                   ['==', ['get', 'reason'], 'boundary'],
                   '#F59E0B',
                   '#DB2777',
                 ],
-                'circle-opacity': ['interpolate', ['linear'], ['get', 'age_s'], 0, 0.9, 600, 0.25],
+                'circle-opacity': 0.25,
                 'circle-stroke-width': 2,
+                'circle-stroke-color': [
+                  'case',
+                  ['==', ['get', 'reason'], 'boundary'],
+                  '#F59E0B',
+                  '#DB2777',
+                ],
+                'circle-stroke-opacity': 0.65,
+              }}
+            />
+            <Layer
+              id="ping-points"
+              type="circle"
+              paint={{
+                'circle-radius': 9,
+                'circle-color': [
+                  'case',
+                  ['==', ['get', 'reason'], 'boundary'],
+                  '#F59E0B',
+                  '#DB2777',
+                ],
+                'circle-stroke-width': 2.5,
                 'circle-stroke-color': '#FFFFFF',
               }}
             />
