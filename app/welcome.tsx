@@ -21,6 +21,7 @@ export default function WelcomeScreen() {
   const [name, setName] = useState('');
   const [color, setColor] = useState(COLORS[0]);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [batteryExpanded, setBatteryExpanded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -119,6 +120,55 @@ export default function WelcomeScreen() {
         </View>
 
         <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: batteryExpanded }}
+          onPress={() => setBatteryExpanded((v) => !v)}
+          style={styles.batteryHeader}
+        >
+          <Text style={styles.batteryHeaderTitle}>⚡ Battery optimisation guidance</Text>
+          <Text style={styles.batteryChevron}>{batteryExpanded ? '▲' : '▼'}</Text>
+        </Pressable>
+
+        {batteryExpanded && (
+          <View style={styles.batteryCard}>
+            <Text style={styles.batteryIntro}>
+              Many Android phones terminate background location updates during the chase to save
+              battery. To ensure reliable live tracking, set GhostRun to Unrestricted:
+            </Text>
+            <View style={styles.brandRow}>
+              <Text style={styles.brandName}>Samsung (One UI)</Text>
+              <Text style={styles.brandInstruction}>
+                Settings → Apps → GhostRun → Battery → Unrestricted
+              </Text>
+            </View>
+            <View style={styles.brandRow}>
+              <Text style={styles.brandName}>Xiaomi / POCO (HyperOS / MIUI)</Text>
+              <Text style={styles.brandInstruction}>
+                Settings → Apps → Manage apps → GhostRun → Battery saver → No restrictions
+              </Text>
+            </View>
+            <View style={styles.brandRow}>
+              <Text style={styles.brandName}>OnePlus / OPPO / Realme (OxygenOS / ColorOS)</Text>
+              <Text style={styles.brandInstruction}>
+                Settings → Apps → GhostRun → Battery usage → Allow background activity
+              </Text>
+            </View>
+            <View style={styles.brandRow}>
+              <Text style={styles.brandName}>Google Pixel</Text>
+              <Text style={styles.brandInstruction}>
+                Settings → Apps → GhostRun → App battery usage → Unrestricted
+              </Text>
+            </View>
+            <View style={styles.brandRow}>
+              <Text style={styles.brandName}>Huawei (EMUI)</Text>
+              <Text style={styles.brandInstruction}>
+                Settings → Battery → App launch → GhostRun → Manage manually (allow background)
+              </Text>
+            </View>
+          </View>
+        )}
+
+        <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{ checked: acknowledged }}
           onPress={() => setAcknowledged((value) => !value)}
@@ -212,4 +262,32 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: '#94A3B8' },
   buttonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
+  batteryHeader: {
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  batteryHeaderTitle: { color: '#0F172A', fontSize: 13, fontWeight: '800' },
+  batteryChevron: { color: '#64748B', fontSize: 12, fontWeight: '700' },
+  batteryCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 6,
+    padding: 14,
+  },
+  batteryIntro: { color: '#475569', fontSize: 12, lineHeight: 18, marginBottom: 10 },
+  brandRow: {
+    borderTopColor: '#F1F5F9',
+    borderTopWidth: 1,
+    paddingVertical: 6,
+  },
+  brandName: { color: '#1D4ED8', fontSize: 12, fontWeight: '800' },
+  brandInstruction: { color: '#334155', fontSize: 11, lineHeight: 16, marginTop: 2 },
 });
