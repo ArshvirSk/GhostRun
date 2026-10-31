@@ -8,11 +8,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  Vibration,
   View,
 } from 'react-native';
 
 import {
   circleRing,
+  distanceM,
   formatAge,
   type LngLat,
   type PointCollection,
@@ -100,6 +102,8 @@ type RoundState = {
     end_reason: string | null;
     area: LngLat & { radius_m: number };
     target_set: boolean;
+    boundary_grace_s?: number;
+    boundary_penalty?: 'warn' | 'extra_ping';
   };
   players: GamePlayer[];
   my_player_id: string;
@@ -155,6 +159,8 @@ export default function GameScreen() {
   const [sharingMessage, setSharingMessage] = useState('');
   const [backgroundSharing, setBackgroundSharing] = useState(false);
   const [fix, setFix] = useState<GeoFix | null>(null);
+  const [outOfBoundsSince, setOutOfBoundsSince] = useState<number | null>(null);
+  const wasOutOfBoundsRef = useRef(false);
   const autoStartedRef = useRef(false);
   const startingRef = useRef(false);
   const sharingRef = useRef<SharingState>('idle');
@@ -423,6 +429,36 @@ export default function GameScreen() {
       : state?.my_position
         ? { longitude: state.my_position.longitude, latitude: state.my_position.latitude }
         : null;
+
+  const currentDistanceM = ownFix && game?.area ? distanceM(ownFix, game.area) : null;
+  const isOutOfBounds =
+    currentDistanceM !== null &&
+    game !== null &&
+    currentDistanceM > game.area.radius_m &&
+    ['head_start', 'live'].includes(game.status);
+
+  useEffect(() => {
+    if (isOutOfBounds) {
+      if (!wasOutOfBoundsRef.current) {
+        wasOutOfBoundsRef.current = true;
+        setOutOfBoundsSince(Date.now());
+        try {
+          Vibration.vibrate(500);
+        } catch {
+          // ignore if vibration is unavailable
+        }
+      }
+    } else {
+      if (wasOutOfBoundsRef.current) {
+        wasOutOfBoundsRef.current = false;
+        setOutOfBoundsSince(null);
+      }
+    }
+  }, [isOutOfBounds]);
+
+  const boundaryGraceS = game?.boundary_grace_s ?? 30;
+  const elapsedGraceS = outOfBoundsSince !== null ? Math.floor((now - outOfBoundsSince) / 1000) : 0;
+  const remainingGraceS = Math.max(0, boundaryGraceS - elapsedGraceS);
 
   const pingFeatures: PointFeature[] = (state?.pings ?? [])
     .filter(
@@ -726,6 +762,17 @@ export default function GameScreen() {
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.subtitle}>{subtitle}</Text>
 
+        {isOutOfBounds && (
+          <View style={styles.boundaryWarning}>
+            <Text style={styles.boundaryWarningTitle}>{"⚠️ You've left the play area"}</Text>
+            <Text style={styles.boundaryWarningSub}>
+              {remainingGraceS > 0
+                ? `${remainingGraceS}s grace remaining before boundary penalty`
+                : 'Grace period expired — your position may be revealed!'}
+            </Text>
+          </View>
+        )}
+
         <View style={styles.statsRow}>
           {timerValue !== null && game!.status !== 'ended' && game!.status !== 'cancelled' && (
             <View style={styles.stat}>
@@ -916,6 +963,25 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.3 },
   title: { color: '#0F172A', fontSize: 24, fontWeight: '900', marginTop: 6 },
   subtitle: { color: '#475569', fontSize: 13, lineHeight: 19, marginTop: 6 },
+  boundaryWarning: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    marginTop: 10,
+    padding: 10,
+  },
+  boundaryWarningTitle: {
+    color: '#B91C1C',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  boundaryWarningSub: {
+    color: '#7F1D1D',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   statsRow: { alignItems: 'flex-end', flexDirection: 'row', gap: 18, marginTop: 14 },
   stat: { flexShrink: 1 },
   statLabel: { color: '#64748B', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
