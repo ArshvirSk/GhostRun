@@ -1,10 +1,12 @@
 import { Camera, Map, UserLocation } from '../src/lib/map';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 
 import { supabase } from '../src/lib/supabase';
+
+const GHOSTRUN_LOGO = require('../assets/logos/android-chrome-512x512.png');
 
 const DEFAULT_MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const MAP_STYLE = process.env.EXPO_PUBLIC_MAP_STYLE_URL || DEFAULT_MAP_STYLE;
@@ -120,11 +122,7 @@ export default function HomeScreen() {
       )}
 
       <View style={styles.topCard}>
-        <View style={[styles.avatar, { backgroundColor: profile?.color ?? '#1D4ED8' }]}>
-          <Text style={styles.avatarText}>
-            {profile?.display_name?.slice(0, 1).toUpperCase() ?? 'G'}
-          </Text>
-        </View>
+        <Image accessibilityLabel="GhostRun" source={GHOSTRUN_LOGO} style={styles.homeLogo} />
         <View style={styles.profileText}>
           <Text style={styles.brand}>GHOSTRUN</Text>
           <Text style={styles.welcome}>
@@ -169,6 +167,14 @@ export default function HomeScreen() {
             <Text style={styles.secondaryActionText}>Join game</Text>
           </Pressable>
         </View>
+        <Pressable
+          accessibilityLabel="How to Play"
+          accessibilityRole="button"
+          onPress={() => router.push('/onboarding' as any)}
+          style={styles.tutorialButton}
+        >
+          <Text style={styles.tutorialButtonText}>📖 How to Play & Game Modes</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -218,14 +224,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     top: 54,
   },
-  avatar: {
-    alignItems: 'center',
-    borderRadius: 22,
+  homeLogo: {
+    borderRadius: 12,
     height: 44,
-    justifyContent: 'center',
     width: 44,
   },
-  avatarText: { color: '#FFFFFF', fontSize: 19, fontWeight: '800' },
   profileText: { flex: 1, marginLeft: 12 },
   brand: { color: '#1D4ED8', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
   welcome: { color: '#0F172A', fontSize: 16, fontWeight: '800', marginTop: 3 },
@@ -266,4 +269,19 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   secondaryActionText: { color: '#1D4ED8', fontSize: 15, fontWeight: '800' },
+  tutorialButton: {
+    alignItems: 'center',
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: 10,
+    minHeight: 38,
+    paddingHorizontal: 12,
+  },
+  tutorialButtonText: {
+    color: '#475569',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });
