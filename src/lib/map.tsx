@@ -43,6 +43,7 @@ export const UserLocation = (maplibre?.UserLocation ??
 export const GeoJSONSource = (maplibre?.GeoJSONSource ??
   EmptyComponent) as unknown as MaplibreModule['GeoJSONSource'];
 export const Layer = (maplibre?.Layer ?? EmptyComponent) as unknown as MaplibreModule['Layer'];
+export type { CameraRef } from '@maplibre/maplibre-react-native';
 
 const styles = StyleSheet.create({
   placeholder: {
