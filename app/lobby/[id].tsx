@@ -46,6 +46,8 @@ export default function LobbyScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [kickingPlayerId, setKickingPlayerId] = useState<string | null>(null);
+  const [bannerMessage, setBannerMessage] = useState<string>('');
 
   const loadState = useCallback(async () => {
     if (!supabase || !gameId) return;
@@ -55,6 +57,10 @@ export default function LobbyScreen() {
     ]);
     setUserId(authData.user?.id ?? null);
     if (error) {
+      if (error.message.includes('not a member')) {
+        router.replace('/home');
+        return;
+      }
       setErrorMessage(error.message);
       return;
     }
@@ -62,7 +68,7 @@ export default function LobbyScreen() {
       setState(data as LobbyState);
       setErrorMessage('');
     }
-  }, [gameId]);
+  }, [gameId, router]);
 
   useEffect(() => {
     const initialLoad = setTimeout(() => void loadState(), 0);
@@ -82,7 +88,12 @@ export default function LobbyScreen() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'events', filter: `game_id=eq.${gameId}` },
-        () => void loadState(),
+        (payload: { new?: { type?: string; payload?: { kicked?: boolean } } }) => {
+          if (payload.new?.type === 'player_left' && payload.new?.payload?.kicked) {
+            setBannerMessage('A player was kicked from the lobby.');
+          }
+          void loadState();
+        },
       )
       .subscribe();
     return () => {
@@ -168,6 +179,14 @@ export default function LobbyScreen() {
     );
   }
 
+  async function confirmKick(player: LobbyPlayer) {
+    if (!supabase || !gameId) return;
+    setKickingPlayerId(null);
+    await runAction('kick', () =>
+      supabase!.rpc('kick_player', { game_id: gameId, player_id: player.id }),
+    );
+  }
+
   async function leaveLobby() {
     if (!supabase || !gameId) return;
     setBusyAction('leave');
@@ -249,20 +268,51 @@ export default function LobbyScreen() {
             </Text>
           </View>
           <View style={styles.playerActions}>
-            {(player.user_id === userId || isHost) && (
+            {kickingPlayerId === player.id ? (
+              <View style={styles.confirmKickRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void confirmKick(player)}
+                  style={styles.confirmKickButton}
+                >
+                  <Text style={styles.confirmKickText}>Kick</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setKickingPlayerId(null)}
+                  style={styles.cancelKickButton}
+                >
+                  <Text style={styles.cancelKickText}>Cancel</Text>
+                </Pressable>
+              </View>
+            ) : (
               <>
-                <TeamButton
-                  label="R"
-                  accessibilityLabel={`Set ${player.display_name} as runner`}
-                  selected={player.team === 'runner'}
-                  onPress={() => void setTeam(player, 'runner')}
-                />
-                <TeamButton
-                  label="H"
-                  accessibilityLabel={`Set ${player.display_name} as hunter`}
-                  selected={player.team === 'hunter'}
-                  onPress={() => void setTeam(player, 'hunter')}
-                />
+                {(player.user_id === userId || isHost) && (
+                  <>
+                    <TeamButton
+                      label="R"
+                      accessibilityLabel={`Set ${player.display_name} as runner`}
+                      selected={player.team === 'runner'}
+                      onPress={() => void setTeam(player, 'runner')}
+                    />
+                    <TeamButton
+                      label="H"
+                      accessibilityLabel={`Set ${player.display_name} as hunter`}
+                      selected={player.team === 'hunter'}
+                      onPress={() => void setTeam(player, 'hunter')}
+                    />
+                  </>
+                )}
+                {isHost && player.user_id !== userId && (
+                  <Pressable
+                    accessibilityLabel={`Kick ${player.display_name}`}
+                    accessibilityRole="button"
+                    onPress={() => setKickingPlayerId(player.id)}
+                    style={styles.kickButton}
+                  >
+                    <Text style={styles.kickButtonText}>✕</Text>
+                  </Pressable>
+                )}
               </>
             )}
           </View>
@@ -361,6 +411,12 @@ export default function LobbyScreen() {
             ? 'Everyone is ready. The host can start the round.'
             : 'Tag Hunt has no target. Ready up and wait for the host to start the round.'}
         </Text>
+      )}
+
+      {bannerMessage !== '' && (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>{bannerMessage}</Text>
+        </View>
       )}
 
       <Pressable
@@ -528,4 +584,46 @@ const styles = StyleSheet.create({
   retryText: { color: '#1D4ED8', fontSize: 15, fontWeight: '800' },
   modeNote: { color: '#94A3B8', fontSize: 12, lineHeight: 18, marginTop: 12 },
   error: { color: '#B91C1C', fontSize: 13, lineHeight: 19, marginTop: 8 },
+  kickButton: {
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderRadius: 9,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  kickButtonText: { color: '#DC2626', fontSize: 13, fontWeight: '800' },
+  confirmKickRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  confirmKickButton: {
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    justifyContent: 'center',
+    minHeight: 34,
+    paddingHorizontal: 8,
+  },
+  confirmKickText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  cancelKickButton: {
+    alignItems: 'center',
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 34,
+    paddingHorizontal: 8,
+  },
+  cancelKickText: { color: '#64748B', fontSize: 12, fontWeight: '700' },
+  banner: {
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: 14,
+    padding: 12,
+  },
+  bannerText: { color: '#1E40AF', fontSize: 13, fontWeight: '700', textAlign: 'center' },
 });
