@@ -25,33 +25,33 @@ and the GPS chase genre. It uses original name, art and copy.
 
 ## Who it is for
 
-| Persona | Needs |
-|---|---|
-| **Host** | Quick setup, clear settings, start/restart/end the game |
-| **Runner** | Rules at a glance, map, target and own trail, boundary warnings |
-| **Hunter** | Delayed pings with age, teammates live, quick and fair tagging |
-| **Spectator** | Still watching after being tagged, recap at the end |
+| Persona       | Needs                                                           |
+| ------------- | --------------------------------------------------------------- |
+| **Host**      | Quick setup, clear settings, start/restart/end the game         |
+| **Runner**    | Rules at a glance, map, target and own trail, boundary warnings |
+| **Hunter**    | Delayed pings with age, teammates live, quick and fair tagging  |
+| **Spectator** | Still watching after being tagged, recap at the end             |
 
 ## Game modes (v1)
 
-| Mode | What happens |
-|---|---|
+| Mode              | What happens                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **Classic Chase** | Runners choose a secret target. Runners win by reaching it. Hunters win by tagging every runner or running out the clock. |
-| **Tag Hunt** | No target. Runners win by surviving until time runs out. Hunters win by tagging everyone. |
+| **Tag Hunt**      | No target. Runners win by surviving until time runs out. Hunters win by tagging everyone.                                 |
 
 ## How information works
 
 This is the heart of the game.
 
-| Information | Runners | Hunters |
-|---|---|---|
-| Own live position | Yes | Yes |
-| Teammates' live positions | Yes | Yes |
-| Opponents' live positions | No | No (only pings) |
-| Delayed pings of runners | Yes (they see what hunters see) | Yes |
-| Secret target | Yes (runners only) | No |
-| Play area boundary | Yes | Yes |
-| Full trails and target | After the game ends | After the game ends |
+| Information               | Runners                         | Hunters             |
+| ------------------------- | ------------------------------- | ------------------- |
+| Own live position         | Yes                             | Yes                 |
+| Teammates' live positions | Yes                             | Yes                 |
+| Opponents' live positions | No                              | No (only pings)     |
+| Delayed pings of runners  | Yes (they see what hunters see) | Yes                 |
+| Secret target             | Yes (runners only)              | No                  |
+| Play area boundary        | Yes                             | Yes                 |
+| Full trails and target    | After the game ends             | After the game ends |
 
 ## Round structure
 
@@ -66,19 +66,19 @@ This is the heart of the game.
 
 ## Game parameters and defaults
 
-| Parameter | Default | Range |
-|---|---|---|
-| Players | — | 2 to 20 |
-| Play area radius | 600 m | 100 to 5000 m |
-| Head start | 180 s | 0 to 600 s |
-| Game duration (after head start) | 45 min | 5 to 240 min |
-| Ping interval | 150 s | 30 to 900 s |
-| Tag radius | 20 m | 5 to 100 m |
-| Target radius | 25 m | 10 to 100 m |
-| Position upload (foreground / background) | 5 s / 10 s | — |
-| Failed tag cooldown | 8 s | — |
-| Boundary grace | 30 s | 10 to 120 s |
-| Boundary penalty | Warn only | Warn / extra ping |
+| Parameter                                 | Default    | Range             |
+| ----------------------------------------- | ---------- | ----------------- |
+| Players                                   | —          | 2 to 20           |
+| Play area radius                          | 600 m      | 100 to 5000 m     |
+| Head start                                | 180 s      | 0 to 600 s        |
+| Game duration (after head start)          | 45 min     | 5 to 240 min      |
+| Ping interval                             | 150 s      | 30 to 900 s       |
+| Tag radius                                | 20 m       | 5 to 100 m        |
+| Target radius                             | 25 m       | 10 to 100 m       |
+| Position upload (foreground / background) | 5 s / 10 s | —                 |
+| Failed tag cooldown                       | 8 s        | —                 |
+| Boundary grace                            | 30 s       | 10 to 120 s       |
+| Boundary penalty                          | Warn only  | Warn / extra ping |
 
 ## Fairness rules
 
