@@ -168,27 +168,14 @@ export default function OnboardingScreen() {
             key={slide.title}
             style={[styles.slidePage, { width: screenWidth, height: screenHeight }]}
           >
-            {/* Full-Screen Ambient Base: guarantees edge-to-edge full coverage with matching city visuals */}
+            {/* Full-Bleed Edge-to-Edge Artwork (Fit to Fill) */}
             <Image
-              accessibilityLabel=""
-              blurRadius={16}
+              accessibilityLabel={slide.title}
               fadeDuration={0}
               resizeMode="cover"
               source={slide.image}
-              style={[StyleSheet.absoluteFill, styles.ambientBg]}
+              style={StyleSheet.absoluteFill}
             />
-            <View style={[StyleSheet.absoluteFill, styles.ambientOverlay]} />
-
-            {/* Sharp Fitted Illustration: full screen width, true aspect ratio, uncropped callouts */}
-            <View pointerEvents="none" style={styles.fgImageContainer}>
-              <Image
-                accessibilityLabel={slide.title}
-                fadeDuration={0}
-                resizeMode="contain"
-                source={slide.image}
-                style={[styles.fgImage, { width: screenWidth, height: screenWidth * (1672 / 941) }]}
-              />
-            </View>
 
             {/* Top Scrim Gradient for Status Bar & Header Legibility */}
             <LinearGradient
@@ -337,26 +324,8 @@ const styles = StyleSheet.create({
   },
   slidePage: {
     justifyContent: 'flex-end',
+    overflow: 'hidden',
     position: 'relative',
-  },
-  ambientBg: {
-    height: '100%',
-    width: '100%',
-  },
-  ambientOverlay: {
-    backgroundColor: 'rgba(8, 12, 22, 0.45)',
-  },
-  fgImageContainer: {
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fgImage: {
-    maxWidth: '100%',
   },
   topScrim: {
     height: 140,
