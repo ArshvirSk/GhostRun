@@ -94,7 +94,7 @@ export default function TargetSelectionScreen() {
     activePlayers.every((player) => player.team !== 'unassigned');
   const everyoneReady =
     activePlayers.length >= 2 && activePlayers.every((player) => player.is_ready);
-  const canStart = targetSaved && teamsAssigned && everyoneReady;
+  const canStart = targetSaved && teamsAssigned;
   const isHost = Boolean(state && self && state.game.host_id === self.user_id);
 
   // Round phases are rendered by the game screen; follow the host there.
@@ -375,15 +375,15 @@ export default function TargetSelectionScreen() {
                 : !teamsAssigned
                   ? 'Every player needs a team before the round can start.'
                   : !everyoneReady
-                    ? 'Every player must be ready before the round can start.'
+                    ? "Some players aren't ready. They'll be carried into the round."
                     : 'The 10-second countdown starts as soon as you press start.'}
             </Text>
           </>
         )}
 
         <Text style={styles.footer}>
-          The host can start the round once the target is saved and every player is ready. Location
-          sharing starts with the 10-second countdown.
+          The host can start the round once the target is saved. Location sharing starts with the
+          10-second countdown.
         </Text>
 
         <Pressable

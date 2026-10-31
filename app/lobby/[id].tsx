@@ -113,7 +113,7 @@ export default function LobbyScreen() {
   const everyoneReady =
     activePlayers.length >= 2 && activePlayers.every((player) => player.is_ready);
   const everyoneAssigned = activePlayers.every((player) => player.team !== 'unassigned');
-  const canStart = hasBothTeams && everyoneAssigned && everyoneReady;
+  const canStart = hasBothTeams && everyoneAssigned;
 
   // The host moves everyone along; every player follows the game's phase.
   useEffect(() => {
@@ -410,15 +410,17 @@ export default function LobbyScreen() {
               : !everyoneAssigned
                 ? 'Every player must choose a team before the round can start.'
                 : !everyoneReady
-                  ? 'Every player must be ready before the round can start.'
+                  ? "Some players aren't ready. They'll be carried into the round."
                   : 'Tag Hunt has no target. The 10-second countdown starts as soon as you press start.'}
           </Text>
         </>
       ) : (
         <Text style={styles.modeNote}>
-          {canStart
+          {everyoneReady
             ? 'Everyone is ready. The host can start the round.'
-            : 'Tag Hunt has no target. Ready up and wait for the host to start the round.'}
+            : canStart
+              ? 'Teams are assigned. Waiting for the host to start the round.'
+              : 'Tag Hunt has no target. Ready up and wait for the host to start the round.'}
         </Text>
       )}
 
