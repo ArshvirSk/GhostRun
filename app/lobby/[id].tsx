@@ -1,3 +1,4 @@
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -262,11 +263,13 @@ export default function LobbyScreen() {
             <Text style={styles.avatarLetter}>{player.display_name.slice(0, 1).toUpperCase()}</Text>
           </View>
           <View style={styles.playerDetails}>
-            <Text style={styles.playerName}>
-              {player.display_name}
-              {player.user_id === state.game.host_id ? '  ♛' : ''}
-              {player.user_id === userId ? '  (you)' : ''}
-            </Text>
+            <View style={styles.playerNameRow}>
+              <Text style={styles.playerName}>{player.display_name}</Text>
+              {player.user_id === state.game.host_id && (
+                <MaterialCommunityIcons color="#EAB308" name="crown" size={14} />
+              )}
+              {player.user_id === userId && <Text style={styles.playerYou}>(you)</Text>}
+            </View>
             <Text style={styles.playerSub}>
               {player.team === 'unassigned'
                 ? 'Choose a team'
@@ -319,7 +322,7 @@ export default function LobbyScreen() {
                     onPress={() => setKickingPlayerId(player.id)}
                     style={styles.kickButton}
                   >
-                    <Text style={styles.kickButtonText}>✕</Text>
+                    <Ionicons color="#EF4444" name="close" size={16} />
                   </Pressable>
                 )}
               </>
@@ -358,7 +361,10 @@ export default function LobbyScreen() {
         {busyAction === 'ready' ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.readyText}>{self?.is_ready ? 'Ready ✓' : 'Ready up'}</Text>
+          <View style={styles.readyContentRow}>
+            {self?.is_ready && <Ionicons color="#FFFFFF" name="checkmark-circle" size={18} />}
+            <Text style={styles.readyText}>{self?.is_ready ? 'Ready' : 'Ready up'}</Text>
+          </View>
         )}
       </Pressable>
 
@@ -551,7 +557,9 @@ const styles = StyleSheet.create({
   },
   avatarLetter: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
   playerDetails: { flex: 1, marginLeft: 10 },
+  playerNameRow: { alignItems: 'center', flexDirection: 'row', gap: 6 },
   playerName: { color: '#0F172A', fontSize: 15, fontWeight: '800' },
+  playerYou: { color: '#64748B', fontSize: 13, fontWeight: '600' },
   playerSub: { color: '#64748B', fontSize: 12, marginTop: 4 },
   playerActions: { flexDirection: 'row', gap: 6 },
   teamButton: {
@@ -585,6 +593,12 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   readySelected: { backgroundColor: '#059669' },
+  readyContentRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
   readyText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   continueButton: {
     alignItems: 'center',

@@ -1,4 +1,5 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../../src/lib/map';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -351,7 +352,10 @@ export default function TargetSelectionScreen() {
           {busy === 'ready' ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.readyButtonText}>{self?.is_ready ? 'Ready ✓' : 'Ready up'}</Text>
+            <View style={styles.readyContentRow}>
+              {self?.is_ready && <Ionicons color="#FFFFFF" name="checkmark-circle" size={18} />}
+              <Text style={styles.readyButtonText}>{self?.is_ready ? 'Ready' : 'Ready up'}</Text>
+            </View>
           )}
         </Pressable>
 
@@ -463,6 +467,12 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   readyButtonOn: { backgroundColor: '#059669' },
+  readyContentRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
   readyButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   startButton: {
     alignItems: 'center',

@@ -1,4 +1,5 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from '../src/lib/map';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -349,14 +350,21 @@ export default function CreateGameScreen() {
               centerMode === 'my_location' && styles.centerToggleSelected,
             ]}
           >
-            <Text
-              style={[
-                styles.centerToggleText,
-                centerMode === 'my_location' && styles.centerToggleTextSelected,
-              ]}
-            >
-              📍 My location
-            </Text>
+            <View style={styles.centerToggleInner}>
+              <Ionicons
+                color={centerMode === 'my_location' ? '#1D4ED8' : '#64748B'}
+                name="locate"
+                size={14}
+              />
+              <Text
+                style={[
+                  styles.centerToggleText,
+                  centerMode === 'my_location' && styles.centerToggleTextSelected,
+                ]}
+              >
+                My location
+              </Text>
+            </View>
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -367,14 +375,21 @@ export default function CreateGameScreen() {
               centerMode === 'custom' && styles.centerToggleSelected,
             ]}
           >
-            <Text
-              style={[
-                styles.centerToggleText,
-                centerMode === 'custom' && styles.centerToggleTextSelected,
-              ]}
-            >
-              🗺️ Plot on map
-            </Text>
+            <View style={styles.centerToggleInner}>
+              <Ionicons
+                color={centerMode === 'custom' ? '#1D4ED8' : '#64748B'}
+                name="map-outline"
+                size={14}
+              />
+              <Text
+                style={[
+                  styles.centerToggleText,
+                  centerMode === 'custom' && styles.centerToggleTextSelected,
+                ]}
+              >
+                Plot on map
+              </Text>
+            </View>
           </Pressable>
         </View>
       </View>
@@ -610,6 +625,12 @@ const styles = StyleSheet.create({
   centerToggleSelected: {
     backgroundColor: '#DBEAFE',
     borderColor: '#1D4ED8',
+  },
+  centerToggleInner: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
   },
   centerToggleText: {
     color: '#475569',

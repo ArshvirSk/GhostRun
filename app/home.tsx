@@ -1,4 +1,5 @@
 import { Camera, Map, UserLocation } from '../src/lib/map';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -173,7 +174,10 @@ export default function HomeScreen() {
           onPress={() => router.push('/onboarding' as any)}
           style={styles.tutorialButton}
         >
-          <Text style={styles.tutorialButtonText}>📖 How to Play & Game Modes</Text>
+          <View style={styles.tutorialButtonContent}>
+            <Ionicons color="#3B82F6" name="book-outline" size={16} />
+            <Text style={styles.tutorialButtonText}>How to Play & Game Modes</Text>
+          </View>
         </Pressable>
       </View>
     </View>
@@ -278,6 +282,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     minHeight: 38,
     paddingHorizontal: 12,
+  },
+  tutorialButtonContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
   },
   tutorialButtonText: {
     color: '#475569',

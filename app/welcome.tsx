@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -125,8 +126,15 @@ export default function WelcomeScreen() {
           onPress={() => setBatteryExpanded((v) => !v)}
           style={styles.batteryHeader}
         >
-          <Text style={styles.batteryHeaderTitle}>⚡ Battery optimisation guidance</Text>
-          <Text style={styles.batteryChevron}>{batteryExpanded ? '▲' : '▼'}</Text>
+          <View style={styles.batteryHeaderTitleRow}>
+            <Ionicons color="#D97706" name="flash" size={16} />
+            <Text style={styles.batteryHeaderTitle}>Battery optimisation guidance</Text>
+          </View>
+          <Ionicons
+            color="#64748B"
+            name={batteryExpanded ? 'chevron-up' : 'chevron-down'}
+            size={18}
+          />
         </Pressable>
 
         {batteryExpanded && (
@@ -175,7 +183,7 @@ export default function WelcomeScreen() {
           style={styles.acknowledgement}
         >
           <View style={[styles.checkbox, acknowledged && styles.checkboxChecked]}>
-            {acknowledged && <Text style={styles.checkmark}>✓</Text>}
+            {acknowledged && <Ionicons color="#FFFFFF" name="checkmark" size={16} />}
           </View>
           <Text style={styles.acknowledgementText}>I understand and will play safely.</Text>
         </Pressable>
@@ -271,6 +279,11 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  batteryHeaderTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   batteryHeaderTitle: { color: '#0F172A', fontSize: 13, fontWeight: '800' },
   batteryChevron: { color: '#64748B', fontSize: 12, fontWeight: '700' },
