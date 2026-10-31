@@ -1,4 +1,4 @@
-import { Camera, Map, UserLocation } from '@maplibre/maplibre-react-native';
+import { Camera, Map, UserLocation } from '../src/lib/map';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
