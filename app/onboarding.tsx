@@ -166,33 +166,33 @@ export default function OnboardingScreen() {
             key={slide.title}
             style={[styles.slidePage, { width: screenWidth, height: screenHeight }]}
           >
-            {/* Full-Screen Edge-to-Edge Illustration */}
+            {/* Fitted On-Screen Illustration (not zoomed in or cropped) */}
             <Image
               accessibilityLabel={slide.title}
               fadeDuration={0}
-              resizeMode="cover"
+              resizeMode="contain"
               source={slide.image}
               style={StyleSheet.absoluteFill}
             />
 
             {/* Top Scrim Gradient for Header Legibility */}
             <LinearGradient
-              colors={['rgba(7, 10, 18, 0.75)', 'rgba(7, 10, 18, 0.25)', 'transparent']}
-              locations={[0, 0.5, 1]}
+              colors={['rgba(8, 12, 22, 0.85)', 'rgba(8, 12, 22, 0.3)', 'transparent']}
+              locations={[0, 0.55, 1]}
               pointerEvents="none"
               style={styles.topScrim}
             />
 
-            {/* Bottom Cinematic Gradient Fade */}
+            {/* Bottom Cinematic Gradient Fade - Focused Behind Content */}
             <LinearGradient
               colors={[
                 'transparent',
                 'rgba(8, 12, 22, 0.35)',
-                'rgba(8, 12, 22, 0.78)',
-                'rgba(8, 12, 22, 0.95)',
+                'rgba(8, 12, 22, 0.75)',
+                'rgba(8, 12, 22, 0.94)',
                 '#080C16',
               ]}
-              locations={[0, 0.28, 0.58, 0.82, 1]}
+              locations={[0, 0.3, 0.6, 0.85, 1]}
               pointerEvents="none"
               style={styles.bottomGradient}
             />
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   topScrim: {
-    height: 140,
+    height: 120,
     left: 0,
     position: 'absolute',
     right: 0,
@@ -349,14 +349,14 @@ const styles = StyleSheet.create({
   },
   bottomGradient: {
     bottom: 0,
-    height: '62%',
+    height: '40%',
     left: 0,
     position: 'absolute',
     right: 0,
   },
   slideContent: {
-    paddingBottom: 150,
-    paddingHorizontal: 26,
+    paddingBottom: 130,
+    paddingHorizontal: 24,
     zIndex: 10,
   },
   badge: {
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: 7,
-    marginBottom: 12,
+    marginBottom: 10,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
@@ -383,11 +383,11 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '900',
     letterSpacing: -0.5,
-    lineHeight: 38,
-    marginBottom: 10,
+    lineHeight: 36,
+    marginBottom: 8,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
   controlsDock: {
     bottom: 0,
     left: 0,
-    paddingBottom: 42,
+    paddingBottom: 36,
     paddingHorizontal: 24,
     position: 'absolute',
     right: 0,
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   dot: {
     borderRadius: 4,
