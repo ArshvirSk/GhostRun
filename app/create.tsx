@@ -1,7 +1,7 @@
-import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../src/lib/map';
+import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from '../src/lib/map';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { circleRing } from '../src/lib/geo';
@@ -57,6 +57,7 @@ function formatValue(key: SettingKey, value: number): string {
 
 export default function CreateGameScreen() {
   const router = useRouter();
+  const cameraRef = useRef<CameraRef>(null);
   const [mode, setMode] = useState<Mode>('classic_chase');
   const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
@@ -78,6 +79,7 @@ export default function CreateGameScreen() {
             setMyLocation(coords);
             setCenter(coords);
             setLocating(false);
+            cameraRef.current?.easeTo({ center: coords, duration: 400 });
           }
           const current = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
@@ -87,6 +89,7 @@ export default function CreateGameScreen() {
             setMyLocation(coords);
             setCenter(coords);
             setLocating(false);
+            cameraRef.current?.easeTo({ center: coords, duration: 400 });
           }
         } else {
           if (active) setLocating(false);
@@ -170,12 +173,15 @@ export default function CreateGameScreen() {
         attribution
         mapStyle={MAP_STYLE}
         onPress={(event) => {
+          const coords = event.nativeEvent.lngLat;
+          if (!coords || !Array.isArray(coords)) return;
           setCenterMode('custom');
-          setCenter(event.nativeEvent.lngLat);
+          setCenter(coords);
+          cameraRef.current?.easeTo({ center: coords, duration: 300 });
         }}
         style={StyleSheet.absoluteFill}
       >
-        <Camera key={`${center[0]},${center[1]}`} initialViewState={{ center, zoom: 13 }} />
+        <Camera ref={cameraRef} initialViewState={{ center, zoom: 13 }} />
         <GeoJSONSource
           id="play-area"
           data={circleRing({ longitude: center[0], latitude: center[1] }, radius)}
@@ -236,6 +242,7 @@ export default function CreateGameScreen() {
               setCenterMode('my_location');
               if (myLocation) {
                 setCenter(myLocation);
+                cameraRef.current?.easeTo({ center: myLocation, duration: 350 });
               } else {
                 setLocating(true);
                 void Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
@@ -243,6 +250,7 @@ export default function CreateGameScreen() {
                     const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
                     setMyLocation(coords);
                     setCenter(coords);
+                    cameraRef.current?.easeTo({ center: coords, duration: 350 });
                   })
                   .catch(() => {})
                   .finally(() => setLocating(false));
@@ -284,6 +292,7 @@ export default function CreateGameScreen() {
       </View>
 
       <ScrollView style={styles.bottomSheet} contentContainerStyle={styles.bottomSheetContent}>
+        <View style={styles.sheetHandle} />
         <Text style={styles.sectionLabel}>MODE</Text>
         <View style={styles.row}>
           <ModeButton
@@ -441,35 +450,41 @@ const styles = StyleSheet.create({
   screen: { backgroundColor: '#E2E8F0', flex: 1 },
   topCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    left: 16,
-    padding: 16,
+    borderRadius: 14,
+    elevation: 3,
+    left: 14,
+    padding: 12,
     position: 'absolute',
-    right: 16,
-    top: 52,
+    right: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    top: 48,
   },
-  title: { color: '#0F172A', fontSize: 22, fontWeight: '800' },
+  title: { color: '#0F172A', fontSize: 18, fontWeight: '800' },
   topCardHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  hint: { color: '#475569', fontSize: 13, marginTop: 4 },
+  hint: { color: '#64748B', fontSize: 12, marginTop: 2 },
   centerToggleRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 10,
+    gap: 6,
+    marginTop: 8,
   },
   centerToggleButton: {
     alignItems: 'center',
     backgroundColor: '#F1F5F9',
     borderColor: '#CBD5E1',
-    borderRadius: 9,
+    borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
-    minHeight: 36,
+    minHeight: 32,
     paddingHorizontal: 8,
+    paddingVertical: 5,
   },
   centerToggleSelected: {
     backgroundColor: '#DBEAFE',
@@ -477,7 +492,7 @@ const styles = StyleSheet.create({
   },
   centerToggleText: {
     color: '#475569',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
   },
   centerToggleTextSelected: {
@@ -486,99 +501,113 @@ const styles = StyleSheet.create({
   },
   bottomSheet: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     bottom: 0,
+    elevation: 8,
     left: 0,
-    maxHeight: '55%',
+    maxHeight: '48%',
     position: 'absolute',
     right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    backgroundColor: '#CBD5E1',
+    borderRadius: 2,
+    height: 4,
+    marginBottom: 8,
+    width: 36,
   },
   bottomSheetContent: {
-    padding: 20,
-    paddingBottom: 30,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 24,
   },
   sectionLabel: {
-    color: '#475569',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.1,
-    marginBottom: 8,
-    marginTop: 8,
+    color: '#64748B',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+    marginTop: 6,
   },
-  row: { flexDirection: 'row', gap: 8 },
+  row: { flexDirection: 'row', gap: 6 },
   modeButton: {
     alignItems: 'center',
     borderColor: '#CBD5E1',
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
-    minHeight: 44,
+    minHeight: 34,
     paddingHorizontal: 8,
   },
-  modeText: { color: '#334155', fontSize: 14, fontWeight: '700' },
+  modeText: { color: '#334155', fontSize: 13, fontWeight: '700' },
   selectedButton: { backgroundColor: '#DBEAFE', borderColor: '#1D4ED8' },
   selectedText: { color: '#1D4ED8' },
   radiusButton: {
     alignItems: 'center',
     borderColor: '#CBD5E1',
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
-    minHeight: 40,
+    minHeight: 32,
   },
-  radiusText: { color: '#334155', fontSize: 13, fontWeight: '700' },
+  radiusText: { color: '#334155', fontSize: 12, fontWeight: '700' },
   settingRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
-    minHeight: 44,
+    marginBottom: 2,
+    minHeight: 34,
   },
-  settingLabel: { color: '#334155', flex: 1, fontSize: 14, fontWeight: '700' },
-  stepper: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  settingLabel: { color: '#334155', flex: 1, fontSize: 13, fontWeight: '600' },
+  stepper: { alignItems: 'center', flexDirection: 'row', gap: 4 },
   stepButton: {
     alignItems: 'center',
     borderColor: '#CBD5E1',
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
-    height: 32,
+    height: 28,
     justifyContent: 'center',
-    width: 32,
+    width: 28,
   },
   stepButtonDisabled: { opacity: 0.3 },
-  stepButtonText: { color: '#1D4ED8', fontSize: 18, fontWeight: '800' },
+  stepButtonText: { color: '#1D4ED8', fontSize: 16, fontWeight: '800', lineHeight: 18 },
   settingValue: {
     color: '#0F172A',
-    fontSize: 14,
-    fontWeight: '800',
-    minWidth: 70,
+    fontSize: 13,
+    fontWeight: '700',
+    minWidth: 64,
     textAlign: 'center',
   },
   penaltyButton: {
     alignItems: 'center',
     borderColor: '#CBD5E1',
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
-    minHeight: 36,
+    minHeight: 30,
     paddingHorizontal: 8,
   },
-  penaltyText: { color: '#334155', fontSize: 13, fontWeight: '700' },
-  coordinateText: { color: '#64748B', fontSize: 12, marginTop: 12 },
-  error: { color: '#B91C1C', fontSize: 13, lineHeight: 18, marginTop: 8 },
+  penaltyText: { color: '#334155', fontSize: 12, fontWeight: '600' },
+  coordinateText: { color: '#64748B', fontSize: 11, marginTop: 6 },
+  error: { color: '#B91C1C', fontSize: 12, lineHeight: 16, marginTop: 6 },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: '#1D4ED8',
-    borderRadius: 12,
+    borderRadius: 10,
     justifyContent: 'center',
-    marginTop: 14,
-    minHeight: 52,
+    marginTop: 10,
+    minHeight: 44,
   },
-  primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
-  cancelButton: { alignItems: 'center', justifyContent: 'center', minHeight: 42 },
-  cancelText: { color: '#475569', fontSize: 15, fontWeight: '700' },
+  primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  cancelButton: { alignItems: 'center', justifyContent: 'center', minHeight: 34, marginTop: 2 },
+  cancelText: { color: '#64748B', fontSize: 13, fontWeight: '600' },
 });
