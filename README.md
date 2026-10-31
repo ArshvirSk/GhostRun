@@ -96,7 +96,7 @@ This is the heart of the game.
 ## Tech
 
 - **Mobile:** Expo + React Native + TypeScript + Expo Router, Android only for v1.
-  Needs a **development build**, not Expo Go (MapLibre and background location).
+  Can be previewed in **Expo Go** with a fallback map placeholder via `src/lib/map.tsx`. A **development build** is required for full MapLibre native rendering and background location tracking.
 - **Map:** MapLibre GL, free tile style, no Google API key.
 - **Location:** `expo-location` + `expo-task-manager`, foreground service plus
   background updates.
