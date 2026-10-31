@@ -1,219 +1,243 @@
-# GhostRun
+# GhostRun 🏃‍♂️💨👻
 
-GhostRun is a real-world chase game played on phones.
+[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases)
+[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases)
+[![Expo SDK](https://img.shields.io/badge/Expo-v58.0-000000.svg)](https://expo.dev)
+[![React Native](https://img.shields.io/badge/React%20Native-0.88-61DAFB.svg)](https://reactnative.dev)
+[![Supabase](https://img.shields.io/badge/Backend-Supabase%20PostGIS-3ECF8E.svg)](https://supabase.com)
+[![MapLibre](https://img.shields.io/badge/Map-MapLibre%20Native-3B82F6.svg)](https://maplibre.org)
+[![License](https://img.shields.io/badge/License-Proprietary-F43F5E.svg)](#license)
 
-One team — **Runners** — tries to reach a secret target or survive. The other
-team — **Hunters** — tries to catch them. Hunters do **not** see live positions.
-They only get **delayed GPS pings** every few minutes, so the game is about
-inference, bluffing and tactics, not following a dot.
+> **GhostRun is an open-world, real-life tactical GPS stealth chase game played on smartphones.**
+>
+> A blend of real-world manhunt, cops & robbers, and espionage radar mechanics. One team—the **Runners**—infiltrates the area to reach a secret extraction target or survive the clock. The other team—the **Hunters**—must track, corner, and physically tag them. 
+> 
+> Unlike typical GPS trackers, **Hunters do not see live runner coordinates**. Instead, the server periodically broadcasts **delayed radar pings**. Gameplay revolves around bluffing, predictive pathing, stealth, and situational awareness—not chasing a moving dot on a screen.
 
-It is inspired by the classic childhood games (manhunt, cops and robbers, tag)
-and the GPS chase genre. It uses original name, art and copy.
+---
 
-![Screens/Vectors/Header/Header app screenshot here](./assets/images/hero.webp)
+## 🎮 Game Modes
 
-## What you can do right now
+### 1. Classic Chase (The Flagship Mode)
+* **The Mission:** Runners secretly select a designated extraction target coordinate on the map within the boundary.
+* **Runners Win:** At least one runner reaches the secret target undetected within the time limit.
+* **Hunters Win:** All runners are tagged, or the match timer expires before runners reach their target.
+* **The Dynamic:** Hunters must deduce where runners are heading based only on sparse, delayed radar snapshots.
 
-- A group of 3–12 friends installs an Android APK, joins a lobby with a 4-letter
-  code, and plays a 30–60 minute outdoor game.
-- Setup is fast: from opening the app to being in a lobby, usually under 2
-  minutes, with no sign-up form.
-- **Secrecy is enforced by the server**, not the client. Hunters cannot read
-  runners' live positions or the secret target, even inspecting network traffic.
-- Tracking survives the screen being off for a full game on common Android phones.
-- Games end cleanly with a recap: winner, trails and target reveal.
+### 2. Tag Hunt (Pure Survival)
+* **The Mission:** No targets, no extraction. Pure adrenaline.
+* **Runners Win:** At least one runner survives until the match timer runs out.
+* **Hunters Win:** Every runner is located and tagged.
 
-## Who it is for
+---
 
-| Persona       | Needs                                                           |
-| ------------- | --------------------------------------------------------------- |
-| **Host**      | Quick setup, clear settings, start/restart/end the game         |
-| **Runner**    | Rules at a glance, map, target and own trail, boundary warnings |
-| **Hunter**    | Delayed pings with age, teammates live, quick and fair tagging  |
-| **Spectator** | Still watching after being tagged, recap at the end             |
+## ⚡ The Core Mechanic: Tactical Asymmetric Information
 
-## Game modes (v1)
+The tension in GhostRun stems from **strict information asymmetry** enforced at the database level:
 
-| Mode              | What happens                                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Classic Chase** | Runners choose a secret target. Runners win by reaching it. Hunters win by tagging every runner or running out the clock. |
-| **Tag Hunt**      | No target. Runners win by surviving until time runs out. Hunters win by tagging everyone.                                 |
+| Information / View | Runners | Hunters |
+| :--- | :---: | :---: |
+| **Own Live Position** | ✅ Real-time | ✅ Real-time |
+| **Teammates' Live Positions** | ✅ Real-time | ✅ Real-time |
+| **Opponent Live Positions** | ❌ Hidden | ❌ Hidden |
+| **Periodic Radar Pings** | ✅ Visible (See what hunters see) | ✅ Visible (Tactical radar pulse) |
+| **Secret Target Coordinate** | ✅ Visible (Runners only) | ❌ Hidden until match ends |
+| **Play Area Boundary** | ✅ Visible with boundary HUD | ✅ Visible with boundary HUD |
+| **Full Trajectories & Replay** | 🏁 Available after game ends | 🏁 Available after game ends |
 
-## How information works
+### 📡 10-Second Radar Ping Window & Haptic Feedback
+- **Tactical Flash:** When the server releases a delayed runner ping, it appears on the live map as an intense glowing radar pulse.
+- **10-Second Lifespan:** Pings remain visible on active radar for **exactly 10 seconds** before dissolving from the live tactical display. Hunters must memorize the snapshot, infer direction and velocity, and communicate.
+- **Dual-Pulse Haptic Vibration:** Whenever a ping fires, physical motor vibration alerts trigger on **both** Runners' and Hunters' phones. Runners feel the adrenaline spike knowing their past location was just compromised; Hunters feel the call to check their radar.
+- **Zero-Leak Security:** Runner live positions and target coordinates are protected by PostgreSQL Row-Level Security (RLS) policies and atomic PostGIS RPCs. Hunters cannot inspect network payloads or websockets to cheat—the server never sends unauthorized coordinates.
 
-This is the heart of the game.
+---
 
-| Information               | Runners                         | Hunters             |
-| ------------------------- | ------------------------------- | ------------------- |
-| Own live position         | Yes                             | Yes                 |
-| Teammates' live positions | Yes                             | Yes                 |
-| Opponents' live positions | No                              | No (only pings)     |
-| Delayed pings of runners  | Yes (they see what hunters see) | Yes                 |
-| Secret target             | Yes (runners only)              | No                  |
-| Play area boundary        | Yes                             | Yes                 |
-| Full trails and target    | After the game ends             | After the game ends |
+## 🌟 Key Features
 
-## Round structure
+- **Edge-to-Edge Full-Bleed Onboarding:** Immersive dark-mode visual slides introducing core rules, roles, and safety guidelines.
+- **Instant Lobby & Fast Join:** Create games in seconds; players join via a clean 4-letter room code.
+- **Auto-Centering GPS Map:** Intelligent coordinate caching and staged native-ready retries ensure map creation centers directly onto the host's actual location.
+- **Configurable Match Settings:**
+  - Play area radius (100 m to 5,000 m).
+  - Head start countdown (0 to 600 s) giving runners time to vanish before hunters are released.
+  - Game duration (5 to 240 mins).
+  - Radar ping interval (30 to 900 s).
+  - Tag proximity radius (5 to 100 m).
+- **Background Location Tracking:** Integrated Android Foreground Service (`expo-location` + `expo-task-manager`) maintains continuous GPS uploads even when the phone screen is locked in a runner's pocket.
+- **Real-Time Geofence Enforcement:** Audio-visual boundary HUD notifies players when exiting the designated play area with a countdown grace period before penalty pings are triggered.
+- **Fair Tagging Engine:** Server validates distance between Hunter and Runner using PostGIS (`ST_DWithin` + accuracy allowance) with an 8-second penalty cooldown on missed tags.
+- **Interactive Post-Match Replay:** Scrubbable timeline showing all player routes, tag events, ping timestamps, and the revealed secret target.
+- **Emergency SOS Beacon:** Instant safety override that immediately broadcasts an unmasked, high-priority emergency location beacon to all players in the lobby.
 
-1. **Lobby** — everyone joins, host sets rules, teams assigned.
-2. **Target selection** (Classic only) — runners pick the secret target inside
-   the play area.
-3. **Ready and countdown** — everyone ready, then a 10-second countdown.
-4. **Head start** — runners move, hunters are locked out and receive no pings.
-5. **Live** — hunters unlocked, pings released on a server schedule, tags and
-   arrival are active.
-6. **Ended** — winner announced, recap and replay available.
+---
 
-## Game parameters and defaults
-
-| Parameter                                 | Default    | Range             |
-| ----------------------------------------- | ---------- | ----------------- |
-| Players                                   | —          | 2 to 20           |
-| Play area radius                          | 600 m      | 100 to 5000 m     |
-| Head start                                | 180 s      | 0 to 600 s        |
-| Game duration (after head start)          | 45 min     | 5 to 240 min      |
-| Ping interval                             | 150 s      | 30 to 900 s       |
-| Tag radius                                | 20 m       | 5 to 100 m        |
-| Target radius                             | 25 m       | 10 to 100 m       |
-| Position upload (foreground / background) | 5 s / 10 s | —                 |
-| Failed tag cooldown                       | 8 s        | —                 |
-| Boundary grace                            | 30 s       | 10 to 120 s       |
-| Boundary penalty                          | Warn only  | Warn / extra ping |
-
-## Fairness rules
-
-- **Tagging:** a hunter presses Tag. The server finds the nearest active runner
-  whose position is fresh (under 20 s old) and within the tag radius plus a small
-  accuracy allowance. If one exists they are tagged; otherwise the attempt fails
-  and starts a cooldown.
-- **Stale positions:** if a runner's last position is old, the ping is still
-  released but marked with its age so hunters can judge it.
-- **Leaving:** a runner who leaves counts as tagged. A hunter who leaves is
-  removed. If the host leaves, the game continues and host rights pass on.
-- **Fair play:** do not enter private property, cross roads unsafely, or play near
-  traffic. The app reminds players and provides an SOS button.
-
-## Tech
-
-- **Mobile:** Expo + React Native + TypeScript + Expo Router, Android only for v1.
-  Can be previewed in **Expo Go** with a fallback map placeholder via `src/lib/map.tsx`. A **development build** is required for full MapLibre native rendering and background location tracking.
-- **Map:** MapLibre GL, free tile style, no Google API key.
-- **Location:** `expo-location` + `expo-task-manager`, foreground service plus
-  background updates.
-- **Notifications (v1):** local notifications only. Remote push (FCM) is v1.1.
-- **State:** Zustand, plus plain `supabase-js` calls.
-- **Storage:** AsyncStorage for Supabase session, active game id and a small
-  offline queue.
-- **Backend:** hosted Supabase — email/password auth, Postgres + PostGIS, Realtime,
-  pg_cron.
-- **Server logic:** PL/pgSQL RPC functions, atomic, PostGIS-native, no cold starts.
-  **No Edge Functions needed in v1.**
-- **Build and distribution:** EAS Build, `preview` profile, `buildType: apk`.
-
-## Repository layout
+## 🛠️ Tech Stack & Architecture
 
 ```
-ghostrun/
-  app/                      # Expo Router screens
-  src/                      # lib, state, hooks, components, theme
-  supabase/                # migrations, schema, RLS, functions, cron
-  scripts/                  # simulator and verification scripts
-  docs/                     # PRD.md, TRD.md, FLOW.md, DECISIONS.md
-  eas.json  package.json  tsconfig.json  .env.example
+                                  [ GhostRun App (Expo / React Native) ]
+                                          │                     │
+                        Background GPS    │                     │  MapLibre Native GL
+                        Foreground Task   │                     │  (OpenFreeMap Style)
+                                          ▼                     ▼
+                               ┌─────────────────────────────────────────┐
+                               │       Supabase Hosted Cloud Engine      │
+                               │                                         │
+                               │  • PostgreSQL 15 + PostGIS              │
+                               │  • Realtime WebSockets (Live Lobbies)   │
+                               │  • Row-Level Security (Anti-Cheat RLS)   │
+                               │  • Atomic PL/pgSQL Stored Procedures    │
+                               └─────────────────────────────────────────┘
 ```
 
-## Verification scripts
+- **Frontend & Framework:** [Expo](https://expo.dev) (SDK 58) / [React Native](https://reactnative.dev) (0.88) with Expo Router.
+- **Language:** TypeScript 6 with strict typing.
+- **Mapping Engine:** [MapLibre React Native](https://github.com/maplibre/maplibre-react-native) with free vector tile rendering via [OpenFreeMap](https://openfreemap.org) (no proprietary map API keys or fees required).
+- **State Management:** [Zustand](https://github.com/pmndrs/zustand) + `@react-native-async-storage/async-storage` for offline queueing and session recovery.
+- **Backend Infrastructure:** [Supabase](https://supabase.com) (PostgreSQL 15, PostGIS extension, Realtime broadcast channels).
+- **Security:** Strict PostgreSQL Row Level Security (RLS) guaranteeing that confidential runner coordinates never reach client hardware during live rounds.
+
+---
+
+## 📁 Repository Structure
+
+```
+GhostRun/
+├── android/                    # Native Android Gradle project configuration
+├── app/                        # Expo Router application screens & navigation
+│   ├── _layout.tsx             # Root navigation stack & theme providers
+│   ├── index.tsx               # Entry router / splash redirection
+│   ├── auth.tsx                # Email & password authentication
+│   ├── onboarding.tsx          # Full-bleed tutorial & role walkthrough
+│   ├── home.tsx                # Main menu (Create, Join, Active Games)
+│   ├── create.tsx              # Game creation & map boundary configuration
+│   ├── lobby/[id].tsx          # Pre-game lobby, team assignment, room code
+│   ├── game/[id].tsx           # Active match: tactical radar, tags, geofencing
+│   └── result/[id].tsx         # Post-match recap, stats & interactive replay
+├── assets/                     # App icons, splash screens, vector illustrations
+├── docs/                       # Product (PRD), Architecture (TRD) & System Specs
+├── scripts/                    # Test suites, simulation tools & cooldown checkers
+├── src/                        # Core application business logic
+│   ├── components/             # Reusable UI components & HUD widgets
+│   ├── hooks/                  # Custom location, game state & device hooks
+│   ├── lib/                    # Supabase client, map abstractions, utilities
+│   ├── state/                  # Zustand global game & player stores
+│   └── theme/                  # Design tokens, color palette, typography
+├── app.json                    # Expo project configuration & Android permissions
+└── package.json                # Dependencies, scripts & build tooling
+```
+
+---
+
+## 🚀 Getting Started
+
+### 1. Download Pre-Built Android APK
+You can install and play GhostRun directly on any modern Android device (Android 8.0+):
+- Head over to the [**Latest Releases**](https://github.com/ArshvirSk/GhostRun/releases).
+- Download `GhostRun-v1.0.0.apk`.
+- Open the `.apk` on your device and tap **Install** (allow "Install from Unknown Sources" if prompted).
+
+---
+
+### 2. Local Development Setup
+
+#### Prerequisites
+- Node.js 20+ and npm
+- Android Studio & Android SDK (for native Android builds)
+- A [Supabase](https://supabase.com) project with PostGIS enabled
+
+#### Installation
 
 ```bash
-npm run test:cooldown   # resend cooldown expiry, normalisation, pruning,
-                        # corrupt data and write failures, in-memory backend
+# Clone the repository
+git clone https://github.com/ArshvirSk/GhostRun.git
+cd GhostRun
+
+# Install dependencies
+npm install
 ```
 
-The full RLS secrecy and end-to-end scenarios live in
-[scripts/rls-check.ts](scripts/rls-check.ts). `scripts/sim` is a multi-player
-Node simulator for testing the whole server logic at a desk.
+#### Environment Variables
+Create a `.env` file in the project root:
 
-## Setup
+```ini
+EXPO_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+EXPO_PUBLIC_MAP_STYLE_URL=https://tiles.openfreemap.org/styles/liberty
+```
 
-1. Clone and install:
-
-   ```bash
-   npm install
-   ```
-
-2. Copy `.env.example` to `.env` and fill in the Supabase values:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   ```
-   EXPO_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key>
-   EXPO_PUBLIC_MAP_STYLE_URL=https://tiles.openfreemap.org/styles/liberty
-   ```
-
-   The anon key ships in the app. The service-role key never goes in the client
-   or this repo.
-
-3. Link the Supabase project and push the schema:
-
-   ```bash
-   npx supabase login
-   npx supabase link --project-ref <ref>
-   npx supabase db push
-   ```
-
-4. Start the development server:
-
-   ```bash
-   npm start
-   ```
-
-   A published preview is not part of setup yet; share the USB/debug or EAS build
-   to play.
-
-## Building an APK
+#### Database Setup
+Apply migrations and deploy PL/pgSQL functions to your Supabase project:
 
 ```bash
-npm i -g eas-cli
-eas login
+# Link your project
+npx supabase login
+npx supabase link --project-ref <your-project-ref>
+
+# Push migrations & schema
+npx supabase db push
+```
+
+#### Start Local Dev Server
+
+```bash
+# Start Metro bundler with Dev Client
+npm start
+
+# Run directly on an attached Android device/emulator
+npm run android
+```
+
+---
+
+## 🧪 Testing & Verification
+
+GhostRun includes an automated test and verification suite:
+
+```bash
+# Run strict TypeScript compiler verification
+npm run typecheck
+
+# Run ESLint validation
+npm run lint
+
+# Run rate-limit, resend cooldown, and storage pruning tests
+npm run test:cooldown
+```
+
+---
+
+## 📦 Building Production Release APK
+
+To compile a standalone release APK locally using Gradle:
+
+```bash
+# Navigate to the Android project directory
+cd android
+
+# Clean and compile release APK
+./gradlew clean assembleRelease
+```
+
+The compiled release APK will be located at:
+`android/app/build/outputs/apk/release/app-release.apk`
+
+Alternatively, build via EAS:
+```bash
 eas build -p android --profile preview
 ```
 
-Share the EAS build link or QR with friends. They open it on Android and allow
-"install unknown apps" once.
+---
 
-JS-only changes can ship with EAS Update. Native changes (permissions, plugins)
-need a new APK.
+## 🛡️ Safety & Fair Play
 
-## Environment variables
+GhostRun is designed for active outdoor fun, but physical safety always comes first:
+1. **Public Spaces Only:** Play in parks, pedestrian zones, campuses, or open fields. Never play in active traffic, construction zones, or restricted areas.
+2. **Respect Boundaries:** Never enter private property.
+3. **Emergency SOS:** In any dangerous situation, press the **SOS** button in the top HUD. It will immediately reveal your exact location to all players and provide an emergency dial shortcut.
 
-`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` and
-`EXPO_PUBLIC_MAP_STYLE_URL` are set through EAS environment variables for builds,
-not committed. `.env.example` documents the shape.
+---
 
-## Status
-
-- **v1:** Classic Chase and Tag Hunt, lobby, delayed pings, tagging, arrival,
-  boundary alerts, recap and replay, Android APK.
-- **v1.1:** remote push (FCM), runner proximity warning, polygon areas, freeze-on-tag option.
-- **v2:** Checkpoint Run, Infection, power-ups, ghost/NPC hunters, shareable recap video.
-
-## Want to run it with real people
-
-Before game day:
-
-- enable email sign-ins in Supabase Auth and sort out confirmation emails (or
-  turn off "Confirm email" during playtesting behind a test project),
-- make sure the redirect allowlist includes the app's reset-password deep link,
-- open the Supabase dashboard before game day so a free-tier inactivity pause does
-  not surprise you,
-- pick a public, safe area and share the safety notice with the group.
-
-Play safely: public areas, no traffic, no trespass. If someone needs help, use
-the SOS button — it shares the player's last position with everyone.
-
-## License
+## 📄 License
 
 Copyright © Arshvir. All rights reserved.
