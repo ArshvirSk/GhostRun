@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -211,7 +212,11 @@ function formatEvent(
     text = 'Round cancelled by host';
   } else if (event.type === 'sos') {
     icon = '🆘';
-    text = `${payload.display_name || 'Player'} sent SOS alert!`;
+    const loc =
+      payload.latitude && payload.longitude
+        ? ` (${Number(payload.latitude).toFixed(3)}, ${Number(payload.longitude).toFixed(3)})`
+        : '';
+    text = `EMERGENCY: ${payload.display_name || 'Player'} sent SOS${loc}`;
   }
 
   const ageS = Math.max(0, (serverNow - Date.parse(event.created_at)) / 1000);
@@ -261,6 +266,31 @@ export default function GameScreen() {
       .catch(() => {});
     void Notifications.requestPermissionsAsync().catch(() => {});
   }, []);
+
+  const [sosHolding, setSosHolding] = useState(false);
+  const [sosSent, setSosSent] = useState(false);
+
+  async function triggerSos() {
+    if (!supabase || !gameId) return;
+    setSosHolding(false);
+    setSosSent(true);
+    try {
+      Vibration.vibrate([0, 500, 200, 500]);
+    } catch {
+      // Ignored if vibration not supported
+    }
+    await supabase.rpc('send_sos', { game_id: gameId });
+    await loadState();
+    try {
+      await Linking.openURL('tel:112');
+    } catch {
+      try {
+        await Linking.openURL('tel:');
+      } catch {
+        // Ignored if dialer cannot open
+      }
+    }
+  }
 
   async function toggleMuted() {
     const next = !muted;
@@ -379,14 +409,23 @@ export default function GameScreen() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'events', filter: `game_id=eq.${gameId}` },
-        () => void loadState(),
+        (payload: { new?: { type?: string; payload?: { display_name?: string } } }) => {
+          if (payload.new?.type === 'sos') {
+            notify(
+              '🚨 SOS EMERGENCY ALERT',
+              `${payload.new.payload?.display_name || 'A player'} needs immediate help!`,
+              [0, 500, 200, 500],
+            );
+          }
+          void loadState();
+        },
       )
       .subscribe();
     return () => {
       clearTimeout(initialLoad);
       void supabase?.removeChannel(channel);
     };
-  }, [gameId, loadState]);
+  }, [gameId, loadState, notify]);
 
   // Purely visual tick; every displayed deadline is measured against server time.
   useEffect(() => {
@@ -1100,6 +1139,35 @@ export default function GameScreen() {
           </Text>
         )}
 
+        {(inPlay || game!.status === 'countdown') && (
+          <View style={styles.sosContainer}>
+            <Pressable
+              accessibilityLabel="Hold for 2 seconds to activate emergency SOS"
+              accessibilityRole="button"
+              delayLongPress={2000}
+              onLongPress={() => void triggerSos()}
+              onPressIn={() => setSosHolding(true)}
+              onPressOut={() => setSosHolding(false)}
+              style={[
+                styles.sosButton,
+                sosHolding && styles.sosButtonHolding,
+                sosSent && styles.sosButtonSent,
+              ]}
+            >
+              <Text style={styles.sosButtonText}>
+                {sosSent
+                  ? '🆘 SOS SENT · DIALER OPENED'
+                  : sosHolding
+                    ? 'HOLDING... RELEASE TO CANCEL'
+                    : '🆘 HOLD FOR SOS (2s)'}
+              </Text>
+            </Pressable>
+            <Text style={styles.sosHint}>
+              Broadcasts your position to everyone and launches emergency services dialer.
+            </Text>
+          </View>
+        )}
+
         <Pressable
           accessibilityRole="button"
           disabled={busy !== ''}
@@ -1285,4 +1353,37 @@ const styles = StyleSheet.create({
   footer: { color: '#94A3B8', fontSize: 11, lineHeight: 17, marginTop: 14 },
   linkButton: { alignItems: 'center', justifyContent: 'center', marginTop: 16, minHeight: 44 },
   linkText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
+  sosContainer: {
+    marginBottom: 6,
+    marginTop: 14,
+  },
+  sosButton: {
+    alignItems: 'center',
+    backgroundColor: '#991B1B',
+    borderRadius: 12,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 16,
+  },
+  sosButtonHolding: {
+    backgroundColor: '#DC2626',
+    borderColor: '#FFFFFF',
+    borderWidth: 2,
+  },
+  sosButtonSent: {
+    backgroundColor: '#450A0A',
+  },
+  sosButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  sosHint: {
+    color: '#94A3B8',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 6,
+    textAlign: 'center',
+  },
 });
