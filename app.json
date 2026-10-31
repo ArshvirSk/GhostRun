@@ -16,7 +16,7 @@
       "package": "com.ghostrun.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0F172A"
+        "backgroundColor": "#FFFFFF"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
