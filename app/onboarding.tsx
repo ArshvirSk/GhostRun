@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import {
   Image,
+  ImageSourcePropType,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -17,19 +19,23 @@ import {
 import { supabase } from '../src/lib/supabase';
 
 const GHOSTRUN_LOGO = require('../assets/logos/android-chrome-512x512.png');
+const SLIDE_1_DARK = require('../assets/onboarding/slide-1-dark.png');
+const SLIDE_2_DARK = require('../assets/onboarding/slide-2-dark.png');
+const SLIDE_3_DARK = require('../assets/onboarding/slide-3-dark.png');
 
 interface SlideData {
+  image: ImageSourcePropType;
   badge: string;
   badgeColor: string;
   title: string;
   subtitle: string;
   description: string;
   bullets: { icon: string; title: string; desc: string }[];
-  sceneType: 'chase' | 'target' | 'safety';
 }
 
 const SLIDES: SlideData[] = [
   {
+    image: SLIDE_1_DARK,
     badge: 'GAME MODE 01 · CHASE',
     badgeColor: '#38BDF8',
     title: 'Classic Chase',
@@ -53,9 +59,9 @@ const SLIDES: SlideData[] = [
         desc: 'Close the distance to within the tag radius and hit TAG to catch runners.',
       },
     ],
-    sceneType: 'chase',
   },
   {
+    image: SLIDE_2_DARK,
     badge: 'GAME MODE 02 · EXTRACTION',
     badgeColor: '#F43F5E',
     title: 'The Secret Target',
@@ -79,9 +85,9 @@ const SLIDES: SlideData[] = [
         desc: 'Straying outside the arena perimeter triggers extra pings for hunters.',
       },
     ],
-    sceneType: 'target',
   },
   {
+    image: SLIDE_3_DARK,
     badge: 'ESSENTIALS · SAFETY FIRST',
     badgeColor: '#10B981',
     title: 'Tactics & Safety',
@@ -105,15 +111,16 @@ const SLIDES: SlideData[] = [
         desc: '1-tap emergency broadcast to all players and direct dialer to emergency services.',
       },
     ],
-    sceneType: 'safety',
   },
 ];
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef<import('react').ElementRef<typeof ScrollView>>(null);
+
+  const imageHeight = Math.max(220, Math.min(320, Math.round(screenHeight * 0.36)));
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
@@ -177,7 +184,7 @@ export default function OnboardingScreen() {
         )}
       </View>
 
-      {/* Paging Slides */}
+      {/* Horizontal Paging Slides */}
       <ScrollView
         bounces={false}
         decelerationRate="fast"
@@ -189,17 +196,29 @@ export default function OnboardingScreen() {
         showsHorizontalScrollIndicator={false}
         style={styles.slider}
       >
-        {SLIDES.map((slide, idx) => (
+        {SLIDES.map((slide) => (
           <View key={slide.title} style={[styles.slide, { width: screenWidth }]}>
-            {/* Slide Hero Illustration */}
-            <View style={styles.illustrationWrapper}>
-              {slide.sceneType === 'chase' && <ChaseIllustration />}
-              {slide.sceneType === 'target' && <TargetIllustration />}
-              {slide.sceneType === 'safety' && <SafetyIllustration />}
+            {/* Visual Hero Card with Bottom Gradient Fade */}
+            <View style={[styles.imageCard, { height: imageHeight }]}>
+              <Image
+                accessibilityLabel={slide.title}
+                resizeMode="cover"
+                source={slide.image}
+                style={styles.slideImage}
+              />
+              <LinearGradient
+                colors={['transparent', 'rgba(9, 13, 22, 0.35)', 'rgba(9, 13, 22, 0.8)', '#090D16']}
+                locations={[0, 0.5, 0.82, 1]}
+                style={styles.imageBottomGradient}
+              />
             </View>
 
-            {/* Slide Content Card */}
-            <View style={styles.contentCard}>
+            {/* Slide Content */}
+            <ScrollView
+              contentContainerStyle={styles.contentScrollContainer}
+              showsVerticalScrollIndicator={false}
+              style={styles.contentScrollView}
+            >
               <View style={[styles.badge, { borderColor: slide.badgeColor }]}>
                 <Text style={[styles.badgeText, { color: slide.badgeColor }]}>{slide.badge}</Text>
               </View>
@@ -219,127 +238,43 @@ export default function OnboardingScreen() {
                   </View>
                 ))}
               </View>
-            </View>
+            </ScrollView>
           </View>
         ))}
       </ScrollView>
 
-      {/* Footer Controls */}
-      <View style={styles.footer}>
-        {/* Pagination Dots */}
-        <View style={styles.dotsContainer}>
-          {SLIDES.map((_, i) => (
-            <View
-              key={i}
-              style={[styles.dot, i === activeIndex ? styles.dotActive : styles.dotInactive]}
-            />
-          ))}
-        </View>
-
-        {/* Action Button */}
-        <Pressable
-          accessibilityRole="button"
-          onPress={handleNext}
-          style={[
-            styles.actionButton,
-            activeIndex === SLIDES.length - 1 && styles.actionButtonFinal,
-          ]}
-        >
-          <Text style={styles.actionButtonText}>
-            {activeIndex === SLIDES.length - 1 ? 'Enter GhostRun ⚡' : 'Next  ➔'}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-// Visual Illustration for Slide 1 (Classic Chase)
-function ChaseIllustration() {
-  return (
-    <View style={styles.sceneContainer}>
-      <View style={styles.radarCircleOuter} />
-      <View style={styles.radarCircleMiddle} />
-      <View style={styles.radarCircleInner} />
-      <View style={styles.radarAxisX} />
-      <View style={styles.radarAxisY} />
-
-      {/* Runner Dot with breadcrumbs */}
-      <View style={styles.runnerTrailPoint1} />
-      <View style={styles.runnerTrailPoint2} />
-      <View style={styles.runnerPoint}>
-        <Text style={styles.pointEmoji}>🏃</Text>
-      </View>
-
-      {/* Hunter Ping Ripple */}
-      <View style={styles.hunterPingWave} />
-      <View style={styles.hunterPoint}>
-        <Text style={styles.pointEmoji}>🎯</Text>
-      </View>
-
-      {/* Tag Proximity Ring */}
-      <View style={styles.tagRingLabelBox}>
-        <Text style={styles.tagRingLabel}>TAG RADIUS · 20M</Text>
-      </View>
-    </View>
-  );
-}
-
-// Visual Illustration for Slide 2 (Tag Hunt & Secret Target)
-function TargetIllustration() {
-  return (
-    <View style={styles.sceneContainer}>
-      <View style={[styles.radarCircleOuter, { borderColor: 'rgba(244, 63, 94, 0.15)' }]} />
-      <View style={[styles.radarCircleMiddle, { borderColor: 'rgba(244, 63, 94, 0.25)' }]} />
-
-      {/* Target Extraction Point */}
-      <View style={styles.targetBeaconHalo} />
-      <View style={styles.targetBeacon}>
-        <Text style={styles.pointEmoji}>📍</Text>
-      </View>
-
-      {/* Route dashed line indicators */}
-      <View style={styles.routeWaypoint1} />
-      <View style={styles.routeWaypoint2} />
-      <View style={styles.runnerExtractionPoint}>
-        <Text style={styles.pointEmoji}>🏃</Text>
-      </View>
-
-      {/* Hunter intercept vector */}
-      <View style={styles.hunterInterceptPoint}>
-        <Text style={styles.pointEmoji}>🕵️</Text>
-      </View>
-
-      <View style={styles.targetLabelBox}>
-        <Text style={styles.targetLabel}>SECRET EXTRACTION BEACON</Text>
-      </View>
-    </View>
-  );
-}
-
-// Visual Illustration for Slide 3 (Tactics & Safety)
-function SafetyIllustration() {
-  return (
-    <View style={styles.sceneContainer}>
-      <View style={[styles.radarCircleOuter, { borderColor: 'rgba(16, 185, 129, 0.12)' }]} />
-
-      {/* Safety Shield Core */}
-      <View style={styles.safetyCard}>
-        <View style={styles.safetyHeaderRow}>
-          <Text style={styles.safetyShieldIcon}>🛡️</Text>
-          <View>
-            <Text style={styles.safetyCardTitle}>EMERGENCY PROTOCOL</Text>
-            <Text style={styles.safetyCardSub}>Real-Time GPS Broadcast</Text>
+      {/* Floating Footer with Ambient Gradient */}
+      <View style={styles.footerWrapper}>
+        <LinearGradient
+          colors={['transparent', 'rgba(9, 13, 22, 0.85)', '#090D16']}
+          locations={[0, 0.45, 1]}
+          pointerEvents="none"
+          style={styles.footerGradient}
+        />
+        <View style={styles.footer}>
+          {/* Pagination Indicator Dots */}
+          <View style={styles.dotsContainer}>
+            {SLIDES.map((_, i) => (
+              <View
+                key={i}
+                style={[styles.dot, i === activeIndex ? styles.dotActive : styles.dotInactive]}
+              />
+            ))}
           </View>
-        </View>
 
-        <View style={styles.sosButtonDemo}>
-          <Text style={styles.sosButtonDemoText}>🚨 HOLD FOR SOS</Text>
-        </View>
-
-        <View style={styles.dialerRow}>
-          <Text style={styles.dialerBadge}>DIALS 112</Text>
-          <Text style={styles.safetyAlertDesc}>Instant Crew Alert</Text>
+          {/* Action Button */}
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleNext}
+            style={[
+              styles.actionButton,
+              activeIndex === SLIDES.length - 1 && styles.actionButtonFinal,
+            ]}
+          >
+            <Text style={styles.actionButtonText}>
+              {activeIndex === SLIDES.length - 1 ? 'Enter GhostRun ⚡' : 'Next  ➔'}
+            </Text>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -355,9 +290,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingBottom: 8,
     paddingHorizontal: 22,
-    paddingTop: 54,
-    paddingBottom: 12,
+    paddingTop: 52,
   },
   headerBrand: {
     alignItems: 'center',
@@ -392,289 +327,35 @@ const styles = StyleSheet.create({
   },
   slide: {
     flex: 1,
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
   },
-  illustrationWrapper: {
-    alignItems: 'center',
-    height: 180,
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  sceneContainer: {
-    alignItems: 'center',
+  imageCard: {
     backgroundColor: '#0F172A',
     borderColor: '#1E293B',
     borderRadius: 20,
     borderWidth: 1,
-    height: 170,
-    justifyContent: 'center',
+    marginTop: 6,
     overflow: 'hidden',
     position: 'relative',
     width: '100%',
   },
-  radarCircleOuter: {
-    borderColor: 'rgba(56, 189, 248, 0.1)',
-    borderRadius: 120,
-    borderWidth: 1,
-    height: 240,
-    position: 'absolute',
-    width: 240,
-  },
-  radarCircleMiddle: {
-    borderColor: 'rgba(56, 189, 248, 0.16)',
-    borderRadius: 80,
-    borderWidth: 1,
-    height: 160,
-    position: 'absolute',
-    width: 160,
-  },
-  radarCircleInner: {
-    borderColor: 'rgba(56, 189, 248, 0.22)',
-    borderRadius: 40,
-    borderWidth: 1,
-    height: 80,
-    position: 'absolute',
-    width: 80,
-  },
-  radarAxisX: {
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
-    height: 1,
-    position: 'absolute',
-    width: '100%',
-  },
-  radarAxisY: {
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+  slideImage: {
     height: '100%',
-    position: 'absolute',
-    width: 1,
-  },
-  runnerPoint: {
-    alignItems: 'center',
-    backgroundColor: '#059669',
-    borderColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 2,
-    height: 28,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 70,
-    top: 36,
-    width: 28,
-  },
-  runnerTrailPoint1: {
-    backgroundColor: 'rgba(5, 150, 105, 0.4)',
-    borderRadius: 5,
-    height: 10,
-    position: 'absolute',
-    right: 105,
-    top: 55,
-    width: 10,
-  },
-  runnerTrailPoint2: {
-    backgroundColor: 'rgba(5, 150, 105, 0.2)',
-    borderRadius: 4,
-    height: 8,
-    position: 'absolute',
-    right: 128,
-    top: 72,
-    width: 8,
-  },
-  hunterPoint: {
-    alignItems: 'center',
-    backgroundColor: '#2563EB',
-    borderColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 2,
-    height: 28,
-    justifyContent: 'center',
-    left: 60,
-    position: 'absolute',
-    top: 85,
-    width: 28,
-  },
-  hunterPingWave: {
-    borderColor: 'rgba(37, 99, 235, 0.4)',
-    borderRadius: 35,
-    borderWidth: 2,
-    height: 70,
-    left: 39,
-    position: 'absolute',
-    top: 64,
-    width: 70,
-  },
-  pointEmoji: {
-    fontSize: 13,
-  },
-  tagRingLabelBox: {
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    borderColor: '#38BDF8',
-    borderRadius: 10,
-    borderWidth: 1,
-    bottom: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    position: 'absolute',
-  },
-  tagRingLabel: {
-    color: '#38BDF8',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  targetBeaconHalo: {
-    backgroundColor: 'rgba(244, 63, 94, 0.15)',
-    borderColor: '#F43F5E',
-    borderRadius: 36,
-    borderWidth: 1.5,
-    height: 72,
-    position: 'absolute',
-    right: 50,
-    top: 25,
-    width: 72,
-  },
-  targetBeacon: {
-    alignItems: 'center',
-    backgroundColor: '#E11D48',
-    borderColor: '#FFFFFF',
-    borderRadius: 18,
-    borderWidth: 2,
-    height: 36,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 68,
-    top: 43,
-    width: 36,
-  },
-  runnerExtractionPoint: {
-    alignItems: 'center',
-    backgroundColor: '#059669',
-    borderColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 2,
-    bottom: 35,
-    height: 28,
-    justifyContent: 'center',
-    left: 55,
-    position: 'absolute',
-    width: 28,
-  },
-  routeWaypoint1: {
-    borderColor: '#10B981',
-    borderRadius: 4,
-    borderStyle: 'dashed',
-    borderWidth: 2,
-    bottom: 58,
-    height: 8,
-    left: 100,
-    position: 'absolute',
-    width: 8,
-  },
-  routeWaypoint2: {
-    borderColor: '#10B981',
-    borderRadius: 4,
-    borderStyle: 'dashed',
-    borderWidth: 2,
-    bottom: 80,
-    height: 8,
-    left: 145,
-    position: 'absolute',
-    width: 8,
-  },
-  hunterInterceptPoint: {
-    alignItems: 'center',
-    backgroundColor: '#D97706',
-    borderColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 2,
-    height: 28,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 120,
-    top: 25,
-    width: 28,
-  },
-  targetLabelBox: {
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    borderColor: '#F43F5E',
-    borderRadius: 10,
-    borderWidth: 1,
-    bottom: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    position: 'absolute',
-  },
-  targetLabel: {
-    color: '#F43F5E',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  safetyCard: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-    borderColor: '#334155',
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 12,
-    width: '88%',
-  },
-  safetyHeaderRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  safetyShieldIcon: {
-    fontSize: 20,
-  },
-  safetyCardTitle: {
-    color: '#F8FAFC',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  safetyCardSub: {
-    color: '#94A3B8',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  sosButtonDemo: {
-    alignItems: 'center',
-    backgroundColor: '#DC2626',
-    borderRadius: 8,
-    justifyContent: 'center',
-    paddingVertical: 6,
     width: '100%',
   },
-  sosButtonDemoText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.6,
+  imageBottomGradient: {
+    bottom: 0,
+    height: '52%',
+    left: 0,
+    position: 'absolute',
+    right: 0,
   },
-  dialerRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 6,
-  },
-  dialerBadge: {
-    backgroundColor: '#7F1D1D',
-    borderRadius: 4,
-    color: '#FECACA',
-    fontSize: 9,
-    fontWeight: '800',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  safetyAlertDesc: {
-    color: '#10B981',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  contentCard: {
+  contentScrollView: {
     flex: 1,
-    marginTop: 10,
+  },
+  contentScrollContainer: {
+    paddingBottom: 90,
+    paddingTop: 12,
   },
   badge: {
     alignSelf: 'flex-start',
@@ -691,9 +372,9 @@ const styles = StyleSheet.create({
   },
   slideTitle: {
     color: '#F8FAFC',
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   slideSubtitle: {
     color: '#94A3B8',
@@ -713,8 +394,8 @@ const styles = StyleSheet.create({
   },
   bulletRow: {
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(30, 41, 59, 0.6)',
-    borderColor: 'rgba(51, 65, 85, 0.6)',
+    backgroundColor: 'rgba(30, 41, 59, 0.65)',
+    borderColor: 'rgba(51, 65, 85, 0.65)',
     borderRadius: 10,
     borderWidth: 1,
     flexDirection: 'row',
@@ -739,14 +420,26 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     marginTop: 1,
   },
+  footerWrapper: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+  footerGradient: {
+    height: 90,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: -20,
+  },
   footer: {
     alignItems: 'center',
-    borderTopColor: '#1E293B',
-    borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingBottom: 24,
     paddingHorizontal: 22,
-    paddingVertical: 18,
+    paddingTop: 8,
   },
   dotsContainer: {
     flexDirection: 'row',
