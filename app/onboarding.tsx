@@ -95,12 +95,6 @@ export default function OnboardingScreen() {
     }
   };
 
-  const handlePrev = () => {
-    if (activeIndex > 0) {
-      goToSlide(activeIndex - 1);
-    }
-  };
-
   const completeOnboarding = async () => {
     try {
       await AsyncStorage.setItem('@ghostrun:onboarded', 'true');
@@ -120,6 +114,14 @@ export default function OnboardingScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
+
+      {/* Ambient Background Gradient */}
+      <LinearGradient
+        colors={['#0B1120', '#080C16', '#05070E']}
+        locations={[0, 0.5, 1]}
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+      />
 
       {/* Floating Top Header */}
       <View style={styles.floatingHeader}>
@@ -149,7 +151,7 @@ export default function OnboardingScreen() {
         </Pressable>
       </View>
 
-      {/* Full-Screen Swiping Slides */}
+      {/* Swiping Slides */}
       <ScrollView
         bounces={false}
         horizontal
@@ -166,38 +168,18 @@ export default function OnboardingScreen() {
             key={slide.title}
             style={[styles.slidePage, { width: screenWidth, height: screenHeight }]}
           >
-            {/* Fitted On-Screen Illustration (not zoomed in or cropped) */}
-            <Image
-              accessibilityLabel={slide.title}
-              fadeDuration={0}
-              resizeMode="contain"
-              source={slide.image}
-              style={StyleSheet.absoluteFill}
-            />
+            {/* Dedicated Hero Image Viewport (fully fitted on screen, uncropped) */}
+            <View style={styles.imageViewport}>
+              <Image
+                accessibilityLabel={slide.title}
+                fadeDuration={0}
+                resizeMode="contain"
+                source={slide.image}
+                style={styles.slideImage}
+              />
+            </View>
 
-            {/* Top Scrim Gradient for Header Legibility */}
-            <LinearGradient
-              colors={['rgba(8, 12, 22, 0.85)', 'rgba(8, 12, 22, 0.3)', 'transparent']}
-              locations={[0, 0.55, 1]}
-              pointerEvents="none"
-              style={styles.topScrim}
-            />
-
-            {/* Bottom Cinematic Gradient Fade - Focused Behind Content */}
-            <LinearGradient
-              colors={[
-                'transparent',
-                'rgba(8, 12, 22, 0.35)',
-                'rgba(8, 12, 22, 0.75)',
-                'rgba(8, 12, 22, 0.94)',
-                '#080C16',
-              ]}
-              locations={[0, 0.3, 0.6, 0.85, 1]}
-              pointerEvents="none"
-              style={styles.bottomGradient}
-            />
-
-            {/* Content Overlay Anchored on Gradient */}
+            {/* Bottom Content Area */}
             <View style={styles.slideContent}>
               <View style={[styles.badge, { borderColor: slide.badgeColor }]}>
                 <View style={[styles.badgeDot, { backgroundColor: slide.badgeColor }]} />
@@ -216,7 +198,7 @@ export default function OnboardingScreen() {
         ))}
       </ScrollView>
 
-      {/* Persistent Bottom Controls (Slide Status + Navigation Buttons) */}
+      {/* Persistent Bottom Controls (Slide Status + Full-Width Action Button) */}
       <View style={styles.controlsDock}>
         {/* Slide Status Indicator Dots */}
         <View style={styles.dotsRow}>
@@ -237,44 +219,28 @@ export default function OnboardingScreen() {
           ))}
         </View>
 
-        {/* Action Button Row with Rock-Solid Fixed Geometry */}
-        <View style={styles.buttonRow}>
-          <Pressable
-            accessibilityLabel="Previous slide"
-            accessibilityRole="button"
-            disabled={activeIndex === 0}
-            onPress={handlePrev}
-            style={({ pressed }) => [
-              styles.prevButton,
-              activeIndex === 0 && styles.prevButtonHidden,
-              pressed && activeIndex > 0 && styles.buttonPressed,
-            ]}
-          >
-            <Ionicons color="#FFFFFF" name="chevron-back" size={24} />
-          </Pressable>
-
-          <Pressable
-            accessibilityLabel={activeIndex === SLIDES.length - 1 ? 'Start Running' : 'Next slide'}
-            accessibilityRole="button"
-            onPress={handleNext}
-            style={({ pressed }) => [
-              styles.nextButton,
-              activeIndex === SLIDES.length - 1 && styles.nextButtonFinal,
-              pressed && styles.buttonPressed,
-            ]}
-          >
-            <View style={styles.nextButtonContent}>
-              <Text style={styles.nextButtonText}>
-                {activeIndex === SLIDES.length - 1 ? 'Start Running' : 'Continue'}
-              </Text>
-              <Ionicons
-                color="#FFFFFF"
-                name={activeIndex === SLIDES.length - 1 ? 'flash' : 'arrow-forward'}
-                size={18}
-              />
-            </View>
-          </Pressable>
-        </View>
+        {/* Action Button (Full Width Continue / Start Running - No Back Button Needed) */}
+        <Pressable
+          accessibilityLabel={activeIndex === SLIDES.length - 1 ? 'Start Running' : 'Continue'}
+          accessibilityRole="button"
+          onPress={handleNext}
+          style={({ pressed }) => [
+            styles.nextButton,
+            activeIndex === SLIDES.length - 1 && styles.nextButtonFinal,
+            pressed && styles.buttonPressed,
+          ]}
+        >
+          <View style={styles.nextButtonContent}>
+            <Text style={styles.nextButtonText}>
+              {activeIndex === SLIDES.length - 1 ? 'Start Running' : 'Continue'}
+            </Text>
+            <Ionicons
+              color="#FFFFFF"
+              name={activeIndex === SLIDES.length - 1 ? 'flash' : 'arrow-forward'}
+              size={18}
+            />
+          </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -337,27 +303,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   slidePage: {
-    justifyContent: 'flex-end',
-    position: 'relative',
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingBottom: 130,
+    paddingTop: 96,
   },
-  topScrim: {
-    height: 120,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
+  imageViewport: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    width: '100%',
   },
-  bottomGradient: {
-    bottom: 0,
-    height: '40%',
-    left: 0,
-    position: 'absolute',
-    right: 0,
+  slideImage: {
+    height: '100%',
+    width: '100%',
   },
   slideContent: {
-    paddingBottom: 130,
     paddingHorizontal: 24,
-    zIndex: 10,
+    paddingTop: 8,
   },
   badge: {
     alignItems: 'center',
@@ -367,7 +332,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: 7,
-    marginBottom: 10,
+    marginBottom: 8,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
@@ -383,20 +348,20 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#FFFFFF',
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: '900',
     letterSpacing: -0.5,
-    lineHeight: 36,
-    marginBottom: 8,
+    lineHeight: 32,
+    marginBottom: 6,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
   description: {
     color: '#CBD5E1',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
-    lineHeight: 22,
+    lineHeight: 20,
     textShadowColor: 'rgba(0, 0, 0, 0.7)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
@@ -428,44 +393,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     width: 8,
   },
-  buttonRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-  },
-  prevButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(30, 41, 59, 0.85)',
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 16,
-    borderWidth: 1,
-    height: 52,
-    justifyContent: 'center',
-    width: 52,
-  },
-  prevButtonHidden: {
-    opacity: 0,
-    pointerEvents: 'none',
-  },
-  prevButtonText: {
-    color: '#FFFFFF',
-    fontSize: 26,
-    fontWeight: '700',
-    lineHeight: 28,
-    marginTop: -2,
-  },
   nextButton: {
     alignItems: 'center',
     backgroundColor: '#2563EB',
     borderRadius: 16,
     elevation: 4,
-    flex: 1,
     height: 52,
     justifyContent: 'center',
     shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 10,
+    width: '100%',
   },
   nextButtonFinal: {
     backgroundColor: '#10B981',
