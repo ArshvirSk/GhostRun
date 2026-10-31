@@ -1,24 +1,20 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from '../src/lib/map';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  LayoutAnimation,
-  Platform,
+  Animated,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  UIManager,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { circleRing } from '../src/lib/geo';
 import { supabase } from '../src/lib/supabase';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 type Mode = 'classic_chase' | 'tag_hunt';
 type BoundaryPenalty = 'warn' | 'extra_ping';
@@ -27,6 +23,8 @@ const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
 const DEFAULT_CENTER: [number, number] = [-97, 38];
 const RADII = [300, 600, 1000, 1500];
+
+let createSheetDragStartY = 0;
 
 // Ranges from m1_games_lobby.sql CHECK constraints
 const SETTINGS = {
@@ -79,12 +77,80 @@ export default function CreateGameScreen() {
   const [radius, setRadius] = useState(600);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const { height: screenHeight } = useWindowDimensions();
+  const SHEET_HEIGHT = Math.max(380, Math.round(screenHeight * 0.54));
+  const COLLAPSED_HEIGHT = 58;
+  const SNAP_BOTTOM = SHEET_HEIGHT - COLLAPSED_HEIGHT;
+  const SNAP_TOP = 0;
+
+  const [translateY] = useState(() => new Animated.Value(SNAP_TOP));
   const [sheetExpanded, setSheetExpanded] = useState(true);
 
-  const toggleSheet = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setSheetExpanded((prev) => !prev);
-  };
+  const contentOpacity = translateY.interpolate({
+    inputRange: [SNAP_TOP, SNAP_BOTTOM * 0.65, SNAP_BOTTOM],
+    outputRange: [1, 0.2, 0],
+    extrapolate: 'clamp',
+  });
+
+  const dockOpacity = translateY.interpolate({
+    inputRange: [SNAP_TOP, SNAP_BOTTOM * 0.4, SNAP_BOTTOM],
+    outputRange: [0, 0.4, 1],
+    extrapolate: 'clamp',
+  });
+
+  const snapSheet = useCallback(
+    (toValue: number, velocity = 0) => {
+      Animated.spring(translateY, {
+        toValue,
+        velocity,
+        tension: 65,
+        friction: 11,
+        useNativeDriver: true,
+      }).start(() => {
+        setSheetExpanded(toValue === SNAP_TOP);
+      });
+    },
+    [SNAP_TOP, translateY],
+  );
+
+  const [panResponder] = useState(() =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5,
+      onPanResponderGrant: () => {
+        translateY.stopAnimation((val) => {
+          createSheetDragStartY = val;
+        });
+      },
+      onPanResponderMove: (_, gesture) => {
+        const newY = Math.max(SNAP_TOP, Math.min(SNAP_BOTTOM, createSheetDragStartY + gesture.dy));
+        translateY.setValue(newY);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        let toValue = SNAP_BOTTOM;
+        if (gesture.vy < -0.35) {
+          toValue = SNAP_TOP;
+        } else if (gesture.vy > 0.35) {
+          toValue = SNAP_BOTTOM;
+        } else {
+          const currentY = Math.max(
+            SNAP_TOP,
+            Math.min(SNAP_BOTTOM, createSheetDragStartY + gesture.dy),
+          );
+          toValue = currentY < SNAP_BOTTOM * 0.5 ? SNAP_TOP : SNAP_BOTTOM;
+        }
+        Animated.spring(translateY, {
+          toValue,
+          velocity: gesture.vy,
+          tension: 65,
+          friction: 11,
+          useNativeDriver: true,
+        }).start(() => {
+          setSheetExpanded(toValue === SNAP_TOP);
+        });
+      },
+    }),
+  );
 
   useEffect(() => {
     let active = true;
@@ -197,6 +263,9 @@ export default function CreateGameScreen() {
           setCenterMode('custom');
           setCenter(coords);
           cameraRef.current?.easeTo({ center: coords, duration: 300 });
+          if (sheetExpanded) {
+            snapSheet(SNAP_BOTTOM);
+          }
         }}
         style={StyleSheet.absoluteFill}
       >
@@ -310,33 +379,33 @@ export default function CreateGameScreen() {
         </View>
       </View>
 
-      <View
+      <Animated.View
         style={[
           styles.bottomSheet,
-          sheetExpanded ? styles.bottomSheetExpanded : styles.bottomSheetCollapsed,
+          {
+            height: SHEET_HEIGHT,
+            transform: [{ translateY }],
+          },
         ]}
       >
-        <Pressable
-          accessibilityLabel={sheetExpanded ? 'Minimize settings' : 'Expand settings'}
-          accessibilityRole="button"
-          onPress={toggleSheet}
-          style={styles.sheetHandleRow}
-        >
+        <View {...panResponder.panHandlers} style={styles.sheetHandleRow}>
           <View style={styles.sheetHandle} />
-          {!sheetExpanded && (
-            <View style={styles.dockBar}>
-              <Text style={styles.dockTitle}>
-                Settings · {radius}m ({mode === 'classic_chase' ? 'Classic' : 'Tag Hunt'})
-              </Text>
-              <Text style={styles.dockHint}>▲ Tap to configure</Text>
-            </View>
-          )}
-        </Pressable>
+          <Animated.View style={[styles.dockBar, { opacity: dockOpacity }]}>
+            <Text style={styles.dockTitle}>
+              Settings · {radius}m ({mode === 'classic_chase' ? 'Classic' : 'Tag Hunt'})
+            </Text>
+            <Text style={styles.dockHint}>▲ Slide up to configure</Text>
+          </Animated.View>
+        </View>
 
-        {sheetExpanded && (
+        <Animated.View
+          pointerEvents={sheetExpanded ? 'auto' : 'none'}
+          style={[styles.bottomSheetInner, { opacity: contentOpacity }]}
+        >
           <ScrollView
-            style={styles.bottomSheetScroll}
             contentContainerStyle={styles.bottomSheetContent}
+            keyboardShouldPersistTaps="handled"
+            style={styles.bottomSheetScroll}
           >
             <Text style={styles.sectionLabel}>MODE</Text>
             <View style={styles.row}>
@@ -471,8 +540,8 @@ export default function CreateGameScreen() {
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
           </ScrollView>
-        )}
-      </View>
+        </Animated.View>
+      </Animated.View>
     </View>
   );
 }
@@ -556,33 +625,30 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     bottom: 0,
-    elevation: 8,
+    elevation: 12,
     left: 0,
     position: 'absolute',
     right: 0,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
   },
-  bottomSheetCollapsed: {
-    maxHeight: 56,
-  },
-  bottomSheetExpanded: {
-    maxHeight: '48%',
+  bottomSheetInner: {
+    flex: 1,
   },
   sheetHandleRow: {
     alignItems: 'center',
-    paddingBottom: 6,
+    paddingBottom: 4,
     paddingTop: 8,
   },
   sheetHandle: {
     alignSelf: 'center',
     backgroundColor: '#CBD5E1',
-    borderRadius: 2,
-    height: 4,
+    borderRadius: 3,
+    height: 5,
     marginBottom: 4,
-    width: 36,
+    width: 40,
   },
   dockBar: {
     alignItems: 'center',
