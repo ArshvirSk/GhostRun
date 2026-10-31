@@ -1,8 +1,10 @@
-import { Camera, Map as MapLibreMap } from '../src/lib/map';
+import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../src/lib/map';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { circleRing } from '../src/lib/geo';
 import { supabase } from '../src/lib/supabase';
 
 type Mode = 'classic_chase' | 'tag_hunt';
@@ -57,9 +59,47 @@ export default function CreateGameScreen() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('classic_chase');
   const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
+  const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
+  const [centerMode, setCenterMode] = useState<'my_location' | 'custom'>('my_location');
+  const [locating, setLocating] = useState(true);
   const [radius, setRadius] = useState(600);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    async function initLocation() {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const last = await Location.getLastKnownPositionAsync();
+          if (active && last) {
+            const coords: [number, number] = [last.coords.longitude, last.coords.latitude];
+            setMyLocation(coords);
+            setCenter(coords);
+            setLocating(false);
+          }
+          const current = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          if (active && current) {
+            const coords: [number, number] = [current.coords.longitude, current.coords.latitude];
+            setMyLocation(coords);
+            setCenter(coords);
+            setLocating(false);
+          }
+        } else {
+          if (active) setLocating(false);
+        }
+      } catch {
+        if (active) setLocating(false);
+      }
+    }
+    void initLocation();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [headStartS, setHeadStartS] = useState<number>(SETTINGS.head_start_s.default);
   const [durationS, setDurationS] = useState<number>(SETTINGS.duration_s.default);
@@ -129,15 +169,118 @@ export default function CreateGameScreen() {
       <MapLibreMap
         attribution
         mapStyle={MAP_STYLE}
-        onPress={(event) => setCenter(event.nativeEvent.lngLat)}
+        onPress={(event) => {
+          setCenterMode('custom');
+          setCenter(event.nativeEvent.lngLat);
+        }}
         style={StyleSheet.absoluteFill}
       >
-        <Camera initialViewState={{ center, zoom: 13 }} />
+        <Camera key={`${center[0]},${center[1]}`} initialViewState={{ center, zoom: 13 }} />
+        <GeoJSONSource
+          id="play-area"
+          data={circleRing({ longitude: center[0], latitude: center[1] }, radius)}
+        >
+          <Layer
+            id="play-area-fill"
+            type="fill"
+            paint={{ 'fill-color': '#1D4ED8', 'fill-opacity': 0.08 }}
+          />
+          <Layer
+            id="play-area-outline"
+            type="line"
+            paint={{ 'line-color': '#1D4ED8', 'line-width': 2, 'line-dasharray': [2, 2] }}
+          />
+        </GeoJSONSource>
+        <GeoJSONSource
+          id="center-marker"
+          data={{
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: {},
+                geometry: { type: 'Point', coordinates: center },
+              },
+            ],
+          }}
+        >
+          <Layer
+            id="center-marker-point"
+            type="circle"
+            paint={{
+              'circle-radius': 7,
+              'circle-color': '#1D4ED8',
+              'circle-stroke-width': 2.5,
+              'circle-stroke-color': '#FFFFFF',
+            }}
+          />
+        </GeoJSONSource>
       </MapLibreMap>
 
       <View style={styles.topCard}>
-        <Text style={styles.title}>Create a game</Text>
-        <Text style={styles.hint}>Tap the map to choose the play-area centre.</Text>
+        <View style={styles.topCardHeader}>
+          <Text style={styles.title}>Create a game</Text>
+          {locating && <ActivityIndicator color="#1D4ED8" size="small" />}
+        </View>
+        <Text style={styles.hint}>
+          {centerMode === 'my_location'
+            ? 'Using your GPS location as play-area centre.'
+            : 'Custom centre selected. Tap anywhere on map to reposition.'}
+        </Text>
+
+        <View style={styles.centerToggleRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: centerMode === 'my_location' }}
+            onPress={() => {
+              setCenterMode('my_location');
+              if (myLocation) {
+                setCenter(myLocation);
+              } else {
+                setLocating(true);
+                void Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+                  .then((pos) => {
+                    const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+                    setMyLocation(coords);
+                    setCenter(coords);
+                  })
+                  .catch(() => {})
+                  .finally(() => setLocating(false));
+              }
+            }}
+            style={[
+              styles.centerToggleButton,
+              centerMode === 'my_location' && styles.centerToggleSelected,
+            ]}
+          >
+            <Text
+              style={[
+                styles.centerToggleText,
+                centerMode === 'my_location' && styles.centerToggleTextSelected,
+              ]}
+            >
+              📍 My location
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: centerMode === 'custom' }}
+            onPress={() => setCenterMode('custom')}
+            style={[
+              styles.centerToggleButton,
+              centerMode === 'custom' && styles.centerToggleSelected,
+            ]}
+          >
+            <Text
+              style={[
+                styles.centerToggleText,
+                centerMode === 'custom' && styles.centerToggleTextSelected,
+              ]}
+            >
+              🗺️ Plot on map
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView style={styles.bottomSheet} contentContainerStyle={styles.bottomSheetContent}>
@@ -241,7 +384,8 @@ export default function CreateGameScreen() {
         </View>
 
         <Text style={styles.coordinateText}>
-          Centre: {center[1].toFixed(5)}, {center[0].toFixed(5)}
+          Centre ({centerMode === 'my_location' ? 'My location' : 'Custom'}): {center[1].toFixed(5)}
+          , {center[0].toFixed(5)}
         </Text>
         {errorMessage !== '' && (
           <Text accessibilityRole="alert" style={styles.error}>
@@ -305,7 +449,41 @@ const styles = StyleSheet.create({
     top: 52,
   },
   title: { color: '#0F172A', fontSize: 22, fontWeight: '800' },
-  hint: { color: '#475569', fontSize: 14, marginTop: 4 },
+  topCardHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  hint: { color: '#475569', fontSize: 13, marginTop: 4 },
+  centerToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  centerToggleButton: {
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+    borderRadius: 9,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 8,
+  },
+  centerToggleSelected: {
+    backgroundColor: '#DBEAFE',
+    borderColor: '#1D4ED8',
+  },
+  centerToggleText: {
+    color: '#475569',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  centerToggleTextSelected: {
+    color: '#1D4ED8',
+    fontWeight: '800',
+  },
   bottomSheet: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 22,
