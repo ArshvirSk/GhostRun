@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { circleRing } from '../src/lib/geo';
 import { supabase } from '../src/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Mode = 'classic_chase' | 'tag_hunt';
 type BoundaryPenalty = 'warn' | 'extra_ping';
@@ -24,6 +25,8 @@ const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
 const DEFAULT_CENTER: [number, number] = [-97, 38];
 const RADII = [300, 600, 1000, 1500];
+const LAST_LOCATION_KEY = '@ghostrun:last_location_coords';
+let cachedMemoryLocation: [number, number] | null = null;
 
 let createSheetDragStartY = 0;
 
@@ -70,9 +73,10 @@ function formatValue(key: SettingKey, value: number): string {
 export default function CreateGameScreen() {
   const router = useRouter();
   const cameraRef = useRef<CameraRef>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const [mode, setMode] = useState<Mode>('classic_chase');
-  const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
-  const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
+  const [center, setCenter] = useState<[number, number]>(() => cachedMemoryLocation || DEFAULT_CENTER);
+  const [myLocation, setMyLocation] = useState<[number, number] | null>(() => cachedMemoryLocation);
   const [centerMode, setCenterMode] = useState<'my_location' | 'custom'>('my_location');
   const [locating, setLocating] = useState(true);
   const [radius, setRadius] = useState(600);
@@ -86,6 +90,15 @@ export default function CreateGameScreen() {
 
   const [translateY] = useState(() => new Animated.Value(SNAP_TOP));
   const [sheetExpanded, setSheetExpanded] = useState(true);
+
+  const safeEaseTo = useCallback((coords: [number, number], duration = 400) => {
+    try {
+      cameraRef.current?.easeTo({ center: coords, duration });
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
 
   const contentOpacity = translateY.interpolate({
     inputRange: [SNAP_TOP, SNAP_BOTTOM * 0.65, SNAP_BOTTOM],
@@ -156,31 +169,68 @@ export default function CreateGameScreen() {
   useEffect(() => {
     let active = true;
     async function initLocation() {
+      // 1. Check cached location to immediately bypass USA fallback
+      try {
+        const cached = await AsyncStorage.getItem(LAST_LOCATION_KEY);
+        if (active && cached) {
+          const parsed = JSON.parse(cached) as [number, number];
+          if (
+            Array.isArray(parsed) &&
+            parsed.length === 2 &&
+            !isNaN(parsed[0]) &&
+            !isNaN(parsed[1])
+          ) {
+            cachedMemoryLocation = parsed;
+            setMyLocation((prev) => prev || parsed);
+            setCenter((prev) => (prev === DEFAULT_CENTER ? parsed : prev));
+            safeEaseTo(parsed, 0);
+          }
+        }
+      } catch {
+        // ignore cache errors
+      }
+
+      // 2. Fetch fresh location coordinates
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
-          const last = await Location.getLastKnownPositionAsync();
-          if (active && last) {
-            const coords: [number, number] = [last.coords.longitude, last.coords.latitude];
-            setMyLocation(coords);
-            setCenter(coords);
-            setLocating(false);
-            cameraRef.current?.easeTo({ center: coords, duration: 400 });
+          try {
+            const last = await Location.getLastKnownPositionAsync();
+            if (active && last) {
+              const coords: [number, number] = [last.coords.longitude, last.coords.latitude];
+              cachedMemoryLocation = coords;
+              setMyLocation(coords);
+              setCenter(coords);
+              setLocating(false);
+              safeEaseTo(coords, 400);
+              void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
+            }
+          } catch {
+            // ignore and proceed to current position
           }
-          const current = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          if (active && current) {
-            const coords: [number, number] = [current.coords.longitude, current.coords.latitude];
-            setMyLocation(coords);
-            setCenter(coords);
-            setLocating(false);
-            cameraRef.current?.easeTo({ center: coords, duration: 400 });
+
+          try {
+            const current = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            if (active && current) {
+              const coords: [number, number] = [current.coords.longitude, current.coords.latitude];
+              cachedMemoryLocation = coords;
+              setMyLocation(coords);
+              setCenter(coords);
+              setLocating(false);
+              safeEaseTo(coords, 400);
+              void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
+            }
+          } catch {
+            // ignore
           }
         } else {
           if (active) setLocating(false);
         }
       } catch {
+        // ignore
+      } finally {
         if (active) setLocating(false);
       }
     }
@@ -188,7 +238,37 @@ export default function CreateGameScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [safeEaseTo]);
+
+  // Reactive camera sync: ensures the camera moves to myLocation once the native map finishes mounting
+  useEffect(() => {
+    if (centerMode !== 'my_location' || !myLocation) return;
+
+    let cancelled = false;
+    const attempt = () => {
+      if (cancelled) return false;
+      return safeEaseTo(myLocation, 400);
+    };
+
+    if (!attempt()) {
+      const timeouts = [100, 250, 500, 1000, 1800].map((delay) =>
+        setTimeout(() => {
+          if (!cancelled && centerMode === 'my_location' && myLocation) {
+            attempt();
+          }
+        }, delay),
+      );
+
+      return () => {
+        cancelled = true;
+        timeouts.forEach(clearTimeout);
+      };
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [centerMode, myLocation, mapLoaded, safeEaseTo]);
 
   const [headStartS, setHeadStartS] = useState<number>(SETTINGS.head_start_s.default);
   const [durationS, setDurationS] = useState<number>(SETTINGS.duration_s.default);
@@ -258,12 +338,13 @@ export default function CreateGameScreen() {
       <MapLibreMap
         attribution
         mapStyle={MAP_STYLE}
+        onDidFinishLoadingMap={() => setMapLoaded(true)}
         onPress={(event) => {
           const coords = event.nativeEvent.lngLat;
           if (!coords || !Array.isArray(coords)) return;
           setCenterMode('custom');
           setCenter(coords);
-          cameraRef.current?.easeTo({ center: coords, duration: 300 });
+          safeEaseTo(coords, 300);
           if (sheetExpanded) {
             snapSheet(SNAP_BOTTOM);
           }
@@ -331,15 +412,17 @@ export default function CreateGameScreen() {
               setCenterMode('my_location');
               if (myLocation) {
                 setCenter(myLocation);
-                cameraRef.current?.easeTo({ center: myLocation, duration: 350 });
+                safeEaseTo(myLocation, 350);
               } else {
                 setLocating(true);
                 void Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
                   .then((pos) => {
                     const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+                    cachedMemoryLocation = coords;
                     setMyLocation(coords);
                     setCenter(coords);
-                    cameraRef.current?.easeTo({ center: coords, duration: 350 });
+                    safeEaseTo(coords, 350);
+                    void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
                   })
                   .catch(() => {})
                   .finally(() => setLocating(false));

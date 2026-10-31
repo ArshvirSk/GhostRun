@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { supabase } from '../src/lib/supabase';
 
@@ -43,7 +44,19 @@ export default function HomeScreen() {
       }
 
       const existingPermission = await Location.getForegroundPermissionsAsync();
-      if (mounted) setPermission(existingPermission);
+      if (mounted) {
+        setPermission(existingPermission);
+        if (existingPermission.granted) {
+          void Location.getLastKnownPositionAsync()
+            .then((last) => {
+              if (last) {
+                const coords = [last.coords.longitude, last.coords.latitude];
+                void AsyncStorage.setItem('@ghostrun:last_location_coords', JSON.stringify(coords));
+              }
+            })
+            .catch(() => {});
+        }
+      }
     }
 
     void load().catch((error: unknown) => {
@@ -76,8 +89,16 @@ export default function HomeScreen() {
     try {
       const result = await Location.requestForegroundPermissionsAsync();
       setPermission(result);
-      if (!result.granted)
+      if (result.granted) {
+        void Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+          .then((pos) => {
+            const coords = [pos.coords.longitude, pos.coords.latitude];
+            void AsyncStorage.setItem('@ghostrun:last_location_coords', JSON.stringify(coords));
+          })
+          .catch(() => {});
+      } else {
         setPermissionError('Location permission is needed to show your position on the map.');
+      }
     } catch (error: unknown) {
       setPermissionError(
         error instanceof Error ? error.message : 'Could not request location permission.',
