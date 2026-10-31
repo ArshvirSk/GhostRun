@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -24,6 +25,7 @@ type Pending =
   | { kind: 'reset'; email: string };
 
 const RESEND_COOLDOWN_S = 60;
+const GHOSTRUN_LOGO = require('../assets/logos/android-chrome-512x512.png');
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -255,7 +257,10 @@ export default function AuthScreen() {
       style={styles.screen}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.eyebrow}>GHOSTRUN ID</Text>
+        <View style={styles.brandRow}>
+          <Image accessibilityLabel="GhostRun" source={GHOSTRUN_LOGO} style={styles.authLogo} />
+          <Text style={styles.eyebrow}>GHOSTRUN ID</Text>
+        </View>
         <Text style={styles.title}>
           {mode === 'sign_in'
             ? 'Welcome back'
@@ -384,6 +389,17 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#F8FAFC', flex: 1 },
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 44 },
+  brandRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 4,
+  },
+  authLogo: {
+    borderRadius: 10,
+    height: 38,
+    width: 38,
+  },
   eyebrow: { color: '#1D4ED8', fontSize: 12, fontWeight: '800', letterSpacing: 1.8 },
   title: { color: '#0F172A', fontSize: 32, fontWeight: '800', marginTop: 10 },
   subtitle: { color: '#475569', fontSize: 16, lineHeight: 24, marginTop: 10 },
