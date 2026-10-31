@@ -2,10 +2,23 @@ import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-
+import {
+  ActivityIndicator,
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  UIManager,
+  View,
+} from 'react-native';
 import { circleRing } from '../src/lib/geo';
 import { supabase } from '../src/lib/supabase';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type Mode = 'classic_chase' | 'tag_hunt';
 type BoundaryPenalty = 'warn' | 'extra_ping';
@@ -66,6 +79,12 @@ export default function CreateGameScreen() {
   const [radius, setRadius] = useState(600);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [sheetExpanded, setSheetExpanded] = useState(true);
+
+  const toggleSheet = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSheetExpanded((prev) => !prev);
+  };
 
   useEffect(() => {
     let active = true;
@@ -291,136 +310,169 @@ export default function CreateGameScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.bottomSheet} contentContainerStyle={styles.bottomSheetContent}>
-        <View style={styles.sheetHandle} />
-        <Text style={styles.sectionLabel}>MODE</Text>
-        <View style={styles.row}>
-          <ModeButton
-            selected={mode === 'classic_chase'}
-            label="Classic Chase"
-            onPress={() => setMode('classic_chase')}
-          />
-          <ModeButton
-            selected={mode === 'tag_hunt'}
-            label="Tag Hunt"
-            onPress={() => setMode('tag_hunt')}
-          />
-        </View>
-
-        <Text style={styles.sectionLabel}>PLAY AREA RADIUS · {radius} M</Text>
-        <View style={styles.row}>
-          {RADII.map((value) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: radius === value }}
-              key={value}
-              onPress={() => setRadius(value)}
-              style={[styles.radiusButton, radius === value && styles.selectedButton]}
-            >
-              <Text style={[styles.radiusText, radius === value && styles.selectedText]}>
-                {value}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={styles.sectionLabel}>GAME SETTINGS</Text>
-        {(Object.keys(SETTINGS) as SettingKey[]).map((key) => (
-          <View key={key} style={styles.settingRow}>
-            <Text style={styles.settingLabel}>{SETTINGS[key].label}</Text>
-            <View style={styles.stepper}>
-              <Pressable
-                accessibilityLabel={`Decrease ${SETTINGS[key].label}`}
-                accessibilityRole="button"
-                disabled={settingValues[key] <= SETTINGS[key].min}
-                onPress={() => adjustSetting(key, -1)}
-                style={[
-                  styles.stepButton,
-                  settingValues[key] <= SETTINGS[key].min && styles.stepButtonDisabled,
-                ]}
-              >
-                <Text style={styles.stepButtonText}>−</Text>
-              </Pressable>
-              <Text style={styles.settingValue}>{formatValue(key, settingValues[key])}</Text>
-              <Pressable
-                accessibilityLabel={`Increase ${SETTINGS[key].label}`}
-                accessibilityRole="button"
-                disabled={settingValues[key] >= SETTINGS[key].max}
-                onPress={() => adjustSetting(key, 1)}
-                style={[
-                  styles.stepButton,
-                  settingValues[key] >= SETTINGS[key].max && styles.stepButtonDisabled,
-                ]}
-              >
-                <Text style={styles.stepButtonText}>+</Text>
-              </Pressable>
-            </View>
-          </View>
-        ))}
-
-        <View style={styles.settingRow}>
-          <Text style={styles.settingLabel}>Boundary penalty</Text>
-          <View style={styles.row}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: boundaryPenalty === 'warn' }}
-              onPress={() => setBoundaryPenalty('warn')}
-              style={[styles.penaltyButton, boundaryPenalty === 'warn' && styles.selectedButton]}
-            >
-              <Text style={[styles.penaltyText, boundaryPenalty === 'warn' && styles.selectedText]}>
-                Warn only
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: boundaryPenalty === 'extra_ping' }}
-              onPress={() => setBoundaryPenalty('extra_ping')}
-              style={[
-                styles.penaltyButton,
-                boundaryPenalty === 'extra_ping' && styles.selectedButton,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.penaltyText,
-                  boundaryPenalty === 'extra_ping' && styles.selectedText,
-                ]}
-              >
-                Extra ping
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <Text style={styles.coordinateText}>
-          Centre ({centerMode === 'my_location' ? 'My location' : 'Custom'}): {center[1].toFixed(5)}
-          , {center[0].toFixed(5)}
-        </Text>
-        {errorMessage !== '' && (
-          <Text accessibilityRole="alert" style={styles.error}>
-            {errorMessage}
-          </Text>
-        )}
+      <View
+        style={[
+          styles.bottomSheet,
+          sheetExpanded ? styles.bottomSheetExpanded : styles.bottomSheetCollapsed,
+        ]}
+      >
         <Pressable
+          accessibilityLabel={sheetExpanded ? 'Minimize settings' : 'Expand settings'}
           accessibilityRole="button"
-          disabled={busy}
-          onPress={() => void createGame()}
-          style={styles.primaryButton}
+          onPress={toggleSheet}
+          style={styles.sheetHandleRow}
         >
-          {busy ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.primaryText}>Create lobby</Text>
+          <View style={styles.sheetHandle} />
+          {!sheetExpanded && (
+            <View style={styles.dockBar}>
+              <Text style={styles.dockTitle}>
+                Settings · {radius}m ({mode === 'classic_chase' ? 'Classic' : 'Tag Hunt'})
+              </Text>
+              <Text style={styles.dockHint}>▲ Tap to configure</Text>
+            </View>
           )}
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          style={styles.cancelButton}
-        >
-          <Text style={styles.cancelText}>Cancel</Text>
-        </Pressable>
-      </ScrollView>
+
+        {sheetExpanded && (
+          <ScrollView
+            style={styles.bottomSheetScroll}
+            contentContainerStyle={styles.bottomSheetContent}
+          >
+            <Text style={styles.sectionLabel}>MODE</Text>
+            <View style={styles.row}>
+              <ModeButton
+                selected={mode === 'classic_chase'}
+                label="Classic Chase"
+                onPress={() => setMode('classic_chase')}
+              />
+              <ModeButton
+                selected={mode === 'tag_hunt'}
+                label="Tag Hunt"
+                onPress={() => setMode('tag_hunt')}
+              />
+            </View>
+
+            <Text style={styles.sectionLabel}>PLAY AREA RADIUS · {radius} M</Text>
+            <View style={styles.row}>
+              {RADII.map((value) => (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: radius === value }}
+                  key={value}
+                  onPress={() => setRadius(value)}
+                  style={[styles.radiusButton, radius === value && styles.selectedButton]}
+                >
+                  <Text style={[styles.radiusText, radius === value && styles.selectedText]}>
+                    {value}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.sectionLabel}>GAME SETTINGS</Text>
+            {(Object.keys(SETTINGS) as SettingKey[]).map((key) => (
+              <View key={key} style={styles.settingRow}>
+                <Text style={styles.settingLabel}>{SETTINGS[key].label}</Text>
+                <View style={styles.stepper}>
+                  <Pressable
+                    accessibilityLabel={`Decrease ${SETTINGS[key].label}`}
+                    accessibilityRole="button"
+                    disabled={settingValues[key] <= SETTINGS[key].min}
+                    onPress={() => adjustSetting(key, -1)}
+                    style={[
+                      styles.stepButton,
+                      settingValues[key] <= SETTINGS[key].min && styles.stepButtonDisabled,
+                    ]}
+                  >
+                    <Text style={styles.stepButtonText}>−</Text>
+                  </Pressable>
+                  <Text style={styles.settingValue}>{formatValue(key, settingValues[key])}</Text>
+                  <Pressable
+                    accessibilityLabel={`Increase ${SETTINGS[key].label}`}
+                    accessibilityRole="button"
+                    disabled={settingValues[key] >= SETTINGS[key].max}
+                    onPress={() => adjustSetting(key, 1)}
+                    style={[
+                      styles.stepButton,
+                      settingValues[key] >= SETTINGS[key].max && styles.stepButtonDisabled,
+                    ]}
+                  >
+                    <Text style={styles.stepButtonText}>+</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+
+            <View style={styles.settingRow}>
+              <Text style={styles.settingLabel}>Boundary penalty</Text>
+              <View style={styles.row}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: boundaryPenalty === 'warn' }}
+                  onPress={() => setBoundaryPenalty('warn')}
+                  style={[
+                    styles.penaltyButton,
+                    boundaryPenalty === 'warn' && styles.selectedButton,
+                  ]}
+                >
+                  <Text
+                    style={[styles.penaltyText, boundaryPenalty === 'warn' && styles.selectedText]}
+                  >
+                    Warn only
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: boundaryPenalty === 'extra_ping' }}
+                  onPress={() => setBoundaryPenalty('extra_ping')}
+                  style={[
+                    styles.penaltyButton,
+                    boundaryPenalty === 'extra_ping' && styles.selectedButton,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.penaltyText,
+                      boundaryPenalty === 'extra_ping' && styles.selectedText,
+                    ]}
+                  >
+                    Extra ping
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <Text style={styles.coordinateText}>
+              Centre ({centerMode === 'my_location' ? 'My location' : 'Custom'}):{' '}
+              {center[1].toFixed(5)}, {center[0].toFixed(5)}
+            </Text>
+            {errorMessage !== '' && (
+              <Text accessibilityRole="alert" style={styles.error}>
+                {errorMessage}
+              </Text>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              onPress={() => void createGame()}
+              style={styles.primaryButton}
+            >
+              {busy ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryText}>Create lobby</Text>
+              )}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.back()}
+              style={styles.cancelButton}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </Pressable>
+          </ScrollView>
+        )}
+      </View>
     </View>
   );
 }
@@ -506,7 +558,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     elevation: 8,
     left: 0,
-    maxHeight: '48%',
     position: 'absolute',
     right: 0,
     shadowColor: '#000',
@@ -514,17 +565,49 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 6,
   },
+  bottomSheetCollapsed: {
+    maxHeight: 56,
+  },
+  bottomSheetExpanded: {
+    maxHeight: '48%',
+  },
+  sheetHandleRow: {
+    alignItems: 'center',
+    paddingBottom: 6,
+    paddingTop: 8,
+  },
   sheetHandle: {
     alignSelf: 'center',
     backgroundColor: '#CBD5E1',
     borderRadius: 2,
     height: 4,
-    marginBottom: 8,
+    marginBottom: 4,
     width: 36,
+  },
+  dockBar: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 2,
+    width: '100%',
+  },
+  dockTitle: {
+    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  dockHint: {
+    color: '#1D4ED8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  bottomSheetScroll: {
+    flex: 1,
   },
   bottomSheetContent: {
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 6,
     paddingBottom: 24,
   },
   sectionLabel: {
