@@ -196,6 +196,15 @@ export default function LobbyScreen() {
     else router.replace('/home');
   }
 
+  async function cancelGame() {
+    if (!supabase || !gameId) return;
+    setBusyAction('cancel');
+    const { error } = await supabase.rpc('cancel_game', { game_id: gameId });
+    setBusyAction('');
+    if (error) setErrorMessage(error.message);
+    else router.replace('/home');
+  }
+
   async function shareCode() {
     if (!state) return;
     await Share.share({ message: `Join my GhostRun lobby with code ${state.game.code}.` });
@@ -431,6 +440,21 @@ export default function LobbyScreen() {
           <Text style={styles.leaveText}>Leave lobby</Text>
         )}
       </Pressable>
+
+      {isHost && (
+        <Pressable
+          accessibilityRole="button"
+          disabled={busyAction !== ''}
+          onPress={() => void cancelGame()}
+          style={styles.cancelGameButton}
+        >
+          {busyAction === 'cancel' ? (
+            <ActivityIndicator color="#B91C1C" />
+          ) : (
+            <Text style={styles.cancelGameText}>Cancel game</Text>
+          )}
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -626,4 +650,14 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   bannerText: { color: '#1E40AF', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  cancelGameButton: {
+    alignItems: 'center',
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: 8,
+    minHeight: 44,
+  },
+  cancelGameText: { color: '#B91C1C', fontSize: 14, fontWeight: '700' },
 });
