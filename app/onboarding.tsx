@@ -19,9 +19,10 @@ import {
 import { supabase } from '../src/lib/supabase';
 
 const GHOSTRUN_LOGO = require('../assets/logos/android-chrome-512x512.png');
-const SLIDE_1_DARK = require('../assets/onboarding/slide-1-dark.png');
-const SLIDE_2_DARK = require('../assets/onboarding/slide-2-dark.png');
-const SLIDE_3_DARK = require('../assets/onboarding/slide-3-dark.png');
+// Onboarding uses light slide illustrations as requested (dark variations kept in assets/onboarding for reference)
+const SLIDE_1_LIGHT = require('../assets/onboarding/slide-1-light.png');
+const SLIDE_2_LIGHT = require('../assets/onboarding/slide-2-light.png');
+const SLIDE_3_LIGHT = require('../assets/onboarding/slide-3-light.png');
 
 interface SlideData {
   image: ImageSourcePropType;
@@ -35,9 +36,9 @@ interface SlideData {
 
 const SLIDES: SlideData[] = [
   {
-    image: SLIDE_1_DARK,
+    image: SLIDE_1_LIGHT,
     badge: 'GAME MODE 01 · CHASE',
-    badgeColor: '#38BDF8',
+    badgeColor: '#1D4ED8',
     title: 'Classic Chase',
     subtitle: 'Live-Action Real-World Manhunt',
     description:
@@ -61,9 +62,9 @@ const SLIDES: SlideData[] = [
     ],
   },
   {
-    image: SLIDE_2_DARK,
+    image: SLIDE_2_LIGHT,
     badge: 'GAME MODE 02 · EXTRACTION',
-    badgeColor: '#F43F5E',
+    badgeColor: '#E11D48',
     title: 'The Secret Target',
     subtitle: 'High-Stakes Extraction Race',
     description:
@@ -87,9 +88,9 @@ const SLIDES: SlideData[] = [
     ],
   },
   {
-    image: SLIDE_3_DARK,
+    image: SLIDE_3_LIGHT,
     badge: 'ESSENTIALS · SAFETY FIRST',
-    badgeColor: '#10B981',
+    badgeColor: '#059669',
     title: 'Tactics & Safety',
     subtitle: 'Play Smart. Stay Protected.',
     description:
@@ -160,7 +161,7 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
       {/* Top Header Bar */}
       <View style={styles.header}>
@@ -198,7 +199,7 @@ export default function OnboardingScreen() {
       >
         {SLIDES.map((slide) => (
           <View key={slide.title} style={[styles.slide, { width: screenWidth }]}>
-            {/* Visual Hero Card with Bottom Gradient Fade */}
+            {/* Visual Hero Card with Bottom Gradient Fade into light background */}
             <View style={[styles.imageCard, { height: imageHeight }]}>
               <Image
                 accessibilityLabel={slide.title}
@@ -207,8 +208,13 @@ export default function OnboardingScreen() {
                 style={styles.slideImage}
               />
               <LinearGradient
-                colors={['transparent', 'rgba(9, 13, 22, 0.35)', 'rgba(9, 13, 22, 0.8)', '#090D16']}
-                locations={[0, 0.5, 0.82, 1]}
+                colors={[
+                  'transparent',
+                  'rgba(248, 250, 252, 0.3)',
+                  'rgba(248, 250, 252, 0.82)',
+                  '#F8FAFC',
+                ]}
+                locations={[0, 0.48, 0.82, 1]}
                 style={styles.imageBottomGradient}
               />
             </View>
@@ -246,7 +252,7 @@ export default function OnboardingScreen() {
       {/* Floating Footer with Ambient Gradient */}
       <View style={styles.footerWrapper}>
         <LinearGradient
-          colors={['transparent', 'rgba(9, 13, 22, 0.85)', '#090D16']}
+          colors={['transparent', 'rgba(248, 250, 252, 0.85)', '#F8FAFC']}
           locations={[0, 0.45, 1]}
           pointerEvents="none"
           style={styles.footerGradient}
@@ -283,7 +289,7 @@ export default function OnboardingScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#090D16',
+    backgroundColor: '#F8FAFC',
     flex: 1,
   },
   header: {
@@ -305,7 +311,7 @@ const styles = StyleSheet.create({
     width: 30,
   },
   headerTitle: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 2,
@@ -315,7 +321,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   skipText: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -330,8 +336,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   imageCard: {
-    backgroundColor: '#0F172A',
-    borderColor: '#1E293B',
+    backgroundColor: '#E2E8F0',
+    borderColor: '#E2E8F0',
     borderRadius: 20,
     borderWidth: 1,
     marginTop: 6,
@@ -371,19 +377,19 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   slideTitle: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 23,
     fontWeight: '900',
     letterSpacing: 0.4,
   },
   slideSubtitle: {
-    color: '#94A3B8',
+    color: '#475569',
     fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
   },
   slideDescription: {
-    color: '#CBD5E1',
+    color: '#334155',
     fontSize: 12,
     lineHeight: 18,
     marginTop: 6,
@@ -394,13 +400,18 @@ const styles = StyleSheet.create({
   },
   bulletRow: {
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(30, 41, 59, 0.65)',
-    borderColor: 'rgba(51, 65, 85, 0.65)',
-    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
     borderWidth: 1,
+    elevation: 1,
     flexDirection: 'row',
     gap: 10,
-    padding: 8,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
   },
   bulletIcon: {
     fontSize: 16,
@@ -410,12 +421,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bulletTitle: {
-    color: '#F8FAFC',
+    color: '#0F172A',
     fontSize: 12,
     fontWeight: '800',
   },
   bulletDesc: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontSize: 11,
     lineHeight: 15,
     marginTop: 1,
@@ -450,23 +461,23 @@ const styles = StyleSheet.create({
     height: 8,
   },
   dotActive: {
-    backgroundColor: '#38BDF8',
+    backgroundColor: '#1D4ED8',
     width: 24,
   },
   dotInactive: {
-    backgroundColor: '#334155',
+    backgroundColor: '#CBD5E1',
     width: 8,
   },
   actionButton: {
     alignItems: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1D4ED8',
     borderRadius: 12,
     justifyContent: 'center',
     minHeight: 46,
     paddingHorizontal: 22,
   },
   actionButtonFinal: {
-    backgroundColor: '#0284C7',
+    backgroundColor: '#2563EB',
     paddingHorizontal: 26,
   },
   actionButtonText: {
