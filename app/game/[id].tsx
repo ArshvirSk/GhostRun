@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   AppState,
   LayoutAnimation,
   Linking,
@@ -13,6 +14,7 @@ import {
   StyleSheet,
   Text,
   UIManager,
+  useWindowDimensions,
   Vibration,
   View,
 } from 'react-native';
@@ -58,6 +60,8 @@ try {
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
+
+let gameSheetDragStartY = 0;
 
 type Team = 'runner' | 'hunter' | 'unassigned';
 type Phase =
@@ -278,7 +282,41 @@ export default function GameScreen() {
   const [sosSent, setSosSent] = useState(false);
 
   const [hudCompact, setHudCompact] = useState(false);
+  const { height: screenHeight } = useWindowDimensions();
+  const SHEET_HEIGHT = Math.max(400, Math.round(screenHeight * 0.58));
+  const COLLAPSED_HEIGHT = 74;
+  const SNAP_BOTTOM = SHEET_HEIGHT - COLLAPSED_HEIGHT;
+  const SNAP_TOP = 0;
+
+  const [sheetTranslateY] = useState(() => new Animated.Value(SNAP_BOTTOM));
   const [sheetExpanded, setSheetExpanded] = useState(false);
+
+  const sheetContentOpacity = sheetTranslateY.interpolate({
+    inputRange: [SNAP_TOP, SNAP_BOTTOM * 0.65, SNAP_BOTTOM],
+    outputRange: [1, 0.2, 0],
+    extrapolate: 'clamp',
+  });
+
+  const sheetHintOpacity = sheetTranslateY.interpolate({
+    inputRange: [SNAP_TOP, SNAP_BOTTOM * 0.4, SNAP_BOTTOM],
+    outputRange: [0.6, 0.8, 1],
+    extrapolate: 'clamp',
+  });
+
+  const snapSheet = useCallback(
+    (toValue: number, velocity = 0) => {
+      Animated.spring(sheetTranslateY, {
+        toValue,
+        velocity,
+        tension: 65,
+        friction: 11,
+        useNativeDriver: true,
+      }).start(() => {
+        setSheetExpanded(toValue === SNAP_TOP);
+      });
+    },
+    [SNAP_TOP, sheetTranslateY],
+  );
 
   // Show full round details on initial load or whenever the game status/phase changes,
   // then smoothly shorten the top bar after ~6 seconds so focus remains on the map.
@@ -302,25 +340,43 @@ export default function GameScreen() {
     setHudCompact((prev) => !prev);
   }, []);
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 8,
-        onPanResponderRelease: (_, gesture) => {
-          if (gesture.dy < -20) {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setSheetExpanded(true);
-          } else if (gesture.dy > 20) {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setSheetExpanded(false);
-          } else {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setSheetExpanded((prev) => !prev);
-          }
-        },
-      }),
-    [],
+  const [panResponder] = useState(() =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5,
+      onPanResponderGrant: () => {
+        sheetTranslateY.stopAnimation((val) => {
+          gameSheetDragStartY = val;
+        });
+      },
+      onPanResponderMove: (_, gesture) => {
+        const newY = Math.max(SNAP_TOP, Math.min(SNAP_BOTTOM, gameSheetDragStartY + gesture.dy));
+        sheetTranslateY.setValue(newY);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        let toValue = SNAP_BOTTOM;
+        if (gesture.vy < -0.35) {
+          toValue = SNAP_TOP;
+        } else if (gesture.vy > 0.35) {
+          toValue = SNAP_BOTTOM;
+        } else {
+          const currentY = Math.max(
+            SNAP_TOP,
+            Math.min(SNAP_BOTTOM, gameSheetDragStartY + gesture.dy),
+          );
+          toValue = currentY < SNAP_BOTTOM * 0.5 ? SNAP_TOP : SNAP_BOTTOM;
+        }
+        Animated.spring(sheetTranslateY, {
+          toValue,
+          velocity: gesture.vy,
+          tension: 65,
+          friction: 11,
+          useNativeDriver: true,
+        }).start(() => {
+          setSheetExpanded(toValue === SNAP_TOP);
+        });
+      },
+    }),
   );
 
   async function triggerSos() {
@@ -892,9 +948,11 @@ export default function GameScreen() {
         attribution
         mapStyle={MAP_STYLE}
         onPress={() => {
-          if (sheetExpanded || !hudCompact) {
+          if (sheetExpanded) {
+            snapSheet(SNAP_BOTTOM);
+          }
+          if (!hudCompact) {
             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setSheetExpanded(false);
             setHudCompact(true);
           }
         }}
@@ -1131,7 +1189,15 @@ export default function GameScreen() {
         </View>
       )}
 
-      <View style={[styles.sheet, sheetExpanded ? styles.sheetExpanded : styles.sheetCollapsed]}>
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            height: SHEET_HEIGHT,
+            transform: [{ translateY: sheetTranslateY }],
+          },
+        ]}
+      >
         <View {...panResponder.panHandlers} style={styles.sheetHandleRow}>
           <View style={styles.sheetHandle} />
           <View style={styles.dockBar}>
@@ -1141,11 +1207,11 @@ export default function GameScreen() {
                   ? 'Activity, Players & Controls'
                   : `Activity & Players (${activePlayers.length})`}
               </Text>
-              <Text style={styles.dockHint}>
-                {sheetExpanded ? '▼ Tap or swipe down to minimize' : '▲ Tap or swipe up to expand'}
-              </Text>
+              <Animated.Text style={[styles.dockHint, { opacity: sheetHintOpacity }]}>
+                {sheetExpanded ? '▼ Slide down to minimize' : '▲ Slide up to view'}
+              </Animated.Text>
             </View>
-            {isLive && !isRunner && !taggedSelf && !sheetExpanded && (
+            {isLive && !isRunner && !taggedSelf && (
               <Pressable
                 accessibilityRole="button"
                 disabled={busy !== ''}
@@ -1162,7 +1228,10 @@ export default function GameScreen() {
           </View>
         </View>
 
-        {sheetExpanded && (
+        <Animated.View
+          pointerEvents={sheetExpanded ? 'auto' : 'none'}
+          style={[styles.sheetInner, { opacity: sheetContentOpacity }]}
+        >
           <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetContent}>
             {isLive && !isRunner && !taggedSelf && (
               <>
@@ -1346,8 +1415,8 @@ export default function GameScreen() {
               are less reliable.
             </Text>
           </ScrollView>
-        )}
-      </View>
+        </Animated.View>
+      </Animated.View>
     </View>
   );
 }
@@ -1508,20 +1577,17 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     bottom: 0,
-    elevation: 8,
+    elevation: 12,
     left: 0,
     position: 'absolute',
     right: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 8,
   },
-  sheetCollapsed: {
-    maxHeight: 74,
-  },
-  sheetExpanded: {
-    maxHeight: '58%',
+  sheetInner: {
+    flex: 1,
   },
   sheetHandleRow: {
     alignItems: 'center',
@@ -1530,10 +1596,10 @@ const styles = StyleSheet.create({
   },
   sheetHandle: {
     backgroundColor: '#CBD5E1',
-    borderRadius: 2,
-    height: 4,
+    borderRadius: 3,
+    height: 5,
     marginBottom: 6,
-    width: 36,
+    width: 42,
   },
   dockBar: {
     alignItems: 'center',
