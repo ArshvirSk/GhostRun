@@ -64,23 +64,31 @@ export default function OnboardingScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef<import('react').ElementRef<typeof ScrollView>>(null);
+  const isProgrammaticScroll = useRef(false);
 
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    isProgrammaticScroll.current = false;
     const offsetX = e.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / screenWidth);
-    if (index !== activeIndex && index >= 0 && index < SLIDES.length) {
+    if (index >= 0 && index < SLIDES.length) {
       setActiveIndex(index);
+    }
+  };
+
+  const goToSlide = (targetIndex: number) => {
+    if (targetIndex >= 0 && targetIndex < SLIDES.length && targetIndex !== activeIndex) {
+      isProgrammaticScroll.current = true;
+      setActiveIndex(targetIndex);
+      scrollRef.current?.scrollTo({
+        x: targetIndex * screenWidth,
+        animated: true,
+      });
     }
   };
 
   const handleNext = () => {
     if (activeIndex < SLIDES.length - 1) {
-      const nextIndex = activeIndex + 1;
-      scrollRef.current?.scrollTo({
-        x: nextIndex * screenWidth,
-        animated: true,
-      });
-      setActiveIndex(nextIndex);
+      goToSlide(activeIndex + 1);
     } else {
       void completeOnboarding();
     }
@@ -88,12 +96,7 @@ export default function OnboardingScreen() {
 
   const handlePrev = () => {
     if (activeIndex > 0) {
-      const prevIndex = activeIndex - 1;
-      scrollRef.current?.scrollTo({
-        x: prevIndex * screenWidth,
-        animated: true,
-      });
-      setActiveIndex(prevIndex);
+      goToSlide(activeIndex - 1);
     }
   };
 
@@ -120,38 +123,44 @@ export default function OnboardingScreen() {
       {/* Floating Top Header */}
       <View style={styles.floatingHeader}>
         <View style={styles.brandRow}>
-          <Image accessibilityLabel="GhostRun" source={GHOSTRUN_LOGO} style={styles.brandLogo} />
+          <Image
+            accessibilityLabel="GhostRun"
+            fadeDuration={0}
+            source={GHOSTRUN_LOGO}
+            style={styles.brandLogo}
+          />
           <Text style={styles.brandTitle}>GHOSTRUN</Text>
         </View>
 
-        {activeIndex < SLIDES.length - 1 ? (
-          <Pressable
-            accessibilityLabel="Skip onboarding"
-            accessibilityRole="button"
-            hitSlop={12}
-            onPress={() => void completeOnboarding()}
-            style={styles.skipButton}
-          >
-            <Text style={styles.skipText}>Skip</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.skipPlaceholder} />
-        )}
+        <Pressable
+          accessibilityLabel="Skip onboarding"
+          accessibilityRole="button"
+          disabled={activeIndex === SLIDES.length - 1}
+          hitSlop={12}
+          onPress={() => void completeOnboarding()}
+          style={({ pressed }) => [
+            styles.skipButton,
+            activeIndex === SLIDES.length - 1 && styles.skipButtonHidden,
+            pressed && styles.buttonPressed,
+          ]}
+        >
+          <Text style={styles.skipText}>Skip</Text>
+        </Pressable>
       </View>
 
       {/* Full-Screen Swiping Slides */}
       <ScrollView
         bounces={false}
-        decelerationRate="fast"
         horizontal
-        onScroll={handleScroll}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        overScrollMode="never"
         pagingEnabled
         ref={scrollRef}
         scrollEventThrottle={16}
         showsHorizontalScrollIndicator={false}
         style={styles.slider}
       >
-        {SLIDES.map((slide, idx) => (
+        {SLIDES.map((slide) => (
           <View
             key={slide.title}
             style={[styles.slidePage, { width: screenWidth, height: screenHeight }]}
@@ -159,6 +168,7 @@ export default function OnboardingScreen() {
             {/* Full-Screen Edge-to-Edge Illustration */}
             <Image
               accessibilityLabel={slide.title}
+              fadeDuration={0}
               resizeMode="cover"
               source={slide.image}
               style={StyleSheet.absoluteFill}
@@ -209,9 +219,13 @@ export default function OnboardingScreen() {
       <View style={styles.controlsDock}>
         {/* Slide Status Indicator Dots */}
         <View style={styles.dotsRow}>
-          {SLIDES.map((_, i) => (
-            <View
-              key={i}
+          {SLIDES.map((slide, i) => (
+            <Pressable
+              accessibilityLabel={`Go to slide ${i + 1}`}
+              accessibilityRole="button"
+              hitSlop={8}
+              key={slide.title}
+              onPress={() => goToSlide(i)}
               style={[
                 styles.dot,
                 i === activeIndex
@@ -222,24 +236,31 @@ export default function OnboardingScreen() {
           ))}
         </View>
 
-        {/* Action Button Row */}
+        {/* Action Button Row with Rock-Solid Fixed Geometry */}
         <View style={styles.buttonRow}>
-          {activeIndex > 0 && (
-            <Pressable
-              accessibilityLabel="Previous slide"
-              accessibilityRole="button"
-              onPress={handlePrev}
-              style={styles.prevButton}
-            >
-              <Text style={styles.prevButtonText}>‹</Text>
-            </Pressable>
-          )}
+          <Pressable
+            accessibilityLabel="Previous slide"
+            accessibilityRole="button"
+            disabled={activeIndex === 0}
+            onPress={handlePrev}
+            style={({ pressed }) => [
+              styles.prevButton,
+              activeIndex === 0 && styles.prevButtonHidden,
+              pressed && activeIndex > 0 && styles.buttonPressed,
+            ]}
+          >
+            <Text style={styles.prevButtonText}>‹</Text>
+          </Pressable>
 
           <Pressable
             accessibilityLabel={activeIndex === SLIDES.length - 1 ? 'Start Running' : 'Next slide'}
             accessibilityRole="button"
             onPress={handleNext}
-            style={[styles.nextButton, activeIndex === SLIDES.length - 1 && styles.nextButtonFinal]}
+            style={({ pressed }) => [
+              styles.nextButton,
+              activeIndex === SLIDES.length - 1 && styles.nextButtonFinal,
+              pressed && styles.buttonPressed,
+            ]}
           >
             <Text style={styles.nextButtonText}>
               {activeIndex === SLIDES.length - 1 ? 'Start Running  ⚡' : 'Continue  ➔'}
@@ -295,13 +316,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
+  skipButtonHidden: {
+    opacity: 0,
+    pointerEvents: 'none',
+  },
   skipText: {
     color: '#E2E8F0',
     fontSize: 13,
     fontWeight: '700',
-  },
-  skipPlaceholder: {
-    width: 50,
   },
   slider: {
     flex: 1,
@@ -405,7 +427,7 @@ const styles = StyleSheet.create({
   },
   prevButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(30, 41, 59, 0.8)',
+    backgroundColor: 'rgba(30, 41, 59, 0.85)',
     borderColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 16,
     borderWidth: 1,
@@ -413,9 +435,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 52,
   },
+  prevButtonHidden: {
+    opacity: 0,
+    pointerEvents: 'none',
+  },
   prevButtonText: {
     color: '#FFFFFF',
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '700',
     lineHeight: 28,
     marginTop: -2,
@@ -442,5 +468,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  buttonPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
 });
