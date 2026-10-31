@@ -29,7 +29,24 @@ import {
   type GeoFix,
   type StartLocationResult,
 } from '../../src/lib/location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+
 import { supabase } from '../../src/lib/supabase';
+
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+} catch {
+  // Ignored in non-native or unsupported environments
+}
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
@@ -225,6 +242,84 @@ export default function GameScreen() {
   const startingRef = useRef(false);
   const sharingRef = useRef<SharingState>('idle');
   const mountedRef = useRef(true);
+
+  const [muted, setMuted] = useState(false);
+  const mutedRef = useRef(false);
+  const prevStatusRef = useRef<string | null>(null);
+  const prevPhaseRef = useRef<string | null>(null);
+  const prevPingIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
+
+  useEffect(() => {
+    AsyncStorage.getItem('ghostrun:muted')
+      .then((val) => {
+        if (val !== null) setMuted(val === 'true');
+      })
+      .catch(() => {});
+    void Notifications.requestPermissionsAsync().catch(() => {});
+  }, []);
+
+  async function toggleMuted() {
+    const next = !muted;
+    setMuted(next);
+    await AsyncStorage.setItem('ghostrun:muted', String(next)).catch(() => {});
+  }
+
+  const notify = useCallback((title: string, body: string, vibratePattern?: number | number[]) => {
+    if (mutedRef.current) return;
+    try {
+      if (vibratePattern) Vibration.vibrate(vibratePattern);
+      void Notifications.scheduleNotificationAsync({
+        content: { title, body },
+        trigger: null,
+      });
+    } catch {
+      // Ignored if permissions not granted or platform issue
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!state) return;
+    const ownPlayer = state.players.find((p) => p.id === state.my_player_id);
+    if (!ownPlayer) return;
+
+    if (prevStatusRef.current === 'active' && ownPlayer.status === 'tagged') {
+      notify(
+        "You've been tagged!",
+        'You are now spectating the remainder of the round.',
+        [0, 250, 100, 250],
+      );
+    }
+    prevStatusRef.current = ownPlayer.status;
+  }, [state, notify]);
+
+  useEffect(() => {
+    if (!state?.game) return;
+    const currentPhase = state.game.status;
+    if (prevPhaseRef.current && prevPhaseRef.current !== 'live' && currentPhase === 'live') {
+      notify('Round started!', 'The hunt is now live. Good luck!', [0, 200, 100, 200]);
+    }
+    prevPhaseRef.current = currentPhase;
+  }, [state?.game, notify]);
+
+  useEffect(() => {
+    if (!state?.pings || state?.game?.status !== 'live') return;
+    const latestPing = state.pings[0];
+    if (!latestPing) return;
+    if (prevPingIdRef.current !== null && latestPing.id !== prevPingIdRef.current) {
+      notify(
+        'Ping released',
+        latestPing.reason === 'boundary'
+          ? 'Boundary violation ping released.'
+          : 'Scheduled runner position ping released.',
+        300,
+      );
+    }
+    prevPingIdRef.current = latestPing.id;
+  }, [state?.pings, state?.game, notify]);
 
   useEffect(() => {
     sharingRef.current = sharing;
@@ -819,9 +914,19 @@ export default function GameScreen() {
       </MapLibreMap>
 
       <View style={styles.hud}>
-        <Text style={[styles.eyebrow, { color: accent }]}>
-          {eyebrow} · {game!.code}
-        </Text>
+        <View style={styles.hudHeaderRow}>
+          <Text style={[styles.eyebrow, { color: accent }]}>
+            {eyebrow} · {game!.code}
+          </Text>
+          <Pressable
+            accessibilityLabel={muted ? 'Unmute alerts' : 'Mute alerts'}
+            accessibilityRole="button"
+            onPress={() => void toggleMuted()}
+            style={styles.muteButton}
+          >
+            <Text style={styles.muteButtonText}>{muted ? '🔕 Muted' : '🔔 Alerts'}</Text>
+          </Pressable>
+        </View>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.subtitle}>{subtitle}</Text>
 
@@ -1040,6 +1145,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     top: 48,
+  },
+  hudHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  muteButton: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  muteButtonText: {
+    color: '#475569',
+    fontSize: 11,
+    fontWeight: '800',
   },
   eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.3 },
   title: { color: '#0F172A', fontSize: 24, fontWeight: '900', marginTop: 6 },
