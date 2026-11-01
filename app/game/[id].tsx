@@ -41,6 +41,7 @@ import * as Notifications from 'expo-notifications';
 
 import { supabase } from '../../src/lib/supabase';
 import {
+  AgentControls,
   HeatButton,
   HeatMark,
   HeatOverlay,
@@ -48,6 +49,7 @@ import {
   ModifierMapLayers,
   ModifierPanel,
   SensedRippleOverlay,
+  TribunalDock,
   useModifierState,
 } from '../../src/components/GameModifiers';
 
@@ -1563,14 +1565,30 @@ export default function GameScreen() {
             )}
 
             {isLive && gameId && game && (
-              <ModifierPanel
-                gameId={gameId}
-                game={game}
-                status={modifiers.status}
-                drops={modifiers.drops}
-                refresh={modifiers.refresh}
-                serverNow={serverNow}
-              />
+              <>
+                <AgentControls
+                  gameId={gameId}
+                  mode={game.mode}
+                  status={modifiers.status}
+                  runners={players.filter((p) => p.team === 'runner' && p.status === 'active')}
+                  onActionComplete={() => void loadState()}
+                />
+                <TribunalDock
+                  gameId={gameId}
+                  myPlayerId={myPlayerId}
+                  status={modifiers.status}
+                  hunters={players.filter((p) => p.team === 'hunter' && p.status === 'active')}
+                  onActionComplete={() => void loadState()}
+                />
+                <ModifierPanel
+                  gameId={gameId}
+                  game={game}
+                  status={modifiers.status}
+                  drops={modifiers.drops}
+                  refresh={modifiers.refresh}
+                  serverNow={serverNow}
+                />
+              </>
             )}
 
             {taggedSelf && game!.status === 'live' && (
