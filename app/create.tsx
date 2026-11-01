@@ -75,7 +75,9 @@ export default function CreateGameScreen() {
   const cameraRef = useRef<CameraRef>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mode, setMode] = useState<Mode>('classic_chase');
-  const [center, setCenter] = useState<[number, number]>(() => cachedMemoryLocation || DEFAULT_CENTER);
+  const [center, setCenter] = useState<[number, number]>(
+    () => cachedMemoryLocation || DEFAULT_CENTER,
+  );
   const [myLocation, setMyLocation] = useState<[number, number] | null>(() => cachedMemoryLocation);
   const [centerMode, setCenterMode] = useState<'my_location' | 'custom'>('my_location');
   const [locating, setLocating] = useState(true);

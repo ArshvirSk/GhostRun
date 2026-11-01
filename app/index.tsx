@@ -122,10 +122,16 @@ export default function SplashScreen() {
       // acknowledged for the current version before Home is reachable.
       setStatusMessage('Checking privacy choices…');
       const { data: consents } = await supabase.rpc('get_my_consents');
-      const ack = (consents as Record<string, { granted?: boolean; policy_version?: number } | undefined> | null)
-        ?.policy_ack;
+      const ack = (
+        consents as Record<
+          string,
+          { granted?: boolean; policy_version?: number } | undefined
+        > | null
+      )?.policy_ack;
       const acknowledgedVersion = ack?.granted ? (ack.policy_version ?? 0) : 0;
-      router.replace(acknowledgedVersion < PRIVACY_VERSION ? ('/privacy?mode=gate' as any) : '/home');
+      router.replace(
+        acknowledgedVersion < PRIVACY_VERSION ? ('/privacy?mode=gate' as any) : '/home',
+      );
     } catch (err) {
       setHasError(true);
       setErrorMessage(err instanceof Error ? err.message : 'Failed to launch GhostRun.');

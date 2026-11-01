@@ -27,12 +27,7 @@ export const PRIVACY_SHORT_VERSION = [
   'You can export or delete everything.',
 ] as const;
 
-export type ConsentType =
-  | 'location'
-  | 'policy_ack'
-  | 'ghost'
-  | 'leaderboard_name'
-  | 'diagnostics';
+export type ConsentType = 'location' | 'policy_ack' | 'ghost' | 'leaderboard_name' | 'diagnostics';
 
 export type PrivacySection = { title: string; body: string };
 
