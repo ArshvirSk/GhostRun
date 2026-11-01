@@ -49,6 +49,9 @@ export default function LobbyScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [kickingPlayerId, setKickingPlayerId] = useState<string | null>(null);
   const [bannerMessage, setBannerMessage] = useState<string>('');
+  // undefined = not loaded yet, null = must still choose (C3), boolean = chosen.
+  const [shareChoice, setShareChoice] = useState<boolean | null | undefined>(undefined);
+  const [savingShare, setSavingShare] = useState(false);
 
   const loadState = useCallback(async () => {
     if (!supabase || !gameId) return;
@@ -68,6 +71,15 @@ export default function LobbyScreen() {
     if (data) {
       setState(data as LobbyState);
       setErrorMessage('');
+    }
+    if (authData.user) {
+      const { data: selfRow } = await supabase
+        .from('players')
+        .select('share_trail')
+        .eq('game_id', gameId)
+        .eq('user_id', authData.user.id)
+        .maybeSingle();
+      if (selfRow) setShareChoice((selfRow.share_trail as boolean | null) ?? null);
     }
   }, [gameId, router]);
 
@@ -211,6 +223,20 @@ export default function LobbyScreen() {
     await Share.share({ message: `Join my GhostRun lobby with code ${state.game.code}.` });
   }
 
+  async function chooseShare(share: boolean) {
+    if (!supabase || !gameId) return;
+    setSavingShare(true);
+    setErrorMessage('');
+    const { error } = await supabase.rpc('set_share_trail', { game_id: gameId, share });
+    setSavingShare(false);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    setShareChoice(share);
+    await loadState();
+  }
+
   if (!state) {
     return (
       <View style={styles.loading}>
@@ -251,6 +277,59 @@ export default function LobbyScreen() {
           <Text style={styles.shareText}>Share</Text>
         </Pressable>
       </View>
+
+      {shareChoice === null && (
+        <View style={styles.shareSheet}>
+          <Text style={styles.shareTitle}>Share your route after the game?</Text>
+          <Text style={styles.shareBody}>
+            When the game ends, a replay shows where everyone moved. You choose what others see of
+            you.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            disabled={savingShare}
+            onPress={() => void chooseShare(true)}
+            style={styles.shareChoiceButton}
+          >
+            <Text style={styles.shareChoiceText}>Share my route</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={savingShare}
+            onPress={() => void chooseShare(false)}
+            style={styles.shareChoiceButton}
+          >
+            <Text style={styles.shareChoiceText}>Keep my route private</Text>
+          </Pressable>
+          <Text style={styles.shareHint}>
+            Either way, in-game events such as tags and pings remain visible, because they already
+            happened in front of everyone. You can change this until the game ends.
+          </Text>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push('/privacy' as any)}
+            style={styles.shareLinkRow}
+          >
+            <Text style={styles.shareLink}>How your location is used</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {shareChoice !== null && shareChoice !== undefined && (
+        <View style={styles.shareStatusRow}>
+          <Text style={styles.shareStatusText}>
+            Route after the game: {shareChoice ? 'shared with the crew' : 'private'}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            disabled={savingShare}
+            onPress={() => void chooseShare(!shareChoice)}
+            style={styles.shareLinkRow}
+          >
+            <Text style={styles.shareLink}>Change</Text>
+          </Pressable>
+        </View>
+      )}
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Players</Text>
@@ -530,6 +609,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   shareText: { color: '#1D4ED8', fontSize: 15, fontWeight: '800' },
+  shareSheet: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#BFDBFE',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 16,
+  },
+  shareTitle: { color: '#0F172A', fontSize: 18, fontWeight: '900' },
+  shareBody: { color: '#475569', fontSize: 14, lineHeight: 20, marginTop: 6 },
+  shareChoiceButton: {
+    alignItems: 'center',
+    borderColor: '#1D4ED8',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    marginTop: 10,
+    minHeight: 52,
+  },
+  shareChoiceText: { color: '#1D4ED8', fontSize: 16, fontWeight: '800' },
+  shareHint: { color: '#64748B', fontSize: 12, lineHeight: 18, marginTop: 12 },
+  shareLinkRow: { justifyContent: 'center', minHeight: 44 },
+  shareLink: { color: '#1D4ED8', fontSize: 14, fontWeight: '700' },
+  shareStatusRow: {
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    paddingHorizontal: 14,
+  },
+  shareStatusText: { color: '#334155', flex: 1, fontSize: 13, fontWeight: '600' },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',

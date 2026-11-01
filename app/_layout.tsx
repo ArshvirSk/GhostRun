@@ -15,6 +15,8 @@ export default function RootLayout() {
         <Stack.Screen name="auth" />
         <Stack.Screen name="reset-password" />
         <Stack.Screen name="welcome" />
+        <Stack.Screen name="privacy" />
+        <Stack.Screen name="settings" />
         <Stack.Screen name="home" />
         <Stack.Screen name="create" />
         <Stack.Screen name="join" />

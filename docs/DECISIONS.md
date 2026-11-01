@@ -82,6 +82,20 @@
 
 **Trade-off:** New accounts need a confirmation email until "Confirm email" is turned off or custom SMTP is configured, so first-run onboarding may pause at "Check your inbox". Existing anonymous sessions keep working until they sign out, but those accounts have no email and cannot be recovered afterwards; there is no account-linking migration.
 
+## 2026-11-01 — Consent comes before new modes (V2-M1)
+
+**Decision:** C3 (route sharing) is now required per game: `players.share_trail` starts NULL, the lobby shows a two-button sheet with no default, and both `set_ready` and `start_game` refuse to advance while any active player is still NULL. `consents` is append-only and has no client grants; the app reads state through `get_my_consents` and writes through `set_consent`. `trail_points` and `get_game_trails` reveal another player's route only when that player's `share_trail = true`; everyone always sees their own.
+
+**Reason:** v1 showed every player's route to every member after a game, which is a privacy-relevant default. MODES.md 7.4 requires a deliberate, equal-choice prompt and least sharing by default.
+
+**Trade-off:** routes recorded before this migration have `share_trail = NULL`, so other players no longer see them in old recaps. This is a deliberate privacy deviation from v1 behaviour: no consent, no sharing. New games in the current APK ask before ready-up and keep working.
+
+**Decision (retention):** `cleanup_old_games()` deletes whole games ended more than 30 days ago, which cascades trails, pings, tags, events and positions. Consent rows and accounts survive. If pg_cron is not enabled, the migration leaves a notice and the operator schedules the same job from the dashboard.
+
+**Decision (account deletion):** `delete_my_data()` first makes the caller leave any in-flight round (with leave-game win checks), passes on unfinished hosted games, then tries to delete the `auth.users` row. If the API role lacks that privilege, it still deletes the profile and every personal row and reports `account_removed: false`; the sign-in record then needs removing from the dashboard.
+
+**Decision (ping lifespan enforcement):** the 10-second on-screen ping life stays. Server-side trimming of `get_game_state` is approved but deferred to V2-M2, where that function is replaced anyway for roles and `mode_id`.
+
 ## 2026-10-30 — Recovery links return to a dedicated reset screen
 
 **Decision:** The auth screen offers "Forgot password?" and, for unconfirmed accounts, resends the confirmation with `auth.resend({ type: 'signup' })`. A reset request calls `resetPasswordForEmail` with `redirectTo: Linking.createURL('/reset-password')`. `app/reset-password.tsx` parses implicit (`#access_token`, `#refresh_token`) and PKCE (`?code`) payloads with `src/lib/authLink.ts`, establishes the session, and updates the password in place before routing to Home or Welcome.

@@ -65,7 +65,7 @@ export default function WelcomeScreen() {
       return;
     }
 
-    router.replace('/home');
+    router.replace('/privacy?mode=gate' as any);
   }
 
   const canContinue =

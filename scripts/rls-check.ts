@@ -454,6 +454,28 @@ async function main() {
     player_id: phaseHunterPlayer.data.id,
     team: 'hunter',
   });
+  // C3: ready-up is blocked until the route-sharing choice is made.
+  const blockedReady = await rpc(host, 'set_ready', { game_id: phaseGameId, ready: true });
+  expect(
+    Boolean(blockedReady.error) && /share your route/i.test(blockedReady.error?.message ?? ''),
+    'ready-up is blocked until the route-sharing choice is made',
+    String(blockedReady.error?.message ?? 'call unexpectedly succeeded'),
+  );
+
+  // Deliberate split for the recap assertions below: the runner shares, the
+  // hunter stays private.
+  const hostShare = await rpc(host, 'set_share_trail', { game_id: phaseGameId, share: true });
+  expect(!hostShare.error, 'runner can choose to share their route', String(hostShare.error?.message ?? ''));
+  const hunterShare = await rpc(hunter, 'set_share_trail', {
+    game_id: phaseGameId,
+    share: false,
+  });
+  expect(
+    !hunterShare.error,
+    'hunter can choose to keep their route private',
+    String(hunterShare.error?.message ?? ''),
+  );
+
   await rpc(host, 'set_ready', { game_id: phaseGameId, ready: true });
   await rpc(hunter, 'set_ready', { game_id: phaseGameId, ready: true });
 
@@ -853,32 +875,53 @@ async function main() {
     'call unexpectedly succeeded',
   );
 
-  // The result screen reads both teams' trails through the recap RPC, while the
-  // underlying table remains member-only and opens only once the game is over.
-  const recapTrails = await rpc<
+  // C3: after the end, the runner sees only their own trail (the hunter chose
+  // private); the hunter sees their own plus the runner's shared route.
+  const runnerRecap = await rpc<
     { player_id: string; longitude: number; latitude: number; recorded_at: string }[]
   >(host, 'get_game_trails', { game_id: phaseGameId });
-  const trailPoints = recapTrails.data ?? [];
+  const runnerTrailPoints = runnerRecap.data ?? [];
   expect(
-    Array.isArray(recapTrails.data) &&
-      trailPoints.some((point) => point.player_id === phaseHostPlayer.data.id) &&
-      trailPoints.some((point) => point.player_id === phaseHunterPlayer.data.id),
-    'the ended-round recap returns both players’ trails',
-    JSON.stringify(recapTrails.error?.message ?? trailPoints.map((point) => point.player_id)),
+    Array.isArray(runnerRecap.data) &&
+      runnerTrailPoints.some((point) => point.player_id === phaseHostPlayer.data.id) &&
+      !runnerTrailPoints.some((point) => point.player_id === phaseHunterPlayer.data.id),
+    'a private route is absent from the recap for other players',
+    JSON.stringify(runnerRecap.error?.message ?? runnerTrailPoints.map((point) => point.player_id)),
   );
   expect(
-    trailPoints.every(
+    runnerTrailPoints.every(
       (point) =>
         Number.isFinite(point.longitude) &&
         Number.isFinite(point.latitude) &&
         typeof point.recorded_at === 'string',
     ),
     'recap trail points carry coordinates and timestamps',
-    JSON.stringify(trailPoints.slice(0, 2)),
+    JSON.stringify(runnerTrailPoints.slice(0, 2)),
+  );
+
+  const hunterRecap = await rpc<{ player_id: string }[]>(hunter, 'get_game_trails', {
+    game_id: phaseGameId,
+  });
+  const hunterTrailPoints = hunterRecap.data ?? [];
+  expect(
+    hunterTrailPoints.some((point) => point.player_id === phaseHostPlayer.data.id) &&
+      hunterTrailPoints.some((point) => point.player_id === phaseHunterPlayer.data.id),
+    'a shared route is visible to teammates after the round ends',
+    JSON.stringify(hunterTrailPoints.map((point) => point.player_id)),
+  );
+
+  const privateDirectSelect = await host
+    .from('trail_points')
+    .select('player_id')
+    .eq('game_id', phaseGameId)
+    .eq('player_id', phaseHunterPlayer.data.id);
+  expectEmpty(
+    privateDirectSelect.data,
+    'the private route is unreadable through a direct table select',
   );
   expectRows(
     (await hunter.from('trail_points').select('*').eq('game_id', phaseGameId)).data,
-    'both teams can read trails after the round ends',
+    'the shared route is readable through a direct table select after the end',
   );
   const outsiderRecapTrails = await rpc(outsider, 'get_game_trails', {
     game_id: phaseGameId,
@@ -1178,6 +1221,73 @@ async function main() {
     Boolean(otherTeam.error),
     'hunter cannot change another player’s team',
     'call unexpectedly succeeded',
+  );
+
+  // Consent records are append-only and reachable only through the RPCs.
+  const policyAck = await rpc(host, 'set_consent', {
+    consent_type: 'policy_ack',
+    granted: true,
+    policy_version: 1,
+  });
+  expect(!policyAck.error, 'a policy acknowledgement can be recorded', String(policyAck.error?.message ?? ''));
+  const directConsentRead = await host.from('consents').select('*');
+  expect(
+    Boolean(directConsentRead.error) || (directConsentRead.data ?? []).length === 0,
+    'consents are not directly readable',
+    JSON.stringify(directConsentRead.data ?? directConsentRead.error?.message),
+  );
+  const directConsentWrite = await host
+    .from('consents')
+    .insert({ user_id: hostUserId, consent_type: 'diagnostics', granted: true });
+  expect(
+    Boolean(directConsentWrite.error),
+    'consents are not directly writable',
+    'insert unexpectedly succeeded',
+  );
+  const myConsents = await rpc<Record<string, unknown>>(host, 'get_my_consents', {});
+  expect(
+    Boolean(myConsents.data && (myConsents.data as Record<string, unknown>).policy_ack),
+    'consent state is readable through get_my_consents',
+    JSON.stringify(myConsents.data ?? myConsents.error?.message),
+  );
+  const exported = await rpc<{ profile?: { id?: string } | null; games?: unknown[] }>(
+    host,
+    'export_my_data',
+    {},
+  );
+  expect(
+    Boolean(exported.data?.profile && (exported.data.profile as { id?: string }).id === hostUserId),
+    'export bundle contains the caller profile',
+    JSON.stringify(exported.error?.message ?? exported.data?.profile),
+  );
+  expect(
+    Array.isArray(exported.data?.games) && (exported.data?.games?.length ?? 0) > 0,
+    'export bundle contains the games the caller joined',
+    JSON.stringify(exported.data?.games?.length ?? exported.error?.message),
+  );
+
+  // Account deletion uses the outsider account (all its secrecy checks are done).
+  const outsiderProfileBefore = await rpc<{ profile?: unknown }>(
+    outsider,
+    'export_my_data',
+    {},
+  );
+  expect(
+    outsiderProfileBefore.data?.profile !== null,
+    'outsider has a profile before deletion',
+    JSON.stringify(outsiderProfileBefore.error?.message),
+  );
+  const deleted = await rpc<{ deleted?: boolean }>(outsider, 'delete_my_data', {});
+  expect(
+    deleted.data?.deleted === true,
+    'delete_my_data removes the caller’s profile and data',
+    JSON.stringify(deleted.error?.message ?? deleted.data),
+  );
+  const outsiderProfileAfter = await rpc<{ profile?: unknown }>(outsider, 'export_my_data', {});
+  expect(
+    outsiderProfileAfter.data?.profile === null,
+    'the deleted profile and personal data are gone',
+    JSON.stringify(outsiderProfileAfter.data?.profile ?? outsiderProfileAfter.error?.message),
   );
 
   for (const client of [host, hunter]) {

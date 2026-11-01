@@ -200,6 +200,17 @@ export default function HomeScreen() {
             <Text style={styles.tutorialButtonText}>How to Play & Game Modes</Text>
           </View>
         </Pressable>
+        <Pressable
+          accessibilityLabel="Privacy and Settings"
+          accessibilityRole="button"
+          onPress={() => router.push('/settings' as any)}
+          style={styles.tutorialButton}
+        >
+          <View style={styles.tutorialButtonContent}>
+            <Ionicons color="#3B82F6" name="settings-outline" size={16} />
+            <Text style={styles.tutorialButtonText}>Privacy & Settings</Text>
+          </View>
+        </Pressable>
       </View>
     </View>
   );
