@@ -20,3 +20,5 @@ android/
 ios/
 supabase/.temp/
 supabase/.branches/
+release/
+*.apk
