@@ -566,9 +566,53 @@ async function main() {
     JSON.stringify(runnerPositions.data ?? runnerPositions.error?.message),
   );
   expectEmpty(
-    (await outsider.from('player_positions').select('*').eq('game_id', phaseGameId)).data,
+    (await outsider.from('player_positions').select('player_id').eq('game_id', phaseGameId)).data,
     'outsider cannot read live positions',
   );
+
+  // V2-M3 secret state: noise and its latches are not selectable at all, even by
+  // the owner; the bar comes from get_my_status. Drops stay hidden until a range
+  // RPC reveals them, and server-only tables are unreachable.
+  const directNoise = await host.from('player_positions').select('noise').eq('game_id', phaseGameId);
+  expect(
+    Boolean(directNoise.error),
+    'noise is not directly selectable',
+    'select unexpectedly succeeded',
+  );
+  const myStatus = await rpc<{ noise: number; player_id: string }>(host, 'get_my_status', {
+    game_id: phaseGameId,
+  });
+  expect(
+    !myStatus.error && typeof myStatus.data?.noise === 'number',
+    'the owner reads their own noise through get_my_status',
+    JSON.stringify(myStatus.error?.message ?? myStatus.data),
+  );
+  const outsiderStatus = await rpc<unknown>(outsider, 'get_my_status', { game_id: phaseGameId });
+  expect(
+    Boolean(outsiderStatus.error),
+    'an outsider cannot read another player status',
+    'call unexpectedly succeeded',
+  );
+  const nearby = await rpc<{ range_m: number; drops: unknown[] }>(host, 'nearby_drops', {
+    game_id: phaseGameId,
+  });
+  expect(
+    !nearby.error && nearby.data?.range_m === 40 && Array.isArray(nearby.data?.drops),
+    'nearby_drops returns an empty reveal when the modifier is off',
+    JSON.stringify(nearby.error?.message ?? nearby.data),
+  );
+  const outsiderNearby = await rpc<unknown>(outsider, 'nearby_drops', { game_id: phaseGameId });
+  expect(
+    Boolean(outsiderNearby.error),
+    'an outsider cannot reveal drops',
+    'call unexpectedly succeeded',
+  );
+  const claims = await host.from('drop_claims').select('*');
+  expect(Boolean(claims.error), 'drop_claims is server-only', 'select unexpectedly succeeded');
+  const secrets = await host.from('server_secrets').select('*');
+  expect(Boolean(secrets.error), 'server_secrets is unreachable from clients', 'select unexpectedly succeeded');
+  const qrUses = await host.from('qr_uses').select('*');
+  expect(Boolean(qrUses.error), 'qr_uses is server-only', 'select unexpectedly succeeded');
 
   // V2-M2 resources: players read only their own economy; teams read only their
   // own shared pool; entities are closed unless their visibility says otherwise.

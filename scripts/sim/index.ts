@@ -137,7 +137,7 @@ async function modeFrameworkScenario() {
     String(duplicate.error?.message ?? 'call unexpectedly succeeded'),
   );
 
-  const flagOff = await create({ modifiers: ['noise_meter'] });
+  const flagOff = await create({ modifiers: ['hot_cold'] });
   expect(
     Boolean(flagOff.error) && /not available yet/i.test(flagOff.error?.message ?? ''),
     'a valid but disabled modifier is rejected until its flag is on',
@@ -176,18 +176,25 @@ async function modeFrameworkScenario() {
     'the registry exposes enabled base modes',
     JSON.stringify(registry.error?.message ?? registry.data),
   );
+  const enabled = new Set(
+    (registry.data?.modifiers ?? []).filter((modifier) => modifier.enabled).map((m) => m.id),
+  );
   expect(
-    Array.isArray(registry.data?.modifiers) &&
-      registry.data!.modifiers.every((modifier) => !modifier.enabled),
+    enabled.has('noise_meter') && enabled.has('dead_drops') && enabled.has('shrinking_zone'),
+    'the implemented modifiers are enabled in the registry',
+    JSON.stringify([...enabled]),
+  );
+  expect(
+    !enabled.has('hot_cold') && !enabled.has('qr_tagging'),
     'unimplemented modifiers stay disabled',
-    JSON.stringify(registry.data?.modifiers),
+    JSON.stringify([...enabled]),
   );
 
   // Lobby-side mode setup also validates: a known-but-disabled modifier fails,
   // and an empty configuration saves cleanly.
   const badSave = await rpc(host, 'set_game_modes', {
     game_id: gameId,
-    modifiers: ['hot_cold'],
+    modifiers: ['qr_tagging'],
     roles: [],
     mode_params: {},
   });
@@ -222,8 +229,195 @@ async function modeFrameworkScenario() {
   }
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitForPhase(
+  client: SupabaseClient,
+  gameId: string,
+  phases: string[],
+  timeoutMs = 25000,
+) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const { data } = await rpc<{ game: { status: string } }>(client, 'get_game_state', {
+      game_id: gameId,
+    });
+    if (data && phases.includes(data.game.status)) return data.game.status;
+    await sleep(1000);
+  }
+  return null;
+}
+
+/** Scripted: Noise Meter, Dead Drops and the Shrinking Zone. */
+async function modifiersScenario() {
+  console.log('\n--- modifiers ---');
+  const host = await newPlayer('SimRunner');
+  const hunter = await newPlayer('SimHunter');
+  const admin = serviceRoleKey
+    ? createClient(url!, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : null;
+
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      modifiers: ['noise_meter', 'dead_drops', 'shrinking_zone'],
+      head_start_s: 0,
+      duration_s: 300,
+      ping_interval_s: 30,
+    },
+  });
+  if (created.error || !created.data?.[0]?.game_id) {
+    fail('a game with M3 modifiers is created', String(created.error?.message ?? 'no game'));
+    return;
+  }
+  pass('a game with M3 modifiers is created');
+  const gameId = created.data[0].game_id;
+
+  const joined = await rpc<unknown>(hunter, 'join_game', { code: created.data[0].code });
+  if (joined.error) {
+    fail('the second player joins', joined.error.message);
+    return;
+  }
+  await rpc(host, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(host, gameId),
+    team: 'runner',
+  });
+  await rpc(hunter, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(hunter, gameId),
+    team: 'hunter',
+  });
+  for (const client of [host, hunter]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+  }
+
+  const started = await rpc<unknown>(host, 'start_game', { game_id: gameId });
+  if (started.error) {
+    fail('the modifier round starts', started.error.message);
+    return;
+  }
+  const live = await waitForPhase(host, gameId, ['live']);
+  expect(live === 'live', 'the round reaches live', String(live));
+  if (live !== 'live') return;
+
+  const firstState = await rpc<{
+    game: { area: { radius_m: number; base_radius_m: number; shrinking: boolean; zone_stage: number } };
+  }>(host, 'get_game_state', { game_id: gameId });
+  expect(
+    firstState.data?.game.area.shrinking === true &&
+      firstState.data?.game.area.radius_m === firstState.data?.game.area.base_radius_m,
+    'the zone starts at full size',
+    JSON.stringify(firstState.data?.game.area),
+  );
+
+  // Noise: moving at 5 m/s raises the bar and is readable only by the owner.
+  let lastNoise = 0;
+  for (let i = 0; i < 3; i += 1) {
+    const upload = await rpc<{ noise: number }>(host, 'submit_position', {
+      game_id: gameId,
+      lat: CENTER.lat + i * 0.00002,
+      lng: CENTER.lng,
+      accuracy: 5,
+      speed: 5,
+      is_mock: true,
+    });
+    lastNoise = upload.data?.noise ?? 0;
+    await sleep(1100);
+  }
+  expect(lastNoise > 0, 'moving raises the runner noise bar', `noise=${lastNoise}`);
+
+  const myStatus = await rpc<{ noise: number; noise_enabled: boolean; drops_enabled: boolean }>(
+    host,
+    'get_my_status',
+    { game_id: gameId },
+  );
+  expect(
+    myStatus.data?.noise_enabled === true && myStatus.data?.drops_enabled === true,
+    'get_my_status reports the active modifiers',
+    JSON.stringify(myStatus.error?.message ?? myStatus.data),
+  );
+  expect(
+    (myStatus.data?.noise ?? 0) > 0,
+    'the owner reads their own noise value',
+    JSON.stringify(myStatus.data),
+  );
+
+  const nearby = await rpc<{ range_m: number; drops: unknown[] }>(host, 'nearby_drops', {
+    game_id: gameId,
+  });
+  expect(
+    nearby.data?.range_m === 40 && Array.isArray(nearby.data?.drops),
+    'nearby_drops returns the 40 m reveal envelope',
+    JSON.stringify(nearby.error?.message ?? nearby.data),
+  );
+
+  const outsider = await newPlayer('SimOutsider');
+  const outsiderDrops = await rpc<unknown>(outsider, 'nearby_drops', { game_id: gameId });
+  expect(
+    Boolean(outsiderDrops.error),
+    'an outsider cannot reveal drops',
+    'call unexpectedly succeeded',
+  );
+
+  const qrOff = await rpc<unknown>(host, 'qr_token', { game_id: gameId });
+  expect(
+    Boolean(qrOff.error) && /qr tagging/i.test(qrOff.error?.message ?? ''),
+    'QR tokens are refused when the modifier is off',
+    String(qrOff.error?.message ?? 'call unexpectedly succeeded'),
+  );
+
+  if (!admin) {
+    console.log('SKIP drop and zone checks need SUPABASE_SERVICE_ROLE_KEY');
+  } else {
+    const drops = await admin
+      .from('entities')
+      .select('id')
+      .eq('game_id', gameId)
+      .eq('kind', 'drop');
+    expect(
+      drops.data?.length === 6,
+      'six drops spawn when the round goes live',
+      JSON.stringify(drops.error?.message ?? drops.data?.length),
+    );
+
+    // Time travel the round to its last tenth so the zone stages have run.
+    await admin
+      .from('games')
+      .update({
+        live_at: new Date(Date.now() - 280_000).toISOString(),
+        ends_at: new Date(Date.now() + 300_000).toISOString(),
+      })
+      .eq('id', gameId);
+
+    const zoneState = await rpc<{
+      game: { area: { radius_m: number; base_radius_m: number; zone_stage: number } };
+      events: { type: string }[];
+    }>(host, 'get_game_state', { game_id: gameId });
+    const area = zoneState.data?.game.area;
+    expect(
+      Boolean(area) && area!.radius_m < area!.base_radius_m && area!.zone_stage >= 2,
+      'the effective radius shrinks near the end of the round',
+      JSON.stringify(area),
+    );
+    expect(
+      (zoneState.data?.events ?? []).some((event) => event.type === 'zone_shrunk'),
+      'a zone shrink is announced in the activity feed',
+      JSON.stringify((zoneState.data?.events ?? []).map((event) => event.type)),
+    );
+  }
+
+  for (const client of [host, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
+  modifiers: modifiersScenario,
 };
 
 async function main() {
