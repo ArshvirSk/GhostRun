@@ -1,17 +1,23 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  Vibration,
+  View,
+} from 'react-native';
 
 import { supabase } from '../lib/supabase';
 import { GeoJSONSource, Layer } from '../lib/map';
 
 /**
- * v2 modifier UI: Noise Meter, Dead Drops and the Shrinking Zone readout.
+ * v2 modifier UI: Noise Meter, Dead Drops, Shrinking Zone, and Hot & Cold Hunt.
  *
- * The server owns every rule. This module only polls the owner-only status RPC
- * (`get_my_status`), the 40 m drop reveal (`nearby_drops`) and sends intents
- * (`start_drop_claim` -> hold -> `claim_drop`, `use_item`). Nothing here decides
- * whether a claim is legal.
+ * The server owns every rule. This module only polls status RPCs, presents HUD overlays,
+ * and handles user actions (Heat press, drop claims, item usage).
  */
 
 export type ItemId = 'veil' | 'decoy' | 'burn' | 'free_ping' | 'jam' | 'sweep';
@@ -27,6 +33,8 @@ export type MyModifierStatus = {
   effects: { veil: boolean; decoy: boolean };
   noise_enabled: boolean;
   drops_enabled: boolean;
+  hot_cold_enabled?: boolean;
+  heat_charges?: number | null;
 };
 
 export type NearbyDrop = {
@@ -36,6 +44,17 @@ export type NearbyDrop = {
   distance_m: number;
   claimable: boolean;
 };
+
+export type HeatMark = {
+  id: number;
+  hunter_id: string;
+  result: 'hot' | 'cold' | 'no_change';
+  longitude: number;
+  latitude: number;
+  pressed_at: string;
+};
+
+export type HeatResult = 'hot' | 'cold' | 'no_change' | null;
 
 type GameShape = {
   status: string;
@@ -83,21 +102,23 @@ export function useModifierState(gameId: string | undefined, game: GameShape | n
   const aliveRef = useRef(true);
   const live = game?.status === 'live';
   const hasModifiers = (game?.modifiers ?? []).some(
-    (id) => id === 'noise_meter' || id === 'dead_drops',
+    (id) => id === 'noise_meter' || id === 'dead_drops' || id === 'hot_cold',
   );
 
   const refresh = useCallback(async () => {
     if (!supabase || !gameId || !live) return;
     const [statusResult, dropsResult] = await Promise.all([
       supabase.rpc('get_my_status', { game_id: gameId }),
-      supabase.rpc('nearby_drops', { game_id: gameId }),
+      (game?.modifiers ?? []).includes('dead_drops')
+        ? supabase.rpc('nearby_drops', { game_id: gameId })
+        : Promise.resolve({ data: null, error: null }),
     ]);
     if (!aliveRef.current) return;
     if (statusResult.data) setStatus(statusResult.data as MyModifierStatus);
     if (dropsResult.data) {
       setDrops(((dropsResult.data as { drops?: NearbyDrop[] }).drops ?? []) as NearbyDrop[]);
     }
-  }, [gameId, live]);
+  }, [game?.modifiers, gameId, live]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -123,44 +144,309 @@ export function useModifierState(gameId: string | undefined, game: GameShape | n
 }
 
 /** Amber drop markers. Only rendered for drops the server already revealed. */
-export function ModifierMapLayers({ drops }: { drops: NearbyDrop[] }) {
-  if (drops.length === 0) return null;
-  const data = {
-    type: 'FeatureCollection' as const,
-    features: drops.map((drop) => ({
-      type: 'Feature' as const,
-      id: drop.id,
-      properties: { claimable: drop.claimable },
-      geometry: {
-        type: 'Point' as const,
-        coordinates: [drop.longitude, drop.latitude],
-      },
-    })),
-  };
+export function ModifierMapLayers({
+  drops,
+  marks = [],
+}: {
+  drops: NearbyDrop[];
+  marks?: HeatMark[];
+}) {
   return (
-    <GeoJSONSource id="drops" data={data}>
-      <Layer
-        id="drop-halo"
-        type="circle"
-        paint={{
-          'circle-radius': 16,
-          'circle-color': '#F59E0B',
-          'circle-opacity': 0.22,
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': '#F59E0B',
-        }}
-      />
-      <Layer
-        id="drop-points"
-        type="circle"
-        paint={{
-          'circle-radius': ['case', ['get', 'claimable'], 9, 7] as any,
-          'circle-color': '#D97706',
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#FFFFFF',
-        }}
-      />
-    </GeoJSONSource>
+    <>
+      {drops.length > 0 && (
+        <GeoJSONSource
+          id="drops"
+          data={{
+            type: 'FeatureCollection' as const,
+            features: drops.map((drop) => ({
+              type: 'Feature' as const,
+              id: drop.id,
+              properties: { claimable: drop.claimable },
+              geometry: {
+                type: 'Point' as const,
+                coordinates: [drop.longitude, drop.latitude],
+              },
+            })),
+          }}
+        >
+          <Layer
+            id="drop-halo"
+            type="circle"
+            paint={{
+              'circle-radius': 16,
+              'circle-color': '#F59E0B',
+              'circle-opacity': 0.22,
+              'circle-stroke-width': 1.5,
+              'circle-stroke-color': '#F59E0B',
+            }}
+          />
+          <Layer
+            id="drop-points"
+            type="circle"
+            paint={{
+              'circle-radius': ['case', ['get', 'claimable'], 9, 7] as any,
+              'circle-color': '#D97706',
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#FFFFFF',
+            }}
+          />
+        </GeoJSONSource>
+      )}
+
+      {marks.length > 0 && (
+        <GeoJSONSource
+          id="heat-marks"
+          data={{
+            type: 'FeatureCollection' as const,
+            features: marks.map((m) => ({
+              type: 'Feature' as const,
+              id: m.id,
+              properties: { result: m.result },
+              geometry: {
+                type: 'Point' as const,
+                coordinates: [m.longitude, m.latitude],
+              },
+            })),
+          }}
+        >
+          <Layer
+            id="heat-mark-halo"
+            type="circle"
+            paint={{
+              'circle-radius': 15,
+              'circle-color': [
+                'match',
+                ['get', 'result'],
+                'hot',
+                '#EF4444',
+                'cold',
+                '#3B82F6',
+                '#94A3B8',
+              ] as any,
+              'circle-opacity': 0.28,
+            }}
+          />
+          <Layer
+            id="heat-mark-points"
+            type="circle"
+            paint={{
+              'circle-radius': 6,
+              'circle-color': [
+                'match',
+                ['get', 'result'],
+                'hot',
+                '#DC2626',
+                'cold',
+                '#2563EB',
+                '#64748B',
+              ] as any,
+              'circle-stroke-width': 1.5,
+              'circle-stroke-color': '#FFFFFF',
+            }}
+          />
+        </GeoJSONSource>
+      )}
+    </>
+  );
+}
+
+/** Non-touch-blocking translucent screen tint overlay with haptics for HEAT results. */
+export function HeatOverlay({
+  result,
+  visible,
+  onDismiss,
+}: {
+  result: HeatResult;
+  visible: boolean;
+  onDismiss?: () => void;
+}) {
+  const [opacity] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    if (visible && result) {
+      try {
+        if (result === 'hot') {
+          Vibration.vibrate([0, 100, 100, 100]); // Two short pulses
+        } else if (result === 'cold') {
+          Vibration.vibrate(120); // One soft pulse
+        }
+      } catch {
+        // ignore
+      }
+
+      // Fade in 150 ms, hold 1.5 s, fade out 1.5 s
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.delay(1500),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        if (onDismiss) onDismiss();
+      });
+    } else {
+      opacity.setValue(0);
+    }
+  }, [visible, result, onDismiss, opacity]);
+
+  if (!visible || !result) return null;
+
+  const bgStyle =
+    result === 'hot'
+      ? styles.heatBgHot
+      : result === 'cold'
+        ? styles.heatBgCold
+        : styles.heatBgNoChange;
+
+  const iconName = result === 'hot' ? 'flame' : result === 'cold' ? 'snow' : 'remove-outline';
+
+  const label = result === 'hot' ? 'HOT' : result === 'cold' ? 'COLD' : 'NO CHANGE';
+
+  const subLabel =
+    result === 'hot' ? 'Runner nearby' : result === 'cold' ? 'Nobody near' : 'Distance unchanged';
+
+  return (
+    <Animated.View pointerEvents="none" style={[styles.heatOverlay, bgStyle, { opacity }]}>
+      <View style={styles.heatBadge}>
+        <Ionicons color="#FFFFFF" name={iconName} size={44} />
+        <Text style={styles.heatBadgeText}>{label}</Text>
+        <Text style={styles.heatBadgeSub}>{subLabel}</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+/** Runner sensed pulse ripple around screen edges (heartbeat haptic, faint ripple). */
+export function SensedRippleOverlay({ active }: { active: boolean }) {
+  const [pulseAnim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    if (active) {
+      try {
+        Vibration.vibrate([0, 80, 100, 80]); // Heartbeat haptic
+      } catch {
+        // ignore
+      }
+
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.9,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [active, pulseAnim]);
+
+  if (!active) return null;
+
+  return (
+    <Animated.View pointerEvents="none" style={[styles.sensedRipple, { opacity: pulseAnim }]} />
+  );
+}
+
+/** Thumb-reachable HEAT button with charge pips and cooldown indicator for hunters. */
+export function HeatButton({
+  gameId,
+  charges = 6,
+  maxCharges = 6,
+  cooldownEndsAt,
+  onPressResult,
+  disabled = false,
+}: {
+  gameId: string;
+  charges?: number;
+  maxCharges?: number;
+  cooldownEndsAt?: string | null;
+  onPressResult: (result: 'hot' | 'cold' | 'no_change') => void;
+  disabled?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(() =>
+    cooldownEndsAt ? Math.max(0, Math.ceil((Date.parse(cooldownEndsAt) - Date.now()) / 1000)) : 0,
+  );
+
+  useEffect(() => {
+    if (!cooldownEndsAt) return;
+    const update = () => {
+      const remaining = Math.max(0, Math.ceil((Date.parse(cooldownEndsAt) - Date.now()) / 1000));
+      setCooldownRemaining(remaining);
+    };
+    const interval = setInterval(update, 250);
+    return () => clearInterval(interval);
+  }, [cooldownEndsAt]);
+
+  async function handlePress() {
+    if (!supabase || busy || disabled || cooldownRemaining > 0 || charges <= 0) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('heat_press', { game_id: gameId });
+      if (!error && data) {
+        const res = (data as { result?: string }).result;
+        if (res === 'hot' || res === 'cold' || res === 'no_change') {
+          onPressResult(res);
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const pips = Array.from({ length: maxCharges }, (_, i) => i < charges);
+
+  return (
+    <View style={styles.heatButtonWrapper}>
+      <Pressable
+        accessibilityLabel="HEAT button: probe for nearby runners"
+        accessibilityRole="button"
+        disabled={busy || disabled || cooldownRemaining > 0 || charges <= 0}
+        onPress={handlePress}
+        style={({ pressed }) => [
+          styles.heatButton,
+          charges <= 0 && styles.heatButtonEmpty,
+          cooldownRemaining > 0 && styles.heatButtonCooldown,
+          pressed && styles.heatButtonPressed,
+        ]}
+      >
+        <Ionicons color="#FFFFFF" name="flame" size={18} style={{ marginRight: 6 }} />
+        <Text style={styles.heatButtonText}>
+          {busy
+            ? 'PROBING…'
+            : cooldownRemaining > 0
+              ? `HEAT (${cooldownRemaining}s)`
+              : charges <= 0
+                ? 'HEAT (EMPTY)'
+                : 'HEAT'}
+        </Text>
+      </Pressable>
+
+      <View style={styles.pipRow}>
+        {pips.map((filled, idx) => (
+          <View key={idx} style={[styles.pip, filled ? styles.pipFilled : styles.pipEmpty]} />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -202,7 +488,9 @@ export function ModifierPanel({
   const noiseOn = modifiers.includes('noise_meter');
   const dropsOn = modifiers.includes('dead_drops');
   const zoneOn = modifiers.includes('shrinking_zone');
-  if (!noiseOn && !dropsOn && !zoneOn) return null;
+  const hotColdOn = modifiers.includes('hot_cold');
+
+  if (!noiseOn && !dropsOn && !zoneOn && !hotColdOn) return null;
   if (game.status !== 'live' && game.status !== 'head_start') return null;
 
   async function activateItem(item: ItemId) {
@@ -276,6 +564,30 @@ export function ModifierPanel({
   return (
     <View style={styles.wrap}>
       <Text style={styles.sectionLabel}>MODIFIERS</Text>
+
+      {hotColdOn && (
+        <View style={styles.card}>
+          <View style={styles.rowBetween}>
+            <View style={styles.titleRow}>
+              <Ionicons color="#DC2626" name="flame" size={16} />
+              <Text style={[styles.cardTitle, { marginLeft: 6 }]}>Hot & Cold Hunt</Text>
+            </View>
+            {status?.team === 'hunter' && (
+              <View style={styles.badgeWrap}>
+                <Text style={styles.badgeText}>{status?.heat_charges ?? 6} charges</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.cardHint}>
+            {status?.team === 'hunter'
+              ? 'Press HEAT to probe for runners. Red = within range, Blue = clear. Marks stay on your map for 5 minutes.'
+              : 'Hunters can probe your heat. If a hunter probes while you are within range, you will feel a sensed heartbeat pulse.'}
+          </Text>
+          <Text style={styles.safetyHint}>
+            Safety reminder: Keep your eyes up when crossing roads and moving through traffic.
+          </Text>
+        </View>
+      )}
 
       {noiseOn && status?.team === 'runner' && (
         <View style={styles.card}>
@@ -446,8 +758,23 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   rowBetween: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  titleRow: { alignItems: 'center', flexDirection: 'row' },
   cardTitle: { color: '#0F172A', fontSize: 14, fontWeight: '800' },
   cardHint: { color: '#64748B', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  safetyHint: {
+    color: '#D97706',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 16,
+    marginTop: 6,
+  },
+  badgeWrap: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  badgeText: { color: '#DC2626', fontSize: 11, fontWeight: '800' },
   noiseValue: { fontSize: 14, fontWeight: '900' },
   noiseTrack: {
     backgroundColor: '#E2E8F0',
@@ -493,4 +820,108 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   refreshText: { color: '#1D4ED8', fontSize: 12, fontWeight: '700', marginLeft: 6 },
+
+  // Hot & Cold overlay styles
+  heatOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 998,
+  },
+  heatBgHot: {
+    backgroundColor: 'rgba(239, 68, 68, 0.33)',
+  },
+  heatBgCold: {
+    backgroundColor: 'rgba(59, 130, 246, 0.33)',
+  },
+  heatBgNoChange: {
+    backgroundColor: 'rgba(100, 116, 139, 0.18)',
+  },
+  heatBadge: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    borderRadius: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  heatBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginTop: 8,
+  },
+  heatBadgeSub: {
+    color: '#CBD5E1',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+
+  // Sensed pulse ripple styles
+  sensedRipple: {
+    ...StyleSheet.absoluteFill,
+    borderColor: 'rgba(139, 92, 246, 0.6)',
+    borderWidth: 10,
+    zIndex: 997,
+  },
+
+  // Heat button styles
+  heatButtonWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heatButton: {
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
+    borderRadius: 14,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 16,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  heatButtonEmpty: {
+    backgroundColor: '#94A3B8',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  heatButtonCooldown: {
+    backgroundColor: '#64748B',
+  },
+  heatButtonPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.97 }],
+  },
+  heatButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  pipRow: {
+    flexDirection: 'row',
+    marginTop: 6,
+  },
+  pip: {
+    borderRadius: 3,
+    height: 6,
+    marginHorizontal: 2,
+    width: 14,
+  },
+  pipFilled: {
+    backgroundColor: '#EF4444',
+  },
+  pipEmpty: {
+    backgroundColor: '#E2E8F0',
+  },
 });
