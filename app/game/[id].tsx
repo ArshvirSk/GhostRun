@@ -41,8 +41,13 @@ import * as Notifications from 'expo-notifications';
 
 import { supabase } from '../../src/lib/supabase';
 import {
+  HeatButton,
+  HeatMark,
+  HeatOverlay,
+  HeatResult,
   ModifierMapLayers,
   ModifierPanel,
+  SensedRippleOverlay,
   useModifierState,
 } from '../../src/components/GameModifiers';
 
@@ -165,6 +170,8 @@ type RoundState = {
   positions: RoundPosition[];
   pings: RoundPing[];
   target: LngLat | null;
+  heat_marks?: HeatMark[];
+  heat_charges?: number | null;
   events?: GameEvent[];
 };
 
@@ -258,6 +265,12 @@ function getEventIcon(type: string): EventIconInfo {
       return { name: 'flash', family: 'ionicons', color: '#4338CA' };
     case 'veil_used':
       return { name: 'eye-off-outline', family: 'ionicons', color: '#4338CA' };
+    case 'heat_used':
+      return { name: 'flame', family: 'ionicons', color: '#EF4444' };
+    case 'heat_mark':
+      return { name: 'radio-button-on', family: 'ionicons', color: '#DC2626' };
+    case 'sensed':
+      return { name: 'pulse', family: 'ionicons', color: '#8B5CF6' };
     case 'decoy_used':
       return { name: 'git-branch-outline', family: 'ionicons', color: '#4338CA' };
     case 'jam':
@@ -342,6 +355,18 @@ function formatEvent(
     text = `Sweep: ${contacts} runner(s) within 150 m`;
   } else if (event.type === 'free_ping') {
     text = 'A Free Ping was released';
+  } else if (event.type === 'heat_used') {
+    text = 'A hunter used HEAT';
+  } else if (event.type === 'heat_mark') {
+    const res =
+      payload.result === 'hot'
+        ? 'HOT (runner near)'
+        : payload.result === 'cold'
+          ? 'COLD (clear)'
+          : 'NO CHANGE';
+    text = `Heat probe: ${res}`;
+  } else if (event.type === 'sensed') {
+    text = 'Sensed pulse: a hunter probed your area!';
   } else if (event.type === 'drop_reported') {
     text = 'A drop was reported and moved';
   }
@@ -377,6 +402,9 @@ export default function GameScreen() {
   const mountedRef = useRef(true);
 
   const [muted, setMuted] = useState(false);
+  const [heatResult, setHeatResult] = useState<HeatResult>(null);
+  const [heatVisible, setHeatVisible] = useState(false);
+  const [sensedActive, setSensedActive] = useState(false);
   const mutedRef = useRef(false);
   const prevStatusRef = useRef<string | null>(null);
   const prevPhaseRef = useRef<string | null>(null);
@@ -681,6 +709,10 @@ export default function GameScreen() {
               `${payload.new.payload?.display_name || 'A player'} needs immediate help!`,
               [0, 500, 200, 500],
             );
+          }
+          if (payload.new?.type === 'sensed') {
+            setSensedActive(true);
+            setTimeout(() => setSensedActive(false), 2000);
           }
           void loadState();
         },
@@ -1243,7 +1275,7 @@ export default function GameScreen() {
           </GeoJSONSource>
         )}
 
-        <ModifierMapLayers drops={modifiers.drops} />
+        <ModifierMapLayers drops={modifiers.drops} marks={state?.heat_marks ?? []} />
 
         {targetData && (
           <GeoJSONSource id="target-point" data={targetData}>
@@ -1275,6 +1307,13 @@ export default function GameScreen() {
           </GeoJSONSource>
         )}
       </MapLibreMap>
+
+      <HeatOverlay
+        result={heatResult}
+        visible={heatVisible}
+        onDismiss={() => setHeatVisible(false)}
+      />
+      <SensedRippleOverlay active={sensedActive} />
 
       <Pressable
         accessibilityLabel={hudCompact ? 'Expand round details' : 'Minimize round details'}
@@ -1428,18 +1467,32 @@ export default function GameScreen() {
               </Animated.Text>
             </View>
             {isLive && !isRunner && !taggedSelf && (
-              <Pressable
-                accessibilityRole="button"
-                disabled={busy !== ''}
-                onPress={() => void attemptTag()}
-                style={[styles.quickTagButton, busy !== '' && styles.disabled]}
-              >
-                {busy === 'tag' ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.quickTagText}>TAG (20m)</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {(game?.modifiers ?? []).includes('hot_cold') && (
+                  <HeatButton
+                    gameId={gameId}
+                    charges={state?.heat_charges ?? 6}
+                    cooldownEndsAt={modifiers.status?.cooldowns?.heat_press}
+                    onPressResult={(res) => {
+                      setHeatResult(res);
+                      setHeatVisible(true);
+                      void loadState();
+                    }}
+                  />
                 )}
-              </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy !== ''}
+                  onPress={() => void attemptTag()}
+                  style={[styles.quickTagButton, busy !== '' && styles.disabled]}
+                >
+                  {busy === 'tag' ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.quickTagText}>TAG ({game?.tag_radius_m ?? 20}m)</Text>
+                  )}
+                </Pressable>
+              </View>
             )}
           </View>
         </View>
