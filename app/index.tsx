@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { PRIVACY_VERSION } from '../src/lib/privacy';
 import { isSupabaseConfigured, supabase } from '../src/lib/supabase';
 
 const GHOSTRUN_LOGO = require('../assets/logos/android-chrome-512x512.png');
@@ -112,7 +113,19 @@ export default function SplashScreen() {
         return;
       }
 
-      router.replace(profile ? '/home' : '/welcome');
+      if (!profile) {
+        router.replace('/welcome');
+        return;
+      }
+
+      // Existing v1 players upgrade into the privacy gate: the policy must be
+      // acknowledged for the current version before Home is reachable.
+      setStatusMessage('Checking privacy choices…');
+      const { data: consents } = await supabase.rpc('get_my_consents');
+      const ack = (consents as Record<string, { granted?: boolean; policy_version?: number } | undefined> | null)
+        ?.policy_ack;
+      const acknowledgedVersion = ack?.granted ? (ack.policy_version ?? 0) : 0;
+      router.replace(acknowledgedVersion < PRIVACY_VERSION ? ('/privacy?mode=gate' as any) : '/home');
     } catch (err) {
       setHasError(true);
       setErrorMessage(err instanceof Error ? err.message : 'Failed to launch GhostRun.');
