@@ -30,11 +30,23 @@ export type MyModifierStatus = {
   smoothed_speed_mps: number | null;
   charges: Partial<Record<ItemId, number>>;
   cooldowns: Record<string, string>;
-  effects: { veil: boolean; decoy: boolean };
+  effects: { veil: boolean; decoy: boolean; scramble?: boolean; silenced?: boolean };
   noise_enabled: boolean;
   drops_enabled: boolean;
   hot_cold_enabled?: boolean;
   heat_charges?: number | null;
+  secret_role?: string | null;
+  double_agent_enabled?: boolean;
+  agent_powers?: {
+    scramble_available: boolean;
+    whisper_available: boolean;
+  } | null;
+  tribunal?: {
+    tribunal_id: string;
+    accused_id: string;
+    started_by: string;
+    my_vote: boolean | null;
+  } | null;
 };
 
 export type NearbyDrop = {
@@ -924,4 +936,390 @@ const styles = StyleSheet.create({
   pipEmpty: {
     backgroundColor: '#E2E8F0',
   },
+  agentContainer: {
+    backgroundColor: '#0F172A',
+    borderColor: '#38BDF8',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginVertical: 8,
+    padding: 12,
+  },
+  agentHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  agentTitle: {
+    color: '#38BDF8',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  agentActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  agentButton: {
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderColor: '#38BDF8',
+    borderRadius: 10,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  agentButtonDisabled: {
+    borderColor: '#334155',
+    opacity: 0.5,
+  },
+  agentButtonText: {
+    color: '#F8FAFC',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  whisperBanner: {
+    backgroundColor: '#0284C7',
+    borderRadius: 8,
+    marginTop: 8,
+    padding: 8,
+  },
+  whisperText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  runnerPicker: {
+    backgroundColor: '#1E293B',
+    borderRadius: 8,
+    marginTop: 8,
+    padding: 8,
+  },
+  runnerPickerTitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  runnerPickItem: {
+    backgroundColor: '#334155',
+    borderRadius: 6,
+    marginBottom: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  runnerPickText: {
+    color: '#F8FAFC',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tribunalBanner: {
+    backgroundColor: '#7F1D1D',
+    borderColor: '#EF4444',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginVertical: 8,
+    padding: 12,
+  },
+  tribunalHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+  },
+  tribunalTitle: {
+    color: '#FCA5A5',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  tribunalPrompt: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    marginBottom: 10,
+  },
+  tribunalButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  ejectButton: {
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    flex: 1,
+    paddingVertical: 8,
+  },
+  innocentButton: {
+    alignItems: 'center',
+    backgroundColor: '#475569',
+    borderRadius: 8,
+    flex: 1,
+    paddingVertical: 8,
+  },
+  tribunalBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  startTribunalButton: {
+    alignItems: 'center',
+    backgroundColor: '#450A0A',
+    borderColor: '#DC2626',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingVertical: 9,
+  },
+  startTribunalText: {
+    color: '#FCA5A5',
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });
+
+/**
+ * AgentControls: secret interface for the Double Agent.
+ */
+export function AgentControls({
+  gameId,
+  mode,
+  status,
+  runners,
+  onActionComplete,
+}: {
+  gameId: string;
+  mode: 'classic_chase' | 'tag_hunt';
+  status: MyModifierStatus | null;
+  runners: { id: string; display_name: string }[];
+  onActionComplete?: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [whisperResult, setWhisperResult] = useState<string | null>(null);
+
+  if (status?.secret_role !== 'agent') {
+    return null;
+  }
+
+  const scrambleAvailable = status.agent_powers?.scramble_available ?? true;
+  const whisperAvailable = status.agent_powers?.whisper_available ?? true;
+
+  async function handleScramble(runnerId: string) {
+    if (!supabase || busy) return;
+    setBusy(true);
+    setShowPicker(false);
+    try {
+      await supabase.rpc('agent_scramble', { game_id: gameId, runner_id: runnerId });
+      Vibration.vibrate([0, 100, 100, 100]);
+      onActionComplete?.();
+    } catch {
+      // Ignore or let parent reload
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleWhisper() {
+    if (!supabase || busy) return;
+    setBusy(true);
+    try {
+      const { data } = await supabase.rpc('agent_whisper', { game_id: gameId });
+      const res = data as { quadrant?: string } | null;
+      if (res?.quadrant) {
+        setWhisperResult(`Secret Target is in the ${res.quadrant} quadrant`);
+      }
+      Vibration.vibrate(150);
+      onActionComplete?.();
+    } catch {
+      // Ignore or let parent reload
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View style={styles.agentContainer}>
+      <View style={styles.agentHeader}>
+        <MaterialCommunityIcons color="#38BDF8" name="incognito" size={18} />
+        <Text style={styles.agentTitle}>DOUBLE AGENT CONTROLS</Text>
+      </View>
+
+      <View style={styles.agentActions}>
+        <Pressable
+          disabled={!scrambleAvailable || busy}
+          onPress={() => setShowPicker(!showPicker)}
+          style={[styles.agentButton, (!scrambleAvailable || busy) && styles.agentButtonDisabled]}
+        >
+          <MaterialCommunityIcons color="#38BDF8" name="radar" size={16} />
+          <Text style={styles.agentButtonText}>
+            {scrambleAvailable ? 'Scramble Ping' : 'Scramble Used'}
+          </Text>
+        </Pressable>
+
+        {mode === 'classic_chase' && (
+          <Pressable
+            disabled={!whisperAvailable || busy}
+            onPress={() => void handleWhisper()}
+            style={[styles.agentButton, (!whisperAvailable || busy) && styles.agentButtonDisabled]}
+          >
+            <MaterialCommunityIcons color="#38BDF8" name="compass-outline" size={16} />
+            <Text style={styles.agentButtonText}>
+              {whisperAvailable ? 'Whisper Target' : 'Whisper Used'}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
+      {whisperResult && (
+        <View style={styles.whisperBanner}>
+          <Text style={styles.whisperText}>{whisperResult}</Text>
+        </View>
+      )}
+
+      {showPicker && (
+        <View style={styles.runnerPicker}>
+          <Text style={styles.runnerPickerTitle}>SELECT RUNNER TO SCRAMBLE</Text>
+          {runners.map((runner) => (
+            <Pressable
+              key={runner.id}
+              onPress={() => void handleScramble(runner.id)}
+              style={styles.runnerPickItem}
+            >
+              <Text style={styles.runnerPickText}>{runner.display_name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * TribunalDock: hunter tribunal voting and inquest initiation.
+ */
+export function TribunalDock({
+  gameId,
+  myPlayerId,
+  status,
+  hunters,
+  onActionComplete,
+}: {
+  gameId: string;
+  myPlayerId: string;
+  status: MyModifierStatus | null;
+  hunters: { id: string; display_name: string }[];
+  onActionComplete?: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [showHunterPicker, setShowHunterPicker] = useState(false);
+
+  if (status?.team !== 'hunter' || !status.double_agent_enabled) {
+    return null;
+  }
+
+  const activeTribunal = status.tribunal;
+  const accusedName =
+    hunters.find((h) => h.id === activeTribunal?.accused_id)?.display_name || 'Suspect';
+  const otherHunters = hunters.filter((h) => h.id !== myPlayerId);
+
+  async function handleVote(vote: boolean) {
+    if (!supabase || busy) return;
+    setBusy(true);
+    try {
+      await supabase.rpc('cast_vote', { game_id: gameId, vote });
+      Vibration.vibrate(100);
+      onActionComplete?.();
+    } catch {
+      // Ignore
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStartTribunal(accusedId: string) {
+    if (!supabase || busy) return;
+    setBusy(true);
+    setShowHunterPicker(false);
+    try {
+      await supabase.rpc('start_tribunal', { game_id: gameId, accused_hunter_id: accusedId });
+      Vibration.vibrate(200);
+      onActionComplete?.();
+    } catch {
+      // Ignore
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (activeTribunal) {
+    const hasVoted = activeTribunal.my_vote !== null && activeTribunal.my_vote !== undefined;
+    return (
+      <View style={styles.tribunalBanner}>
+        <View style={styles.tribunalHeader}>
+          <MaterialCommunityIcons color="#FCA5A5" name="gavel" size={18} />
+          <Text style={styles.tribunalTitle}>TRIBUNAL IN PROGRESS</Text>
+        </View>
+        <Text style={styles.tribunalPrompt}>
+          Suspect: <Text style={{ fontWeight: 'bold' }}>{accusedName}</Text>. Vote to eject:
+        </Text>
+        <View style={styles.tribunalButtons}>
+          <Pressable
+            disabled={busy || hasVoted}
+            onPress={() => void handleVote(true)}
+            style={[styles.ejectButton, (busy || hasVoted) && { opacity: 0.5 }]}
+          >
+            <Text style={styles.tribunalBtnText}>
+              {hasVoted && activeTribunal.my_vote === true ? 'Voted Eject' : 'Eject'}
+            </Text>
+          </Pressable>
+          <Pressable
+            disabled={busy || hasVoted}
+            onPress={() => void handleVote(false)}
+            style={[styles.innocentButton, (busy || hasVoted) && { opacity: 0.5 }]}
+          >
+            <Text style={styles.tribunalBtnText}>
+              {hasVoted && activeTribunal.my_vote === false ? 'Voted Innocent' : 'Innocent'}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {showHunterPicker ? (
+        <View style={styles.runnerPicker}>
+          <Text style={styles.runnerPickerTitle}>ACCUSE A HUNTER OF BEING DOUBLE AGENT</Text>
+          {otherHunters.map((hunter) => (
+            <Pressable
+              key={hunter.id}
+              onPress={() => void handleStartTribunal(hunter.id)}
+              style={styles.runnerPickItem}
+            >
+              <Text style={styles.runnerPickText}>{hunter.display_name}</Text>
+            </Pressable>
+          ))}
+          <Pressable onPress={() => setShowHunterPicker(false)} style={{ marginTop: 4 }}>
+            <Text style={{ color: '#94A3B8', fontSize: 11, textAlign: 'center' }}>Cancel</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          disabled={busy || otherHunters.length === 0}
+          onPress={() => setShowHunterPicker(true)}
+          style={[styles.startTribunalButton, (busy || otherHunters.length === 0) && { opacity: 0.5 }]}
+        >
+          <MaterialCommunityIcons color="#FCA5A5" name="gavel" size={16} />
+          <Text style={styles.startTribunalText}>Convene Hunter Tribunal</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
