@@ -680,6 +680,31 @@ async function main() {
     'insert unexpectedly succeeded',
   );
 
+  // Ghost library & contributions secrecy:
+  const directGhostLib = await host.from('ghost_library').select('*');
+  expect(
+    Boolean(directGhostLib.error),
+    'ghost_library is not directly selectable by clients',
+    'select unexpectedly succeeded',
+  );
+  const outsiderContrib = await outsider.from('ghost_contributions').select('*');
+  expectEmpty(
+    outsiderContrib.data,
+    'outsider reads no ghost_contributions of other users',
+  );
+  const hunterNearby = await rpc<unknown[]>(hunter, 'nearby_entities', { game_id: phaseGameId });
+  expect(
+    (hunterNearby.data?.length ?? 0) === 0,
+    'hunters cannot read raw ghost coordinates through nearby_entities',
+    JSON.stringify(hunterNearby.data ?? hunterNearby.error?.message),
+  );
+  const outsiderEntities = await rpc<unknown[]>(outsider, 'nearby_entities', { game_id: phaseGameId });
+  expect(
+    (outsiderEntities.data?.length ?? 0) === 0,
+    'outsider cannot read nearby_entities',
+    JSON.stringify(outsiderEntities.data ?? outsiderEntities.error?.message),
+  );
+
   // Secret role: no direct column access, owner-only through the RPC.
   const directRole = await hunter.from('players').select('secret_role').eq('game_id', phaseGameId);
   expect(
@@ -1362,6 +1387,21 @@ async function main() {
     arrivalHunterState.data?.target !== null,
     'the target is revealed when the round ends',
     JSON.stringify(arrivalHunterState.data?.target),
+  );
+
+  const preview = await rpc<{ can_contribute: boolean }>(host, 'preview_ghost', {
+    game_id: arrivalGameId,
+  });
+  expect(
+    !preview.error && typeof preview.data?.can_contribute === 'boolean',
+    'preview_ghost returns valid preview response for ended game',
+    JSON.stringify(preview.data ?? preview.error?.message),
+  );
+  const outsiderPreview = await rpc(outsider, 'preview_ghost', { game_id: arrivalGameId });
+  expect(
+    Boolean(outsiderPreview.error),
+    'outsiders cannot call preview_ghost',
+    'call unexpectedly succeeded',
   );
 
   // Clients must not be able to write the game directly.
