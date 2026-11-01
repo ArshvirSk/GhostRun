@@ -27,6 +27,37 @@ type GamePlayer = {
   team: Team;
   status: 'active' | 'tagged' | 'left';
   is_ready: boolean;
+  secret_role?: string | null;
+};
+
+type PlayerStat = {
+  player_id: string;
+  user_id: string;
+  display_name: string;
+  color: string;
+  team: Team;
+  status: string;
+  secret_role?: string | null;
+  share_trail: boolean | null;
+  closest_call_m: number | null;
+  longest_unseen_s: number;
+  loudest_noise: number;
+  peak_speed_mps: number;
+  drops_claimed: number;
+};
+
+type GameStats = {
+  game_id: string;
+  status: string;
+  winner: string | null;
+  duration_s: number;
+  players: PlayerStat[];
+  heat_stats: {
+    total_presses: number;
+    hot_hits: number;
+    hit_rate_pct: number;
+  };
+  total_drops_claimed: number;
 };
 
 type FinalPosition = {
@@ -103,6 +134,7 @@ export default function ResultScreen() {
   const gameId = Array.isArray(id) ? id[0] : id;
 
   const [state, setState] = useState<RoundResultState | null>(null);
+  const [gameStats, setGameStats] = useState<GameStats | null>(null);
   const [trails, setTrails] = useState<TrailPoint[]>([]);
   const [loadingTrails, setLoadingTrails] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -149,16 +181,24 @@ export default function ResultScreen() {
     }
 
     setLoadingTrails(true);
-    const { data: trailData, error: trailLoadError } = await supabase.rpc('get_game_trails', {
-      game_id: gameId,
-    });
+    const [trailRes, statsRes] = await Promise.all([
+      supabase.rpc('get_game_trails', { game_id: gameId }),
+      supabase.rpc('get_game_stats', { game_id: gameId }),
+    ]);
+
     if (!mountedRef.current) return;
-    if (trailLoadError) {
-      setTrailError(trailLoadError.message);
+
+    if (trailRes.error) {
+      setTrailError(trailRes.error.message);
     } else {
-      setTrails((trailData as TrailPoint[] | null) ?? []);
+      setTrails((trailRes.data as TrailPoint[] | null) ?? []);
       setTrailError('');
     }
+
+    if (!statsRes.error && statsRes.data) {
+      setGameStats(statsRes.data as GameStats);
+    }
+
     setLoadingTrails(false);
   }, [gameId]);
 
@@ -241,6 +281,11 @@ export default function ResultScreen() {
     () => new Map((state?.players ?? []).map((player) => [player.id, player])),
     [state],
   );
+
+  const myPlayerStats = useMemo(() => {
+    if (!gameStats || !state) return null;
+    return gameStats.players.find((p) => p.player_id === state.my_player_id) || null;
+  }, [gameStats, state]);
 
   const trailsByPlayer = useMemo(() => {
     const grouped = new Map<string, TrailPoint[]>();
@@ -570,10 +615,81 @@ export default function ResultScreen() {
           {target && <Text style={styles.legendText}>Target</Text>}
         </View>
 
+        {gameStats && (
+          <View style={styles.recapStatsContainer}>
+            <Text style={styles.sectionLabel}>MATCH HIGHLIGHTS</Text>
+            <View style={styles.statCardsGrid}>
+              {myPlayerStats && (
+                <View style={styles.statCardHighlight}>
+                  <Text style={styles.statCardCategory}>YOUR CLOSEST CALL</Text>
+                  <Text style={styles.statCardBigValue}>
+                    {myPlayerStats.closest_call_m !== null
+                      ? `${myPlayerStats.closest_call_m} m`
+                      : myPlayerStats.share_trail === false
+                        ? 'Private route'
+                        : '—'}
+                  </Text>
+                  <Text style={styles.statCardSub}>
+                    {myPlayerStats.share_trail === false
+                      ? 'Route kept private'
+                      : 'Closest opponent approach'}
+                  </Text>
+                </View>
+              )}
+
+              {myPlayerStats && myPlayerStats.team === 'runner' && (
+                <View style={styles.statCard}>
+                  <Text style={styles.statCardCategory}>LONGEST UNSEEN</Text>
+                  <Text style={styles.statCardBigValue}>
+                    {formatDuration(myPlayerStats.longest_unseen_s)}
+                  </Text>
+                  <Text style={styles.statCardSub}>Undetected streak</Text>
+                </View>
+              )}
+
+              {myPlayerStats && (
+                <View style={styles.statCard}>
+                  <Text style={styles.statCardCategory}>LOUDEST MOMENT</Text>
+                  <Text style={styles.statCardBigValue}>
+                    {myPlayerStats.loudest_noise}
+                    <Text style={{ fontSize: 13, color: '#94A3B8' }}> / 100</Text>
+                  </Text>
+                  <Text style={styles.statCardSub}>Peak noise level</Text>
+                </View>
+              )}
+
+              {gameStats.heat_stats.total_presses > 0 && (
+                <View style={styles.statCard}>
+                  <Text style={styles.statCardCategory}>HEAT HIT RATE</Text>
+                  <Text style={styles.statCardBigValue}>{gameStats.heat_stats.hit_rate_pct}%</Text>
+                  <Text style={styles.statCardSub}>
+                    {gameStats.heat_stats.hot_hits} of {gameStats.heat_stats.total_presses} probes hot
+                  </Text>
+                </View>
+              )}
+
+              {gameStats.total_drops_claimed > 0 && (
+                <View style={styles.statCard}>
+                  <Text style={styles.statCardCategory}>DROPS CLAIMED</Text>
+                  <Text style={styles.statCardBigValue}>
+                    {myPlayerStats?.drops_claimed ?? 0}
+                    <Text style={{ fontSize: 13, color: '#94A3B8' }}>
+                      {' '}
+                      / {gameStats.total_drops_claimed} total
+                    </Text>
+                  </Text>
+                  <Text style={styles.statCardSub}>Tactical supply items</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         <Text style={styles.sectionLabel}>FINAL POSITIONS · {positions.length}</Text>
         {players.map((player) => {
           const position = positions.find((entry) => entry.player_id === player.id);
           const isWinner = player.id === winnerId;
+          const isAgent = player.secret_role === 'agent';
           return (
             <View key={player.id} style={styles.playerRow}>
               <View style={[styles.playerDot, { backgroundColor: player.color }]} />
@@ -582,6 +698,12 @@ export default function ResultScreen() {
                   <Text style={styles.playerName}>{player.display_name}</Text>
                   {player.user_id === game.host_id && (
                     <MaterialCommunityIcons color="#EAB308" name="crown" size={13} />
+                  )}
+                  {isAgent && (
+                    <View style={styles.agentBadge}>
+                      <MaterialCommunityIcons color="#0284C7" name="incognito" size={12} />
+                      <Text style={styles.agentBadgeText}>AGENT</Text>
+                    </View>
                   )}
                   {player.id === state.my_player_id && <Text style={styles.playerYou}>(you)</Text>}
                 </View>
@@ -769,4 +891,64 @@ const styles = StyleSheet.create({
   footer: { color: '#94A3B8', fontSize: 11, lineHeight: 17, marginTop: 14 },
   linkButton: { alignItems: 'center', justifyContent: 'center', marginTop: 16, minHeight: 44 },
   linkText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
+  recapStatsContainer: {
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  statCardsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  statCard: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexBasis: '48%',
+    flexGrow: 1,
+    padding: 12,
+  },
+  statCardHighlight: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexBasis: '100%',
+    padding: 12,
+  },
+  statCardCategory: {
+    color: '#64748B',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  statCardBigValue: {
+    color: '#0F172A',
+    fontSize: 20,
+    fontWeight: '900',
+    marginVertical: 4,
+  },
+  statCardSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  agentBadge: {
+    alignItems: 'center',
+    backgroundColor: '#E0F2FE',
+    borderColor: '#38BDF8',
+    borderRadius: 6,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  agentBadgeText: {
+    color: '#0369A1',
+    fontSize: 9,
+    fontWeight: '800',
+  },
 });
