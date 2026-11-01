@@ -29,12 +29,23 @@ type ConsentState = {
 
 type Consents = Partial<Record<string, ConsentState>>;
 
+type GhostRecord = {
+  ghost_id: string;
+  created_at: string;
+  duration_s: number;
+  point_count: number;
+  difficulty: string;
+  expires_at: string;
+};
+
 export default function PrivacyScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const router = useRouter();
   const isGate = mode === 'gate';
 
   const [consents, setConsents] = useState<Consents | null>(null);
+  const [ghosts, setGhosts] = useState<GhostRecord[]>([]);
+  const [deletingGhosts, setDeletingGhosts] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState('');
   const [actionError, setActionError] = useState('');
@@ -50,13 +61,34 @@ export default function PrivacyScreen() {
   const load = useCallback(async () => {
     if (!supabase) return;
     setLoadError('');
-    const { data, error } = await supabase.rpc('get_my_consents');
-    if (error) {
-      setLoadError(error.message);
+    const [consentsRes, ghostsRes] = await Promise.all([
+      supabase.rpc('get_my_consents'),
+      supabase.rpc('list_my_ghosts'),
+    ]);
+    if (consentsRes.error) {
+      setLoadError(consentsRes.error.message);
       return;
     }
-    setConsents((data ?? {}) as Consents);
+    setConsents((consentsRes.data ?? {}) as Consents);
+    if (!ghostsRes.error && Array.isArray(ghostsRes.data)) {
+      setGhosts(ghostsRes.data as GhostRecord[]);
+    }
   }, []);
+
+  async function handleDeleteGhosts() {
+    if (!supabase) return;
+    setDeletingGhosts(true);
+    setActionError('');
+    const { data, error } = await supabase.rpc('delete_my_ghosts');
+    setDeletingGhosts(false);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
+    setToast(`Deleted ${data ?? 0} ghost route(s).`);
+    setTimeout(() => setToast(''), 2500);
+    await load();
+  }
 
   useEffect(() => {
     // Deferred so the fetch does not set state synchronously inside the effect.
@@ -190,14 +222,35 @@ export default function PrivacyScreen() {
             You pick per game when you join a lobby. You can change it there until the round ends,
             and hide your route later from the result screen.
           </Text>
-          <View style={styles.staticRow}>
-            <Text style={styles.choiceLabel}>Ghost contribution</Text>
-            <Text style={styles.staticValue}>Coming later</Text>
+          <View style={styles.ghostSection}>
+            <View style={styles.staticRow}>
+              <Text style={styles.choiceLabel}>Ghost Library Contributions</Text>
+              <Text style={styles.staticValue}>
+                {ghosts.length === 0 ? 'None active' : `${ghosts.length} active`}
+              </Text>
+            </View>
+            <Text style={styles.helper}>
+              Contributed routes are completely anonymous, have 150m automatically trimmed from the
+              start and end to protect your origin and destination privacy, and are automatically
+              deleted after 90 days.
+            </Text>
+            {ghosts.length > 0 && (
+              <Pressable
+                accessibilityRole="button"
+                disabled={deletingGhosts}
+                onPress={() => void handleDeleteGhosts()}
+                style={styles.deleteGhostsButton}
+              >
+                {deletingGhosts ? (
+                  <ActivityIndicator color="#DC2626" size="small" />
+                ) : (
+                  <Text style={styles.deleteGhostsText}>
+                    Delete all my ghost routes ({ghosts.length})
+                  </Text>
+                )}
+              </Pressable>
+            )}
           </View>
-          <Text style={styles.helper}>
-            If we add ghosts, they will be anonymous and off by default, with a preview before
-            anything is saved.
-          </Text>
 
           <Pressable
             accessibilityRole="button"
@@ -365,6 +418,27 @@ const styles = StyleSheet.create({
   },
   staticValue: { color: '#64748B', fontSize: 13, fontWeight: '600' },
   helper: { color: '#64748B', fontSize: 13, lineHeight: 19, marginBottom: 8 },
+  ghostSection: {
+    borderBottomColor: '#E2E8F0',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 4,
+  },
+  deleteGhostsButton: {
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginBottom: 8,
+    marginTop: 4,
+    paddingVertical: 10,
+  },
+  deleteGhostsText: {
+    color: '#DC2626',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   linkRow: {
     alignItems: 'center',
     flexDirection: 'row',
