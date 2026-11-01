@@ -913,12 +913,270 @@ async function recapStatsScenario() {
   }
 }
 
+/** Scripted: v2.2 Haunted Map & Ghost NPC simulation engine. */
+async function hauntedMapScenario() {
+  console.log('\n--- Scenario: haunted-map (v2.2 Haunted Map & Ghost NPCs) ---');
+  const host = await newPlayer('HauntHost');
+  const hunter = await newPlayer('HauntHunter');
+
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'haunted_map',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: { head_start_s: 0, duration_s: 300, ping_interval_s: 30 },
+  });
+
+  if (created.error || !created.data?.[0]?.game_id) {
+    throw new Error(`haunted_map create failed: ${created.error?.message}`);
+  }
+  const gameId = created.data[0].game_id;
+
+  const joined = await rpc<string>(hunter, 'join_game', { code: created.data[0].code });
+  if (joined.error || joined.data !== gameId) {
+    throw new Error(`hunter join failed: ${joined.error?.message}`);
+  }
+
+  await rpc(host, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(host, gameId),
+    team: 'runner',
+  });
+  await rpc(hunter, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(hunter, gameId),
+    team: 'hunter',
+  });
+
+  await rpc(host, 'set_share_trail', { game_id: gameId, share: true });
+  await rpc(hunter, 'set_share_trail', { game_id: gameId, share: true });
+
+  await rpc(host, 'set_ready', { game_id: gameId, ready: true });
+  await rpc(hunter, 'set_ready', { game_id: gameId, ready: true });
+
+  const startRes = await rpc<Record<string, unknown>>(host, 'start_game', { game_id: gameId });
+  expect(
+    !startRes.error && startRes.data?.status === 'countdown',
+    'Haunted Map game starts successfully in countdown',
+    String(startRes.error?.message ?? startRes.data?.status),
+  );
+
+  // Fast forward past countdown to live
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  // 1. Verify ghosts_spawned event
+  const events = (await host.from('events').select('*').eq('game_id', gameId)).data ?? [];
+  expect(
+    events.some((e) => e.type === 'ghosts_spawned'),
+    'ghosts_spawned event emitted to players',
+    JSON.stringify(events.map((e) => e.type)),
+  );
+
+  // Step the simulation to advance ghost positions along paths
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  // 2. Submit runner position near Ghost 1's interpolated position along synthetic loop
+  // Ghost 1 moves from (37.7749, -122.41565) toward (37.7770, -122.41675)
+  // At ~11s, interpolated position is ~(37.77567, -122.41605)
+  const ghostEstimateLat = CENTER.lat + 0.00077;
+  const ghostEstimateLng = CENTER.lng + 0.00335;
+
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: ghostEstimateLat,
+    lng: ghostEstimateLng,
+    accuracy: 3,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // 3. Test nearby_entities
+  const runnerNearby = await rpc<
+    { id: string; kind: string; latitude: number; longitude: number; distance_m: number }[]
+  >(host, 'nearby_entities', { game_id: gameId });
+
+  expect(
+    !runnerNearby.error && Array.isArray(runnerNearby.data),
+    'runner can query nearby_entities for ghost blips',
+    JSON.stringify(runnerNearby.data ?? runnerNearby.error),
+  );
+
+  const hunterNearby = await rpc<unknown[]>(hunter, 'nearby_entities', { game_id: gameId });
+  expect(
+    !hunterNearby.error && Array.isArray(hunterNearby.data) && hunterNearby.data.length === 0,
+    'hunter receives zero raw ghost entities from nearby_entities',
+    JSON.stringify(hunterNearby.data ?? hunterNearby.error),
+  );
+
+  // 4. Test haunted tag interaction
+  // If ghost was detected by runner within 80m, submit exact position at ghost
+  if (runnerNearby.data && runnerNearby.data.length > 0) {
+    const detected = runnerNearby.data[0];
+    await rpc(host, 'submit_position', {
+      game_id: gameId,
+      lat: detected.latitude,
+      lng: detected.longitude,
+      accuracy: 2,
+      recorded_at: new Date().toISOString(),
+    });
+  }
+
+  // Advance simulation to evaluate 12m proximity tag
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  const updatedEvents = (await host.from('events').select('*').eq('game_id', gameId)).data ?? [];
+  const hasHauntedTag = updatedEvents.some(
+    (e) => e.type === 'runner_tagged' && e.payload?.by === 'ghost',
+  );
+  expect(
+    hasHauntedTag,
+    'ghost tags runner within 12m with haunted tag event',
+    JSON.stringify(updatedEvents.map((e) => e.payload ?? e.type)),
+  );
+
+  for (const client of [host, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
+/** Scripted: v2.2 Ghost Library contribution, preview, listing, and deletion. */
+async function ghostContributionScenario() {
+  console.log('\n--- Scenario: ghost-contribution (v2.2 Ghost Library & Trimming) ---');
+  const host = await newPlayer('GhostRunner');
+  const hunter = await newPlayer('GhostTagger');
+
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: { head_start_s: 0, duration_s: 300, ping_interval_s: 30 },
+  });
+
+  if (created.error || !created.data?.[0]?.game_id) {
+    throw new Error(`tag_hunt create failed: ${created.error?.message}`);
+  }
+  const gameId = created.data[0].game_id;
+
+  await rpc(hunter, 'join_game', { code: created.data[0].code });
+
+  await rpc(host, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(host, gameId),
+    team: 'runner',
+  });
+  await rpc(hunter, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(hunter, gameId),
+    team: 'hunter',
+  });
+
+  await rpc(host, 'set_share_trail', { game_id: gameId, share: true });
+  await rpc(hunter, 'set_share_trail', { game_id: gameId, share: true });
+
+  await rpc(host, 'set_ready', { game_id: gameId, ready: true });
+  await rpc(hunter, 'set_ready', { game_id: gameId, ready: true });
+
+  await rpc(host, 'start_game', { game_id: gameId });
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  // Submit 10 fixes covering ~800m total path (0.0008 deg lat per step ≈ 88.9m)
+  // Spaced 11 seconds apart to satisfy the 10s trail_points throttle and <120s freshness
+  const nowMs = Date.now();
+  for (let i = 0; i < 10; i++) {
+    await rpc(host, 'submit_position', {
+      game_id: gameId,
+      lat: CENTER.lat + i * 0.0008,
+      lng: CENTER.lng,
+      accuracy: 5,
+      recorded_at: new Date(nowMs - (9 - i) * 11000).toISOString(),
+    });
+  }
+
+  // Hunter tags runner at final point to end game
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 9 * 0.0008,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(hunter, 'attempt_tag', { game_id: gameId });
+
+  // 1. Preview Ghost
+  const preview = await rpc<{
+    can_contribute: boolean;
+    original_length_m: number;
+    trimmed_length_m: number;
+    duration_s: number;
+    geojson: unknown;
+  }>(host, 'preview_ghost', { game_id: gameId });
+
+  expect(
+    preview.data?.can_contribute === true,
+    'preview_ghost confirms route is eligible for contribution',
+    JSON.stringify(preview.data ?? preview.error),
+  );
+  expect(
+    Number(preview.data?.trimmed_length_m) >= 300,
+    'trimmed length is at least 300m after privacy trimming',
+    String(preview.data?.trimmed_length_m),
+  );
+
+  // 2. Contribute Ghost
+  const contribute = await rpc<{
+    success: boolean;
+    ghost_id: string;
+    trimmed_length_m: number;
+    duration_s: number;
+  }>(host, 'contribute_ghost', { game_id: gameId });
+
+  expect(
+    contribute.data?.success === true && typeof contribute.data?.ghost_id === 'string',
+    'contribute_ghost successfully stores ghost into ghost_library',
+    JSON.stringify(contribute.data ?? contribute.error),
+  );
+  const ghostId = contribute.data?.ghost_id;
+
+  // 3. List My Ghosts
+  const myGhosts = await rpc<{ ghost_id: string; length_m: number }[]>(host, 'list_my_ghosts', {});
+  expect(
+    Array.isArray(myGhosts.data) && myGhosts.data.some((g) => g.ghost_id === ghostId),
+    'list_my_ghosts contains the newly contributed ghost',
+    JSON.stringify(myGhosts.data ?? myGhosts.error),
+  );
+
+  // 4. Delete My Ghost
+  const del = await rpc<{ deleted_count: number }>(host, 'delete_my_ghosts', {
+    ghost_ids: [ghostId],
+  });
+  expect(
+    del.data?.deleted_count === 1,
+    'delete_my_ghosts deletes the selected ghost',
+    JSON.stringify(del.data ?? del.error),
+  );
+
+  const afterDelete = await rpc<{ ghost_id: string }[]>(host, 'list_my_ghosts', {});
+  expect(
+    Array.isArray(afterDelete.data) && !afterDelete.data.some((g) => g.ghost_id === ghostId),
+    'deleted ghost is absent from list_my_ghosts',
+    JSON.stringify(afterDelete.data ?? afterDelete.error),
+  );
+
+  for (const client of [host, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
   'hot-cold': hotColdScenario,
   'double-agent': doubleAgentScenario,
   'recap-stats': recapStatsScenario,
+  'haunted-map': hauntedMapScenario,
+  'ghost-contribution': ghostContributionScenario,
 };
 
 async function main() {
