@@ -4,4 +4,10 @@ project_id = "ghostrun"
 enabled = true
 
 [db]
-major_version = 15
+major_version = 17
+
+[auth.email]
+# Friends-scale play: sign-up returns a session immediately so no confirmation
+# email (and its low hourly limit) can block a new player. Set by the owner
+# on 2026-11-01.
+enable_confirmations = false

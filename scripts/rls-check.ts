@@ -348,6 +348,8 @@ async function main() {
     'call unexpectedly succeeded',
   );
 
+  await rpc(host, 'set_share_trail', { game_id: gameId, share: true });
+  await rpc(hunter, 'set_share_trail', { game_id: gameId, share: false });
   const hostReady = await rpc(host, 'set_ready', { game_id: gameId, ready: true });
   const hunterReady = await rpc(hunter, 'set_ready', { game_id: gameId, ready: true });
   expect(
@@ -576,9 +578,13 @@ async function main() {
     'trails are unavailable while the round is live',
     'call unexpectedly succeeded',
   );
-  expectEmpty(
-    (await host.from('trail_points').select('*').eq('game_id', phaseGameId)).data,
-    'members cannot read trails during the live round',
+  const liveTrailRows =
+    (await host.from('trail_points').select('player_id').eq('game_id', phaseGameId)).data ?? [];
+  expect(
+    liveTrailRows.length > 0 &&
+      liveTrailRows.every((row) => row.player_id === phaseHostPlayer.data.id),
+    'during play a member reads only their own trail points',
+    JSON.stringify(liveTrailRows),
   );
   const liveReplay = await rpc<{ tags: unknown[]; pings: unknown[] }>(host, 'get_game_replay', {
     game_id: phaseGameId,
@@ -1144,6 +1150,8 @@ async function main() {
   });
   if (arrivalSet.error) throw new Error(`arrival target failed: ${arrivalSet.error.message}`);
 
+  await rpc(host, 'set_share_trail', { game_id: arrivalGameId, share: true });
+  await rpc(hunter, 'set_share_trail', { game_id: arrivalGameId, share: false });
   await rpc(host, 'set_ready', { game_id: arrivalGameId, ready: true });
   await rpc(hunter, 'set_ready', { game_id: arrivalGameId, ready: true });
   const arrivalStart = await rpc(host, 'start_game', { game_id: arrivalGameId });
