@@ -1,0 +1,33 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Runs every 2 days at midnight UTC (00:00)
+    - cron: '0 0 */2 * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions web interface
+
+jobs:
+  ping:
+    name: Keep-Alive Heartbeat
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send keep-alive ping to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://jgpbxsvgpewjvauozrzq.supabase.co' }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpncGJ4c3ZncGV3anZhdW96cnpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNzY5MDMsImV4cCI6MjEwODg1MjkwM30.FvvJuMJENngAiLmDcyv46s0dxXo9n0ReK-OdlNuS0ug' }}
+        run: |
+          echo "Pinging Supabase database to prevent free-tier pause..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${SUPABASE_URL}/rest/v1/rpc/health_ping" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{}")
+
+          echo "Response HTTP Status: ${HTTP_STATUS}"
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "Keep-alive ping successful. Supabase database is active and awake."
+          else
+            echo "Keep-alive ping failed with status code ${HTTP_STATUS}."
+            exit 1
+          fi
