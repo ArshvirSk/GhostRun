@@ -40,6 +40,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
 import { supabase } from '../../src/lib/supabase';
+import {
+  ModifierMapLayers,
+  ModifierPanel,
+  useModifierState,
+} from '../../src/components/GameModifiers';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -107,7 +112,7 @@ type RoundPing = {
   latitude: number | null;
   accuracy_m: number | null;
   position_age_s: number | null;
-  reason: 'scheduled' | 'boundary';
+  reason: 'scheduled' | 'boundary' | 'noise' | 'camping' | 'item';
   released_at: string;
 };
 
@@ -127,6 +132,9 @@ type RoundState = {
     code: string;
     host_id: string;
     mode: 'classic_chase' | 'tag_hunt';
+    mode_id?: 'classic_chase' | 'tag_hunt';
+    modifiers?: string[];
+    roles?: string[];
     status: Phase;
     head_start_s: number;
     duration_s: number;
@@ -139,7 +147,13 @@ type RoundState = {
     next_ping_at: string | null;
     winner: 'runners' | 'hunters' | null;
     end_reason: string | null;
-    area: LngLat & { radius_m: number };
+    area: LngLat & {
+      radius_m: number;
+      base_radius_m?: number;
+      zone_stage?: number;
+      zone_stage_count?: number;
+      shrinking?: boolean;
+    };
     target_set: boolean;
     boundary_grace_s?: number;
     boundary_penalty?: 'warn' | 'extra_ping';
@@ -187,6 +201,19 @@ type EventIconInfo = {
   color: string;
 };
 
+const ITEM_NAMES: Record<string, string> = {
+  veil: 'Veil',
+  decoy: 'Decoy',
+  burn: 'Burn',
+  free_ping: 'Free Ping',
+  jam: 'Jam',
+  sweep: 'Sweep',
+};
+
+function prettyItem(id: unknown) {
+  return ITEM_NAMES[String(id)] ?? 'item';
+}
+
 function getEventIcon(type: string): EventIconInfo {
   switch (type) {
     case 'tag':
@@ -211,6 +238,38 @@ function getEventIcon(type: string): EventIconInfo {
       return { name: 'stop-circle-outline', family: 'ionicons', color: '#EF4444' };
     case 'sos':
       return { name: 'alarm-light', family: 'mci', color: '#DC2626' };
+    case 'noise_spark':
+      return { name: 'volume-high', family: 'ionicons', color: '#EA580C' };
+    case 'noise_ping':
+      return { name: 'volume-high', family: 'ionicons', color: '#DC2626' };
+    case 'camping_ping':
+      return { name: 'timer-outline', family: 'ionicons', color: '#EA580C' };
+    case 'vehicle_warning':
+      return { name: 'car', family: 'ionicons', color: '#B45309' };
+    case 'zone_shrink_soon':
+      return { name: 'resize', family: 'ionicons', color: '#0EA5E9' };
+    case 'zone_shrunk':
+      return { name: 'contract', family: 'ionicons', color: '#0EA5E9' };
+    case 'drop_claimed':
+      return { name: 'package-variant', family: 'mci', color: '#D97706' };
+    case 'drop_item':
+      return { name: 'gift-outline', family: 'ionicons', color: '#D97706' };
+    case 'item_used':
+      return { name: 'flash', family: 'ionicons', color: '#4338CA' };
+    case 'veil_used':
+      return { name: 'eye-off-outline', family: 'ionicons', color: '#4338CA' };
+    case 'decoy_used':
+      return { name: 'git-branch-outline', family: 'ionicons', color: '#4338CA' };
+    case 'jam':
+      return { name: 'access-point-off', family: 'mci', color: '#B91C1C' };
+    case 'burn_reveal':
+      return { name: 'fire', family: 'mci', color: '#EA580C' };
+    case 'sweep':
+      return { name: 'radar', family: 'mci', color: '#0EA5E9' };
+    case 'free_ping':
+      return { name: 'radar', family: 'mci', color: '#7C3AED' };
+    case 'drop_reported':
+      return { name: 'map-marker-off', family: 'mci', color: '#64748B' };
     default:
       return { name: 'megaphone-outline', family: 'ionicons', color: '#64748B' };
   }
@@ -252,6 +311,39 @@ function formatEvent(
         ? ` (${Number(payload.latitude).toFixed(3)}, ${Number(payload.longitude).toFixed(3)})`
         : '';
     text = `EMERGENCY: ${payload.display_name || 'Player'} sent SOS${loc}`;
+  } else if (event.type === 'noise_spark') {
+    text = 'A runner is loud (no exact spot)';
+  } else if (event.type === 'noise_ping') {
+    text = 'A runner made too much noise (+ping)';
+  } else if (event.type === 'camping_ping') {
+    text = 'A runner stayed in one spot (+ping)';
+  } else if (event.type === 'vehicle_warning') {
+    text = 'Vehicle speed detected. Slow down or stop.';
+  } else if (event.type === 'zone_shrink_soon') {
+    text = `Zone shrinks to ${payload.radius_m ?? '?'} m in under a minute`;
+  } else if (event.type === 'zone_shrunk') {
+    text = `Zone shrank to ${payload.radius_m ?? '?'} m`;
+  } else if (event.type === 'drop_claimed') {
+    text = `${payload.team === 'runner' ? 'A runner' : 'A hunter'} claimed a drop`;
+  } else if (event.type === 'drop_item') {
+    text = `You found: ${prettyItem(payload.item)}`;
+  } else if (event.type === 'item_used') {
+    text = `You used ${prettyItem(payload.item)}`;
+  } else if (event.type === 'veil_used') {
+    text = 'A runner’s Veil skipped a ping';
+  } else if (event.type === 'decoy_used') {
+    text = 'A runner’s ping was a Decoy';
+  } else if (event.type === 'jam') {
+    text = 'A runner’s item was jammed';
+  } else if (event.type === 'burn_reveal') {
+    text = 'Burn: nearest hunter revealed';
+  } else if (event.type === 'sweep') {
+    const contacts = Array.isArray(payload.contacts) ? payload.contacts.length : 0;
+    text = `Sweep: ${contacts} runner(s) within 150 m`;
+  } else if (event.type === 'free_ping') {
+    text = 'A Free Ping was released';
+  } else if (event.type === 'drop_reported') {
+    text = 'A drop was reported and moved';
   }
 
   const ageS = Math.max(0, (serverNow - Date.parse(event.created_at)) / 1000);
@@ -557,11 +649,18 @@ export default function GameScreen() {
           } catch {
             // ignore
           }
+          const pingReason = payload.new?.reason;
           notify(
             'Radar Ping Released',
-            payload.new?.reason === 'boundary'
+            pingReason === 'boundary'
               ? 'Runner out of bounds ping!'
-              : 'Runner location ping detected!',
+              : pingReason === 'noise'
+                ? 'A runner was too loud and pinged!'
+                : pingReason === 'camping'
+                  ? 'A runner camped too long and pinged!'
+                  : pingReason === 'item'
+                    ? 'An item ping was released!'
+                    : 'Runner location ping detected!',
             [0, 500, 200, 500],
           );
           void loadState();
@@ -775,6 +874,7 @@ export default function GameScreen() {
   }
 
   const game = state?.game ?? null;
+  const modifiers = useModifierState(gameId, game);
   const players = state?.players ?? [];
   const myPlayerId = state?.my_player_id ?? '';
   const myTeam = state?.my_team ?? 'unassigned';
@@ -829,7 +929,8 @@ export default function GameScreen() {
       (ping): ping is RoundPing & { longitude: number; latitude: number } =>
         ping.longitude !== null &&
         ping.latitude !== null &&
-        Math.max(0, (serverNow - Date.parse(ping.released_at)) / 1000) <= PING_VISIBILITY_DURATION_S,
+        Math.max(0, (serverNow - Date.parse(ping.released_at)) / 1000) <=
+          PING_VISIBILITY_DURATION_S,
     )
     .map((ping) => {
       const releasedAgo = Math.max(0, (serverNow - Date.parse(ping.released_at)) / 1000);
@@ -1093,6 +1194,12 @@ export default function GameScreen() {
                   'case',
                   ['==', ['get', 'reason'], 'boundary'],
                   '#F59E0B',
+                  ['==', ['get', 'reason'], 'noise'],
+                  '#DC2626',
+                  ['==', ['get', 'reason'], 'camping'],
+                  '#EA580C',
+                  ['==', ['get', 'reason'], 'item'],
+                  '#7C3AED',
                   '#DB2777',
                 ],
                 'circle-opacity': 0.25,
@@ -1101,6 +1208,12 @@ export default function GameScreen() {
                   'case',
                   ['==', ['get', 'reason'], 'boundary'],
                   '#F59E0B',
+                  ['==', ['get', 'reason'], 'noise'],
+                  '#DC2626',
+                  ['==', ['get', 'reason'], 'camping'],
+                  '#EA580C',
+                  ['==', ['get', 'reason'], 'item'],
+                  '#7C3AED',
                   '#DB2777',
                 ],
                 'circle-stroke-opacity': 0.65,
@@ -1115,6 +1228,12 @@ export default function GameScreen() {
                   'case',
                   ['==', ['get', 'reason'], 'boundary'],
                   '#F59E0B',
+                  ['==', ['get', 'reason'], 'noise'],
+                  '#DC2626',
+                  ['==', ['get', 'reason'], 'camping'],
+                  '#EA580C',
+                  ['==', ['get', 'reason'], 'item'],
+                  '#7C3AED',
                   '#DB2777',
                 ],
                 'circle-stroke-width': 2.5,
@@ -1123,6 +1242,8 @@ export default function GameScreen() {
             />
           </GeoJSONSource>
         )}
+
+        <ModifierMapLayers drops={modifiers.drops} />
 
         {targetData && (
           <GeoJSONSource id="target-point" data={targetData}>
@@ -1386,6 +1507,17 @@ export default function GameScreen() {
                   )}
                 </View>
               </View>
+            )}
+
+            {isLive && gameId && game && (
+              <ModifierPanel
+                gameId={gameId}
+                game={game}
+                status={modifiers.status}
+                drops={modifiers.drops}
+                refresh={modifiers.refresh}
+                serverNow={serverNow}
+              />
             )}
 
             {taggedSelf && game!.status === 'live' && (

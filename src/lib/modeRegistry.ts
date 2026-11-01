@@ -49,7 +49,13 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       teams: ['runner', 'hunter'],
       min_players: 2,
       compatible_roles: ['double_agent', 'vip', 'operator'],
-      compatible_modifiers: ['noise_meter', 'dead_drops', 'hot_cold', 'qr_tagging', 'shrinking_zone'],
+      compatible_modifiers: [
+        'noise_meter',
+        'dead_drops',
+        'hot_cold',
+        'qr_tagging',
+        'shrinking_zone',
+      ],
       parameters: {},
       enabled: true,
     },
@@ -60,17 +66,29 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       teams: ['runner', 'hunter'],
       min_players: 2,
       compatible_roles: ['double_agent', 'operator'],
-      compatible_modifiers: ['noise_meter', 'dead_drops', 'hot_cold', 'qr_tagging', 'shrinking_zone'],
+      compatible_modifiers: [
+        'noise_meter',
+        'dead_drops',
+        'hot_cold',
+        'qr_tagging',
+        'shrinking_zone',
+      ],
       parameters: {},
       enabled: true,
     },
   ],
   modifiers: [
-    { id: 'noise_meter', layer: 'modifier', name: 'Noise Meter', parameters: {}, enabled: false },
-    { id: 'dead_drops', layer: 'modifier', name: 'Dead Drops', parameters: {}, enabled: false },
+    { id: 'noise_meter', layer: 'modifier', name: 'Noise Meter', parameters: {}, enabled: true },
+    { id: 'dead_drops', layer: 'modifier', name: 'Dead Drops', parameters: {}, enabled: true },
     { id: 'hot_cold', layer: 'modifier', name: 'Hot & Cold Hunt', parameters: {}, enabled: false },
     { id: 'qr_tagging', layer: 'modifier', name: 'QR Tagging', parameters: {}, enabled: false },
-    { id: 'shrinking_zone', layer: 'modifier', name: 'Shrinking Zone', parameters: {}, enabled: false },
+    {
+      id: 'shrinking_zone',
+      layer: 'modifier',
+      name: 'Shrinking Zone',
+      parameters: {},
+      enabled: true,
+    },
   ],
   roles: [
     { id: 'double_agent', layer: 'role', name: 'Double Agent', enabled: false },
@@ -120,9 +138,7 @@ const ROLE_RULES: Record<string, string[]> = {
 export function parameterSummary(definition: ModifierDefinition): string {
   const entries = Object.entries(definition.parameters ?? {});
   if (entries.length === 0) return '';
-  return entries
-    .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${String(value)}`)
-    .join(' · ');
+  return entries.map(([key, value]) => `${key.replace(/_/g, ' ')}: ${String(value)}`).join(' · ');
 }
 
 export function rulesFor(modifiers: string[], roles: string[]): string[] {
