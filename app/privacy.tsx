@@ -288,8 +288,8 @@ export default function PrivacyScreen() {
         <Text style={styles.policyLink}>{PRIVACY_POLICY_URL}</Text>
       ) : (
         <Text style={styles.placeholder}>
-          TODO: hosted full-policy URL is not set yet. Contact {PRIVACY_CONTACT_EMAIL} for the full
-          text.
+          For privacy inquiries, account data questions, or the full policy text, contact{' '}
+          {PRIVACY_CONTACT_EMAIL}.
         </Text>
       )}
 
