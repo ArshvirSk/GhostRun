@@ -82,6 +82,20 @@
 
 **Trade-off:** New accounts need a confirmation email until "Confirm email" is turned off or custom SMTP is configured, so first-run onboarding may pause at "Check your inbox". Existing anonymous sessions keep working until they sign out, but those accounts have no email and cannot be recovered afterwards; there is no account-linking migration.
 
+## 2026-11-01 — Mode framework keeps the v1 enum beside mode_id (V2-M2)
+
+**Decision:** `games.mode_id text` is the canonical v2 selector, defaulted to `classic_chase` and kept equal to the legacy `games.mode` enum by `create_game` and `rematch_game`. Roles and modifiers are validated server-side against one catalogue (`mode_catalogue`, `role_catalogue`, `modifier_catalogue`), first for existence and compatibility, then for the `app_settings` feature flag. Unimplemented items therefore report "not available yet", while an incompatible pair still reports the compatibility error even when both are disabled. `set_game_modes` lets the host change modifiers/roles in the lobby; the base mode stays on the create screen, matching the v1 flow.
+
+**Reason:** the released APK reads the enum; changing it in place would be a risky type migration for zero benefit. Validating before flags makes the matrix testable while nothing is switched on. The feature flags are server-only rows (`app_settings`), so turning a mode on later is a data change, not a deploy.
+
+**Trade-off:** two mode columns must stay in sync; both RPCs do it, and legacy rows are backfilled by the migration.
+
+**Decision (secret per-player state):** `secret_role` and `status_detail` are hidden with column-level grants on `players` rather than row policies, because teammates share the same row. The owner reads them through `get_my_role`. Direct selects on those columns fail for everyone, including the owner. `entities` visibility supports runner/hunter/all; `'owner'` stays closed until an owner column exists.
+
+**Decision (ping window):** the approved server-side enforcement is live: `get_game_state` returns a ping only if it was released in the last 10 seconds (or the game has ended, for the recap). `get_game_replay` keeps the full history.
+
+**Decision (resources):** `start_game` seeds empty `player_resources` rows for active players and both `team_resources` rows, so later modifiers can read totals without null checks. `rematch_game` copies mode_id, roles, modifiers and mode_params, but resets each player's `share_trail` (C3 is per game).
+
 ## 2026-11-01 — Consent comes before new modes (V2-M1)
 
 **Decision:** C3 (route sharing) is now required per game: `players.share_trail` starts NULL, the lobby shows a two-button sheet with no default, and both `set_ready` and `start_game` refuse to advance while any active player is still NULL. `consents` is append-only and has no client grants; the app reads state through `get_my_consents` and writes through `set_consent`. `trail_points` and `get_game_trails` reveal another player's route only when that player's `share_trail = true`; everyone always sees their own.
