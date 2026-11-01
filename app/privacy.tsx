@@ -115,7 +115,11 @@ export default function PrivacyScreen() {
         <Text accessibilityRole="alert" style={styles.error}>
           {loadError}
         </Text>
-        <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.primaryButton}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void load()}
+          style={styles.primaryButton}
+        >
           <Text style={styles.primaryButtonText}>Try again</Text>
         </Pressable>
       </View>
@@ -137,9 +141,7 @@ export default function PrivacyScreen() {
       )}
 
       <Text style={styles.title}>Privacy</Text>
-      <Text style={styles.versionLine}>
-        Version {PRIVACY_VERSION}.0 · Updated 2026-11-01
-      </Text>
+      <Text style={styles.versionLine}>Version {PRIVACY_VERSION}.0 · Updated 2026-11-01</Text>
 
       {needsAcknowledgement && (
         <View style={styles.changedCard}>
@@ -221,11 +223,7 @@ export default function PrivacyScreen() {
                 style={styles.sectionHeader}
               >
                 <Text style={styles.sectionTitle}>{section.title}</Text>
-                <Ionicons
-                  color="#64748B"
-                  name={open ? 'chevron-up' : 'chevron-down'}
-                  size={16}
-                />
+                <Ionicons color="#64748B" name={open ? 'chevron-up' : 'chevron-down'} size={16} />
               </Pressable>
               {open && <Text style={styles.sectionBody}>{section.body}</Text>}
             </View>

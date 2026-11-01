@@ -467,7 +467,11 @@ async function main() {
   // Deliberate split for the recap assertions below: the runner shares, the
   // hunter stays private.
   const hostShare = await rpc(host, 'set_share_trail', { game_id: phaseGameId, share: true });
-  expect(!hostShare.error, 'runner can choose to share their route', String(hostShare.error?.message ?? ''));
+  expect(
+    !hostShare.error,
+    'runner can choose to share their route',
+    String(hostShare.error?.message ?? ''),
+  );
   const hunterShare = await rpc(hunter, 'set_share_trail', {
     game_id: phaseGameId,
     share: false,
@@ -573,7 +577,10 @@ async function main() {
   // V2-M3 secret state: noise and its latches are not selectable at all, even by
   // the owner; the bar comes from get_my_status. Drops stay hidden until a range
   // RPC reveals them, and server-only tables are unreachable.
-  const directNoise = await host.from('player_positions').select('noise').eq('game_id', phaseGameId);
+  const directNoise = await host
+    .from('player_positions')
+    .select('noise')
+    .eq('game_id', phaseGameId);
   expect(
     Boolean(directNoise.error),
     'noise is not directly selectable',
@@ -610,7 +617,11 @@ async function main() {
   const claims = await host.from('drop_claims').select('*');
   expect(Boolean(claims.error), 'drop_claims is server-only', 'select unexpectedly succeeded');
   const secrets = await host.from('server_secrets').select('*');
-  expect(Boolean(secrets.error), 'server_secrets is unreachable from clients', 'select unexpectedly succeeded');
+  expect(
+    Boolean(secrets.error),
+    'server_secrets is unreachable from clients',
+    'select unexpectedly succeeded',
+  );
   const qrUses = await host.from('qr_uses').select('*');
   expect(Boolean(qrUses.error), 'qr_uses is server-only', 'select unexpectedly succeeded');
 
@@ -663,18 +674,30 @@ async function main() {
   const directEntity = await host
     .from('entities')
     .insert({ game_id: phaseGameId, kind: 'item', visible_to: 'all' });
-  expect(Boolean(directEntity.error), 'clients cannot insert entities', 'insert unexpectedly succeeded');
+  expect(
+    Boolean(directEntity.error),
+    'clients cannot insert entities',
+    'insert unexpectedly succeeded',
+  );
 
   // Secret role: no direct column access, owner-only through the RPC.
   const directRole = await hunter.from('players').select('secret_role').eq('game_id', phaseGameId);
-  expect(Boolean(directRole.error), 'secret_role is not directly selectable', 'select unexpectedly succeeded');
-  const myRole = await rpc<{ role: string | null }>(hunter, 'get_my_role', { game_id: phaseGameId });
+  expect(
+    Boolean(directRole.error),
+    'secret_role is not directly selectable',
+    'select unexpectedly succeeded',
+  );
+  const myRole = await rpc<{ role: string | null }>(hunter, 'get_my_role', {
+    game_id: phaseGameId,
+  });
   expect(
     !myRole.error && myRole.data?.role === null,
     'a player reads their own secret role through the RPC',
     JSON.stringify(myRole.error?.message ?? myRole.data),
   );
-  const otherRole = await rpc<{ role: string | null }>(host, 'get_my_role', { game_id: phaseGameId });
+  const otherRole = await rpc<{ role: string | null }>(host, 'get_my_role', {
+    game_id: phaseGameId,
+  });
   expect(
     !otherRole.error && otherRole.data?.role === null,
     'the RPC never returns another player’s role',
@@ -1348,7 +1371,11 @@ async function main() {
     granted: true,
     policy_version: 1,
   });
-  expect(!policyAck.error, 'a policy acknowledgement can be recorded', String(policyAck.error?.message ?? ''));
+  expect(
+    !policyAck.error,
+    'a policy acknowledgement can be recorded',
+    String(policyAck.error?.message ?? ''),
+  );
   const directConsentRead = await host.from('consents').select('*');
   expect(
     Boolean(directConsentRead.error) || (directConsentRead.data ?? []).length === 0,
@@ -1386,11 +1413,7 @@ async function main() {
   );
 
   // Account deletion uses the outsider account (all its secrecy checks are done).
-  const outsiderProfileBefore = await rpc<{ profile?: unknown }>(
-    outsider,
-    'export_my_data',
-    {},
-  );
+  const outsiderProfileBefore = await rpc<{ profile?: unknown }>(outsider, 'export_my_data', {});
   expect(
     outsiderProfileBefore.data?.profile !== null,
     'outsider has a profile before deletion',
