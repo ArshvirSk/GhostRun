@@ -91,7 +91,8 @@ async function playerId(client: SupabaseClient, gameId: string): Promise<string>
     .eq('game_id', gameId)
     .eq('user_id', user.user?.id ?? '')
     .single();
-  if (error || !data?.id) throw new Error(`Could not read player row: ${error?.message ?? 'missing'}`);
+  if (error || !data?.id)
+    throw new Error(`Could not read player row: ${error?.message ?? 'missing'}`);
   return data.id as string;
 }
 
@@ -137,7 +138,7 @@ async function modeFrameworkScenario() {
     String(duplicate.error?.message ?? 'call unexpectedly succeeded'),
   );
 
-  const flagOff = await create({ modifiers: ['hot_cold'] });
+  const flagOff = await create({ modifiers: ['qr_tagging'] });
   expect(
     Boolean(flagOff.error) && /not available yet/i.test(flagOff.error?.message ?? ''),
     'a valid but disabled modifier is rejected until its flag is on',
@@ -165,11 +166,10 @@ async function modeFrameworkScenario() {
     team: 'hunter',
   });
 
-  const registry = await rpc<{ modes: { id: string; enabled: boolean }[]; modifiers: { id: string; enabled: boolean }[] }>(
-    host,
-    'get_mode_registry',
-    {},
-  );
+  const registry = await rpc<{
+    modes: { id: string; enabled: boolean }[];
+    modifiers: { id: string; enabled: boolean }[];
+  }>(host, 'get_mode_registry', {});
   expect(
     Array.isArray(registry.data?.modes) &&
       registry.data!.modes.some((mode) => mode.id === 'classic_chase' && mode.enabled),
@@ -180,12 +180,15 @@ async function modeFrameworkScenario() {
     (registry.data?.modifiers ?? []).filter((modifier) => modifier.enabled).map((m) => m.id),
   );
   expect(
-    enabled.has('noise_meter') && enabled.has('dead_drops') && enabled.has('shrinking_zone'),
+    enabled.has('noise_meter') &&
+      enabled.has('dead_drops') &&
+      enabled.has('shrinking_zone') &&
+      enabled.has('hot_cold'),
     'the implemented modifiers are enabled in the registry',
     JSON.stringify([...enabled]),
   );
   expect(
-    !enabled.has('hot_cold') && !enabled.has('qr_tagging'),
+    !enabled.has('qr_tagging'),
     'unimplemented modifiers stay disabled',
     JSON.stringify([...enabled]),
   );
@@ -209,7 +212,11 @@ async function modeFrameworkScenario() {
     roles: [],
     mode_params: {},
   });
-  expect(!goodSave.error, 'set_game_modes saves an empty configuration', String(goodSave.error?.message ?? ''));
+  expect(
+    !goodSave.error,
+    'set_game_modes saves an empty configuration',
+    String(goodSave.error?.message ?? ''),
+  );
 
   const outsider = await newPlayer('SimOutsider');
   const outsiderSave = await rpc(outsider, 'set_game_modes', {
@@ -254,7 +261,9 @@ async function modifiersScenario() {
   const host = await newPlayer('SimRunner');
   const hunter = await newPlayer('SimHunter');
   const admin = serviceRoleKey
-    ? createClient(url!, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    ? createClient(url!, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
     : null;
 
   const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
@@ -305,7 +314,9 @@ async function modifiersScenario() {
   if (live !== 'live') return;
 
   const firstState = await rpc<{
-    game: { area: { radius_m: number; base_radius_m: number; shrinking: boolean; zone_stage: number } };
+    game: {
+      area: { radius_m: number; base_radius_m: number; shrinking: boolean; zone_stage: number };
+    };
   }>(host, 'get_game_state', { game_id: gameId });
   expect(
     firstState.data?.game.area.shrinking === true &&
@@ -415,9 +426,237 @@ async function modifiersScenario() {
   }
 }
 
+/** Scripted: Hot & Cold Hunt modifier checks (Variant A proximity, Variant B trend, cooldowns, secrecy). */
+async function hotColdScenario() {
+  console.log('\n--- hot & cold hunt ---');
+
+  const host = await newPlayer('SimHCHost');
+  const hunter = await newPlayer('SimHCHunter');
+  const outsider = await newPlayer('SimHCOutsider');
+
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 500,
+    settings: {
+      modifiers: ['hot_cold'],
+      head_start_s: 0,
+      duration_s: 600,
+      ping_interval_s: 60,
+      mode_params: {
+        hot_cold: {
+          variant: 'proximity',
+          heat_charges: 6,
+          cooldown_s: 2,
+          radius_m: 150,
+        },
+      },
+    },
+  });
+
+  const gameId = created.data?.[0]?.game_id;
+  const code = created.data?.[0]?.code;
+  if (!gameId || !code) throw new Error(`Create failed: ${created.error?.message ?? 'no id'}`);
+
+  await rpc<unknown>(hunter, 'join_game', { code });
+  await rpc(host, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(host, gameId),
+    team: 'runner',
+  });
+  await rpc(hunter, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(hunter, gameId),
+    team: 'hunter',
+  });
+  for (const client of [host, hunter]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+  }
+
+  const started = await rpc<unknown>(host, 'start_game', { game_id: gameId });
+  expect(!started.error, 'game with Hot & Cold starts cleanly', started.error?.message ?? 'ok');
+
+  const live = await waitForPhase(host, gameId, ['live']);
+  expect(live === 'live', 'the round reaches live', String(live));
+  if (live !== 'live') return;
+
+  // Verify ping_interval_s was multiplied by 3 (60 -> 180)
+  const state = await rpc<{ game: { ping_interval_s: number; status: string } }>(
+    hunter,
+    'get_game_state',
+    { game_id: gameId },
+  );
+  expect(
+    state.data?.game.ping_interval_s === 180,
+    'Hot & Cold triples the scheduled ping interval',
+    String(state.data?.game.ping_interval_s),
+  );
+
+  // Runner calling heat_press is rejected
+  const runnerPress = await rpc<{ result: string }>(host, 'heat_press', { game_id: gameId });
+  expect(
+    Boolean(runnerPress.error) && /only hunters/i.test(runnerPress.error?.message ?? ''),
+    'runners cannot use HEAT',
+    runnerPress.error?.message ?? 'unexpected success',
+  );
+
+  // Hunter calling heat_press before uploading position returns stale_position
+  const stalePress = await rpc<{ result: string; charges_left: number }>(hunter, 'heat_press', {
+    game_id: gameId,
+  });
+  expect(
+    stalePress.data?.result === 'stale_position',
+    'HEAT returns stale_position when hunter has no fresh fix',
+    JSON.stringify(stalePress.data ?? stalePress.error?.message),
+  );
+
+  // Hunter uploads position at center
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // Runner uploads position 50 m from hunter (within 150 m radius)
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.00045,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // Hunter presses HEAT -> returns 'hot'
+  const hotPress = await rpc<{ result: string; charges_left: number }>(hunter, 'heat_press', {
+    game_id: gameId,
+  });
+  expect(
+    hotPress.data?.result === 'hot' && hotPress.data?.charges_left === 5,
+    'HEAT returns hot when a runner is within heat radius and spends 1 charge',
+    JSON.stringify(hotPress.data ?? hotPress.error?.message),
+  );
+
+  // Immediate re-press fails personal cooldown
+  const cooldownPress = await rpc<{ result: string }>(hunter, 'heat_press', { game_id: gameId });
+  expect(
+    Boolean(cooldownPress.error) && /cooldown/i.test(cooldownPress.error?.message ?? ''),
+    'HEAT enforces personal cooldown',
+    cooldownPress.error?.message ?? 'unexpected success',
+  );
+
+  // Check hunter sees heat mark in feed view
+  const { data: feedMarks } = await hunter
+    .from('heat_press_feed')
+    .select('*')
+    .eq('game_id', gameId);
+  expect(
+    (feedMarks?.length ?? 0) >= 1 && feedMarks?.[0]?.result === 'hot',
+    'hunter sees the mark in heat_press_feed view',
+    JSON.stringify(feedMarks),
+  );
+  expect(
+    feedMarks?.[0] && !('nearest_runner_m' in feedMarks[0]),
+    'heat_press_feed does not expose nearest_runner_m',
+    JSON.stringify(feedMarks?.[0]),
+  );
+
+  // Runner and outsider cannot see marks in heat_press_feed
+  const { data: runnerFeed } = await host.from('heat_press_feed').select('*').eq('game_id', gameId);
+  expect(
+    (runnerFeed?.length ?? 0) === 0,
+    'runner cannot see marks in heat_press_feed',
+    JSON.stringify(runnerFeed),
+  );
+
+  const { data: outsiderFeed } = await outsider
+    .from('heat_press_feed')
+    .select('*')
+    .eq('game_id', gameId);
+  expect(
+    (outsiderFeed?.length ?? 0) === 0,
+    'outsider cannot see marks in heat_press_feed',
+    JSON.stringify(outsiderFeed),
+  );
+
+  // Base table heat_presses is locked during play
+  const { data: basePresses } = await hunter.from('heat_presses').select('*').eq('game_id', gameId);
+  expect(
+    (basePresses?.length ?? 0) === 0,
+    'heat_presses base table is unreadable during live play',
+    JSON.stringify(basePresses),
+  );
+
+  // Check events for hunter and runner:
+  // Hunter receives heat_mark event
+  const hunterState = await rpc<{ events: { type: string; payload?: { result?: string } }[] }>(
+    hunter,
+    'get_game_state',
+    { game_id: gameId },
+  );
+  const hunterEvents = hunterState.data?.events ?? [];
+  expect(
+    hunterEvents.some((e) => e.type === 'heat_mark' && e.payload?.result === 'hot'),
+    'hunter receives heat_mark event with result',
+    JSON.stringify(hunterEvents.map((e) => e.type)),
+  );
+
+  // Runner receives heat_used (without result) and sensed pulse event
+  const runnerState = await rpc<{ events: { type: string; payload?: Record<string, unknown> }[] }>(
+    host,
+    'get_game_state',
+    { game_id: gameId },
+  );
+  const runnerEvents = runnerState.data?.events ?? [];
+  expect(
+    runnerEvents.some((e) => e.type === 'heat_used'),
+    'runner receives heat_used announcement',
+    JSON.stringify(runnerEvents.map((e) => e.type)),
+  );
+  expect(
+    runnerEvents.some((e) => e.type === 'sensed'),
+    'runner receives sensed pulse when within heat radius',
+    JSON.stringify(runnerEvents.map((e) => e.type)),
+  );
+  expect(
+    !runnerEvents.some((e) => e.type === 'heat_mark'),
+    'runner does not receive heat_mark event',
+    'runner leaked heat_mark',
+  );
+
+  // Wait for cooldown (2 s)
+  await new Promise((r) => setTimeout(r, 2200));
+
+  // Runner moves far away (350 m away from hunter)
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.0035,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // Hunter presses again -> returns 'cold'
+  const coldPress = await rpc<{ result: string; charges_left: number }>(hunter, 'heat_press', {
+    game_id: gameId,
+  });
+  expect(
+    coldPress.data?.result === 'cold' && coldPress.data?.charges_left === 4,
+    'HEAT returns cold when runners are outside heat radius',
+    JSON.stringify(coldPress.data ?? coldPress.error?.message),
+  );
+
+  for (const client of [host, hunter, outsider]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
+  'hot-cold': hotColdScenario,
 };
 
 async function main() {
@@ -425,7 +664,8 @@ async function main() {
   const names = requested ? [requested] : Object.keys(SCENARIOS);
   for (const name of names) {
     const scenario = SCENARIOS[name];
-    if (!scenario) throw new Error(`Unknown scenario "${name}". Known: ${Object.keys(SCENARIOS).join(', ')}`);
+    if (!scenario)
+      throw new Error(`Unknown scenario "${name}". Known: ${Object.keys(SCENARIOS).join(', ')}`);
     await scenario();
   }
 
