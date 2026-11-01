@@ -163,14 +163,14 @@ The tension in GhostRun stems from **strict information asymmetry** enforced at 
 - **Background Location Tracking:** Integrated Android Foreground Service (`expo-location` + `expo-task-manager`) maintains continuous GPS uploads even when the phone screen is locked in a runner's pocket.
 - **Real-Time Geofence Enforcement:** Audio-visual boundary HUD notifies players when exiting the designated play area with a countdown grace period before penalty pings are triggered.
 - **Fair Tagging Engine:** Server validates distance between Hunter and Runner using PostGIS (`ST_DWithin` + accuracy allowance) with an 8-second penalty cooldown on missed tags.
-- **Directionless Proximity Radar (Hot & Cold):** Hunter `PULSE` sensor queries runner distance without exposing coordinates, triggering counter-detection alerts for nearby runners.
+- **Directionless Proximity Radar (Hot & Cold):** Hunter HEAT proximity pulses with binary red/blue feedback based on area-scaled distance, triggering counter-detection alerts for nearby runners.
 - **Interactive Match Modifiers:** Stackable physical rules including dynamic Noise Meters, Dead Drop tactical caches, QR tags, and Shrinking Zone perimeter contraction.
 - **In-App Camera QR Code Scanner & Dynamic Badges:** Fullscreen camera viewfinder scanner (`expo-camera`) with animated reticle for hunters, and rolling 20s HMAC-SHA256 dynamic QR badges for runners.
 - **Native Audio SFX Engine & Master HUD Mute:** Procedural 16-bit 44.1kHz audio effects (sonar radar sweep, proximity heat pips, tag buzzer, whisper chime, victory/defeat stingers, countdown metronome) with persistent mute toggle.
 - **Radar Ping Ripple Micro-Animations:** Dual concentric animated radar rings expanding outward across the map upon ping arrival.
-- **Autonomous Ghost NPCs & Ghost Library:** Historical runner routes replayed as autonomous spectral entities with 12 m proximity hazards, backed by automated 150 m privacy start/end trimming.
+- **Autonomous Ghost NPCs & Pseudonymous Ghost Library:** Historical runner routes replayed as autonomous spectral entities with 12 m proximity hazards, backed by automated 150 m privacy start/end trimming.
 - **Undercover Double Agent & Tribunal:** Counter-intelligence mole with secret Scramble & Whisper powers, plus an Emergency Tribunal voting dock for loyal hunters.
-- **GDPR & Privacy Architecture:** Granular C1–C6 consent choices, mandatory Replay Route Sharing opt-in, self-service data export, and 30-day auto retention.
+- **Privacy Controls & Consent Architecture:** Granular C1–C6 consent choices, mandatory Replay Route Sharing opt-in, self-service data export and deletion, and 30-day auto retention.
 - **Interactive Post-Match Replay & Highlights:** Scrubbable timeline showing all player routes, tag events, ping timestamps, revealed secret target, and match highlights (Closest Call, Loudest Moment, Heat Hit Rate).
 - **Emergency SOS Beacon:** Instant safety override that immediately broadcasts an unmasked, high-priority emergency location beacon to all players in the lobby.
 

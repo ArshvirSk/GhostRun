@@ -1567,17 +1567,20 @@ export default function GameScreen() {
                 </Pressable>
               </View>
             )}
-            {isLive && isRunner && !taggedSelf && (game?.modifiers ?? []).includes('qr_tagging') && (
-              <Pressable
-                accessibilityLabel="Show My QR Code"
-                accessibilityRole="button"
-                onPress={() => setRunnerQrVisible(true)}
-                style={styles.runnerQrButton}
-              >
-                <MaterialCommunityIcons color="#0F172A" name="qrcode" size={16} />
-                <Text style={styles.runnerQrButtonText}>MY QR</Text>
-              </Pressable>
-            )}
+            {isLive &&
+              isRunner &&
+              !taggedSelf &&
+              (game?.modifiers ?? []).includes('qr_tagging') && (
+                <Pressable
+                  accessibilityLabel="Show My QR Code"
+                  accessibilityRole="button"
+                  onPress={() => setRunnerQrVisible(true)}
+                  style={styles.runnerQrButton}
+                >
+                  <MaterialCommunityIcons color="#0F172A" name="qrcode" size={16} />
+                  <Text style={styles.runnerQrButtonText}>MY QR</Text>
+                </Pressable>
+              )}
           </View>
         </View>
 
@@ -1608,29 +1611,35 @@ export default function GameScreen() {
               </>
             )}
 
-            {isLive && !isRunner && !taggedSelf && (game?.modifiers ?? []).includes('qr_tagging') && (
-              <Pressable
-                accessibilityLabel="Scan runner QR tag"
-                accessibilityRole="button"
-                onPress={() => setHunterScannerVisible(true)}
-                style={styles.sheetQrScanButton}
-              >
-                <MaterialCommunityIcons color="#FFFFFF" name="qrcode-scan" size={18} />
-                <Text style={styles.sheetQrScanText}>SCAN RUNNER QR TAG</Text>
-              </Pressable>
-            )}
+            {isLive &&
+              !isRunner &&
+              !taggedSelf &&
+              (game?.modifiers ?? []).includes('qr_tagging') && (
+                <Pressable
+                  accessibilityLabel="Scan runner QR tag"
+                  accessibilityRole="button"
+                  onPress={() => setHunterScannerVisible(true)}
+                  style={styles.sheetQrScanButton}
+                >
+                  <MaterialCommunityIcons color="#FFFFFF" name="qrcode-scan" size={18} />
+                  <Text style={styles.sheetQrScanText}>SCAN RUNNER QR TAG</Text>
+                </Pressable>
+              )}
 
-            {isLive && isRunner && !taggedSelf && (game?.modifiers ?? []).includes('qr_tagging') && (
-              <Pressable
-                accessibilityLabel="Show my QR tag"
-                accessibilityRole="button"
-                onPress={() => setRunnerQrVisible(true)}
-                style={styles.sheetRunnerQrButton}
-              >
-                <MaterialCommunityIcons color="#0F172A" name="qrcode" size={18} />
-                <Text style={styles.sheetRunnerQrText}>SHOW MY QR TAG</Text>
-              </Pressable>
-            )}
+            {isLive &&
+              isRunner &&
+              !taggedSelf &&
+              (game?.modifiers ?? []).includes('qr_tagging') && (
+                <Pressable
+                  accessibilityLabel="Show my QR tag"
+                  accessibilityRole="button"
+                  onPress={() => setRunnerQrVisible(true)}
+                  style={styles.sheetRunnerQrButton}
+                >
+                  <MaterialCommunityIcons color="#0F172A" name="qrcode" size={18} />
+                  <Text style={styles.sheetRunnerQrText}>SHOW MY QR TAG</Text>
+                </Pressable>
+              )}
 
             {!taggedSelf && (inPlay || game!.status === 'countdown') && (
               <View style={styles.locationCard}>

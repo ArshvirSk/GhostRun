@@ -390,7 +390,10 @@ export default function AuthScreen() {
             accessibilityRole="button"
             disabled={busy || !isSupabaseConfigured}
             onPress={() => void handleGuestSignIn()}
-            style={[styles.guestButton, (busy || !isSupabaseConfigured) && styles.guestButtonDisabled]}
+            style={[
+              styles.guestButton,
+              (busy || !isSupabaseConfigured) && styles.guestButtonDisabled,
+            ]}
           >
             <Text style={styles.guestButtonText}>Continue as Guest</Text>
           </Pressable>
