@@ -119,7 +119,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
     },
   ],
   roles: [
-    { id: 'double_agent', layer: 'role', name: 'Double Agent', enabled: false },
+    { id: 'double_agent', layer: 'role', name: 'Double Agent', enabled: true },
     { id: 'vip', layer: 'role', name: 'VIP Escort', enabled: false },
     { id: 'operator', layer: 'role', name: 'Operator', enabled: false },
   ],
