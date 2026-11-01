@@ -29,6 +29,46 @@
 * **Runners Win:** At least one runner survives until the match timer runs out.
 * **Hunters Win:** Every runner is located and tagged.
 
+### 3. Hot & Cold Hunt (Directionless Proximity Pulse)
+* **The Mission:** Hunter radar receives directionless heat pulses instead of coordinate snapshots.
+* **Proximity Feedback:** Pressing `PULSE` queries runner distances within the area without exposing coordinates:
+  - **HOT:** nearest runner $\le 75\text{ m}$.
+  - **WARM:** nearest runner $75\text{ m} < d \le 175\text{ m}$.
+  - **COLD:** nearest runner $> 175\text{ m}$.
+* **Counter-Detection:** Runners inside the $175\text{ m}$ radius receive a physical vibration and `sensed` pulse alert, warning them that hunters are closing in.
+
+---
+
+## 🎛️ Modifiers (Stackable Match Dynamics)
+
+Lobbies can stack one or more modifiers to alter match mechanics:
+
+1. **Noise Meter:** Real-time speed and accelerometer tracking. Sprinting or erratic movement raises your noise bar. Crossing 60 alerts hunters with an acoustic spark; hitting 100 triggers an instant radar ping. Stationary camping (>4 min) releases a camping radar ping.
+2. **Dead Drops:** Physical caches spawn across the play area. Players who discover a drop within 40 m and hold position inside 15 m for 4 seconds unlock team tactical utilities (Veil, Decoy, Recon).
+3. **QR Tagging:** Backup physical verification using high-entropy HMAC-SHA256 rotating QR tokens (20 s TTL), preventing GPS drift disputes in tight indoor/urban corridors.
+4. **Shrinking Zone:** In the final third of the round, the play boundary contracts inward across timed stages (100% → 70% → 45%), forcing remaining runners and hunters into an intense endgame bottleneck.
+
+---
+
+## 🕵️ Secret Roles: Double Agent & Emergency Tribunal
+
+* **The Mole:** In Classic Chase matches with $\ge 2$ hunters, one hunter can be secretly designated as the **Double Agent**.
+* **Covert Powers:**
+  - **Whisper (Once per match):** Reveals the cardinal quadrant (`North`, `South`, `East`, `West`) of the runners' extraction target.
+  - **Scramble (2-min cooldown):** Jams hunters' radar on the next ping round, shifting a chosen runner's revealed coordinate by 150–250 m.
+* **Emergency Tribunal:** Suspicious hunters can convene an Emergency Tribunal and vote to eject an accused hunter. If the Double Agent is ejected, hunters gain a bonus ping round; ejecting a loyal hunter penalizes hunters with a 5-minute radar silence.
+
+---
+
+## 🔒 Privacy, Consent & Retention Architecture
+
+GhostRun v2 implements rigorous, transparent privacy controls:
+- **C1–C6 Consent Architecture:** Formal consent states for location, policy acknowledgment, ghost replays, leaderboard names, diagnostics, and spectator feeds.
+- **Route Sharing Choice (Consent C3):** Every player explicitly chooses whether to share their replay breadcrumb trail (`Share Route` or `Keep Private`) before readying up.
+- **Data Minimization:** Private trails are omitted from post-match recaps, opponent views, and closest-call statistics.
+- **Auto-Retention:** Completed games, raw trails, and event logs are scheduled for deletion after 30 days via `cleanup_old_games()`.
+- **User Control:** One-tap **Export My Data** and permanent **Delete My Account** (`delete_my_data()`) are available in Settings → Privacy.
+
 ---
 
 ## ⚡ The Core Mechanic: Tactical Asymmetric Information
@@ -200,6 +240,12 @@ npm run typecheck
 
 # Run ESLint validation
 npm run lint
+
+# Run automated RLS secrecy matrix verification
+npm run rls
+
+# Run end-to-end multi-agent game simulator (all modes & modifiers)
+npm run sim
 
 # Run rate-limit, resend cooldown, and storage pruning tests
 npm run test:cooldown
