@@ -1076,6 +1076,41 @@ async function main() {
     'outsiders cannot read trails after the round ends',
   );
 
+  // V2-M5: Recap stats C3 consent gate and post-end role reveal
+  const memberStats = await rpc<{
+    players: {
+      player_id: string;
+      share_trail: boolean | null;
+      closest_call_m: number | null;
+      loudest_noise: number;
+    }[];
+  }>(host, 'get_game_stats', { game_id: phaseGameId });
+  const hunterStat = memberStats.data?.players?.find(
+    (p) => p.player_id === phaseHunterPlayer.data.id,
+  );
+  expect(
+    !memberStats.error && hunterStat !== undefined && hunterStat.closest_call_m === null,
+    'a player who declined route sharing has null closest call in recap stats',
+    JSON.stringify(memberStats.data ?? memberStats.error?.message),
+  );
+
+  const outsiderStats = await rpc(outsider, 'get_game_stats', { game_id: phaseGameId });
+  expect(
+    Boolean(outsiderStats.error),
+    'outsiders cannot request game stats',
+    'call unexpectedly succeeded',
+  );
+
+  const endedSnapshot = await rpc<{
+    players: { id: string; secret_role?: string | null }[];
+  }>(host, 'get_game_state', { game_id: phaseGameId });
+  expect(
+    Array.isArray(endedSnapshot.data?.players) &&
+      endedSnapshot.data.players.every((p) => 'secret_role' in p),
+    'post-end state reveals secret_role property for all players',
+    JSON.stringify(endedSnapshot.data?.players),
+  );
+
   // The replay adds the timestamped tag and ping history on top of the trails.
   const replay = await rpc<{
     tags: {

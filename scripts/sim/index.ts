@@ -653,19 +653,281 @@ async function hotColdScenario() {
   }
 }
 
+async function doubleAgentScenario() {
+  console.log('\n--- double agent ---');
+  const host = await newPlayer('DA-Host');
+  const hunter1 = await newPlayer('DA-Hunter1');
+  const hunter2 = await newPlayer('DA-Hunter2');
+
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'classic_chase',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      roles: ['double_agent'],
+      duration_s: 1800,
+      head_start_s: 0,
+      ping_interval_s: 30,
+    },
+  });
+  const game = created.data?.[0];
+  if (!game?.game_id) throw new Error(`Game creation failed: ${created.error?.message}`);
+  const gameId = game.game_id;
+  const code = game.code;
+
+  await rpc(hunter1, 'join_game', { code });
+  await rpc(hunter2, 'join_game', { code });
+
+  await rpc(host, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(host, gameId),
+    team: 'runner',
+  });
+  await rpc(hunter1, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(hunter1, gameId),
+    team: 'hunter',
+  });
+  await rpc(hunter2, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(hunter2, gameId),
+    team: 'hunter',
+  });
+
+  for (const client of [host, hunter1, hunter2]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
+  await rpc(host, 'begin_target_selection', { game_id: gameId });
+  await rpc(host, 'set_target', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.002,
+    lng: CENTER.lng,
+  });
+
+  for (const client of [host, hunter1, hunter2]) {
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
+  const startRes = await rpc<{ status: string }>(host, 'start_game', { game_id: gameId });
+  expect(
+    !startRes.error && startRes.data?.status === 'countdown',
+    'game with Double Agent starts cleanly',
+    JSON.stringify(startRes.data ?? startRes.error?.message),
+  );
+
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  const role1 = await rpc<{ role: string | null }>(hunter1, 'get_my_role', { game_id: gameId });
+  const role2 = await rpc<{ role: string | null }>(hunter2, 'get_my_role', { game_id: gameId });
+
+  const h1IsAgent = role1.data?.role === 'agent';
+  const h2IsAgent = role2.data?.role === 'agent';
+
+  expect(
+    (h1IsAgent && !h2IsAgent) || (!h1IsAgent && h2IsAgent),
+    'exactly one hunter is secretly assigned as Double Agent',
+    `h1: ${role1.data?.role}, h2: ${role2.data?.role}`,
+  );
+
+  const agent = h1IsAgent ? hunter1 : hunter2;
+  const loyalHunter = h1IsAgent ? hunter2 : hunter1;
+
+  const whisper = await rpc<{ quadrant: string }>(agent, 'agent_whisper', { game_id: gameId });
+  expect(
+    whisper.data?.quadrant === 'North',
+    'Whisper reveals correct cardinal quadrant of target',
+    JSON.stringify(whisper.data ?? whisper.error?.message),
+  );
+
+  const repeatWhisper = await rpc(agent, 'agent_whisper', { game_id: gameId });
+  expect(
+    Boolean(repeatWhisper.error),
+    'Whisper cannot be used twice',
+    'call unexpectedly succeeded',
+  );
+
+  const loyalWhisper = await rpc(loyalHunter, 'agent_whisper', { game_id: gameId });
+  expect(
+    Boolean(loyalWhisper.error),
+    'loyal hunter cannot use Whisper',
+    'call unexpectedly succeeded',
+  );
+
+  const hostState = await rpc<{ players: { id: string; team: string }[] }>(
+    host,
+    'get_game_state',
+    { game_id: gameId },
+  );
+  const runnerId = hostState.data!.players.find((p) => p.team === 'runner')!.id;
+
+  const scramble = await rpc<{ success: boolean }>(agent, 'agent_scramble', {
+    game_id: gameId,
+    runner_id: runnerId,
+  });
+  expect(
+    scramble.data?.success === true,
+    'Scramble is armed on chosen runner',
+    JSON.stringify(scramble.data ?? scramble.error?.message),
+  );
+
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const agentStatus = await rpc<{ player_id: string }>(agent, 'get_my_status', { game_id: gameId });
+  const agentId = agentStatus.data!.player_id;
+
+  const tribunalStart = await rpc<{ tribunal_id: string; status: string }>(
+    loyalHunter,
+    'start_tribunal',
+    {
+      game_id: gameId,
+      accused_hunter_id: agentId,
+    },
+  );
+  expect(
+    !tribunalStart.error,
+    'loyal hunter can convene tribunal against suspect',
+    JSON.stringify(tribunalStart.data ?? tribunalStart.error?.message),
+  );
+
+  const voteRes = await rpc<{ status: string; outcome: string; was_agent: boolean }>(
+    agent,
+    'cast_vote',
+    {
+      game_id: gameId,
+      vote: true,
+    },
+  );
+  expect(
+    voteRes.data?.outcome === 'ejected' && voteRes.data?.was_agent === true,
+    'majority tribunal vote ejects the Double Agent with bonus ping',
+    JSON.stringify(voteRes.data ?? voteRes.error?.message),
+  );
+
+  for (const client of [host, hunter1, hunter2]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
+async function recapStatsScenario() {
+  console.log('\n--- recap stats ---');
+  const host = await newPlayer('Recap-Host');
+  const hunter = await newPlayer('Recap-Hunter');
+
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      duration_s: 1800,
+      head_start_s: 0,
+      ping_interval_s: 30,
+    },
+  });
+  const game = created.data?.[0];
+  if (!game?.game_id) throw new Error(`Game creation failed: ${created.error?.message}`);
+  const gameId = game.game_id;
+  const code = game.code;
+
+  await rpc(hunter, 'join_game', { code });
+  await rpc(host, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(host, gameId),
+    team: 'runner',
+  });
+  await rpc(hunter, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(hunter, gameId),
+    team: 'hunter',
+  });
+
+  await rpc(host, 'set_share_trail', { game_id: gameId, share: true });
+  await rpc(hunter, 'set_share_trail', { game_id: gameId, share: false });
+
+  await rpc(host, 'set_ready', { game_id: gameId, ready: true });
+  await rpc(hunter, 'set_ready', { game_id: gameId, ready: true });
+
+  await rpc(host, 'start_game', { game_id: gameId });
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  await rpc(hunter, 'attempt_tag', { game_id: gameId });
+
+  const stats = await rpc<{
+    winner: string;
+    players: {
+      player_id: string;
+      share_trail: boolean | null;
+      closest_call_m: number | null;
+      loudest_noise: number;
+    }[];
+  }>(host, 'get_game_stats', { game_id: gameId });
+
+  expect(
+    !stats.error && stats.data?.winner === 'hunters',
+    'get_game_stats returns completed game summary',
+    JSON.stringify(stats.data ?? stats.error?.message),
+  );
+
+  const runnerStat = stats.data?.players.find((p) => p.share_trail === true);
+  const hunterStat = stats.data?.players.find((p) => p.share_trail === false);
+
+  expect(
+    hunterStat !== undefined && hunterStat.closest_call_m === null,
+    'private route player has null closest_call_m in stats',
+    JSON.stringify(hunterStat),
+  );
+  expect(
+    typeof runnerStat?.loudest_noise === 'number',
+    'recap stats include loudest noise value',
+    JSON.stringify(runnerStat),
+  );
+
+  for (const client of [host, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
   'hot-cold': hotColdScenario,
+  'double-agent': doubleAgentScenario,
+  'recap-stats': recapStatsScenario,
 };
 
 async function main() {
   const requested = process.argv[2];
-  const names = requested ? [requested] : Object.keys(SCENARIOS);
+  const names = !requested || requested === 'all' ? Object.keys(SCENARIOS) : [requested];
   for (const name of names) {
     const scenario = SCENARIOS[name];
     if (!scenario)
-      throw new Error(`Unknown scenario "${name}". Known: ${Object.keys(SCENARIOS).join(', ')}`);
+      throw new Error(`Unknown scenario "${name}". Known: ${Object.keys(SCENARIOS).join(', ')}, all`);
     await scenario();
   }
 
