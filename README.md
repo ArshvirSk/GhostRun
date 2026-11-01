@@ -107,7 +107,11 @@ The tension in GhostRun stems from **strict information asymmetry** enforced at 
 - **Background Location Tracking:** Integrated Android Foreground Service (`expo-location` + `expo-task-manager`) maintains continuous GPS uploads even when the phone screen is locked in a runner's pocket.
 - **Real-Time Geofence Enforcement:** Audio-visual boundary HUD notifies players when exiting the designated play area with a countdown grace period before penalty pings are triggered.
 - **Fair Tagging Engine:** Server validates distance between Hunter and Runner using PostGIS (`ST_DWithin` + accuracy allowance) with an 8-second penalty cooldown on missed tags.
-- **Interactive Post-Match Replay:** Scrubbable timeline showing all player routes, tag events, ping timestamps, and the revealed secret target.
+- **Directionless Proximity Radar (Hot & Cold):** Hunter `PULSE` sensor queries runner distance without exposing coordinates, triggering counter-detection alerts for nearby runners.
+- **Interactive Match Modifiers:** Stackable physical rules including dynamic Noise Meters, Dead Drop tactical caches, QR tags, and Shrinking Zone perimeter contraction.
+- **Undercover Double Agent & Tribunal:** Counter-intelligence mole with secret Scramble & Whisper powers, plus an Emergency Tribunal voting dock for loyal hunters.
+- **GDPR & Privacy Architecture:** Granular C1–C6 consent choices, mandatory Replay Route Sharing opt-in, self-service data export, and 30-day auto retention.
+- **Interactive Post-Match Replay & Highlights:** Scrubbable timeline showing all player routes, tag events, ping timestamps, revealed secret target, and match highlights (Closest Call, Loudest Moment, Heat Hit Rate).
 - **Emergency SOS Beacon:** Instant safety override that immediately broadcasts an unmasked, high-priority emergency location beacon to all players in the lobby.
 
 ---
@@ -130,12 +134,17 @@ The tension in GhostRun stems from **strict information asymmetry** enforced at 
                                └─────────────────────────────────────────┘
 ```
 
-- **Frontend & Framework:** [Expo](https://expo.dev) (SDK 58) / [React Native](https://reactnative.dev) (0.88) with Expo Router.
-- **Language:** TypeScript 6 with strict typing.
-- **Mapping Engine:** [MapLibre React Native](https://github.com/maplibre/maplibre-react-native) with free vector tile rendering via [OpenFreeMap](https://openfreemap.org) (no proprietary map API keys or fees required).
-- **State Management:** [Zustand](https://github.com/pmndrs/zustand) + `@react-native-async-storage/async-storage` for offline queueing and session recovery.
-- **Backend Infrastructure:** [Supabase](https://supabase.com) (PostgreSQL 15, PostGIS extension, Realtime broadcast channels).
-- **Security:** Strict PostgreSQL Row Level Security (RLS) guaranteeing that confidential runner coordinates never reach client hardware during live rounds.
+### ⚡ Zero-Server Architecture: Do I need to turn on a backend?
+
+> **NO.** You do **not** need to run any local server, Docker container, or background process on your computer to play or test GhostRun.
+
+GhostRun is **100% serverless** and operates entirely through the cloud:
+1. **Hosted Cloud Database:** Authentication, real-time WebSocket lobbies, PostGIS spatial queries, and player sessions run on the hosted Supabase cloud infrastructure.
+2. **Server-Authoritative PL/pgSQL:** All gameplay rules (ping timers, proximity calculations, noise meters, dead drops, double agent abilities, and tag checks) execute inside atomic PostgreSQL `SECURITY DEFINER` stored procedures.
+3. **Lazy Game Clock:** Game phases, head-starts, and ping schedules advance dynamically when devices query or submit fixes. No background cron daemon or long-running worker process is required.
+4. **Decentralized Vector Tiles:** MapLibre renders maps directly from OpenFreeMap’s public global CDN with no API keys or local tile servers needed.
+
+Anyone who downloads the release APK can install it, create or join a lobby with a 4-letter room code, and play immediately outdoors without touching a terminal.
 
 ---
 
@@ -150,13 +159,20 @@ GhostRun/
 │   ├── auth.tsx                # Email & password authentication
 │   ├── onboarding.tsx          # Full-bleed tutorial & role walkthrough
 │   ├── home.tsx                # Main menu (Create, Join, Active Games)
+│   ├── privacy.tsx             # Privacy controls, consent toggles, export & deletion
 │   ├── create.tsx              # Game creation & map boundary configuration
 │   ├── lobby/[id].tsx          # Pre-game lobby, team assignment, room code
 │   ├── game/[id].tsx           # Active match: tactical radar, tags, geofencing
 │   └── result/[id].tsx         # Post-match recap, stats & interactive replay
 ├── assets/                     # App icons, splash screens, vector illustrations
-├── docs/                       # Product (PRD), Architecture (TRD) & System Specs
+├── docs/                       # Product (PRD), Architecture (TRD), Specs & Playtest Guide
+│   ├── MODES.md                # v2 modes, modifiers and role specifications
+│   ├── PLAYTEST.md             # Outdoor playtest protocol, debrief questions & checklists
+│   ├── DECISIONS.md            # Architecture decision records
+│   └── V2_AUDIT.md             # Schema audit and migration roadmap
 ├── scripts/                    # Test suites, simulation tools & cooldown checkers
+│   ├── rls-check.ts            # Anti-cheat RLS secrecy matrix verification
+│   └── sim/index.ts            # Multi-agent game simulator (all modes & modifiers)
 ├── src/                        # Core application business logic
 │   ├── components/             # Reusable UI components & HUD widgets
 │   ├── hooks/                  # Custom location, game state & device hooks
@@ -173,8 +189,8 @@ GhostRun/
 
 ### 1. Download Pre-Built Android APK
 You can install and play GhostRun directly on any modern Android device (Android 8.0+):
-- Head over to the [**Latest Releases**](https://github.com/ArshvirSk/GhostRun/releases).
-- Download `GhostRun-v1.0.0.apk`.
+- Head over to the [**Latest Releases**](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.0.0).
+- Download **`GhostRun-v2.0.0.apk`**.
 - Open the `.apk` on your device and tap **Install** (allow "Install from Unknown Sources" if prompted).
 
 ---
