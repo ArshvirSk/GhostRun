@@ -977,10 +977,9 @@ async function hauntedMapScenario() {
   await rpc(host, 'advance_game', { game_id: gameId });
 
   // 2. Submit runner position near Ghost 1's interpolated position along synthetic loop
-  // Ghost 1 moves from (37.7749, -122.41565) toward (37.7770, -122.41675)
-  // At ~11s, interpolated position is ~(37.77567, -122.41605)
-  const ghostEstimateLat = CENTER.lat + 0.00077;
-  const ghostEstimateLng = CENTER.lng + 0.00335;
+  // Ghost 1 starts along synthetic loop at offset 0 deg (CENTER.lat, CENTER.lng + 0.00375)
+  const ghostEstimateLat = CENTER.lat;
+  const ghostEstimateLng = CENTER.lng + 0.00375;
 
   await rpc(host, 'submit_position', {
     game_id: gameId,
@@ -1008,7 +1007,7 @@ async function hauntedMapScenario() {
     JSON.stringify(hunterNearby.data ?? hunterNearby.error),
   );
 
-  // 4. Test haunted tag interaction
+  // 4. Test haunted tag interaction with 3-second dwell requirement (Milestone S1 / D3)
   // If ghost was detected by runner within 80m, submit exact position at ghost
   if (runnerNearby.data && runnerNearby.data.length > 0) {
     const detected = runnerNearby.data[0];
@@ -1021,11 +1020,40 @@ async function hauntedMapScenario() {
     });
   }
 
-  // Advance simulation to evaluate 12m proximity tag
+  // First tick: starts dwell timer, runner should NOT be tagged yet
   await rpc(host, 'advance_game', { game_id: gameId });
 
-  const updatedEvents = (await host.from('events').select('*').eq('game_id', gameId)).data ?? [];
-  const hasHauntedTag = updatedEvents.some(
+  let updatedEvents = (await host.from('events').select('*').eq('game_id', gameId)).data ?? [];
+  let hasHauntedTag = updatedEvents.some(
+    (e) => e.type === 'runner_tagged' && e.payload?.by === 'ghost',
+  );
+  expect(
+    !hasHauntedTag,
+    'ghost does not tag runner without 3-second continuous dwell',
+    'tagged prematurely without 3s dwell',
+  );
+
+  // Continuous dwell: submit runner positions tracking the moving ghost each second for 4 seconds
+  for (let s = 0; s < 4; s++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const refreshedNearby = await rpc<
+      { id: string; kind: string; latitude: number; longitude: number; distance_m: number }[]
+    >(host, 'nearby_entities', { game_id: gameId });
+    if (refreshedNearby.data && refreshedNearby.data.length > 0) {
+      const currentGhost = refreshedNearby.data[0];
+      await rpc(host, 'submit_position', {
+        game_id: gameId,
+        lat: currentGhost.latitude,
+        lng: currentGhost.longitude,
+        accuracy: 2,
+        recorded_at: new Date().toISOString(),
+      });
+    }
+    await rpc(host, 'advance_game', { game_id: gameId });
+  }
+
+  updatedEvents = (await host.from('events').select('*').eq('game_id', gameId)).data ?? [];
+  hasHauntedTag = updatedEvents.some(
     (e) => e.type === 'runner_tagged' && e.payload?.by === 'ghost',
   );
   expect(
@@ -1169,6 +1197,183 @@ async function ghostContributionScenario() {
   }
 }
 
+/** Scripted: Milestone S1 Security, Fairness, Clock Timing, Assist Mode, Safety Guards & Health Ping Abuse. */
+async function s1SecurityTimingScenario() {
+  console.log('\n--- Scenario: s1-security-timing (Milestone S1) ---');
+  const host = await newPlayer('S1Host');
+  const hunter = await newPlayer('S1Hunter');
+
+  // 1. Clock Advancement (advance_active_games / idle clock advancement)
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: { head_start_s: 0, duration_s: 300, ping_interval_s: 30, ping_visible_s: 10, ghost_mode: 'assist' },
+  });
+  if (created.error || !created.data?.[0]?.game_id) {
+    throw new Error(`s1 create_game failed: ${created.error?.message}`);
+  }
+  const gameId = created.data[0].game_id;
+
+  await rpc(hunter, 'join_game', { code: created.data[0].code });
+  await rpc(host, 'set_team', { game_id: gameId, player_id: await playerId(host, gameId), team: 'runner' });
+  await rpc(hunter, 'set_team', { game_id: gameId, player_id: await playerId(hunter, gameId), team: 'hunter' });
+  await rpc(host, 'set_share_trail', { game_id: gameId, share: true });
+  await rpc(hunter, 'set_share_trail', { game_id: gameId, share: true });
+  await rpc(host, 'set_ready', { game_id: gameId, ready: true });
+  await rpc(hunter, 'set_ready', { game_id: gameId, ready: true });
+
+  const startRes = await rpc<{ status: string }>(host, 'start_game', { game_id: gameId });
+  expect(startRes.data?.status === 'countdown', 'game starts in countdown', String(startRes.data?.status));
+
+  // Wait 11 seconds for countdown to expire
+  await new Promise((r) => setTimeout(r, 11000));
+
+  // Advance idle games via advance_active_games without players calling advance_game directly
+  const unauthClient = createClient(url!, anonKey!, { auth: { persistSession: false } });
+  const advRes = await unauthClient.rpc('advance_active_games', { limit_count: 10 });
+  expect(
+    !advRes.error && Number(advRes.data?.advanced_count) >= 1,
+    'advance_active_games advances idle active games',
+    JSON.stringify(advRes.data ?? advRes.error),
+  );
+
+  const stateAfterAdv = await rpc<Record<string, unknown>>(host, 'get_game_state', { game_id: gameId });
+  expect(
+    (stateAfterAdv.data?.game as any)?.status === 'live',
+    'idle game reached live status through advance_active_games clock tick',
+    (stateAfterAdv.data?.game as any)?.status,
+  );
+
+  // 2. Ping Window Visibility (D5)
+  expect(
+    (stateAfterAdv.data?.game as any)?.ping_visible_s === 10,
+    'game ping_visible_s is 10 by default',
+    String((stateAfterAdv.data?.game as any)?.ping_visible_s),
+  );
+
+  // 3. Safety Guard: Mock Location Detection
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 5,
+    is_mock: true,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const mockEvents = (await host.from('events').select('*').eq('game_id', gameId).eq('type', 'mock_location_detected')).data ?? [];
+  expect(
+    mockEvents.length > 0,
+    'mock_location_detected event is emitted when mock fix is submitted',
+    `events=${mockEvents.length}`,
+  );
+
+  // 4. Safety Guard: Universal Vehicle Warning
+  // Warm up exponential speed smoothing above 8 m/s across sustained window
+  for (let i = 0; i < 4; i++) {
+    await rpc(host, 'submit_position', {
+      game_id: gameId,
+      lat: CENTER.lat + 0.0001 * (i + 1),
+      lng: CENTER.lng,
+      speed: 15.0,
+      accuracy: 5,
+      recorded_at: new Date(Date.now() - 11000 + i * 200).toISOString(),
+    });
+  }
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.001,
+    lng: CENTER.lng,
+    speed: 15.0,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  const vehicleEvents = (await host.from('events').select('*').eq('game_id', gameId).eq('type', 'vehicle_warning')).data ?? [];
+  expect(
+    vehicleEvents.length > 0,
+    'vehicle_warning event is emitted when speed >= 8 m/s for 10 s',
+    `events=${vehicleEvents.length}`,
+  );
+
+  for (const client of [host, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+
+  // 5. Ghost Assist Mode (D3) & Inaccuracy Gating
+  const assistHost = await newPlayer('AssistHost');
+  const assistHunter = await newPlayer('AssistHunter');
+  const assistCreated = await rpc<{ game_id: string; code: string }[]>(assistHost, 'create_game', {
+    mode: 'haunted_map',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: { head_start_s: 0, duration_s: 300, ghost_mode: 'assist' },
+  });
+  const assistGameId = assistCreated.data![0].game_id;
+  await rpc(assistHunter, 'join_game', { code: assistCreated.data![0].code });
+  await rpc(assistHost, 'set_team', { game_id: assistGameId, player_id: await playerId(assistHost, assistGameId), team: 'runner' });
+  await rpc(assistHunter, 'set_team', { game_id: assistGameId, player_id: await playerId(assistHunter, assistGameId), team: 'hunter' });
+  await rpc(assistHost, 'set_share_trail', { game_id: assistGameId, share: true });
+  await rpc(assistHunter, 'set_share_trail', { game_id: assistGameId, share: true });
+  await rpc(assistHost, 'set_ready', { game_id: assistGameId, ready: true });
+  await rpc(assistHunter, 'set_ready', { game_id: assistGameId, ready: true });
+  await rpc(assistHost, 'start_game', { game_id: assistGameId });
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(assistHost, 'advance_game', { game_id: assistGameId });
+
+  // 1. Inaccuracy check: runner near ghost with accuracy 35m (>30m) must be ignored
+  await rpc(assistHost, 'submit_position', {
+    game_id: assistGameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng + 0.00375,
+    accuracy: 35.0,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(assistHost, 'advance_game', { game_id: assistGameId });
+
+  const inaccuratePings = (await assistHunter.from('pings').select('*').eq('game_id', assistGameId).eq('reason', 'ghost_sighting')).data ?? [];
+  expect(
+    inaccuratePings.length === 0,
+    'inaccurate runner fix (>30m) is ignored by ghost and produces no sighting ping',
+    `pings=${inaccuratePings.length}`,
+  );
+
+  // 2. Assist sighting check: runner near ghost with accuracy 5m (<=30m) within 40m triggers ghost_sighting ping
+  await rpc(assistHost, 'submit_position', {
+    game_id: assistGameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng + 0.00375,
+    accuracy: 5.0,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(assistHost, 'advance_game', { game_id: assistGameId });
+
+  const sightingPings = (await assistHunter.from('pings').select('*').eq('game_id', assistGameId).eq('reason', 'ghost_sighting')).data ?? [];
+  expect(
+    sightingPings.length > 0,
+    'ghost in assist mode emits sighting ping to hunters within 40m',
+    `pings=${sightingPings.length}`,
+  );
+
+  for (const client of [assistHost, assistHunter]) {
+    await rpc(client, 'leave_game', { game_id: assistGameId });
+  }
+
+  // 6. Hardened health_ping 100-call rapid abuse test
+  const pingPromises = Array.from({ length: 100 }, () =>
+    unauthClient.rpc('health_ping', { body: {} })
+  );
+  const pingResults = await Promise.all(pingPromises);
+  const allSucceeded = pingResults.every((res) => !res.error && res.data?.ok === true && res.data?.app === 'ghostrun');
+  expect(
+    allSucceeded,
+    '100 rapid concurrent health_ping keep-alive calls all succeed cleanly without failure',
+    `succeeded=${pingResults.filter((r) => r.data?.ok).length}`,
+  );
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -1177,6 +1382,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   'recap-stats': recapStatsScenario,
   'haunted-map': hauntedMapScenario,
   'ghost-contribution': ghostContributionScenario,
+  's1-security-timing': s1SecurityTimingScenario,
 };
 
 async function main() {
