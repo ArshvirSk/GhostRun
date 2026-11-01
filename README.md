@@ -4,8 +4,8 @@
 
 ![GhostRun](banner.png)
 
-[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.0.0)
-[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.0.0)
+[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.3.0)
+[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.3.0)
 [![Expo SDK](https://img.shields.io/badge/Expo-v58.0-000000.svg)](https://expo.dev)
 [![React Native](https://img.shields.io/badge/React%20Native-0.88-61DAFB.svg)](https://reactnative.dev)
 [![Supabase](https://img.shields.io/badge/Backend-Supabase%20PostGIS-3ECF8E.svg)](https://supabase.com)
@@ -52,8 +52,21 @@ Lobbies can stack one or more modifiers to alter match mechanics:
 
 1. **Noise Meter:** Real-time speed and accelerometer tracking. Sprinting or erratic movement raises your noise bar. Crossing 60 alerts hunters with an acoustic spark; hitting 100 triggers an instant radar ping. Stationary camping (>4 min) releases a camping radar ping.
 2. **Dead Drops:** Physical caches spawn across the play area. Players who discover a drop within 40 m and hold position inside 15 m for 4 seconds unlock team tactical utilities (Veil, Decoy, Recon).
-3. **QR Tagging:** Backup physical verification using high-entropy HMAC-SHA256 rotating QR tokens (20 s TTL), preventing GPS drift disputes in tight indoor/urban corridors.
+3. **QR Tagging:** Backup physical verification using high-entropy HMAC-SHA256 rotating QR tokens (20 s TTL), preventing GPS drift disputes in tight indoor/urban corridors. Features an integrated camera viewfinder scanner for hunters and rotating dynamic QR cards for runners.
 4. **Shrinking Zone:** In the final third of the round, the play boundary contracts inward across timed stages (100% → 70% → 45%), forcing remaining runners and hunters into an intense endgame bottleneck.
+
+---
+
+## 🔊 Sensory Feedback & Audio Engine
+
+GhostRun incorporates a native, zero-latency procedural audio and haptic engine with a master in-app mute toggle:
+- **Sonar Radar Ping Sweep:** Plays on every scheduled ping release or fresh ring detection, accompanied by an expanding animated ripple wave.
+- **Proximity Heat Alerts:** Dual high-tech pips for `HOT` proximity and muffled acoustic thud for `COLD`.
+- **Target Tag Buzzer:** Confirms physical or QR-verified tags with an unmistakable alert.
+- **Double Agent Whisper:** Ethereal celestial chime played when a mole transmits directional clues.
+- **Endgame Stingers:** Triumphant major-chord fanfare for the winning squad and somber cadence for the defeated.
+- **Match Countdown Ticks:** Tactile audio metronome ticking down the final 10 seconds before round launch.
+- **One-Tap SFX Mute:** Instant persistent toggle in the HUD header (`SFX On` / `SFX Off`), saved via AsyncStorage.
 
 ---
 
