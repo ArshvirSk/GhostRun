@@ -1,12 +1,19 @@
-# GhostRun 🏃‍♂️💨👻
+# GhostRun — Real-World Tactical GPS Stealth Chase Game
 
-[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases)
-[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases)
+<div align="center">
+
+![GhostRun](banner.png)
+
+[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.0.0)
+[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.0.0)
 [![Expo SDK](https://img.shields.io/badge/Expo-v58.0-000000.svg)](https://expo.dev)
 [![React Native](https://img.shields.io/badge/React%20Native-0.88-61DAFB.svg)](https://reactnative.dev)
 [![Supabase](https://img.shields.io/badge/Backend-Supabase%20PostGIS-3ECF8E.svg)](https://supabase.com)
 [![MapLibre](https://img.shields.io/badge/Map-MapLibre%20Native-3B82F6.svg)](https://maplibre.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/License-Proprietary-F43F5E.svg)](#license)
+
+</div>
 
 > **GhostRun is an open-world, real-life tactical GPS stealth chase game played on smartphones.**
 >
@@ -303,3 +310,14 @@ GhostRun is designed for active outdoor fun, but physical safety always comes fi
 ## 📄 License
 
 Copyright © Arshvir. All rights reserved.
+
+---
+
+<div align="center">
+
+Built with ❤️ by [Arshvir Singh Kalsi](https://github.com/ArshvirSk)
+
+⭐ **Star this repo if you find it useful!**
+
+</div>
+
