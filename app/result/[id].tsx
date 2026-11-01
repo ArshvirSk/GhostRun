@@ -1,5 +1,5 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../../src/lib/map';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -16,6 +16,20 @@ import { supabase } from '../../src/lib/supabase';
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
+
+type GhostPreview = {
+  can_contribute: boolean;
+  reason: string | null;
+  original_point_count: number;
+  trimmed_point_count: number;
+  original_length_m: number;
+  trimmed_length_m: number;
+  trimmed_start_m: number;
+  trimmed_end_m: number;
+  duration_s: number;
+  difficulty: string;
+  already_contributed: boolean;
+};
 
 type Team = 'runner' | 'hunter' | 'unassigned';
 
@@ -141,6 +155,10 @@ export default function ResultScreen() {
   const [trailError, setTrailError] = useState('');
   const [rematchBusy, setRematchBusy] = useState(false);
   const [rematchError, setRematchError] = useState('');
+  const [ghostPreview, setGhostPreview] = useState<GhostPreview | null>(null);
+  const [ghostBusy, setGhostBusy] = useState(false);
+  const [ghostSuccess, setGhostSuccess] = useState(false);
+  const [ghostDismissed, setGhostDismissed] = useState(false);
   const mountedRef = useRef(true);
   const leavingRef = useRef(false);
 
@@ -181,9 +199,12 @@ export default function ResultScreen() {
     }
 
     setLoadingTrails(true);
-    const [trailRes, statsRes] = await Promise.all([
+    const [trailRes, statsRes, ghostRes] = await Promise.all([
       supabase.rpc('get_game_trails', { game_id: gameId }),
       supabase.rpc('get_game_stats', { game_id: gameId }),
+      snapshot.my_team === 'runner'
+        ? supabase.rpc('preview_ghost', { game_id: gameId })
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
     if (!mountedRef.current) return;
@@ -199,8 +220,26 @@ export default function ResultScreen() {
       setGameStats(statsRes.data as GameStats);
     }
 
+    if (!ghostRes.error && ghostRes.data) {
+      setGhostPreview(ghostRes.data as GhostPreview);
+    }
+
     setLoadingTrails(false);
   }, [gameId]);
+
+  async function handleContributeGhost() {
+    if (!supabase || !gameId || ghostBusy) return;
+    setGhostBusy(true);
+    setErrorMessage('');
+    const { error } = await supabase.rpc('contribute_ghost', { game_id: gameId });
+    if (!mountedRef.current) return;
+    setGhostBusy(false);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    setGhostSuccess(true);
+  }
 
   useEffect(() => {
     const initialLoad = setTimeout(() => void load(), 0);
@@ -685,6 +724,75 @@ export default function ResultScreen() {
           </View>
         )}
 
+        {ghostPreview && ghostPreview.can_contribute && !ghostDismissed && (
+          <View style={styles.ghostContributionCard}>
+            <View style={styles.ghostHeaderRow}>
+              <MaterialCommunityIcons color="#7C3AED" name="ghost" size={20} />
+              <Text style={styles.ghostCardTitle}>Contribute to Ghost Library</Text>
+            </View>
+            {ghostSuccess || ghostPreview.already_contributed ? (
+              <View style={styles.ghostSuccessBox}>
+                <Ionicons color="#059669" name="checkmark-circle" size={18} />
+                <Text style={styles.ghostSuccessText}>
+                  {ghostSuccess
+                    ? 'Thank you! Your route was trimmed by 150m and added to the ghost library.'
+                    : 'You have already contributed this route to the ghost library.'}
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.ghostCardBody}>
+                  Help solo players practice! Your route is anonymized and trimmed by 150m at the
+                  start and end to keep your exact locations private.
+                </Text>
+                <View style={styles.ghostStatsRow}>
+                  <View style={styles.ghostStatCol}>
+                    <Text style={styles.ghostStatLabel}>TRIMMED LENGTH</Text>
+                    <Text style={styles.ghostStatValue}>
+                      {ghostPreview.trimmed_length_m >= 1000
+                        ? `${(ghostPreview.trimmed_length_m / 1000).toFixed(1)} km`
+                        : `${ghostPreview.trimmed_length_m} m`}
+                    </Text>
+                  </View>
+                  <View style={styles.ghostStatCol}>
+                    <Text style={styles.ghostStatLabel}>DURATION</Text>
+                    <Text style={styles.ghostStatValue}>
+                      {formatDuration(ghostPreview.duration_s)}
+                    </Text>
+                  </View>
+                  <View style={styles.ghostStatCol}>
+                    <Text style={styles.ghostStatLabel}>DIFFICULTY</Text>
+                    <Text style={[styles.ghostStatValue, { textTransform: 'capitalize' }]}>
+                      {ghostPreview.difficulty}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.ghostButtonRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={ghostBusy}
+                    onPress={() => void handleContributeGhost()}
+                    style={styles.ghostContributeBtn}
+                  >
+                    {ghostBusy ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Text style={styles.ghostContributeBtnText}>Contribute Route</Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setGhostDismissed(true)}
+                    style={styles.ghostDismissBtn}
+                  >
+                    <Text style={styles.ghostDismissBtnText}>Not now</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+        )}
+
         <Text style={styles.sectionLabel}>FINAL POSITIONS · {positions.length}</Text>
         {players.map((player) => {
           const position = positions.find((entry) => entry.player_id === player.id);
@@ -950,5 +1058,105 @@ const styles = StyleSheet.create({
     color: '#0369A1',
     fontSize: 9,
     fontWeight: '800',
+  },
+  ghostContributionCard: {
+    backgroundColor: '#FAF5FF',
+    borderColor: '#E9D5FF',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 14,
+  },
+  ghostHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+  },
+  ghostCardTitle: {
+    color: '#6B21A8',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  ghostCardBody: {
+    color: '#7E22CE',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  ghostStatsRow: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#F3E8FF',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
+    paddingVertical: 10,
+  },
+  ghostStatCol: {
+    alignItems: 'center',
+  },
+  ghostStatLabel: {
+    color: '#9333EA',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  ghostStatValue: {
+    color: '#3B0764',
+    fontSize: 14,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  ghostButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  ghostContributeBtn: {
+    alignItems: 'center',
+    backgroundColor: '#7C3AED',
+    borderRadius: 10,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: 12,
+  },
+  ghostContributeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  ghostDismissBtn: {
+    alignItems: 'center',
+    borderColor: '#D8B4FE',
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: 14,
+  },
+  ghostDismissBtnText: {
+    color: '#7E22CE',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  ghostSuccessBox: {
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+    padding: 10,
+  },
+  ghostSuccessText: {
+    color: '#065F46',
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
   },
 });

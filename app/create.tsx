@@ -18,7 +18,7 @@ import { circleRing } from '../src/lib/geo';
 import { supabase } from '../src/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type Mode = 'classic_chase' | 'tag_hunt';
+type Mode = 'classic_chase' | 'tag_hunt' | 'haunted_map';
 type BoundaryPenalty = 'warn' | 'extra_ping';
 
 const MAP_STYLE =
@@ -492,7 +492,13 @@ export default function CreateGameScreen() {
           <View style={styles.sheetHandle} />
           <Animated.View style={[styles.dockBar, { opacity: dockOpacity }]}>
             <Text style={styles.dockTitle}>
-              Settings · {radius}m ({mode === 'classic_chase' ? 'Classic' : 'Tag Hunt'})
+              Settings · {radius}m (
+              {mode === 'classic_chase'
+                ? 'Classic'
+                : mode === 'haunted_map'
+                  ? 'Haunted Map'
+                  : 'Tag Hunt'}
+              )
             </Text>
             <Text style={styles.dockHint}>▲ Slide up to configure</Text>
           </Animated.View>
@@ -518,6 +524,11 @@ export default function CreateGameScreen() {
                 selected={mode === 'tag_hunt'}
                 label="Tag Hunt"
                 onPress={() => setMode('tag_hunt')}
+              />
+              <ModeButton
+                selected={mode === 'haunted_map'}
+                label="Haunted Map"
+                onPress={() => setMode('haunted_map')}
               />
             </View>
 
