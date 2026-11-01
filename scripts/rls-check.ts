@@ -882,6 +882,14 @@ async function main() {
     'outsider cannot read pings',
   );
 
+  const unauthClient = createClient(url!, anonKey!, { auth: { persistSession: false } });
+  const hpRes = await unauthClient.rpc('health_ping');
+  expect(
+    hpRes.data?.ok === true && hpRes.data?.app === 'ghostrun',
+    'health_ping keep-alive succeeds for anon',
+    JSON.stringify(hpRes.data ?? hpRes.error),
+  );
+
   const nextPingState = pingSnapshot.data?.game as { next_ping_at?: string } | undefined;
   const nextPingServerTime = pingSnapshot.data?.server_time as string | undefined;
   const nextPingDelta =
@@ -1018,6 +1026,13 @@ async function main() {
   expectEmpty(
     (await outsider.from('tags').select('*').eq('game_id', phaseGameId)).data,
     'outsider cannot read tag records',
+  );
+
+  const postEndPings = (await hunter.from('pings').select('*').eq('game_id', phaseGameId)).data ?? [];
+  expect(
+    postEndPings.length > 0,
+    'full ping history is readable by members after round ends',
+    `got ${postEndPings.length} pings`,
   );
 
   const taggedState = await rpc<Record<string, unknown>>(host, 'get_game_state', {

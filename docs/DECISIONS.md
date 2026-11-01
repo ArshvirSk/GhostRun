@@ -166,4 +166,41 @@
 
 **Decision:** The user-confirmed contact email `arshvirsk26@gmail.com` is established across the privacy framework, settings, and documentation. Physical outdoor playtesting is signed off as completed. External recurring cron execution (pinging `health_ping` and running `cleanup_old_games()` 30-day retention) is confirmed active.
 
+## 2026-11-01 — Milestone S1: Security, Fairness & Timing (Decisions D1–D8)
+
+### D1: Hot & Cold Result Representation (Binary Red/Blue)
+- **Decision:** Confirmed binary red/blue result representation. Verified that shared team charge pool (6 charges, 30 s lazy regen), personal cooldown (10 s), radius fuzz (area-scaled, clamped 80–250 m, fuzzed ±15%), repeat-press rule, fading map heat marks layer (5 min expiry), and `heat_press_feed` view (stripping raw distance metrics) are active and fully enforced.
+
+### D2: Modifiers Framework & Ping Multiplier
+- **Decision:** Confirmed Hot & Cold as a stackable modifier compatible with base modes (Classic Chase, Tag Hunt, Jailbreak, Relay Heist). When Hot & Cold modifier is active, `start_game` triples the scheduled ping interval (`ping_interval_s * 3`) by default to balance proximity pulses with delayed radar snapshots.
+
+### D3: Ghost NPC Behaviour Modes (Haunt vs. Assist)
+- **Decision:** Added `games.ghost_mode` with values `'haunt'` (default) and `'assist'`.
+  - **Haunt:** Ghost acts as an autonomous PvE hazard tagging runners within 12 m. Requires a 3-second continuous dwell time and discards fixes with GPS accuracy $> 30\text{ m}$ to prevent unfair drift tags.
+  - **Assist:** Ghost emits `'ghost_sighting'` radar pings to hunters whenever an active runner is within 40 m of a ghost, in addition to the 12 m haunt tag.
+  - Ghost entity speeds are strictly clamped to $\le 2.0\text{ m/s}$ with coordinate clamping inside the active play boundary.
+
+### D4: Scramble Power Configuration
+- **Decision:** Scramble is single-use by default. Host-configurable charges (1–3) and cooldown periods are supported via `mode_params.double_agent.scramble_charges` and `scramble_cooldown_s`.
+
+### D5: Server-Side Ping Window Enforcement
+- **Decision:** Enforced `ping_visible_s` (default 10 s) server-side during live play via RLS policy on `public.pings` and within `get_game_state`. Expired pings are purged from live wire responses and cannot be queried during an active round; full ping history is revealed once the match reaches `ended`.
+- **Security & Threat Model Notice:** Server-side ping windowing prevents unauthorized querying, re-fetching, or scraping of expired pings over the network or WebSocket connections. However, it cannot prevent a player's physical client device from capturing, screen-recording, or locally caching a visible ping while it is displayed on screen during its active window.
+
+### D6: Game Clock, Automation & Retention Delay
+- **Decision:** Verified `pg_cron` extension availability on the Supabase project. Scheduled `advance_active_games(10)` every 30 seconds via `cron.schedule('advance-active-games', '30 seconds', ...)`. Maintained `health_ping()` as an idempotent keep-alive and fallback endpoint with internal shared-secret validation (`server_secrets.cron_secret` or body token).
+- **Game Clock Worst-Case Delays:**
+  - *Active matches:* 0 seconds delay (advances synchronously on each incoming client position fix via lazy evaluation).
+  - *Idle matches (all players disconnected or idle):* Up to 30 seconds delay under `pg_cron`.
+  - *Fallback mode (external cron without pg_cron):* Bounded by the external webhook polling interval (typically 10–15 minutes).
+
+### D7: Guest Authentication & Privacy Architecture
+- **Decision:** Added guest sign-in (`supabase.auth.signInAnonymously()`) on `AuthScreen`. Guests are subject to the identical safety onboarding, consent gate (C1–C6), and age confirmation (16+) at `/welcome` and `/privacy?mode=gate`. Self-service data export (`export_my_data`) and account deletion (`delete_my_data`) function identically for guests via their authenticated `auth.uid()`.
+- **Anonymous Sign-In Limit:** Supabase default per-IP rate limit for anonymous sign-ins is **30 requests per IP per hour** (`RATE_LIMIT_ANONYMOUS_USERS = 30`).
+- **Terminology & Compliance Constraint:** Strictly prohibited language claiming legal or GDPR compliance. All copy and documentation strictly refer to "Privacy controls", "Consent choices", "Pseudonymous data minimization", and "Self-service data rights".
+
+### D8: Cross-Platform Strategy
+- **Decision:** Confirmed continuous reuse of the unified Expo / React Native codebase for Android and future iOS releases. iOS platform validation is scheduled for Phase B item B13.
+
+
 

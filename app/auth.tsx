@@ -156,6 +156,23 @@ export default function AuthScreen() {
     setBusy(false);
   }
 
+  async function handleGuestSignIn() {
+    if (!isSupabaseConfigured || !supabase) return;
+    setBusy(true);
+    setErrorMessage('');
+    setResendStatus(null);
+
+    const { error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      setErrorMessage(authErrorMessage(error));
+      setBusy(false);
+      return;
+    }
+
+    await routeAfterAuth();
+    setBusy(false);
+  }
+
   async function resendConfirmation() {
     if (!supabase || pending?.kind !== 'confirm' || resending || Date.now() < cooldownUntil) return;
 
@@ -368,6 +385,17 @@ export default function AuthScreen() {
           )}
         </Pressable>
 
+        {mode !== 'reset' && (
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy || !isSupabaseConfigured}
+            onPress={() => void handleGuestSignIn()}
+            style={[styles.guestButton, (busy || !isSupabaseConfigured) && styles.guestButtonDisabled]}
+          >
+            <Text style={styles.guestButtonText}>Continue as Guest</Text>
+          </Pressable>
+        )}
+
         <Pressable
           accessibilityRole="button"
           onPress={() => switchMode(mode === 'sign_in' ? 'sign_up' : 'sign_in')}
@@ -440,4 +468,15 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: '#1D4ED8', fontSize: 16, fontWeight: '800' },
   switchButton: { alignItems: 'center', justifyContent: 'center', marginTop: 20, minHeight: 44 },
   switchText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
+  guestButton: {
+    alignItems: 'center',
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    marginTop: 12,
+    minHeight: 52,
+  },
+  guestButtonDisabled: { opacity: 0.5 },
+  guestButtonText: { color: '#334155', fontSize: 16, fontWeight: '700' },
 });

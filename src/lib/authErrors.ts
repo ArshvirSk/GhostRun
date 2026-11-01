@@ -24,6 +24,8 @@ export function authErrorMessage(error: AuthError): string {
       return 'That email address is not accepted. Try another one.';
     case 'otp_expired':
       return 'That link has expired. Request a new one.';
+    case 'anonymous_provider_disabled':
+      return 'Guest sign-in is disabled on this server. Sign in with email instead.';
     default:
       return error.message;
   }

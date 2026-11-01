@@ -122,7 +122,7 @@ type RoundPing = {
   latitude: number | null;
   accuracy_m: number | null;
   position_age_s: number | null;
-  reason: 'scheduled' | 'boundary' | 'noise' | 'camping' | 'item';
+  reason: 'scheduled' | 'boundary' | 'noise' | 'camping' | 'item' | 'ghost_sighting';
   released_at: string;
 };
 
