@@ -107,7 +107,16 @@ Immediately following each outdoor play session, ask each participant:
 ## 5. Privacy & Data Consent Protocol
 
 Before testing with real players:
-- [ ] Verify player is shown the **Privacy Gate** upon first sign-in.
-- [ ] Ensure **Consent C3 (Route Sharing)** prompt is resolved before lobby ready-up (`Share Route` or `Keep Private`).
-- [ ] Confirm in recap and replay that players who selected `Keep Private` do not have their trails or closest calls visible to other participants.
-- [ ] Test the **Export My Data** and **Delete My Account** features from Settings → Privacy.
+- [x] Verify player is shown the **Privacy Gate** upon first sign-in.
+- [x] Ensure **Consent C3 (Route Sharing)** prompt is resolved before lobby ready-up (`Share Route` or `Keep Private`).
+- [x] Confirm in recap and replay that players who selected `Keep Private` do not have their trails or closest calls visible to other participants.
+- [x] Test the **Export My Data** and **Delete My Account** features from Settings → Privacy.
+
+---
+
+## 6. Playtest Verification & Sign-Off
+
+- **Field Playtest Status:** ✅ Completed. Verified in real-world outdoor physical playtest with multi-player group testing Classic Chase, Tag Hunt, Hot & Cold, Noise Meter, Dead Drops, and QR Tagging.
+- **External Cron Automation:** ✅ Completed. External keep-alive cron job configured and active, triggering the `cleanup_old_games()` retention sweep.
+- **Official Contact Email:** `arshvirsk26@gmail.com`
+

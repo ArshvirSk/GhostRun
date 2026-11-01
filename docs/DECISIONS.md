@@ -162,3 +162,8 @@
 
 **Decision (Recap Stats & C3 Route Gating):** `get_game_stats(game_id uuid)` compiles match highlights including Closest Call, Longest Unseen Streak, Loudest Noise, Heat Hit Rate, and Drops Claimed. Closest Call calculation strictly respects user consent C3 (`share_trail`): if either player in the encounter declined route sharing (`share_trail = false`), `closest_call_m` returns `null` and the client renders "Private route". Secret roles are revealed only after the game reaches `ended`.
 
+## 2026-11-01 — Field Playtest Completion, External Cron & Contact Verification
+
+**Decision:** The user-confirmed contact email `arshvirsk26@gmail.com` is established across the privacy framework, settings, and documentation. Physical outdoor playtesting is signed off as completed. External recurring cron execution (pinging `health_ping` and running `cleanup_old_games()` 30-day retention) is confirmed active.
+
+

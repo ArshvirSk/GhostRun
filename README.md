@@ -209,8 +209,8 @@ GhostRun/
 
 ### 1. Download Pre-Built Android APK
 You can install and play GhostRun directly on any modern Android device (Android 8.0+):
-- Head over to the [**Latest Releases**](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.0.0).
-- Download **`GhostRun-v2.0.0.apk`**.
+- Head over to the [**Latest Releases**](https://github.com/ArshvirSk/GhostRun/releases/latest).
+- Download **`app-release.apk`**.
 - Open the `.apk` on your device and tap **Install** (allow "Install from Unknown Sources" if prompted).
 
 ---
@@ -328,7 +328,7 @@ Copyright © Arshvir. All rights reserved.
 
 <div align="center">
 
-Built with ❤️ by [Arshvir Singh Kalsi](https://github.com/ArshvirSk)
+Built with ❤️ by [Arshvir Singh Kalsi](https://github.com/ArshvirSk) · Contact: [arshvirsk26@gmail.com](mailto:arshvirsk26@gmail.com)
 
 ⭐ **Star this repo if you find it useful!**
 
