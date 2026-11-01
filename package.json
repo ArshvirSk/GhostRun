@@ -9,8 +9,9 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "format:check": "prettier --check \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\" \"*.{json,js}\"",
-    "test:cooldown": "tsx scripts/test-resend-cooldown.ts",
-    "sim": "tsx scripts/sim/index.ts"
+    "test:cooldown": "node --env-file=.env --import tsx scripts/test-resend-cooldown.ts",
+    "sim": "node --env-file=.env --import tsx scripts/sim/index.ts",
+    "rls": "node --env-file=.env --import tsx scripts/rls-check.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
