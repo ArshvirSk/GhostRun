@@ -1,0 +1,62 @@
+name: CI & Quality Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  quality:
+    name: Code Quality & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check code formatting (Prettier)
+        run: npm run format:check
+
+      - name: Verify TypeScript types
+        run: npm run typecheck
+
+      - name: Run unit & cooldown tests
+        run: npm run test:cooldown
+
+  integration:
+    name: Anti-Cheat & Game Simulation (Live Supabase)
+    needs: quality
+    runs-on: ubuntu-latest
+    if: "${{ env.EXPO_PUBLIC_SUPABASE_URL != '' || secrets.EXPO_PUBLIC_SUPABASE_URL != '' }}"
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL || 'https://jgpbxsvgpewjvauozrzq.supabase.co' }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpncGJ4c3ZncGV3anZhdW96cnpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNzY5MDMsImV4cCI6MjEwODg1MjkwM30.FvvJuMJENngAiLmDcyv46s0dxXo9n0ReK-OdlNuS0ug' }}
+      EXPO_PUBLIC_MAP_STYLE_URL: https://tiles.openfreemap.org/styles/liberty
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run anti-cheat RLS secrecy matrix
+        run: npm run rls
+
+      - name: Run multi-agent game simulator
+        run: npm run sim

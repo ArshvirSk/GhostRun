@@ -1,15 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { supabase } from '../lib/supabase';
 
@@ -103,12 +95,7 @@ export function RunnerQrCard({
   }, [token, visible]);
 
   return (
-    <Modal
-      animationType="fade"
-      onRequestClose={onClose}
-      transparent
-      visible={visible}
-    >
+    <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.headerRow}>
@@ -127,7 +114,8 @@ export function RunnerQrCard({
           </View>
 
           <Text style={styles.instructions}>
-            Show this screen to a hunter. When they scan it within tag range, your physical encounter is confirmed.
+            Show this screen to a hunter. When they scan it within tag range, your physical
+            encounter is confirmed.
           </Text>
 
           <View style={styles.qrContainer}>
@@ -151,11 +139,7 @@ export function RunnerQrCard({
             </Text>
           </View>
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={onClose}
-            style={styles.doneBtn}
-          >
+          <Pressable accessibilityRole="button" onPress={onClose} style={styles.doneBtn}>
             <Text style={styles.doneBtnText}>Hide Code</Text>
           </Pressable>
         </View>

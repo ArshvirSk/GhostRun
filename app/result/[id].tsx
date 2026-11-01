@@ -702,7 +702,8 @@ export default function ResultScreen() {
                   <Text style={styles.statCardCategory}>HEAT HIT RATE</Text>
                   <Text style={styles.statCardBigValue}>{gameStats.heat_stats.hit_rate_pct}%</Text>
                   <Text style={styles.statCardSub}>
-                    {gameStats.heat_stats.hot_hits} of {gameStats.heat_stats.total_presses} probes hot
+                    {gameStats.heat_stats.hot_hits} of {gameStats.heat_stats.total_presses} probes
+                    hot
                   </Text>
                 </View>
               )}

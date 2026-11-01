@@ -1319,7 +1319,10 @@ export function TribunalDock({
         <Pressable
           disabled={busy || otherHunters.length === 0}
           onPress={() => setShowHunterPicker(true)}
-          style={[styles.startTribunalButton, (busy || otherHunters.length === 0) && { opacity: 0.5 }]}
+          style={[
+            styles.startTribunalButton,
+            (busy || otherHunters.length === 0) && { opacity: 0.5 },
+          ]}
         >
           <MaterialCommunityIcons color="#FCA5A5" name="gavel" size={16} />
           <Text style={styles.startTribunalText}>Convene Hunter Tribunal</Text>

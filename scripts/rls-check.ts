@@ -1522,7 +1522,55 @@ async function main() {
     JSON.stringify(outsiderProfileAfter.data?.profile ?? outsiderProfileAfter.error?.message),
   );
 
-  for (const client of [host, hunter]) {
+  // Multi-asset account deletion test on an active game participant (hunter).
+  // Hunter participated in multiple matches, uploaded position fixes, recorded trail points,
+  // performed tags, and holds privacy consent records.
+  await rpc(hunter, 'set_consent', { consent_type: 'ghost', granted: true });
+  const hunterExportBefore = await rpc<{
+    profile?: { id?: string } | null;
+    games?: unknown[];
+    trail_points?: unknown[];
+  }>(hunter, 'export_my_data', {});
+  expect(
+    Boolean(
+      hunterExportBefore.data?.profile &&
+        (hunterExportBefore.data?.trail_points?.length ?? 0) > 0 &&
+        (hunterExportBefore.data?.games?.length ?? 0) > 0,
+    ),
+    'active participant has profile, games and trail points before deletion',
+    JSON.stringify({
+      hasProfile: Boolean(hunterExportBefore.data?.profile),
+      gamesCount: hunterExportBefore.data?.games?.length,
+      trailCount: hunterExportBefore.data?.trail_points?.length,
+    }),
+  );
+
+  const hunterDeleted = await rpc<{ deleted?: boolean }>(hunter, 'delete_my_data', {});
+  expect(
+    hunterDeleted.data?.deleted === true,
+    'delete_my_data succeeds for active participant with multi-asset data',
+    JSON.stringify(hunterDeleted.error?.message ?? hunterDeleted.data),
+  );
+
+  const hunterExportAfter = await rpc<{
+    profile?: unknown;
+    trail_points?: unknown[];
+  }>(hunter, 'export_my_data', {});
+  expect(
+    hunterExportAfter.data?.profile === null &&
+      (!hunterExportAfter.data?.trail_points || hunterExportAfter.data.trail_points.length === 0),
+    'active participant profile, trails, and personal assets are scrubbed',
+    JSON.stringify(hunterExportAfter.data ?? hunterExportAfter.error?.message),
+  );
+
+  const hunterConsentsAfter = await rpc<Record<string, unknown>>(hunter, 'get_my_consents', {});
+  expect(
+    Object.keys(hunterConsentsAfter.data ?? {}).length === 0,
+    'active participant consents are completely purged after account deletion',
+    JSON.stringify(hunterConsentsAfter.data),
+  );
+
+  for (const client of [host]) {
     await rpc(client, 'leave_game', { game_id: gameId });
     await rpc(client, 'leave_game', { game_id: phaseGameId });
     await rpc(client, 'leave_game', { game_id: arrivalGameId });

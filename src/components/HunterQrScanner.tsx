@@ -117,7 +117,9 @@ export function HunterQrScanner({
       } else {
         setIsError(true);
         const reason = res?.reason ?? 'Invalid QR token';
-        setScanMessage(reason === 'expired' ? 'Token expired. Runner must show a fresh code.' : reason);
+        setScanMessage(
+          reason === 'expired' ? 'Token expired. Runner must show a fresh code.' : reason,
+        );
         setTimeout(() => {
           setIsProcessing(false);
           lastScannedToken.current = null;
@@ -134,11 +136,7 @@ export function HunterQrScanner({
   }
 
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      visible={visible}
-    >
+    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
       <View style={styles.container}>
         {!permission ? (
           <View style={styles.centeredNotice}>
@@ -159,11 +157,7 @@ export function HunterQrScanner({
             >
               <Text style={styles.permissionBtnText}>Grant Camera Permission</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onClose}
-              style={styles.cancelBtn}
-            >
+            <Pressable accessibilityRole="button" onPress={onClose} style={styles.cancelBtn}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </Pressable>
           </View>
@@ -237,15 +231,18 @@ export function HunterQrScanner({
                     <ActivityIndicator color="#FFFFFF" size="small" style={{ marginRight: 6 }} />
                   )}
                   {scanSuccess && (
-                    <Ionicons color="#FFFFFF" name="checkmark-circle" size={18} style={{ marginRight: 6 }} />
+                    <Ionicons
+                      color="#FFFFFF"
+                      name="checkmark-circle"
+                      size={18}
+                      style={{ marginRight: 6 }}
+                    />
                   )}
                   <Text style={styles.feedbackText}>{scanMessage}</Text>
                 </View>
               )}
 
-              <Text style={styles.hintText}>
-                Aim at runner’s QR code to confirm tag
-              </Text>
+              <Text style={styles.hintText}>Aim at runner’s QR code to confirm tag</Text>
             </View>
           </CameraView>
         )}

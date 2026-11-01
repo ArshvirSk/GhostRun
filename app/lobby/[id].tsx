@@ -93,8 +93,7 @@ export default function LobbyScreen() {
         setDraftModifiers(loaded.game.modifiers ?? []);
         setDraftRoles(loaded.game.roles ?? []);
         const daParams = loaded.game.mode_params?.double_agent as
-          | { scramble_charges?: number }
-          | undefined;
+          { scramble_charges?: number } | undefined;
         if (daParams?.scramble_charges) {
           setScrambleCharges(Number(daParams.scramble_charges));
         }
