@@ -2,7 +2,7 @@
   "expo": {
     "name": "GhostRun",
     "slug": "ghostrun",
-    "version": "2.2.0",
+    "version": "2.3.0",
     "orientation": "portrait",
     "scheme": "ghost-run",
     "icon": "./assets/icon.png",
@@ -26,7 +26,8 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECEIVE_BOOT_COMPLETED"
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.CAMERA"
       ]
     },
     "plugins": [
@@ -42,7 +43,14 @@
         }
       ],
       "expo-notifications",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-audio",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "GhostRun needs camera access to scan runner QR codes for QR Tagging."
+        }
+      ]
     ],
     "web": {
       "favicon": "./assets/favicon.png"

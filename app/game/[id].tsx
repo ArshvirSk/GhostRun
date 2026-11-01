@@ -52,6 +52,9 @@ import {
   TribunalDock,
   useModifierState,
 } from '../../src/components/GameModifiers';
+import { HunterQrScanner } from '../../src/components/HunterQrScanner';
+import { RunnerQrCard } from '../../src/components/RunnerQrCard';
+import { initAudio, isAudioMuted, playSound, toggleAudioMuted } from '../../src/lib/audio';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -404,6 +407,10 @@ export default function GameScreen() {
   const mountedRef = useRef(true);
 
   const [muted, setMuted] = useState(false);
+  const [sfxMuted, setSfxMuted] = useState(false);
+  const [pingRippleActive, setPingRippleActive] = useState(false);
+  const [runnerQrVisible, setRunnerQrVisible] = useState(false);
+  const [hunterScannerVisible, setHunterScannerVisible] = useState(false);
   const [heatResult, setHeatResult] = useState<HeatResult>(null);
   const [heatVisible, setHeatVisible] = useState(false);
   const [sensedActive, setSensedActive] = useState(false);
@@ -411,6 +418,7 @@ export default function GameScreen() {
   const prevStatusRef = useRef<string | null>(null);
   const prevPhaseRef = useRef<string | null>(null);
   const prevPingIdRef = useRef<number | null>(null);
+  const prevCountdownSecRef = useRef<number | null>(null);
 
   useEffect(() => {
     mutedRef.current = muted;
@@ -423,6 +431,7 @@ export default function GameScreen() {
       })
       .catch(() => {});
     void Notifications.requestPermissionsAsync().catch(() => {});
+    void initAudio().then((isMuted) => setSfxMuted(isMuted));
   }, []);
 
   const [sosHolding, setSosHolding] = useState(false);
@@ -579,6 +588,7 @@ export default function GameScreen() {
     if (!ownPlayer) return;
 
     if (prevStatusRef.current === 'active' && ownPlayer.status === 'tagged') {
+      playSound('tag');
       notify(
         "You've been tagged!",
         'You are now spectating the remainder of the round.',
@@ -594,8 +604,30 @@ export default function GameScreen() {
     if (prevPhaseRef.current && prevPhaseRef.current !== 'live' && currentPhase === 'live') {
       notify('Round started!', 'The hunt is now live. Good luck!', [0, 200, 100, 200]);
     }
+    if (prevPhaseRef.current && prevPhaseRef.current !== 'ended' && currentPhase === 'ended') {
+      const ownPlayer = state.players.find((p) => p.id === state.my_player_id);
+      const isWinner =
+        (state.game.winner === 'runners' && ownPlayer?.team === 'runner') ||
+        (state.game.winner === 'hunters' && ownPlayer?.team === 'hunter');
+      if (isWinner) {
+        playSound('victory');
+      } else {
+        playSound('defeat');
+      }
+    }
     prevPhaseRef.current = currentPhase;
-  }, [state?.game, notify]);
+  }, [state, notify]);
+
+  // Audio countdown ticks during 10-second countdown
+  useEffect(() => {
+    if (state?.game?.status === 'countdown' && state.game.head_start_at) {
+      const remainingSec = Math.ceil((Date.parse(state.game.head_start_at) - serverNow) / 1000);
+      if (remainingSec > 0 && remainingSec <= 10 && remainingSec !== prevCountdownSecRef.current) {
+        prevCountdownSecRef.current = remainingSec;
+        playSound('countdown');
+      }
+    }
+  }, [state?.game?.status, state?.game?.head_start_at, serverNow]);
 
   useEffect(() => {
     if (!state?.pings || state?.game?.status !== 'live') return;
@@ -603,6 +635,9 @@ export default function GameScreen() {
     if (!latestPing) return;
     const isFresh = Math.max(0, (serverNow - Date.parse(latestPing.released_at)) / 1000) <= 6;
     if (prevPingIdRef.current !== null && latestPing.id !== prevPingIdRef.current) {
+      playSound('ping');
+      setPingRippleActive(true);
+      setTimeout(() => setPingRippleActive(false), 1200);
       try {
         Vibration.vibrate([0, 500, 200, 500]);
       } catch {
@@ -616,6 +651,9 @@ export default function GameScreen() {
         [0, 500, 200, 500],
       );
     } else if (prevPingIdRef.current === null && isFresh) {
+      playSound('ping');
+      setPingRippleActive(true);
+      setTimeout(() => setPingRippleActive(false), 1200);
       try {
         Vibration.vibrate([0, 500, 200, 500]);
       } catch {
@@ -674,6 +712,9 @@ export default function GameScreen() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pings', filter: `game_id=eq.${gameId}` },
         (payload: { new?: { id?: number; reason?: string } }) => {
+          playSound('ping');
+          setPingRippleActive(true);
+          setTimeout(() => setPingRippleActive(false), 1200);
           try {
             Vibration.vibrate([0, 500, 200, 500]);
           } catch {
@@ -879,6 +920,7 @@ export default function GameScreen() {
     }
     const result = data as TagResult;
     if (result.success) {
+      playSound('tag');
       setTagMessage(
         result.phase === 'ended' ? 'Tag confirmed. The round is over.' : 'Tag confirmed.',
       );
@@ -1370,6 +1412,24 @@ export default function GameScreen() {
               </Text>
               <View style={styles.hudHeaderActions}>
                 <Pressable
+                  accessibilityLabel={sfxMuted ? 'Unmute SFX' : 'Mute SFX'}
+                  accessibilityRole="button"
+                  onPress={async () => {
+                    const next = await toggleAudioMuted();
+                    setSfxMuted(next);
+                  }}
+                  style={styles.muteButton}
+                >
+                  <View style={styles.muteButtonContent}>
+                    <Ionicons
+                      color={sfxMuted ? '#94A3B8' : '#1D4ED8'}
+                      name={sfxMuted ? 'volume-mute' : 'volume-high'}
+                      size={14}
+                    />
+                    <Text style={styles.muteButtonText}>{sfxMuted ? 'SFX Off' : 'SFX On'}</Text>
+                  </View>
+                </Pressable>
+                <Pressable
                   accessibilityLabel={muted ? 'Unmute alerts' : 'Mute alerts'}
                   accessibilityRole="button"
                   onPress={() => void toggleMuted()}
@@ -1482,6 +1542,17 @@ export default function GameScreen() {
                     }}
                   />
                 )}
+                {(game?.modifiers ?? []).includes('qr_tagging') && (
+                  <Pressable
+                    accessibilityLabel="Scan runner QR tag"
+                    accessibilityRole="button"
+                    onPress={() => setHunterScannerVisible(true)}
+                    style={styles.qrScanButton}
+                  >
+                    <MaterialCommunityIcons color="#FFFFFF" name="qrcode-scan" size={16} />
+                    <Text style={styles.qrScanButtonText}>SCAN QR</Text>
+                  </Pressable>
+                )}
                 <Pressable
                   accessibilityRole="button"
                   disabled={busy !== ''}
@@ -1495,6 +1566,17 @@ export default function GameScreen() {
                   )}
                 </Pressable>
               </View>
+            )}
+            {isLive && isRunner && !taggedSelf && (game?.modifiers ?? []).includes('qr_tagging') && (
+              <Pressable
+                accessibilityLabel="Show My QR Code"
+                accessibilityRole="button"
+                onPress={() => setRunnerQrVisible(true)}
+                style={styles.runnerQrButton}
+              >
+                <MaterialCommunityIcons color="#0F172A" name="qrcode" size={16} />
+                <Text style={styles.runnerQrButtonText}>MY QR</Text>
+              </Pressable>
             )}
           </View>
         </View>
@@ -1524,6 +1606,30 @@ export default function GameScreen() {
                 </Text>
                 {tagMessage !== '' && <Text style={styles.tagMessage}>{tagMessage}</Text>}
               </>
+            )}
+
+            {isLive && !isRunner && !taggedSelf && (game?.modifiers ?? []).includes('qr_tagging') && (
+              <Pressable
+                accessibilityLabel="Scan runner QR tag"
+                accessibilityRole="button"
+                onPress={() => setHunterScannerVisible(true)}
+                style={styles.sheetQrScanButton}
+              >
+                <MaterialCommunityIcons color="#FFFFFF" name="qrcode-scan" size={18} />
+                <Text style={styles.sheetQrScanText}>SCAN RUNNER QR TAG</Text>
+              </Pressable>
+            )}
+
+            {isLive && isRunner && !taggedSelf && (game?.modifiers ?? []).includes('qr_tagging') && (
+              <Pressable
+                accessibilityLabel="Show my QR tag"
+                accessibilityRole="button"
+                onPress={() => setRunnerQrVisible(true)}
+                style={styles.sheetRunnerQrButton}
+              >
+                <MaterialCommunityIcons color="#0F172A" name="qrcode" size={18} />
+                <Text style={styles.sheetRunnerQrText}>SHOW MY QR TAG</Text>
+              </Pressable>
             )}
 
             {!taggedSelf && (inPlay || game!.status === 'countdown') && (
@@ -1734,6 +1840,83 @@ export default function GameScreen() {
           </ScrollView>
         </Animated.View>
       </Animated.View>
+
+      <RadarPingRipple active={pingRippleActive} />
+
+      {gameId && (
+        <>
+          <RunnerQrCard
+            visible={runnerQrVisible}
+            gameId={gameId}
+            onClose={() => setRunnerQrVisible(false)}
+          />
+
+          <HunterQrScanner
+            visible={hunterScannerVisible}
+            gameId={gameId}
+            onTagSuccess={() => void loadState()}
+            onClose={() => setHunterScannerVisible(false)}
+          />
+        </>
+      )}
+    </View>
+  );
+}
+
+function RadarPingRipple({ active }: { active: boolean }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (active) {
+      anim.setValue(0);
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [active, anim]);
+
+  if (!active) return null;
+
+  const scale1 = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.2, 2.4],
+  });
+  const opacity1 = anim.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [0.8, 0.5, 0],
+  });
+
+  const scale2 = anim.interpolate({
+    inputRange: [0, 0.3, 1],
+    outputRange: [0.1, 0.3, 1.8],
+  });
+  const opacity2 = anim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0.7, 0.4, 0],
+  });
+
+  return (
+    <View pointerEvents="none" style={styles.radarRippleContainer}>
+      <Animated.View
+        style={[
+          styles.radarRippleRing,
+          {
+            transform: [{ scale: scale1 }],
+            opacity: opacity1,
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.radarRippleRingSecondary,
+          {
+            transform: [{ scale: scale2 }],
+            opacity: opacity2,
+          },
+        ]}
+      />
     </View>
   );
 }
@@ -2121,5 +2304,95 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 6,
     textAlign: 'center',
+  },
+  qrScanButton: {
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderRadius: 9,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 12,
+  },
+  qrScanButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  runnerQrButton: {
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+    borderRadius: 9,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 12,
+  },
+  runnerQrButtonText: {
+    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  sheetQrScanButton: {
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderRadius: 13,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 12,
+    minHeight: 52,
+  },
+  sheetQrScanText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  sheetRunnerQrButton: {
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
+    borderRadius: 13,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 12,
+    minHeight: 52,
+  },
+  sheetRunnerQrText: {
+    color: '#0F172A',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  radarRippleContainer: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 90,
+  },
+  radarRippleRing: {
+    borderColor: '#0284C7',
+    borderRadius: 100,
+    borderWidth: 3,
+    height: 200,
+    position: 'absolute',
+    width: 200,
+  },
+  radarRippleRingSecondary: {
+    borderColor: '#38BDF8',
+    borderRadius: 100,
+    borderWidth: 1.5,
+    height: 200,
+    position: 'absolute',
+    width: 200,
   },
 });

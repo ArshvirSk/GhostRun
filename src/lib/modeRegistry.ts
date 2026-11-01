@@ -108,8 +108,8 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
   modifiers: [
     { id: 'noise_meter', layer: 'modifier', name: 'Noise Meter', parameters: {}, enabled: true },
     { id: 'dead_drops', layer: 'modifier', name: 'Dead Drops', parameters: {}, enabled: true },
-    { id: 'hot_cold', layer: 'modifier', name: 'Hot & Cold Hunt', parameters: {}, enabled: false },
-    { id: 'qr_tagging', layer: 'modifier', name: 'QR Tagging', parameters: {}, enabled: false },
+    { id: 'hot_cold', layer: 'modifier', name: 'Hot & Cold Hunt', parameters: {}, enabled: true },
+    { id: 'qr_tagging', layer: 'modifier', name: 'QR Tagging', parameters: {}, enabled: true },
     {
       id: 'shrinking_zone',
       layer: 'modifier',

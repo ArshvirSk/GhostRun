@@ -12,6 +12,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { GeoJSONSource, Layer } from '../lib/map';
+import { playSound } from '../lib/audio';
 
 /**
  * v2 modifier UI: Noise Meter, Dead Drops, Shrinking Zone, and Hot & Cold Hunt.
@@ -278,8 +279,10 @@ export function HeatOverlay({
     if (visible && result) {
       try {
         if (result === 'hot') {
+          playSound('heat_hot');
           Vibration.vibrate([0, 100, 100, 100]); // Two short pulses
         } else if (result === 'cold') {
+          playSound('heat_cold');
           Vibration.vibrate(120); // One soft pulse
         }
       } catch {
@@ -340,6 +343,7 @@ export function SensedRippleOverlay({ active }: { active: boolean }) {
 
   useEffect(() => {
     if (active) {
+      playSound('heat_hot');
       try {
         Vibration.vibrate([0, 80, 100, 80]); // Heartbeat haptic
       } catch {
@@ -1134,6 +1138,7 @@ export function AgentControls({
       if (res?.quadrant) {
         setWhisperResult(`Secret Target is in the ${res.quadrant} quadrant`);
       }
+      playSound('whisper');
       Vibration.vibrate(150);
       onActionComplete?.();
     } catch {
