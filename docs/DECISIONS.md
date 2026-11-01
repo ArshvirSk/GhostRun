@@ -143,3 +143,22 @@
 **Reason:** one derived radius keeps the drawn boundary and the enforced boundary identical, and the lazy clock avoids another scheduled job.
 
 **Trade-off:** a round paused across a stage boundary will announce and shrink on the next read rather than at the exact wall-clock second; no data is lost.
+
+## 2026-11-01 — Hot & Cold Hunt Variant A Proximity Engine (V2-M4)
+
+**Decision (Hot & Cold Hunt Base Mode):** Implemented Variant A (Proximity pulse) with 5 charges per hunter and a 2-second cooldown. When a hunter activates `heat_press`, the server evaluates the distance to the nearest active runner with a fresh GPS fix: $\le 75\text{ m}$ returns `hot`, $75\text{ m} < \text{dist} \le 175\text{ m}$ returns `warm`, and $> 175\text{ m}$ returns `cold`. Hunters receive a `heat_mark` event with the result and their remaining charges. Runners within $175\text{ m}$ receive a `sensed` pulse event; all runners receive an advisory `heat_used` announcement without revealing the result.
+
+**Reason:** Keeps the server-authoritative information asymmetry principle intact: the exact distance to the nearest runner is never exposed over the network, only the categorical band.
+
+**Trade-off:** Hunters without a fresh fix (<20 s) cannot press; if runners have stale fixes (>30 s), the press safely returns `cold` rather than leaking location age. Base table `heat_presses` is locked during live play by RLS; hunters view marks through `heat_press_feed` view which strips `nearest_runner_m`.
+
+## 2026-11-01 — Double Agent and Recap Stats Gating (V2-M5)
+
+**Decision (Double Agent Role & Tribunal):** When `double_agent` is enabled in Classic Chase and there are at least two hunters, `start_game` secretly assigns one hunter `secret_role = 'agent'`. If fewer than 2 hunters are present, the role is automatically disabled with a warning event. The Double Agent receives two powers: Whisper (reveals the secret target's cardinal quadrant `North`/`East`/`South`/`West`, once per game) and Scramble (shifts a chosen runner's next scheduled ping by 150–250 m within the play boundary). Loyal hunters can call an emergency Tribunal against a suspect; a majority vote ejects the accused. Ejecting the true agent triggers an immediate bonus ping round; ejecting a loyal hunter penalizes hunters by delaying the next ping by one interval and silencing pulses for 5 minutes.
+
+**Reason:** Creates psychological tension and counter-intelligence within the hunting pack without requiring external moderator oversight. The tribunal mechanic provides a high-stakes self-policing mechanism.
+
+**Trade-off:** A Double Agent who does not use their abilities plays like a normal hunter; voting ties result in acquittal without penalty.
+
+**Decision (Recap Stats & C3 Route Gating):** `get_game_stats(game_id uuid)` compiles match highlights including Closest Call, Longest Unseen Streak, Loudest Noise, Heat Hit Rate, and Drops Claimed. Closest Call calculation strictly respects user consent C3 (`share_trail`): if either player in the encounter declined route sharing (`share_trail = false`), `closest_call_m` returns `null` and the client renders "Private route". Secret roles are revealed only after the game reaches `ended`.
+
