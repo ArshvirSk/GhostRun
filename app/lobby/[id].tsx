@@ -65,6 +65,7 @@ export default function LobbyScreen() {
   const [registry, setRegistry] = useState<ModeRegistry>(FALLBACK_REGISTRY);
   const [draftModifiers, setDraftModifiers] = useState<string[]>([]);
   const [draftRoles, setDraftRoles] = useState<string[]>([]);
+  const [scrambleCharges, setScrambleCharges] = useState<number>(1);
   const draftTouchedRef = useRef(false);
   const [savingModes, setSavingModes] = useState(false);
   const [modesMessage, setModesMessage] = useState('');
@@ -91,6 +92,12 @@ export default function LobbyScreen() {
       if (!draftTouchedRef.current) {
         setDraftModifiers(loaded.game.modifiers ?? []);
         setDraftRoles(loaded.game.roles ?? []);
+        const daParams = loaded.game.mode_params?.double_agent as
+          | { scramble_charges?: number }
+          | undefined;
+        if (daParams?.scramble_charges) {
+          setScrambleCharges(Number(daParams.scramble_charges));
+        }
       }
     }
     const { data: registryData } = await supabase.rpc('get_mode_registry');
@@ -273,11 +280,22 @@ export default function LobbyScreen() {
     if (!supabase || !gameId) return;
     setSavingModes(true);
     setModesMessage('');
+    const modeParams: Record<string, unknown> = {
+      ...(state?.game.mode_params ?? {}),
+    };
+    if (draftRoles.includes('double_agent')) {
+      modeParams.double_agent = {
+        scramble_charges: scrambleCharges,
+        scramble_cooldown_s: 120,
+      };
+    } else {
+      delete modeParams.double_agent;
+    }
     const { error } = await supabase.rpc('set_game_modes', {
       game_id: gameId,
       modifiers: draftModifiers,
       roles: draftRoles,
-      mode_params: {},
+      mode_params: modeParams,
     });
     setSavingModes(false);
     if (error) {
@@ -460,6 +478,42 @@ export default function LobbyScreen() {
                 );
               })}
             </View>
+
+            {chosenRoles.includes('double_agent') && isHost && (
+              <View style={styles.roleConfigBox}>
+                <Text style={styles.roleConfigTitle}>DOUBLE AGENT SETTINGS</Text>
+                <View style={styles.roleConfigRow}>
+                  <Text style={styles.roleConfigLabel}>Scramble Charges:</Text>
+                  <View style={styles.chargeButtonGroup}>
+                    {[1, 2, 3].map((num) => (
+                      <Pressable
+                        key={num}
+                        accessibilityLabel={`Set ${num} scramble charges`}
+                        accessibilityRole="button"
+                        onPress={() => {
+                          draftTouchedRef.current = true;
+                          setScrambleCharges(num);
+                        }}
+                        style={[
+                          styles.chargeButton,
+                          scrambleCharges === num && styles.chargeButtonActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chargeButtonText,
+                            scrambleCharges === num && styles.chargeButtonTextActive,
+                          ]}
+                        >
+                          {num}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+                <Text style={styles.roleConfigHint}>Cooldown between scrambles: 120s (2 min)</Text>
+              </View>
+            )}
 
             {rules.length > 0 && (
               <View style={styles.rulesBox}>
@@ -871,6 +925,60 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   saveModesText: { color: '#1D4ED8', fontSize: 15, fontWeight: '800' },
+  roleConfigBox: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    marginTop: 12,
+    padding: 12,
+  },
+  roleConfigTitle: {
+    color: '#0F172A',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+  roleConfigRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  roleConfigLabel: {
+    color: '#334155',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  chargeButtonGroup: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  chargeButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: 'center',
+    width: 36,
+  },
+  chargeButtonActive: {
+    backgroundColor: '#1D4ED8',
+    borderColor: '#1D4ED8',
+  },
+  chargeButtonText: {
+    color: '#334155',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  chargeButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  roleConfigHint: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 6,
+  },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
