@@ -23,6 +23,26 @@
 
 ---
 
+## 📑 Table of Contents
+- [🎮 Game Modes](#-game-modes)
+- [🎛️ Modifiers (Stackable Match Dynamics)](#️-modifiers-stackable-match-dynamics)
+- [🔊 Sensory Feedback & Audio Engine](#-sensory-feedback--audio-engine)
+- [👻 Ghost Library & Privacy Trimming](#-ghost-library--privacy-trimming-150-m)
+- [🕵️ Secret Roles: Double Agent & Tribunal](#️-secret-roles-double-agent--emergency-tribunal)
+- [🔒 Privacy, Consent & Retention Architecture](#-privacy-consent--retention-architecture)
+- [⚡ The Core Mechanic: Tactical Asymmetric Information](#-the-core-mechanic-tactical-asymmetric-information)
+- [🌟 Key Features](#-key-features)
+- [🛠️ Tech Stack & Architecture](#️-tech-stack--architecture)
+- [⚙️ Serverless Automation & Keep-Alive](#️-serverless-keep-alive--retention-automation-cron-joborg--github-actions)
+- [📁 Repository Structure](#-repository-structure)
+- [🚀 Getting Started](#-getting-started)
+- [🧪 Testing & Verification](#-testing--verification)
+- [📦 Building Production Release APK](#-building-production-release-apk)
+- [🛡️ Safety & Fair Play](#️-safety--fair-play)
+- [📄 License & Contact](#-license)
+
+---
+
 ## 🎮 Game Modes
 
 ### 1. Classic Chase (The Flagship Mode)
@@ -43,6 +63,12 @@
   - **WARM:** nearest runner $75\text{ m} < d \le 175\text{ m}$.
   - **COLD:** nearest runner $> 175\text{ m}$.
 * **Counter-Detection:** Runners inside the $175\text{ m}$ radius receive a physical vibration and `sensed` pulse alert, warning them that hunters are closing in.
+
+### 4. Haunted Map & Ghost NPCs (Asymmetric AI Haunting)
+* **The Mission:** Match dynamics are haunted by historical runner routes replayed as autonomous Ghost NPCs.
+* **Autonomous Patrol:** At countdown completion, the engine selects verified ghost routes from the library, spawning spectral entities that patrol the area with realistic physics and time-scaled velocities.
+* **Proximity Threat:** Ghosts emit radar anomalies to living runners. If a runner steps within $12\text{ m}$ of a ghost entity, they suffer an immediate haunted tag.
+* **Stealth Invisibility:** Ghost entities are rendered invisible to hunters, forcing runners to navigate both the human pursuit and spectral hazards.
 
 ---
 
@@ -67,6 +93,16 @@ GhostRun incorporates a native, zero-latency procedural audio and haptic engine 
 - **Endgame Stingers:** Triumphant major-chord fanfare for the winning squad and somber cadence for the defeated.
 - **Match Countdown Ticks:** Tactile audio metronome ticking down the final 10 seconds before round launch.
 - **One-Tap SFX Mute:** Instant persistent toggle in the HUD header (`SFX On` / `SFX Off`), saved via AsyncStorage.
+
+---
+
+## 👻 Ghost Library & Privacy Trimming (150 m)
+
+GhostRun introduces an asynchronous community ghost recording system:
+- **Anonymous Contribution (Consent C4):** Runners who finish a match can preview their route and contribute it to the regional ghost library.
+- **Automated Privacy Trimming:** To protect player privacy, the server automatically trims **150 meters** from both the start and end of every recorded route. Private residences, school gates, and personal departure points are permanently stripped before any route is archived.
+- **Cryptographic Anonymity:** Contributed ghosts retain zero player IDs, personal identifiers, or profile linkages in the `ghost_library` table.
+- **Self-Service Management:** Players can view, audit, and permanently delete their contributed ghosts at any time from Settings → Privacy.
 
 ---
 
@@ -129,6 +165,10 @@ The tension in GhostRun stems from **strict information asymmetry** enforced at 
 - **Fair Tagging Engine:** Server validates distance between Hunter and Runner using PostGIS (`ST_DWithin` + accuracy allowance) with an 8-second penalty cooldown on missed tags.
 - **Directionless Proximity Radar (Hot & Cold):** Hunter `PULSE` sensor queries runner distance without exposing coordinates, triggering counter-detection alerts for nearby runners.
 - **Interactive Match Modifiers:** Stackable physical rules including dynamic Noise Meters, Dead Drop tactical caches, QR tags, and Shrinking Zone perimeter contraction.
+- **In-App Camera QR Code Scanner & Dynamic Badges:** Fullscreen camera viewfinder scanner (`expo-camera`) with animated reticle for hunters, and rolling 20s HMAC-SHA256 dynamic QR badges for runners.
+- **Native Audio SFX Engine & Master HUD Mute:** Procedural 16-bit 44.1kHz audio effects (sonar radar sweep, proximity heat pips, tag buzzer, whisper chime, victory/defeat stingers, countdown metronome) with persistent mute toggle.
+- **Radar Ping Ripple Micro-Animations:** Dual concentric animated radar rings expanding outward across the map upon ping arrival.
+- **Autonomous Ghost NPCs & Ghost Library:** Historical runner routes replayed as autonomous spectral entities with 12 m proximity hazards, backed by automated 150 m privacy start/end trimming.
 - **Undercover Double Agent & Tribunal:** Counter-intelligence mole with secret Scramble & Whisper powers, plus an Emergency Tribunal voting dock for loyal hunters.
 - **GDPR & Privacy Architecture:** Granular C1–C6 consent choices, mandatory Replay Route Sharing opt-in, self-service data export, and 30-day auto retention.
 - **Interactive Post-Match Replay & Highlights:** Scrubbable timeline showing all player routes, tag events, ping timestamps, revealed secret target, and match highlights (Closest Call, Loudest Moment, Heat Hit Rate).
@@ -165,6 +205,53 @@ GhostRun is **100% serverless** and operates entirely through the cloud:
 4. **Decentralized Vector Tiles:** MapLibre renders maps directly from OpenFreeMap’s public global CDN with no API keys or local tile servers needed.
 
 Anyone who downloads the release APK can install it, create or join a lobby with a 4-letter room code, and play immediately outdoors without touching a terminal.
+
+### ⚙️ Serverless Keep-Alive & Retention Automation (cron-job.org / GitHub Actions)
+
+Because Supabase free-tier projects automatically pause after prolonged inactivity, GhostRun includes an atomic, lightweight health-check and retention sweep procedure: `health_ping()`.
+
+You can set up an external recurring ping to keep the project warm and automatically trigger the 30-day data retention cleanup without needing any dedicated server.
+
+#### Method 1: cron-job.org (Recommended)
+1. Sign in or create a free account at [cron-job.org](https://cron-job.org/).
+2. Create a new cron job with the following parameters:
+   - **Title:** `GhostRun Keep-Alive & Retention Sweep`
+   - **URL:** `https://<your-project-ref>.supabase.co/rest/v1/rpc/health_ping`
+   - **Execution Schedule:** Every 10 minutes (`*/10 * * * *`)
+   - **Request Method:** `POST`
+   - **Request Headers:**
+     ```http
+     apikey: <your-supabase-anon-key>
+     Authorization: Bearer <your-supabase-anon-key>
+     Content-Type: application/json
+     ```
+   - **Request Body:** `{}`
+3. Save the job. The server responds with `200 OK` and payload:
+   ```json
+   { "ok": true, "timestamp": "2026-11-01T21:00:00Z", "cleaned_games": 0 }
+   ```
+
+#### Method 2: GitHub Actions Workflow
+Add a GitHub Actions workflow in `.github/workflows/keepalive.yml`:
+```yaml
+name: Supabase Keep-Alive & Retention
+on:
+  schedule:
+    - cron: '*/15 * * * *' # Every 15 minutes
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase health_ping
+        run: |
+          curl -s -X POST "${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}/rest/v1/rpc/health_ping" \
+            -H "apikey: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+```
 
 ---
 
