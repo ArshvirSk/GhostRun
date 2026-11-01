@@ -270,7 +270,7 @@ async function main() {
     'hunter can read their game',
   );
   expectRows(
-    (await hunter.from('players').select('*').eq('game_id', gameId)).data,
+    (await hunter.from('players').select('id, team, status, is_ready').eq('game_id', gameId)).data,
     'hunter can read the roster',
   );
 
@@ -568,6 +568,73 @@ async function main() {
   expectEmpty(
     (await outsider.from('player_positions').select('*').eq('game_id', phaseGameId)).data,
     'outsider cannot read live positions',
+  );
+
+  // V2-M2 resources: players read only their own economy; teams read only their
+  // own shared pool; entities are closed unless their visibility says otherwise.
+  const ownResources = await host
+    .from('player_resources')
+    .select('player_id')
+    .eq('game_id', phaseGameId);
+  expect(
+    (ownResources.data ?? []).length === 1 &&
+      ownResources.data?.[0]?.player_id === phaseHostPlayer.data.id,
+    'a player reads only their own player_resources row',
+    JSON.stringify(ownResources.data ?? ownResources.error?.message),
+  );
+  expectEmpty(
+    (await outsider.from('player_resources').select('*').eq('game_id', phaseGameId)).data,
+    'an outsider cannot read player_resources',
+  );
+
+  const runnerTeamResources = await host
+    .from('team_resources')
+    .select('team')
+    .eq('game_id', phaseGameId);
+  expect(
+    (runnerTeamResources.data ?? []).length === 1 &&
+      runnerTeamResources.data?.[0]?.team === 'runner',
+    'a runner reads only the runner team_resources row',
+    JSON.stringify(runnerTeamResources.data ?? runnerTeamResources.error?.message),
+  );
+  const hunterTeamResources = await hunter
+    .from('team_resources')
+    .select('team')
+    .eq('game_id', phaseGameId);
+  expect(
+    (hunterTeamResources.data ?? []).length === 1 &&
+      hunterTeamResources.data?.[0]?.team === 'hunter',
+    'a hunter reads only the hunter team_resources row',
+    JSON.stringify(hunterTeamResources.data ?? hunterTeamResources.error?.message),
+  );
+  expectEmpty(
+    (await outsider.from('team_resources').select('*').eq('game_id', phaseGameId)).data,
+    'an outsider cannot read team_resources',
+  );
+
+  expectEmpty(
+    (await host.from('entities').select('*').eq('game_id', phaseGameId)).data,
+    'entities with no matching visibility are unreadable',
+  );
+  const directEntity = await host
+    .from('entities')
+    .insert({ game_id: phaseGameId, kind: 'item', visible_to: 'all' });
+  expect(Boolean(directEntity.error), 'clients cannot insert entities', 'insert unexpectedly succeeded');
+
+  // Secret role: no direct column access, owner-only through the RPC.
+  const directRole = await hunter.from('players').select('secret_role').eq('game_id', phaseGameId);
+  expect(Boolean(directRole.error), 'secret_role is not directly selectable', 'select unexpectedly succeeded');
+  const myRole = await rpc<{ role: string | null }>(hunter, 'get_my_role', { game_id: phaseGameId });
+  expect(
+    !myRole.error && myRole.data?.role === null,
+    'a player reads their own secret role through the RPC',
+    JSON.stringify(myRole.error?.message ?? myRole.data),
+  );
+  const otherRole = await rpc<{ role: string | null }>(host, 'get_my_role', { game_id: phaseGameId });
+  expect(
+    !otherRole.error && otherRole.data?.role === null,
+    'the RPC never returns another player’s role',
+    JSON.stringify(otherRole.error?.message ?? otherRole.data),
   );
 
   // Trails are a recap resource. They must stay closed while the round runs so a

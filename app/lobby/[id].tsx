@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,6 +11,12 @@ import {
   View,
 } from 'react-native';
 
+import {
+  FALLBACK_REGISTRY,
+  parameterSummary,
+  rulesFor,
+  type ModeRegistry,
+} from '../../src/lib/modeRegistry';
 import { supabase } from '../../src/lib/supabase';
 
 type Team = 'runner' | 'hunter' | 'unassigned';
@@ -28,6 +34,10 @@ type LobbyGame = {
   code: string;
   host_id: string;
   mode: 'classic_chase' | 'tag_hunt';
+  mode_id: 'classic_chase' | 'tag_hunt';
+  modifiers: string[];
+  roles: string[];
+  mode_params: Record<string, unknown>;
   status: string;
 };
 type LobbyState = {
@@ -52,6 +62,12 @@ export default function LobbyScreen() {
   // undefined = not loaded yet, null = must still choose (C3), boolean = chosen.
   const [shareChoice, setShareChoice] = useState<boolean | null | undefined>(undefined);
   const [savingShare, setSavingShare] = useState(false);
+  const [registry, setRegistry] = useState<ModeRegistry>(FALLBACK_REGISTRY);
+  const [draftModifiers, setDraftModifiers] = useState<string[]>([]);
+  const [draftRoles, setDraftRoles] = useState<string[]>([]);
+  const draftTouchedRef = useRef(false);
+  const [savingModes, setSavingModes] = useState(false);
+  const [modesMessage, setModesMessage] = useState('');
 
   const loadState = useCallback(async () => {
     if (!supabase || !gameId) return;
@@ -71,7 +87,14 @@ export default function LobbyScreen() {
     if (data) {
       setState(data as LobbyState);
       setErrorMessage('');
+      const loaded = data as LobbyState;
+      if (!draftTouchedRef.current) {
+        setDraftModifiers(loaded.game.modifiers ?? []);
+        setDraftRoles(loaded.game.roles ?? []);
+      }
     }
+    const { data: registryData } = await supabase.rpc('get_mode_registry');
+    if (registryData) setRegistry(registryData as ModeRegistry);
     if (authData.user) {
       const { data: selfRow } = await supabase
         .from('players')
@@ -237,6 +260,34 @@ export default function LobbyScreen() {
     await loadState();
   }
 
+  function toggleDraft(list: 'modifiers' | 'roles', id: string) {
+    draftTouchedRef.current = true;
+    setModesMessage('');
+    const setter = list === 'modifiers' ? setDraftModifiers : setDraftRoles;
+    setter((current) =>
+      current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
+    );
+  }
+
+  async function saveModeConfig() {
+    if (!supabase || !gameId) return;
+    setSavingModes(true);
+    setModesMessage('');
+    const { error } = await supabase.rpc('set_game_modes', {
+      game_id: gameId,
+      modifiers: draftModifiers,
+      roles: draftRoles,
+      mode_params: {},
+    });
+    setSavingModes(false);
+    if (error) {
+      setModesMessage(error.message);
+      return;
+    }
+    draftTouchedRef.current = false;
+    await loadState();
+  }
+
   if (!state) {
     return (
       <View style={styles.loading}>
@@ -330,6 +381,119 @@ export default function LobbyScreen() {
           </Pressable>
         </View>
       )}
+
+      {(() => {
+        const registryMode = registry.modes.find((mode) => mode.id === state.game.mode_id);
+        const activeModifiers = state.game.modifiers ?? [];
+        const activeRoles = state.game.roles ?? [];
+        const rules = rulesFor(activeModifiers, activeRoles);
+        const compatibleModifiers = registry.modifiers.filter((modifier) =>
+          registryMode?.compatible_modifiers.includes(modifier.id),
+        );
+        const compatibleRoles = registry.roles.filter((role) =>
+          registryMode?.compatible_roles.includes(role.id),
+        );
+        const chosenModifiers = isHost ? draftModifiers : activeModifiers;
+        const chosenRoles = isHost ? draftRoles : activeRoles;
+        return (
+          <View style={styles.modeCard}>
+            <Text style={styles.cardEyebrow}>MODE</Text>
+            <Text style={styles.modeName}>
+              {registryMode?.name ??
+                (state.game.mode === 'classic_chase' ? 'Classic Chase' : 'Tag Hunt')}
+            </Text>
+            <Text style={styles.modeHint}>
+              {isHost
+                ? 'You can add modifiers and roles until the round starts.'
+                : 'The host chooses modifiers and roles. Everyone plays by the same rules.'}
+            </Text>
+
+            <Text style={styles.modeSub}>Modifiers</Text>
+            <View style={styles.chipRow}>
+              {compatibleModifiers.map((modifier) => {
+                const active = chosenModifiers.includes(modifier.id);
+                return (
+                  <Pressable
+                    key={modifier.id}
+                    accessibilityRole="button"
+                    disabled={!isHost || !modifier.enabled || savingModes}
+                    onPress={() => toggleDraft('modifiers', modifier.id)}
+                    style={[
+                      styles.chip,
+                      active && styles.chipActive,
+                      (!modifier.enabled || !isHost) && styles.chipDisabled,
+                    ]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {modifier.name}
+                      {modifier.enabled ? '' : ' · Soon'}
+                    </Text>
+                    {active && modifier.enabled && parameterSummary(modifier) !== '' && (
+                      <Text style={styles.chipParams}>{parameterSummary(modifier)}</Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.modeSub}>Roles</Text>
+            <View style={styles.chipRow}>
+              {compatibleRoles.map((role) => {
+                const active = chosenRoles.includes(role.id);
+                return (
+                  <Pressable
+                    key={role.id}
+                    accessibilityRole="button"
+                    disabled={!isHost || !role.enabled || savingModes}
+                    onPress={() => toggleDraft('roles', role.id)}
+                    style={[
+                      styles.chip,
+                      active && styles.chipActive,
+                      (!role.enabled || !isHost) && styles.chipDisabled,
+                    ]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {role.name}
+                      {role.enabled ? '' : ' · Soon'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {rules.length > 0 && (
+              <View style={styles.rulesBox}>
+                <Text style={styles.rulesTitle}>RULES THIS ROUND</Text>
+                {rules.map((line) => (
+                  <Text key={line} style={styles.ruleLine}>
+                    • {line}
+                  </Text>
+                ))}
+              </View>
+            )}
+
+            {isHost && (
+              <Pressable
+                accessibilityRole="button"
+                disabled={savingModes}
+                onPress={() => void saveModeConfig()}
+                style={styles.saveModesButton}
+              >
+                {savingModes ? (
+                  <ActivityIndicator color="#1D4ED8" size="small" />
+                ) : (
+                  <Text style={styles.saveModesText}>Save mode setup</Text>
+                )}
+              </Pressable>
+            )}
+            {modesMessage !== '' && (
+              <Text accessibilityRole="alert" style={styles.error}>
+                {modesMessage}
+              </Text>
+            )}
+          </View>
+        );
+      })()}
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Players</Text>
@@ -642,6 +806,71 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   shareStatusText: { color: '#334155', flex: 1, fontSize: 13, fontWeight: '600' },
+  modeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    elevation: 2,
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+  },
+  cardEyebrow: {
+    color: '#1D4ED8',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  modeName: { color: '#0F172A', fontSize: 20, fontWeight: '900', marginTop: 4 },
+  modeHint: { color: '#64748B', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  modeSub: {
+    color: '#334155',
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 6,
+    marginTop: 14,
+  },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    borderWidth: 1,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipActive: { backgroundColor: '#EFF6FF', borderColor: '#1D4ED8' },
+  chipDisabled: { opacity: 0.45 },
+  chipText: { color: '#334155', fontSize: 13, fontWeight: '700' },
+  chipTextActive: { color: '#1D4ED8' },
+  chipParams: { color: '#64748B', fontSize: 10, marginTop: 2 },
+  rulesBox: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
+  },
+  rulesTitle: {
+    color: '#64748B',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  ruleLine: { color: '#334155', fontSize: 13, lineHeight: 19 },
+  saveModesButton: {
+    alignItems: 'center',
+    borderColor: '#1D4ED8',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    marginTop: 14,
+    minHeight: 48,
+  },
+  saveModesText: { color: '#1D4ED8', fontSize: 15, fontWeight: '800' },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
