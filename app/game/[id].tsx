@@ -91,6 +91,7 @@ type GamePlayer = {
   team: Team;
   status: 'active' | 'tagged' | 'left' | 'jailed';
   is_ready: boolean;
+  is_remote?: boolean;
   jailed_at?: string | null;
   frozen_until?: string | null;
   secret_role?: string | null;
@@ -237,6 +238,26 @@ type RoundState = {
     } | null;
     is_carrier: boolean;
     handoff_pending_from?: string | null;
+  } | null;
+  markers?: {
+    id: string;
+    label: string;
+    latitude: number;
+    longitude: number;
+    placed_by: string;
+    placed_at: string;
+    expires_at: string;
+  }[];
+  scan_envelope?: {
+    id: string;
+    latitude: number;
+    longitude: number;
+    radius_m: number;
+    expires_at: string;
+  } | null;
+  operator?: {
+    is_operator: boolean;
+    scan_cooldown_s: number;
   } | null;
 };
 
@@ -860,6 +881,7 @@ export default function GameScreen() {
   const status = state?.game.status ?? null;
   const selfPlayer = state?.players.find((player) => player.id === state?.my_player_id) ?? null;
   const taggedSelf = selfPlayer?.status === 'tagged';
+  const isOperator = !!state?.operator?.is_operator || !!selfPlayer?.is_remote;
 
   const phaseDeadline =
     status === 'countdown'
@@ -926,7 +948,7 @@ export default function GameScreen() {
   useEffect(() => {
     if (!status) return;
     const inRound = status === 'countdown' || status === 'head_start' || status === 'live';
-    if (inRound && !autoStartedRef.current && !taggedSelf) {
+    if (inRound && !autoStartedRef.current && !taggedSelf && !isOperator) {
       autoStartedRef.current = true;
       void beginSharing();
     }
@@ -938,7 +960,7 @@ export default function GameScreen() {
         setBackgroundSharing(false);
       });
     }
-  }, [beginSharing, status, taggedSelf]);
+  }, [beginSharing, isOperator, status, taggedSelf]);
 
   // A tagged runner becomes a spectator; their position is no longer gameplay.
   useEffect(() => {
@@ -1207,6 +1229,119 @@ export default function GameScreen() {
       ),
     };
   }, [safeZones]);
+
+  const markers = state?.markers;
+  const markersData = useMemo(() => {
+    if (!markers || markers.length === 0) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: markers.map((m) => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [m.longitude, m.latitude],
+        },
+        properties: { label: m.label, id: m.id },
+      })),
+    };
+  }, [markers]);
+
+  const scanEnvelope = state?.scan_envelope;
+  const scanEnvelopeData = useMemo(() => {
+    if (!scanEnvelope) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: [
+        circleRing(
+          { longitude: scanEnvelope.longitude, latitude: scanEnvelope.latitude },
+          scanEnvelope.radius_m,
+        ),
+      ],
+    };
+  }, [scanEnvelope]);
+
+  const [optimisticCooldownUntil, setOptimisticCooldownUntil] = useState<number | null>(null);
+  const [operatorBannerMsg, setOperatorBannerMsg] = useState('');
+
+  const serverScanCooldownS = state?.operator?.scan_cooldown_s ?? 0;
+  const operatorScanCooldown = useMemo(() => {
+    if (optimisticCooldownUntil) {
+      const remaining = Math.max(0, Math.ceil((optimisticCooldownUntil - serverNow) / 1000));
+      if (remaining > 0) return remaining;
+    }
+    return serverScanCooldownS;
+  }, [optimisticCooldownUntil, serverNow, serverScanCooldownS]);
+
+  async function triggerOperatorScan() {
+    if (!supabase || !gameId || busy !== '' || operatorScanCooldown > 0) return;
+    setBusy('scan');
+    try {
+      const params: Record<string, any> = { p_game_id: gameId };
+      if (myTeam === 'hunter') {
+        const center = game?.area ?? { longitude: 0, latitude: 0 };
+        params.p_lat = center.latitude;
+        params.p_lng = center.longitude;
+      }
+      const { data, error } = await supabase.rpc('operator_scan', params);
+      if (error) {
+        setOperatorBannerMsg(`Scan failed: ${error.message}`);
+      } else if (data) {
+        if (data.scan_type === 'runner_sweep') {
+          if (data.found) {
+            setOperatorBannerMsg('Hunter detected! 150m envelope active for 10s.');
+          } else {
+            setOperatorBannerMsg(data.message || 'No hunter signals detected.');
+          }
+        } else if (data.scan_type === 'hunter_census') {
+          setOperatorBannerMsg(`Census Scan: ${data.count} runner(s) within 200m.`);
+        }
+        setOptimisticCooldownUntil(Date.now() + 90000);
+        void loadState();
+      }
+    } catch (e: any) {
+      setOperatorBannerMsg(`Scan error: ${e.message}`);
+    } finally {
+      setBusy('');
+      setTimeout(() => setOperatorBannerMsg(''), 8000);
+    }
+  }
+
+  async function placeTacticalMarker(label?: string) {
+    if (!supabase || !gameId || busy !== '') return;
+    setBusy('marker');
+    try {
+      const center = game?.area ?? { longitude: 0, latitude: 0 };
+      const { error } = await supabase.rpc('place_marker', {
+        p_game_id: gameId,
+        p_lat: center.latitude,
+        p_lng: center.longitude,
+        p_label: label ?? 'Tactical Point',
+      });
+      if (error) {
+        setOperatorBannerMsg(`Marker failed: ${error.message}`);
+      } else {
+        setOperatorBannerMsg('Tactical marker placed (expires in 90s).');
+        void loadState();
+      }
+    } finally {
+      setBusy('');
+      setTimeout(() => setOperatorBannerMsg(''), 5000);
+    }
+  }
+
+  async function clearTacticalMarker(markerId: string) {
+    if (!supabase || !gameId || busy !== '') return;
+    setBusy(`clear_${markerId}`);
+    try {
+      await supabase.rpc('clear_marker', {
+        p_game_id: gameId,
+        p_marker_id: markerId,
+      });
+      void loadState();
+    } finally {
+      setBusy('');
+    }
+  }
 
   const hunterProximity = state?.assassin_ring?.hunter_proximity;
   useEffect(() => {
@@ -2065,6 +2200,36 @@ export default function GameScreen() {
             />
           </GeoJSONSource>
         )}
+
+        {scanEnvelopeData && (
+          <GeoJSONSource id="operator-scan-envelope" data={scanEnvelopeData}>
+            <Layer
+              id="operator-scan-envelope-fill"
+              type="fill"
+              paint={{ 'fill-color': '#F59E0B', 'fill-opacity': 0.18 }}
+            />
+            <Layer
+              id="operator-scan-envelope-line"
+              type="line"
+              paint={{ 'line-color': '#D97706', 'line-width': 2, 'line-dasharray': [4, 2] }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {markersData && (
+          <GeoJSONSource id="tactical-markers" data={markersData}>
+            <Layer
+              id="tactical-markers-circle"
+              type="circle"
+              paint={{
+                'circle-radius': 8,
+                'circle-color': isRunner ? '#10B981' : '#EF4444',
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#FFFFFF',
+              }}
+            />
+          </GeoJSONSource>
+        )}
       </MapLibreMap>
 
       <HeatOverlay
@@ -2221,6 +2386,13 @@ export default function GameScreen() {
         </View>
       )}
 
+      {operatorBannerMsg !== '' && !sheetExpanded && (
+        <View style={styles.operatorToast}>
+          <Ionicons color="#92400E" name="radio" size={16} />
+          <Text style={styles.operatorToastText}>{operatorBannerMsg}</Text>
+        </View>
+      )}
+
       <Animated.View
         style={[
           styles.sheet,
@@ -2243,7 +2415,7 @@ export default function GameScreen() {
                 {sheetExpanded ? '▼ Slide down to minimize' : '▲ Slide up to view'}
               </Animated.Text>
             </View>
-            {isLive && (!isRunner || isAssassinRing) && !taggedSelf && (
+            {isLive && (!isRunner || isAssassinRing) && !taggedSelf && !isOperator && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 {!isAssassinRing && (game?.modifiers ?? []).includes('hot_cold') && (
                   <HeatButton
@@ -2282,6 +2454,33 @@ export default function GameScreen() {
                 </Pressable>
               </View>
             )}
+            {isLive && isOperator && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy !== '' || operatorScanCooldown > 0}
+                  onPress={() => void triggerOperatorScan()}
+                  style={[
+                    styles.operatorDockBtn,
+                    (busy !== '' || operatorScanCooldown > 0) && styles.operatorActionBtnDisabled,
+                  ]}
+                >
+                  <Ionicons color="#FFFFFF" name="scan" size={14} />
+                  <Text style={styles.operatorDockBtnText}>
+                    {operatorScanCooldown > 0 ? `SCAN (${operatorScanCooldown}s)` : 'SCAN'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy !== ''}
+                  onPress={() => void placeTacticalMarker()}
+                  style={[styles.operatorDockBtn, busy !== '' && styles.operatorActionBtnDisabled]}
+                >
+                  <Ionicons color="#FFFFFF" name="flag" size={14} />
+                  <Text style={styles.operatorDockBtnText}>+ MARK</Text>
+                </Pressable>
+              </View>
+            )}
             {isLive &&
               isRunner &&
               !taggedSelf &&
@@ -2304,7 +2503,60 @@ export default function GameScreen() {
           style={[styles.sheetInner, { opacity: sheetContentOpacity }]}
         >
           <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetContent}>
-            {isLive && (!isRunner || isAssassinRing) && !taggedSelf && (
+            {isLive && isOperator && (
+              <View style={styles.operatorMissionCard}>
+                <Text style={styles.operatorMissionTitle}>
+                  MISSION CONTROL — {myTeam.toUpperCase()} OPERATOR
+                </Text>
+                <Text style={styles.operatorMissionSubtitle}>
+                  {myTeam === 'runner'
+                    ? 'Scan triggers a 150m vague envelope on the nearest active hunter (10s duration). Place up to 3 tactical markers (90s TTL).'
+                    : 'Scan returns a 200m census count of runners near the game area center. Place up to 3 tactical markers (90s TTL).'}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busy !== '' || operatorScanCooldown > 0}
+                    onPress={() => void triggerOperatorScan()}
+                    style={[
+                      styles.operatorActionBtn,
+                      { flex: 1 },
+                      (busy !== '' || operatorScanCooldown > 0) && styles.operatorActionBtnDisabled,
+                    ]}
+                  >
+                    <Text style={styles.operatorActionBtnText}>
+                      {busy === 'scan' ? 'SCANNING...' : operatorScanCooldown > 0 ? `COOLDOWN (${operatorScanCooldown}s)` : 'TRIGGER SCAN'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busy !== ''}
+                    onPress={() => void placeTacticalMarker()}
+                    style={[styles.operatorActionBtn, { flex: 1, backgroundColor: '#0284C7' }, busy !== '' && styles.operatorActionBtnDisabled]}
+                  >
+                    <Text style={styles.operatorActionBtnText}>
+                      {busy === 'marker' ? 'PLACING...' : '+ MARKER'}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {markers && markers.length > 0 && (
+                  <View style={styles.operatorMarkerList}>
+                    <Text style={[styles.statLabel, { marginBottom: 4 }]}>ACTIVE TEAM MARKERS ({markers.length}/3)</Text>
+                    {markers.map((m) => (
+                      <View key={m.id} style={styles.operatorMarkerItem}>
+                        <Text style={styles.operatorMarkerLabel}>• {m.label}</Text>
+                        <Pressable onPress={() => void clearTacticalMarker(m.id)}>
+                          <Text style={styles.operatorMarkerClearText}>CLEAR</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {isLive && (!isRunner || isAssassinRing) && !taggedSelf && !isOperator && (
               <>
                 <Pressable
                   accessibilityRole="button"
@@ -3597,5 +3849,103 @@ const styles = StyleSheet.create({
     color: '#92400E',
     fontSize: 14,
     fontWeight: '700',
+  },
+  operatorToast: {
+    position: 'absolute',
+    top: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  operatorToastText: {
+    color: '#92400E',
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+  operatorDockBtn: {
+    backgroundColor: '#0F172A',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  operatorDockBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  operatorMissionCard: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    padding: 14,
+  },
+  operatorMissionTitle: {
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  operatorMissionSubtitle: {
+    color: '#475569',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  operatorActionBtn: {
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    height: 48,
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  operatorActionBtnDisabled: {
+    opacity: 0.5,
+  },
+  operatorActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  operatorMarkerList: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 8,
+  },
+  operatorMarkerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  operatorMarkerLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  operatorMarkerClearText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#EF4444',
   },
 });

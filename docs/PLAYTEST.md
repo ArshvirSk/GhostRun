@@ -164,7 +164,18 @@ Immediately following each outdoor play session, ask each participant:
   - 60-second advance warning banner warns all players.
   - Effective boundary strictly enforces updated coordinates without shifting center.
 
-### 3.7 VIP Escort Role Add-on (docs/MODES.md §5.2)
+### 3.8 Secret Role: Double Agent (§5.1)
+- [ ] Exactly one hunter is secretly assigned `secret_role = 'agent'` when enabled ($\ge 2$ hunters).
+- [ ] Agent HUD reveals secret **Whisper** and **Scramble** controls.
+- [ ] **Whisper:** Accurately reveals the target's cardinal quadrant (`North`, `South`, `East`, `West`).
+- [ ] **Scramble:** Displaces runner's next scheduled ping by 150–250 m within boundary limits.
+- [ ] **Tribunal:**
+  - Any loyal hunter can convene a tribunal and accuse a suspect.
+  - Voting banner allows instant guilty/innocent casting.
+  - Majority guilty ejects the agent and awards hunters a bonus ping round.
+  - Erroneous ejection of a loyal hunter imposes a 5-minute silence penalty.
+
+### 3.9 VIP Escort Role Add-on (docs/MODES.md §5.2)
 * **Recommended Group:** 5–12 players (minimum 1 hunter, 2 runners; recommended 2+ hunters, 4+ runners).
 * **Setting:** Campus, park, or urban neighborhood (radius 300–600 m).
 * **Pre-Flight & Setup:**
@@ -193,16 +204,39 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Tag Hunt: Match timer expires with VIP alive: **Runners Win (`time_expired`)**.
   - [ ] VIP offline fail-safe: VIP disconnects for $> 60\text{ s}$; confirm active bodyguard is auto-promoted to VIP (`vip_promoted`).
 
-### 3.8 Secret Role: Double Agent (§5.1)
-- [ ] Exactly one hunter is secretly assigned `secret_role = 'agent'` when enabled ($\ge 2$ hunters).
-- [ ] Agent HUD reveals secret **Whisper** and **Scramble** controls.
-- [ ] **Whisper:** Accurately reveals the target's cardinal quadrant (`North`, `South`, `East`, `West`).
-- [ ] **Scramble:** Displaces runner's next scheduled ping by 150–250 m within boundary limits.
-- [ ] **Tribunal:**
-  - Any loyal hunter can convene a tribunal and accuse a suspect.
-  - Voting banner allows instant guilty/innocent casting.
-  - Majority guilty ejects the agent and awards hunters a bonus ping round.
-  - Erroneous ejection of a loyal hunter imposes a 5-minute silence penalty.
+### 3.10 Operator Remote Role Add-on (docs/MODES.md §5.3)
+* **Recommended Group:** 4–12 players (e.g. 2 field runners + 1 runner operator, 2 field hunters + 1 hunter operator).
+* **Setting:** Any outdoor venue; Operator can participate remotely (e.g., from home, base camp, or stationary bench).
+* **Pre-Flight & Setup:**
+  - [ ] Enable **Operator** role add-on in lobby settings (`classic_chase`, `tag_hunt`, `jailbreak`, or `relay_heist`).
+  - [ ] Player taps team toggle to cycle to `[Op]` or presses "Assign as Remote Operator".
+  - [ ] Confirm squad sub-label shows `[Operator]` and "Remote: stationary tactical oversight".
+  - [ ] Verify that assigning a second operator to the same squad is rejected (limit 1 per squad).
+  - [ ] Verify that starting without at least one field player on each squad is blocked.
+* **Operator Interface & GPS Bypass:**
+  - [ ] In game, Operator HUD presents "MISSION CONTROL: OPERATOR" tactical banner.
+  - [ ] Verify that background GPS tracking and location sharing are disabled for the operator.
+  - [ ] Verify that operator is immune to tagging and cannot execute tags.
+* **Tactical Markers:**
+  - [ ] Operator pans map and taps "+ MARK" button or long-presses to place a tactical waypoint.
+  - [ ] Enter marker label (e.g., "Rendezvous Point", "Flank North").
+  - [ ] Confirm marker appears on all teammates' maps with pulse animation.
+  - [ ] Confirm marker expires automatically after 90 seconds.
+  - [ ] Verify team isolation: opponents cannot see markers on radar or in entities queries.
+* **Runner Operator Tactical Sweep:**
+  - [ ] Runner Operator presses "SCAN" dock action.
+  - [ ] Confirm 150 m fuzzed circular envelope appears on runners' maps centered near nearest hunter.
+  - [ ] Confirm envelope expires after 10 seconds.
+  - [ ] Verify zero raw hunter GPS coordinates are exposed to clients.
+* **Hunter Operator Sector Census:**
+  - [ ] Hunter Operator pans map crosshair to sector inside the boundary and presses "SCAN".
+  - [ ] Confirm toast notification displays runner count within 200 m (e.g., "2 runners detected").
+  - [ ] Verify attempting scan outside boundary is rejected.
+  - [ ] Confirm 90-second tactical scan cooldown is enforced.
+* **Tactical Radio Comms:**
+  - [ ] Operator sends a broadcast message (e.g., "Hunter approaching west gate").
+  - [ ] Verify all teammates receive the radio dispatch banner on screen.
+
 
 ---
 

@@ -28,6 +28,7 @@ type LobbyPlayer = {
   team: Team;
   status: 'active' | 'tagged' | 'left' | 'jailed';
   is_ready: boolean;
+  is_remote?: boolean;
 };
 type LobbyGame = {
   id: string;
@@ -275,6 +276,17 @@ export default function LobbyScreen() {
     if (!supabase || !gameId) return;
     await runAction('team', () =>
       supabase!.rpc('set_team', { game_id: gameId, player_id: player.id, team }),
+    );
+  }
+
+  async function toggleRemote(player: LobbyPlayer) {
+    if (!supabase || !gameId) return;
+    await runAction('remote', () =>
+      supabase!.rpc('set_player_remote', {
+        p_game_id: gameId,
+        p_is_remote: !player.is_remote,
+        p_player_id: player.id,
+      }),
     );
   }
 
@@ -718,8 +730,8 @@ export default function LobbyScreen() {
                 : player.team === 'unassigned'
                   ? 'Choose a team'
                   : player.team === 'runner'
-                    ? 'Runner'
-                    : 'Hunter'}{' '}
+                    ? (player.is_remote ? 'Runner Operator' : 'Runner')
+                    : (player.is_remote ? 'Hunter Operator' : 'Hunter')}{' '}
               · {player.is_ready ? 'Ready' : 'Not ready'}
             </Text>
           </View>
@@ -757,6 +769,14 @@ export default function LobbyScreen() {
                       selected={player.team === 'hunter'}
                       onPress={() => void setTeam(player, 'hunter')}
                     />
+                    {state.game.roles.includes('operator') && player.team !== 'unassigned' && (
+                      <TeamButton
+                        label="Op"
+                        accessibilityLabel={`Toggle Operator for ${player.display_name}`}
+                        selected={!!player.is_remote}
+                        onPress={() => void toggleRemote(player)}
+                      />
+                    )}
                   </>
                 )}
                 {isHost && player.user_id !== userId && (
