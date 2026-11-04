@@ -133,12 +133,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       teams: ['solo'],
       min_players: 3,
       compatible_roles: [],
-      compatible_modifiers: [
-        'noise_meter',
-        'dead_drops',
-        'qr_tagging',
-        'shrinking_zone',
-      ],
+      compatible_modifiers: ['noise_meter', 'dead_drops', 'qr_tagging', 'shrinking_zone'],
       parameters: {
         tag_radius_m: 15,
         safe_zone_count: 2,
@@ -237,18 +232,10 @@ const ROLE_RULES: Record<string, string[]> = {
 };
 
 export const BASE_MODE_RULES: Record<string, string[]> = {
-  classic_chase: [
-    'Runners reach the secret target to win. Hunters tag runners to eliminate them.',
-  ],
-  tag_hunt: [
-    'No secret target. Hunters must tag all runners before time expires.',
-  ],
-  haunted_map: [
-    'Spectral NPCs patrol the area. Evade ghosts and opponents.',
-  ],
-  ghost_duel: [
-    'Solo time trial against ghost recordings.',
-  ],
+  classic_chase: ['Runners reach the secret target to win. Hunters tag runners to eliminate them.'],
+  tag_hunt: ['No secret target. Hunters must tag all runners before time expires.'],
+  haunted_map: ['Spectral NPCs patrol the area. Evade ghosts and opponents.'],
+  ghost_duel: ['Solo time trial against ghost recordings.'],
   jailbreak: [
     'Tagged runners are sent to Jail instead of elimination.',
     'Free runners can rescue all jailed teammates by holding within 10 m of the jail for 10 s.',

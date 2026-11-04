@@ -265,7 +265,13 @@ type SharingState = 'idle' | 'starting' | 'on' | 'denied' | 'error';
 
 type TagResult = {
   success: boolean;
-  reason?: 'cooldown' | 'stale_position' | 'no_target' | 'in_safe_zone' | 'no_prey_assigned' | 'already_frozen';
+  reason?:
+    | 'cooldown'
+    | 'stale_position'
+    | 'no_target'
+    | 'in_safe_zone'
+    | 'no_prey_assigned'
+    | 'already_frozen';
   runner_id?: string;
   phase?: Phase;
   winner?: 'runners' | 'hunters' | 'solo' | null;
@@ -686,11 +692,7 @@ export default function GameScreen() {
       );
     } else if (prevStatusRef.current === 'jailed' && ownPlayer.status === 'active') {
       playSound('victory');
-      notify(
-        'You were rescued!',
-        'You are free! Run to safe ground.',
-        [0, 150, 80, 150],
-      );
+      notify('You were rescued!', 'You are free! Run to safe ground.', [0, 150, 80, 150]);
     }
     prevStatusRef.current = ownPlayer.status;
   }, [state, notify]);
@@ -1027,10 +1029,22 @@ export default function GameScreen() {
       } else {
         setTagMessage(
           result.phase === 'ended'
-            ? (result.end_reason === 'vip_eliminated'
-                ? 'VIP eliminated! Hunters win!'
-                : isJb ? 'All runners jailed! Round over.' : isAr ? 'Last survivor standing! Victory!' : isRh ? 'All runners tagged! Hunters win!' : 'Tag confirmed. The round is over.')
-            : (isJb ? 'Runner jailed!' : isAr ? 'Target eliminated! New prey assigned.' : isRh ? 'Runner tagged! Package dropped!' : 'Tag confirmed.'),
+            ? result.end_reason === 'vip_eliminated'
+              ? 'VIP eliminated! Hunters win!'
+              : isJb
+                ? 'All runners jailed! Round over.'
+                : isAr
+                  ? 'Last survivor standing! Victory!'
+                  : isRh
+                    ? 'All runners tagged! Hunters win!'
+                    : 'Tag confirmed. The round is over.'
+            : isJb
+              ? 'Runner jailed!'
+              : isAr
+                ? 'Target eliminated! New prey assigned.'
+                : isRh
+                  ? 'Runner tagged! Package dropped!'
+                  : 'Tag confirmed.',
         );
       }
       await loadState();
@@ -1185,10 +1199,7 @@ export default function GameScreen() {
 
   const jailRingData = useMemo(() => {
     if (jailLongitude === undefined || jailLatitude === undefined) return null;
-    return circleRing(
-      { longitude: jailLongitude, latitude: jailLatitude },
-      jailRadiusM,
-    );
+    return circleRing({ longitude: jailLongitude, latitude: jailLatitude }, jailRadiusM);
   }, [jailLongitude, jailLatitude, jailRadiusM]);
 
   const jailPointData: PointCollection | null = useMemo(() => {
@@ -1213,11 +1224,14 @@ export default function GameScreen() {
   const isLive = state?.game?.status === 'live';
   const jailedSelf = selfPlayer?.status === 'jailed';
   const autoReleaseS =
-    (state?.game?.mode_params?.jailbreak as { auto_release_s?: number } | undefined)?.auto_release_s ?? 300;
+    (state?.game?.mode_params?.jailbreak as { auto_release_s?: number } | undefined)
+      ?.auto_release_s ?? 300;
   const releaseRadiusM =
-    (state?.game?.mode_params?.jailbreak as { release_radius_m?: number } | undefined)?.release_radius_m ?? 10;
+    (state?.game?.mode_params?.jailbreak as { release_radius_m?: number } | undefined)
+      ?.release_radius_m ?? 10;
   const releaseHoldS =
-    (state?.game?.mode_params?.jailbreak as { release_hold_s?: number } | undefined)?.release_hold_s ?? 10;
+    (state?.game?.mode_params?.jailbreak as { release_hold_s?: number } | undefined)
+      ?.release_hold_s ?? 10;
 
   const safeZones = state?.assassin_ring?.safe_zones;
   const safeZonesData = useMemo(() => {
@@ -1431,7 +1445,10 @@ export default function GameScreen() {
   }, [packageState]);
 
   const distanceToDroppedPackage =
-    ownFix && packageState?.status === 'dropped' && packageState.longitude !== undefined && packageState.latitude !== undefined
+    ownFix &&
+    packageState?.status === 'dropped' &&
+    packageState.longitude !== undefined &&
+    packageState.latitude !== undefined
       ? distanceM(ownFix, { longitude: packageState.longitude, latitude: packageState.latitude })
       : null;
 
@@ -1520,21 +1537,24 @@ export default function GameScreen() {
     }
   }, [gameId, securingHolding]);
 
-  const handleRequestHandoff = useCallback(async (targetPlayerId: string) => {
-    if (!supabase || !gameId) return;
-    setBusy('handoff');
-    const { error } = await supabase.rpc('request_handoff', {
-      p_game_id: gameId,
-      p_target_player_id: targetPlayerId,
-    });
-    setBusy('');
-    if (error) {
-      setTagMessage(error.message);
-    } else {
-      setTagMessage('Handoff requested! Waiting for teammate to confirm...');
-      await loadState();
-    }
-  }, [gameId, loadState]);
+  const handleRequestHandoff = useCallback(
+    async (targetPlayerId: string) => {
+      if (!supabase || !gameId) return;
+      setBusy('handoff');
+      const { error } = await supabase.rpc('request_handoff', {
+        p_game_id: gameId,
+        p_target_player_id: targetPlayerId,
+      });
+      setBusy('');
+      if (error) {
+        setTagMessage(error.message);
+      } else {
+        setTagMessage('Handoff requested! Waiting for teammate to confirm...');
+        await loadState();
+      }
+    },
+    [gameId, loadState],
+  );
 
   const handleConfirmHandoff = useCallback(async () => {
     if (!supabase || !gameId) return;
@@ -1599,32 +1619,53 @@ export default function GameScreen() {
     if (!isRunner || !isLive || isFrozen || !ownFix || !isVipMode) return null;
     const oppositeRole = isVip ? 'bodyguard' : 'vip';
     const candidates = (state?.players ?? [])
-      .filter((p) => p.team === 'runner' && p.id !== myPlayerId && p.status === 'active' && p.secret_role === oppositeRole)
+      .filter(
+        (p) =>
+          p.team === 'runner' &&
+          p.id !== myPlayerId &&
+          p.status === 'active' &&
+          p.secret_role === oppositeRole,
+      )
       .map((p) => {
         const pos = (state?.positions ?? []).find((entry) => entry.player_id === p.id);
-        const dist = pos ? distanceM(ownFix, { longitude: pos.longitude, latitude: pos.latitude }) : Infinity;
+        const dist = pos
+          ? distanceM(ownFix, { longitude: pos.longitude, latitude: pos.latitude })
+          : Infinity;
         return { player: p, distance: dist };
       })
       .filter((c) => c.distance <= 5.0)
       .sort((a, b) => a.distance - b.distance);
     return candidates[0] ?? null;
-  }, [isRunner, isLive, isFrozen, ownFix, isVipMode, isVip, myPlayerId, state?.players, state?.positions]);
+  }, [
+    isRunner,
+    isLive,
+    isFrozen,
+    ownFix,
+    isVipMode,
+    isVip,
+    myPlayerId,
+    state?.players,
+    state?.positions,
+  ]);
 
-  const handleRequestRoleSwap = useCallback(async (targetPlayerId: string) => {
-    if (!supabase || !gameId) return;
-    setBusy('request_swap');
-    const { error } = await supabase.rpc('request_role_swap', {
-      p_game_id: gameId,
-      p_target_player_id: targetPlayerId,
-    });
-    setBusy('');
-    if (error) {
-      setTagMessage(error.message);
-    } else {
-      setTagMessage('Role swap requested! Waiting for teammate to confirm...');
-      await loadState();
-    }
-  }, [gameId, loadState]);
+  const handleRequestRoleSwap = useCallback(
+    async (targetPlayerId: string) => {
+      if (!supabase || !gameId) return;
+      setBusy('request_swap');
+      const { error } = await supabase.rpc('request_role_swap', {
+        p_game_id: gameId,
+        p_target_player_id: targetPlayerId,
+      });
+      setBusy('');
+      if (error) {
+        setTagMessage(error.message);
+      } else {
+        setTagMessage('Role swap requested! Waiting for teammate to confirm...');
+        await loadState();
+      }
+    },
+    [gameId, loadState],
+  );
 
   const handleConfirmRoleSwap = useCallback(async () => {
     if (!supabase || !gameId) return;
@@ -1674,7 +1715,9 @@ export default function GameScreen() {
       } catch {
         // ignore
       }
-      setTagMessage(`Rescue complete! ${(data as { freed_count?: number })?.freed_count ?? 1} runner(s) freed.`);
+      setTagMessage(
+        `Rescue complete! ${(data as { freed_count?: number })?.freed_count ?? 1} runner(s) freed.`,
+      );
       await loadState();
     }
   }, [gameId, loadState]);
@@ -1754,16 +1797,15 @@ export default function GameScreen() {
   const inPlay = ['head_start', 'live'].includes(game!.status);
   const tagRingData = isLive && !isRunner && ownFix ? circleRing(ownFix, game!.tag_radius_m) : null;
 
-  let eyebrow =
-    isAssassinRing
-      ? 'ASSASSIN RING'
-      : isRelayHeist
-        ? 'RELAY HEIST'
-        : game!.mode_id === 'jailbreak'
-          ? 'JAILBREAK'
-          : game!.mode === 'classic_chase'
-            ? 'CLASSIC CHASE'
-            : 'TAG HUNT';
+  let eyebrow = isAssassinRing
+    ? 'ASSASSIN RING'
+    : isRelayHeist
+      ? 'RELAY HEIST'
+      : game!.mode_id === 'jailbreak'
+        ? 'JAILBREAK'
+        : game!.mode === 'classic_chase'
+          ? 'CLASSIC CHASE'
+          : 'TAG HUNT';
   let title = '';
   let subtitle = '';
   let timerLabel = '';
@@ -1776,13 +1818,21 @@ export default function GameScreen() {
     timerLabel = 'COUNTDOWN';
     timerValue = game!.head_start_at ? (Date.parse(game!.head_start_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'head_start') {
-    accent = isAssassinRing ? '#D97706' : isRelayHeist ? '#059669' : isRunner ? '#059669' : '#B45309';
+    accent = isAssassinRing
+      ? '#D97706'
+      : isRelayHeist
+        ? '#059669'
+        : isRunner
+          ? '#059669'
+          : '#B45309';
     title = isAssassinRing ? 'Disperse' : isRunner ? 'Head start' : 'Hunters locked';
     subtitle = isAssassinRing
       ? 'Move away from other players. The ring activates when the timer reaches zero.'
       : isRelayHeist
         ? isRunner
-          ? (isCarrier ? 'You have the package! Move toward extraction or plan handoffs.' : 'Escort your carrier or prepare for a relay handoff.')
+          ? isCarrier
+            ? 'You have the package! Move toward extraction or plan handoffs.'
+            : 'Escort your carrier or prepare for a relay handoff.'
           : 'Hunters locked. The package and runners will activate when the countdown ends.'
         : isRunner
           ? 'Move away from the target and stay inside the play area. Hunters cannot see you yet.'
@@ -1790,7 +1840,13 @@ export default function GameScreen() {
     timerLabel = isRunner ? 'HUNTERS UNLOCK IN' : 'UNLOCKING IN';
     timerValue = game!.live_at ? (Date.parse(game!.live_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'live') {
-    accent = isAssassinRing ? '#D97706' : isRelayHeist ? (isRunner ? '#059669' : '#DC2626') : '#DB2777';
+    accent = isAssassinRing
+      ? '#D97706'
+      : isRelayHeist
+        ? isRunner
+          ? '#059669'
+          : '#DC2626'
+        : '#DB2777';
     title = isAssassinRing
       ? state?.assassin_ring?.my_prey
         ? `Hunt: ${state.assassin_ring.my_prey.display_name}`
@@ -1806,10 +1862,20 @@ export default function GameScreen() {
             ? 'Secure the dropped package!'
             : 'Intercept the carrier'
         : isRunner
-          ? (isVipMode
-              ? (isFrozen ? 'Frozen (Bodyguard Decoy)' : isVip ? 'VIP: Evade & Extract' : 'Bodyguard: Protect VIP')
-              : (isJailbreak ? 'Evade hunters & rescue' : 'Reach the target'))
-          : (isJailbreak ? 'Jail all runners' : isVipMode ? 'Hunt & eliminate the VIP' : 'Hunt the runners');
+          ? isVipMode
+            ? isFrozen
+              ? 'Frozen (Bodyguard Decoy)'
+              : isVip
+                ? 'VIP: Evade & Extract'
+                : 'Bodyguard: Protect VIP'
+            : isJailbreak
+              ? 'Evade hunters & rescue'
+              : 'Reach the target'
+          : isJailbreak
+            ? 'Jail all runners'
+            : isVipMode
+              ? 'Hunt & eliminate the VIP'
+              : 'Hunt the runners';
     subtitle = isAssassinRing
       ? state?.assassin_ring?.in_safe_zone
         ? 'You are inside a Safe Zone. Tagging is disabled.'
@@ -1829,27 +1895,32 @@ export default function GameScreen() {
             ? 'Hold package location for 20 seconds to secure and win!'
             : 'Track radar pings to find and tag the package carrier.'
         : isRunner
-          ? (isVipMode
-              ? (isFrozen
-                  ? `You were tagged! Frozen as a decoy for ${frozenRemainingS ?? 60}s.`
-                  : isVip
-                    ? 'Hunters win if they tag you! Stay protected and reach extraction.'
-                    : `Shield your VIP from hunters! ${distanceToVip !== null ? `VIP is ${Math.round(distanceToVip)}m away.` : ''}`)
-              : (isJailbreak ? 'Stay out of jail. Free captured teammates at the Jail marker.' : 'Your team is on the map. Hunters only get delayed pings of your position.'))
-          : (isJailbreak ? 'Tag runners to send them to Jail. Win by jailing all runners at once.' : isVipMode ? 'Identify and tag the secret VIP runner to win the round!' : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.');
+          ? isVipMode
+            ? isFrozen
+              ? `You were tagged! Frozen as a decoy for ${frozenRemainingS ?? 60}s.`
+              : isVip
+                ? 'Hunters win if they tag you! Stay protected and reach extraction.'
+                : `Shield your VIP from hunters! ${distanceToVip !== null ? `VIP is ${Math.round(distanceToVip)}m away.` : ''}`
+            : isJailbreak
+              ? 'Stay out of jail. Free captured teammates at the Jail marker.'
+              : 'Your team is on the map. Hunters only get delayed pings of your position.'
+          : isJailbreak
+            ? 'Tag runners to send them to Jail. Win by jailing all runners at once.'
+            : isVipMode
+              ? 'Identify and tag the secret VIP runner to win the round!'
+              : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.';
     timerLabel = 'TIME LEFT';
     timerValue = game!.ends_at ? (Date.parse(game!.ends_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'ended') {
     eyebrow = 'ROUND OVER';
     accent = isAssassinRing ? '#D97706' : game!.winner === 'runners' ? '#059669' : '#B91C1C';
-    title =
-      isAssassinRing
-        ? 'Ring Survivor Victory'
-        : game!.winner === 'runners'
-          ? 'Runners win'
-          : game!.winner === 'hunters'
-            ? 'Hunters win'
-            : 'Round over';
+    title = isAssassinRing
+      ? 'Ring Survivor Victory'
+      : game!.winner === 'runners'
+        ? 'Runners win'
+        : game!.winner === 'hunters'
+          ? 'Hunters win'
+          : 'Round over';
     subtitle =
       game!.end_reason === 'extraction_complete'
         ? 'The runners delivered the package to extraction!'
@@ -1859,17 +1930,17 @@ export default function GameScreen() {
             ? 'The final survivor won the elimination ring.'
             : game!.end_reason === 'all_jailed'
               ? 'All runners were jailed.'
-          : game!.end_reason === 'time_expired'
-            ? isAssassinRing
-              ? 'Time ran out. The assassin with the most eliminations wins.'
-              : 'Time ran out.'
-            : game!.end_reason === 'all_tagged'
-              ? 'Every runner was tagged.'
-              : game!.end_reason === 'all_hunters_left'
-                ? 'Every hunter left the round.'
-                : game!.end_reason === 'target_reached'
-                  ? 'A runner reached the secret target.'
-                  : 'This round has finished.';
+              : game!.end_reason === 'time_expired'
+                ? isAssassinRing
+                  ? 'Time ran out. The assassin with the most eliminations wins.'
+                  : 'Time ran out.'
+                : game!.end_reason === 'all_tagged'
+                  ? 'Every runner was tagged.'
+                  : game!.end_reason === 'all_hunters_left'
+                    ? 'Every hunter left the round.'
+                    : game!.end_reason === 'target_reached'
+                      ? 'A runner reached the secret target.'
+                      : 'This round has finished.';
   } else if (game!.status === 'cancelled') {
     eyebrow = 'ROUND CANCELLED';
     accent = '#64748B';
@@ -2525,14 +2596,22 @@ export default function GameScreen() {
                     ]}
                   >
                     <Text style={styles.operatorActionBtnText}>
-                      {busy === 'scan' ? 'SCANNING...' : operatorScanCooldown > 0 ? `COOLDOWN (${operatorScanCooldown}s)` : 'TRIGGER SCAN'}
+                      {busy === 'scan'
+                        ? 'SCANNING...'
+                        : operatorScanCooldown > 0
+                          ? `COOLDOWN (${operatorScanCooldown}s)`
+                          : 'TRIGGER SCAN'}
                     </Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
                     disabled={busy !== ''}
                     onPress={() => void placeTacticalMarker()}
-                    style={[styles.operatorActionBtn, { flex: 1, backgroundColor: '#0284C7' }, busy !== '' && styles.operatorActionBtnDisabled]}
+                    style={[
+                      styles.operatorActionBtn,
+                      { flex: 1, backgroundColor: '#0284C7' },
+                      busy !== '' && styles.operatorActionBtnDisabled,
+                    ]}
                   >
                     <Text style={styles.operatorActionBtnText}>
                       {busy === 'marker' ? 'PLACING...' : '+ MARKER'}
@@ -2542,7 +2621,9 @@ export default function GameScreen() {
 
                 {markers && markers.length > 0 && (
                   <View style={styles.operatorMarkerList}>
-                    <Text style={[styles.statLabel, { marginBottom: 4 }]}>ACTIVE TEAM MARKERS ({markers.length}/3)</Text>
+                    <Text style={[styles.statLabel, { marginBottom: 4 }]}>
+                      ACTIVE TEAM MARKERS ({markers.length}/3)
+                    </Text>
                     {markers.map((m) => (
                       <View key={m.id} style={styles.operatorMarkerItem}>
                         <Text style={styles.operatorMarkerLabel}>• {m.label}</Text>
@@ -2567,7 +2648,9 @@ export default function GameScreen() {
                   {busy === 'tag' ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.tagText}>{isAssassinRing ? 'TAG YOUR TARGET' : 'TAG A RUNNER'}</Text>
+                    <Text style={styles.tagText}>
+                      {isAssassinRing ? 'TAG YOUR TARGET' : 'TAG A RUNNER'}
+                    </Text>
                   )}
                 </Pressable>
                 <Text style={styles.tagHint}>
@@ -2647,7 +2730,12 @@ export default function GameScreen() {
                       onPressOut={() => void cancelRescueHold()}
                       style={[styles.rescueButton, rescueHolding && styles.rescueButtonHolding]}
                     >
-                      <View style={[styles.rescueProgressBar, { width: `${Math.round(rescueProgress * 100)}%` }]} />
+                      <View
+                        style={[
+                          styles.rescueProgressBar,
+                          { width: `${Math.round(rescueProgress * 100)}%` },
+                        ]}
+                      />
                       <Text style={styles.rescueButtonText}>
                         {rescueHolding
                           ? `HOLDING... ${Math.round(rescueProgress * 100)}%`
@@ -2664,7 +2752,11 @@ export default function GameScreen() {
                 {isRunner && isCarrier && (
                   <View style={styles.heistCarrierCard}>
                     <View style={styles.rescueHeaderRow}>
-                      <MaterialCommunityIcons color="#059669" name="package-variant-closed" size={20} />
+                      <MaterialCommunityIcons
+                        color="#059669"
+                        name="package-variant-closed"
+                        size={20}
+                      />
                       <Text style={styles.heistCarrierTitle}>YOU HAVE THE PACKAGE</Text>
                     </View>
                     <Text style={styles.heistCarrierSubtitle}>
@@ -2679,20 +2771,25 @@ export default function GameScreen() {
                             accessibilityLabel="Hand off package to teammate"
                             accessibilityRole="button"
                             disabled={busy !== ''}
-                            onPress={() => void handleRequestHandoff(nearestTeammateRunner.player.id)}
+                            onPress={() =>
+                              void handleRequestHandoff(nearestTeammateRunner.player.id)
+                            }
                             style={[styles.heistActionBtn, busy !== '' && styles.disabled]}
                           >
                             {busy === 'handoff' ? (
                               <ActivityIndicator color="#FFFFFF" />
                             ) : (
                               <Text style={styles.heistActionBtnText}>
-                                HAND OFF TO {nearestTeammateRunner.player.display_name.toUpperCase()}
+                                HAND OFF TO{' '}
+                                {nearestTeammateRunner.player.display_name.toUpperCase()}
                               </Text>
                             )}
                           </Pressable>
                         ) : (
                           <Text style={styles.rescueSubtitle}>
-                            Teammate {nearestTeammateRunner.player.display_name} is {Math.round(nearestTeammateRunner.distance)}m away (get within 5m to hand off).
+                            Teammate {nearestTeammateRunner.player.display_name} is{' '}
+                            {Math.round(nearestTeammateRunner.distance)}m away (get within 5m to
+                            hand off).
                           </Text>
                         )}
                       </View>
@@ -2832,7 +2929,11 @@ export default function GameScreen() {
                         accessibilityRole="button"
                         disabled={busy !== ''}
                         onPress={() => void handleConfirmRoleSwap()}
-                        style={[styles.vipSwapActionBtn, { flex: 1 }, busy !== '' && styles.disabled]}
+                        style={[
+                          styles.vipSwapActionBtn,
+                          { flex: 1 },
+                          busy !== '' && styles.disabled,
+                        ]}
                       >
                         {busy === 'confirm_swap' ? (
                           <ActivityIndicator color="#FFFFFF" />
@@ -2868,7 +2969,11 @@ export default function GameScreen() {
                       accessibilityRole="button"
                       disabled={busy !== ''}
                       onPress={() => void handleRequestRoleSwap(eligibleSwapPartner.player.id)}
-                      style={[styles.vipSwapActionBtn, busy !== '' && styles.disabled, { marginTop: 8 }]}
+                      style={[
+                        styles.vipSwapActionBtn,
+                        busy !== '' && styles.disabled,
+                        { marginTop: 8 },
+                      ]}
                     >
                       {busy === 'request_swap' ? (
                         <ActivityIndicator color="#FFFFFF" />
@@ -3006,7 +3111,10 @@ export default function GameScreen() {
                     styles.playerMeta,
                     player.status === 'jailed' && styles.playerJailed,
                     player.status === 'tagged' && styles.playerTagged,
-                    player.team === 'runner' && player.status !== 'tagged' && player.status !== 'jailed' && styles.playerRunner,
+                    player.team === 'runner' &&
+                      player.status !== 'tagged' &&
+                      player.status !== 'jailed' &&
+                      styles.playerRunner,
                   ]}
                 >
                   {player.status === 'jailed'
