@@ -7,6 +7,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Phase B: Milestone B2 — Assassin Ring Base Mode (docs/MODES.md §4.3)
+- **Base Mode Integration:**
+  - Added `assassin_ring` base mode enum, team type `'solo'`, and mode catalogue entry in `mode_catalogue()`.
+  - Added `assassin_ring` mode registry rules in `src/lib/modeRegistry.ts` and lobby selection in `app/create.tsx`.
+  - Added solo roster support and 3+ player threshold in `app/lobby/[id].tsx`.
+- **Server Authority & Secrecy:**
+  - Implemented circular Hamiltonian cycle contract permutation generation in `start_game` stored in `public.ring_assignments`.
+  - Zero-knowledge secrecy: RLS policy `ring_assignments_select` ensures each player only reads their assigned active prey. Stalker identity and ring layout remain hidden until the game concludes.
+  - Directionless proximity warnings: amber proximity warning when hunter $\le 100\text{ m}$, rapid red pulse when hunter $\le 40\text{ m}$.
+  - Safe zones: auto-places 2 safe zones (20 m radius) inside the boundary (host-adjustable via `set_safe_zone_location`). Tagging is disabled inside safe zones, and scheduled radar pings are masked.
+  - Contract relinking: eliminated players are removed from active play; their hunter inherits their prey contract ($P_{hunter} \to P_{prey's\_prey}$).
+  - Win conditions: last survivor wins (`winner = 'solo'`, `end_reason = 'last_survivor'`), or timeout with most eliminations.
+  - Offline inactivity timeout: automatically eliminates players who stop sending position fixes for > 3 minutes while live and relinks the contract ring.
+- **Client & HUD:**
+  - HUD displays assigned prey profile, status, and live directional tracking against prey.
+  - Added hunter proximity sensory warning indicator and haptic feedback.
+  - Safe zone visual indicators and tag disabled banner.
+  - Results screen support for solo winners and `last_survivor` outcome.
+- **Verification:**
+  - Passed `npm run sim assassin-ring` and full simulator suite (`npm run sim`).
+  - Added 13 dedicated Assassin Ring access and secrecy checks in `scripts/rls-check.ts` (100% pass).
+
 ### Phase B: Milestone B1 — Jailbreak Base Mode (docs/MODES.md §4.1)
 - **Base Mode Integration:**
   - Added `jailbreak` base mode enum and registry entry in `src/lib/modeRegistry.ts` and `app/create.tsx`.

@@ -79,7 +79,7 @@ const MAP_STYLE =
 
 let gameSheetDragStartY = 0;
 
-type Team = 'runner' | 'hunter' | 'unassigned';
+type Team = 'runner' | 'hunter' | 'solo' | 'unassigned';
 type Phase =
   'lobby' | 'target_selection' | 'countdown' | 'head_start' | 'live' | 'ended' | 'cancelled';
 
@@ -157,7 +157,7 @@ type RoundState = {
     live_at: string | null;
     ends_at: string | null;
     next_ping_at: string | null;
-    winner: 'runners' | 'hunters' | null;
+    winner: 'runners' | 'hunters' | 'solo' | null;
     end_reason: string | null;
     area: LngLat & {
       radius_m: number;
@@ -187,16 +187,34 @@ type RoundState = {
   heat_marks?: HeatMark[];
   heat_charges?: number | null;
   events?: GameEvent[];
+  assassin_ring?: {
+    my_prey: {
+      player_id: string;
+      display_name: string;
+      color: string;
+      status: string;
+    } | null;
+    hunter_proximity: 'none' | 'near' | 'close';
+    safe_zones: {
+      id: string;
+      zone_index: number;
+      longitude: number;
+      latitude: number;
+      radius_m: number;
+    }[];
+    in_safe_zone: boolean;
+    active_survivors: number;
+  } | null;
 };
 
 type SharingState = 'idle' | 'starting' | 'on' | 'denied' | 'error';
 
 type TagResult = {
   success: boolean;
-  reason?: 'cooldown' | 'stale_position' | 'no_target';
+  reason?: 'cooldown' | 'stale_position' | 'no_target' | 'in_safe_zone' | 'no_prey_assigned';
   runner_id?: string;
   phase?: Phase;
-  winner?: 'runners' | 'hunters' | null;
+  winner?: 'runners' | 'hunters' | 'solo' | null;
   end_reason?: string | null;
 };
 
@@ -945,20 +963,25 @@ export default function GameScreen() {
     if (result.success) {
       playSound('tag');
       const isJb = state?.game.mode_id === 'jailbreak';
+      const isAr = state?.game.mode_id === 'assassin_ring';
       setTagMessage(
         result.phase === 'ended'
-          ? (isJb ? 'All runners jailed! Round over.' : 'Tag confirmed. The round is over.')
-          : (isJb ? 'Runner jailed!' : 'Tag confirmed.'),
+          ? (isJb ? 'All runners jailed! Round over.' : isAr ? 'Last survivor standing! Victory!' : 'Tag confirmed. The round is over.')
+          : (isJb ? 'Runner jailed!' : isAr ? 'Target eliminated! New prey assigned.' : 'Tag confirmed.'),
       );
       await loadState();
       return;
     }
     setTagMessage(
-      result.reason === 'cooldown'
-        ? 'Tag cooldown. Try again in a few seconds.'
-        : result.reason === 'stale_position'
-          ? 'Waiting for a fresh GPS fix before tagging.'
-          : 'No runner in range.',
+      result.reason === 'in_safe_zone'
+        ? 'Inside Safe Zone. Tagging is disabled.'
+        : result.reason === 'cooldown'
+          ? 'Tag cooldown. Try again in a few seconds.'
+          : result.reason === 'stale_position'
+            ? 'Waiting for a fresh GPS fix before tagging.'
+            : state?.game.mode_id === 'assassin_ring'
+              ? 'Target not in range.'
+              : 'No runner in range.',
     );
   }
 
@@ -1116,6 +1139,7 @@ export default function GameScreen() {
   }, [jailLongitude, jailLatitude]);
 
   const isJailbreak = state?.game?.mode_id === 'jailbreak';
+  const isAssassinRing = state?.game?.mode_id === 'assassin_ring';
   const isLive = state?.game?.status === 'live';
   const jailedSelf = selfPlayer?.status === 'jailed';
   const autoReleaseS =
@@ -1124,6 +1148,34 @@ export default function GameScreen() {
     (state?.game?.mode_params?.jailbreak as { release_radius_m?: number } | undefined)?.release_radius_m ?? 10;
   const releaseHoldS =
     (state?.game?.mode_params?.jailbreak as { release_hold_s?: number } | undefined)?.release_hold_s ?? 10;
+
+  const safeZones = state?.assassin_ring?.safe_zones;
+  const safeZonesData = useMemo(() => {
+    if (!safeZones || safeZones.length === 0) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: safeZones.map((sz) =>
+        circleRing({ longitude: sz.longitude, latitude: sz.latitude }, sz.radius_m),
+      ),
+    };
+  }, [safeZones]);
+
+  const hunterProximity = state?.assassin_ring?.hunter_proximity;
+  useEffect(() => {
+    if (hunterProximity === 'close') {
+      try {
+        Vibration.vibrate([0, 300, 150, 300]);
+      } catch {
+        // ignore
+      }
+    } else if (hunterProximity === 'near') {
+      try {
+        Vibration.vibrate([0, 200]);
+      } catch {
+        // ignore
+      }
+    }
+  }, [hunterProximity]);
 
   const jailedRemainingS = useMemo(() => {
     if (!jailedSelf || !selfPlayer?.jailed_at) return null;
@@ -1135,13 +1187,10 @@ export default function GameScreen() {
     return (state?.players ?? []).filter((p) => p.team === 'runner' && p.status === 'jailed');
   }, [state?.players]);
 
-  const distanceToJail = useMemo(() => {
-    if (!ownFix || jailLongitude === undefined || jailLatitude === undefined) return null;
-    return distanceM(ownFix, {
-      longitude: jailLongitude,
-      latitude: jailLatitude,
-    });
-  }, [ownFix, jailLongitude, jailLatitude]);
+  const distanceToJail =
+    ownFix && jailLongitude !== undefined && jailLatitude !== undefined
+      ? distanceM(ownFix, { longitude: jailLongitude, latitude: jailLatitude })
+      : null;
 
   const canRescue =
     isRunner &&
@@ -1252,11 +1301,13 @@ export default function GameScreen() {
   const tagRingData = isLive && !isRunner && ownFix ? circleRing(ownFix, game!.tag_radius_m) : null;
 
   let eyebrow =
-    game!.mode_id === 'jailbreak'
-      ? 'JAILBREAK'
-      : game!.mode === 'classic_chase'
-        ? 'CLASSIC CHASE'
-        : 'TAG HUNT';
+    isAssassinRing
+      ? 'ASSASSIN RING'
+      : game!.mode_id === 'jailbreak'
+        ? 'JAILBREAK'
+        : game!.mode === 'classic_chase'
+          ? 'CLASSIC CHASE'
+          : 'TAG HUNT';
   let title = '';
   let subtitle = '';
   let timerLabel = '';
@@ -1269,42 +1320,64 @@ export default function GameScreen() {
     timerLabel = 'COUNTDOWN';
     timerValue = game!.head_start_at ? (Date.parse(game!.head_start_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'head_start') {
-    accent = isRunner ? '#059669' : '#B45309';
-    title = isRunner ? 'Head start' : 'Hunters locked';
-    subtitle = isRunner
-      ? 'Move away from the target and stay inside the play area. Hunters cannot see you yet.'
-      : 'The runners are moving. The map unlocks when the timer reaches zero.';
+    accent = isAssassinRing ? '#D97706' : isRunner ? '#059669' : '#B45309';
+    title = isAssassinRing ? 'Disperse' : isRunner ? 'Head start' : 'Hunters locked';
+    subtitle = isAssassinRing
+      ? 'Move away from other players. The ring activates when the timer reaches zero.'
+      : isRunner
+        ? 'Move away from the target and stay inside the play area. Hunters cannot see you yet.'
+        : 'The runners are moving. The map unlocks when the timer reaches zero.';
     timerLabel = isRunner ? 'HUNTERS UNLOCK IN' : 'UNLOCKING IN';
     timerValue = game!.live_at ? (Date.parse(game!.live_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'live') {
-    accent = '#DB2777';
-    title = isRunner ? (isJailbreak ? 'Evade hunters & rescue' : 'Reach the target') : (isJailbreak ? 'Jail all runners' : 'Hunt the runners');
-    subtitle = isRunner
-      ? (isJailbreak ? 'Stay out of jail. Free captured teammates at the Jail marker.' : 'Your team is on the map. Hunters only get delayed pings of your position.')
-      : (isJailbreak ? 'Tag runners to send them to Jail. Win by jailing all runners at once.' : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.');
+    accent = isAssassinRing ? '#D97706' : '#DB2777';
+    title = isAssassinRing
+      ? state?.assassin_ring?.my_prey
+        ? `Hunt: ${state.assassin_ring.my_prey.display_name}`
+        : 'Hunt your assigned prey'
+      : isRunner
+        ? (isJailbreak ? 'Evade hunters & rescue' : 'Reach the target')
+        : (isJailbreak ? 'Jail all runners' : 'Hunt the runners');
+    subtitle = isAssassinRing
+      ? state?.assassin_ring?.in_safe_zone
+        ? 'You are inside a Safe Zone. Tagging is disabled.'
+        : state?.assassin_ring?.hunter_proximity === 'close'
+          ? 'WARNING: YOUR HUNTER IS WITHIN 40m!'
+          : state?.assassin_ring?.hunter_proximity === 'near'
+            ? 'CAUTION: Your hunter is within 100m.'
+            : 'Track your assigned prey. Stay alert for your unknown hunter.'
+      : isRunner
+        ? (isJailbreak ? 'Stay out of jail. Free captured teammates at the Jail marker.' : 'Your team is on the map. Hunters only get delayed pings of your position.')
+        : (isJailbreak ? 'Tag runners to send them to Jail. Win by jailing all runners at once.' : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.');
     timerLabel = 'TIME LEFT';
     timerValue = game!.ends_at ? (Date.parse(game!.ends_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'ended') {
     eyebrow = 'ROUND OVER';
-    accent = game!.winner === 'runners' ? '#059669' : '#B91C1C';
+    accent = isAssassinRing ? '#D97706' : game!.winner === 'runners' ? '#059669' : '#B91C1C';
     title =
-      game!.winner === 'runners'
-        ? 'Runners win'
-        : game!.winner === 'hunters'
-          ? 'Hunters win'
-          : 'Round over';
+      isAssassinRing
+        ? 'Ring Survivor Victory'
+        : game!.winner === 'runners'
+          ? 'Runners win'
+          : game!.winner === 'hunters'
+            ? 'Hunters win'
+            : 'Round over';
     subtitle =
-      game!.end_reason === 'all_jailed'
-        ? 'All runners were jailed.'
-        : game!.end_reason === 'time_expired'
-          ? 'Time ran out.'
-          : game!.end_reason === 'all_tagged'
-            ? 'Every runner was tagged.'
-            : game!.end_reason === 'all_hunters_left'
-              ? 'Every hunter left the round.'
-              : game!.end_reason === 'target_reached'
-                ? 'A runner reached the secret target.'
-                : 'This round has finished.';
+      game!.end_reason === 'last_survivor'
+        ? 'The final survivor won the elimination ring.'
+        : game!.end_reason === 'all_jailed'
+          ? 'All runners were jailed.'
+          : game!.end_reason === 'time_expired'
+            ? isAssassinRing
+              ? 'Time ran out. The assassin with the most eliminations wins.'
+              : 'Time ran out.'
+            : game!.end_reason === 'all_tagged'
+              ? 'Every runner was tagged.'
+              : game!.end_reason === 'all_hunters_left'
+                ? 'Every hunter left the round.'
+                : game!.end_reason === 'target_reached'
+                  ? 'A runner reached the secret target.'
+                  : 'This round has finished.';
   } else if (game!.status === 'cancelled') {
     eyebrow = 'ROUND CANCELLED';
     accent = '#64748B';
@@ -1553,6 +1626,25 @@ export default function GameScreen() {
             />
           </GeoJSONSource>
         )}
+
+        {safeZonesData && (
+          <GeoJSONSource id="safe-zones" data={safeZonesData}>
+            <Layer
+              id="safe-zones-fill"
+              type="fill"
+              paint={{ 'fill-color': '#10B981', 'fill-opacity': 0.15 }}
+            />
+            <Layer
+              id="safe-zones-outline"
+              type="line"
+              paint={{
+                'line-color': '#059669',
+                'line-width': 2,
+                'line-dasharray': [3, 2],
+              }}
+            />
+          </GeoJSONSource>
+        )}
       </MapLibreMap>
 
       <HeatOverlay
@@ -1731,9 +1823,9 @@ export default function GameScreen() {
                 {sheetExpanded ? '▼ Slide down to minimize' : '▲ Slide up to view'}
               </Animated.Text>
             </View>
-            {isLive && !isRunner && !taggedSelf && (
+            {isLive && (!isRunner || isAssassinRing) && !taggedSelf && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                {(game?.modifiers ?? []).includes('hot_cold') && (
+                {!isAssassinRing && (game?.modifiers ?? []).includes('hot_cold') && (
                   <HeatButton
                     gameId={gameId}
                     charges={state?.heat_charges ?? 6}
@@ -1792,7 +1884,7 @@ export default function GameScreen() {
           style={[styles.sheetInner, { opacity: sheetContentOpacity }]}
         >
           <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetContent}>
-            {isLive && !isRunner && !taggedSelf && (
+            {isLive && (!isRunner || isAssassinRing) && !taggedSelf && (
               <>
                 <Pressable
                   accessibilityRole="button"
@@ -1803,12 +1895,13 @@ export default function GameScreen() {
                   {busy === 'tag' ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.tagText}>TAG A RUNNER</Text>
+                    <Text style={styles.tagText}>{isAssassinRing ? 'TAG YOUR TARGET' : 'TAG A RUNNER'}</Text>
                   )}
                 </Pressable>
                 <Text style={styles.tagHint}>
-                  Get within {game!.tag_radius_m} m of a runner and tap. Both positions must be
-                  fresh.
+                  {isAssassinRing
+                    ? `Get within ${game!.tag_radius_m} m of your assigned prey and tap. Safe zones disable tagging.`
+                    : `Get within ${game!.tag_radius_m} m of a runner and tap. Both positions must be fresh.`}
                 </Text>
                 {tagMessage !== '' && <Text style={styles.tagMessage}>{tagMessage}</Text>}
               </>

@@ -90,7 +90,36 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Verify auto-release: an unrescued prisoner is freed automatically after 300 seconds.
   - [ ] Verify shrinking zone safety: if an active safe zone shrinks past the jail perimeter, all prisoners are evacuated automatically.
 
-### 3.5 Modifiers Checklists
+### 3.5 Assassin Ring Base Mode (docs/MODES.md §4.3)
+* **Recommended Group:** 6–16 players (minimum 3 players).
+* **Setting:** Campus, sprawling park, or urban neighborhood with defined boundaries (radius 400–800 m).
+* **Pre-Flight & Setup:**
+  - [ ] Host selects **Assassin Ring** mode on game creation.
+  - [ ] In the lobby, verify that team assignment toggles are suppressed; all players join the solo roster.
+  - [ ] Verify that starting with fewer than 3 players is blocked by the server with a clear minimum player prompt.
+  - [ ] Confirm two safe zones (20 m radius) are auto-generated on the map, with host option to adjust placement in the lobby.
+* **Phase & Play Dynamic:**
+  - [ ] 10-second countdown initiates. The server generates a circular Hamiltonian cycle contract permutation in `ring_assignments`.
+  - [ ] Verify zero-knowledge secrecy: each player's HUD only reveals their assigned prey's display name and color. Their hunter's identity and bearing remain completely hidden.
+  - [ ] Scheduled radar pings display only the player's active prey location.
+  - [ ] Proximity warnings:
+    - [ ] Approaching within 100 m of your target (or your hunter approaching within 100 m of you) triggers an amber pulse.
+    - [ ] Closing to striking distance ($\le 40\text{ m}$) triggers an urgent red pulse and distinct sensory vibration.
+  - [ ] Safe Zone Shelter:
+    - [ ] Stepping inside a safe zone displays the "In Safe Zone" shield banner.
+    - [ ] Attempting a tag from inside (or against a target inside) a safe zone is rejected with an `in_safe_zone` status.
+    - [ ] Scheduled radar pings are masked while sheltering in safe zones.
+  - [ ] Elimination & Relinking:
+    - [ ] When outside safe zones and within tag radius ($\le 15\text{ m}$), pressing Tag eliminates the prey.
+    - [ ] The eliminated prey transitions to spectator/eliminated HUD.
+    - [ ] The hunter's HUD immediately updates to their prey's former target ($P_{hunter} \to P_{prey's\_prey}$).
+* **Victory & Fail-Safes:**
+  - [ ] Final two players face off in an intense duel.
+  - [ ] Tagging the final prey terminates the game immediately with **Solo Victory (`last_survivor`)**.
+  - [ ] If round duration expires, player with the highest elimination count wins (`time_expired`).
+  - [ ] Inactivity fail-safe: any player who stops transmitting location fixes for > 3 minutes while live is auto-eliminated for offline timeout, and the contract ring relinks seamlessly around them.
+
+### 3.6 Modifiers Checklists
 - [ ] **Noise Meter:**
   - Fast running / sprinting smoothly increases loudness toward 100.
   - Crossing 60 sends a `noise_spark` alert to hunters.

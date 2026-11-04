@@ -77,6 +77,14 @@
 * **Proximity Threat:** Ghosts emit radar anomalies to living runners. If a runner steps within $12\text{ m}$ of a ghost entity, they suffer an immediate haunted tag.
 * **Stealth Invisibility:** Ghost entities are rendered invisible to hunters, forcing runners to navigate both the human pursuit and spectral hazards.
 
+### 6. Assassin Ring (Circular Contract Hunt)
+* **The Mission:** A circular Hamiltonian cycle of contracts ($P_1 \to P_2 \to P_3 \to \dots \to P_n \to P_1$). Every player is simultaneously a hunter stalking their assigned prey and a target running from an unknown assassin behind them.
+* **Solo Free-For-All:** Supports 3+ players (recommended 6–16). No teams—every player plays as `solo`.
+* **Zero-Knowledge Secrecy:** Players are only shown their active prey's profile and scheduled radar pings. Their hunter's identity and bearing remain completely hidden.
+* **Directionless Proximity Pulse:** When a player's hunter approaches within $100\text{ m}$, an amber proximity warning pulses. If the hunter enters urgent striking distance ($\le 40\text{ m}$), a rapid red haptic pulse sounds.
+* **Safe Zones (Shelter):** Two safe zones are auto-placed inside the play boundary (or customized by the host). Inside safe zones, tagging is disabled, and scheduled radar pings are masked.
+* **Contract Relinking & Victory:** Tagging your assigned prey eliminates them and immediately transfers their prey contract to you ($P_{hunter} \to P_{prey's\_prey}$). The last survivor standing wins the round (`winner = 'solo'`, `end_reason = 'last_survivor'`).
+
 ---
 
 ## 🎛️ Modifiers (Stackable Match Dynamics)
