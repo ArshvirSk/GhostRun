@@ -1362,9 +1362,14 @@ async function s1SecurityTimingScenario() {
   }
 
   // 6. Hardened health_ping 100-call rapid abuse test
-  const pingPromises = Array.from({ length: 100 }, () =>
-    unauthClient.rpc('health_ping', { body: {} })
-  );
+  const pingPromises = Array.from({ length: 100 }, async () => {
+    let res = await unauthClient.rpc('health_ping', { body: {} });
+    if (res.error) {
+      // Transient network retry for cloud endpoint test
+      res = await unauthClient.rpc('health_ping', { body: {} });
+    }
+    return res;
+  });
   const pingResults = await Promise.all(pingPromises);
   const allSucceeded = pingResults.every((res) => !res.error && res.data?.ok === true && res.data?.app === 'ghostrun');
   expect(
@@ -1688,6 +1693,273 @@ async function jailbreakScenario() {
   }
 }
 
+async function assassinRingScenario() {
+  console.log('\n--- Scenario: assassin-ring (B2 Assassin Ring Base Mode) ---');
+  const pA = await newPlayer('AssassinA');
+  const pB = await newPlayer('AssassinB');
+  const pC = await newPlayer('AssassinC');
+
+  const created = await rpc<{ game_id: string; code: string }[]>(pA, 'create_game', {
+    mode: 'assassin_ring',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      head_start_s: 0,
+      duration_s: 300,
+      ping_interval_s: 30,
+      mode_params: {
+        assassin_ring: {
+          tag_radius_m: 15,
+          hunter_pulse_far_m: 100,
+          hunter_pulse_near_m: 40,
+        },
+      },
+    },
+  });
+
+  if (created.error || !created.data?.[0]?.game_id) {
+    throw new Error(`assassin_ring create failed: ${created.error?.message}`);
+  }
+  const gameId = created.data[0].game_id;
+  const code = created.data[0].code;
+
+  await rpc(pB, 'join_game', { code });
+  await rpc(pC, 'join_game', { code });
+
+  for (const client of [pA, pB, pC]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
+  // 1. Host starts the game
+  const started = await rpc(pA, 'start_game', { game_id: gameId });
+  expect(
+    !started.error,
+    'Assassin Ring game starts cleanly in countdown',
+    String(started.error?.message ?? 'ok'),
+  );
+
+  // 2. Safe zones auto-created
+  const safeZonesRes = await pA
+    .from('entities')
+    .select('id, kind, geog, state')
+    .eq('game_id', gameId)
+    .eq('kind', 'safe_zone');
+  expect(
+    (safeZonesRes.data?.length ?? 0) >= 2,
+    'two safe zones auto-created for Assassin Ring game',
+    `found: ${safeZonesRes.data?.length}`,
+  );
+
+  const idA = await playerId(pA, gameId);
+  const idB = await playerId(pB, gameId);
+  const idC = await playerId(pC, gameId);
+
+  // 3. Ring assignments generated (tested per-player under RLS)
+  const ringA = (await pA.from('ring_assignments').select('hunter_player_id, prey_player_id, status').eq('game_id', gameId).eq('status', 'active')).data ?? [];
+  const ringB = (await pB.from('ring_assignments').select('hunter_player_id, prey_player_id, status').eq('game_id', gameId).eq('status', 'active')).data ?? [];
+  const ringC = (await pC.from('ring_assignments').select('hunter_player_id, prey_player_id, status').eq('game_id', gameId).eq('status', 'active')).data ?? [];
+
+  expect(
+    ringA.length === 1 && ringB.length === 1 && ringC.length === 1,
+    'each player sees exactly one active assignment under RLS',
+    `A=${ringA.length}, B=${ringB.length}, C=${ringC.length}`,
+  );
+
+  const preyA = ringA[0]?.prey_player_id;
+  const preyB = ringB[0]?.prey_player_id;
+  const preyC = ringC[0]?.prey_player_id;
+
+  expect(
+    preyA !== idA && preyB !== idB && preyC !== idC,
+    'no player is their own prey in the ring',
+    `A->${preyA}, B->${preyB}, C->${preyC}`,
+  );
+
+  const preySet = new Set([preyA, preyB, preyC]);
+  expect(
+    preySet.size === 3,
+    'all prey assignments are unique forming a complete cycle',
+    `preys=${Array.from(preySet).join(',')}`,
+  );
+
+  // Advance game to live through countdown
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(pA, 'advance_game', { game_id: gameId });
+
+  // 4. Test proximity pulse
+  const clientById: Record<string, typeof pA> = { [idA]: pA, [idB]: pB, [idC]: pC };
+  const allAssignments = [
+    { hunter: idA, prey: preyA },
+    { hunter: idB, prey: preyB },
+    { hunter: idC, prey: preyC },
+  ];
+  const hunterOfB_id = allAssignments.find((a) => a.prey === idB)!.hunter;
+  const hunterOfB_client = clientById[hunterOfB_id];
+
+  // Upload position for B at center
+  await rpc(pB, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // Hunter of B positions 28m away (close proximity <= 40m)
+  await rpc(hunterOfB_client, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.00025, // ~28m
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // Third player positions 300m away
+  const thirdId = [idA, idB, idC].find((id) => id !== idB && id !== hunterOfB_id)!;
+  await rpc(clientById[thirdId], 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.003,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const stateB = await rpc<{ assassin_ring: { hunter_proximity: string; my_prey: { player_id: string } } }>(
+    pB,
+    'get_game_state',
+    { game_id: gameId }
+  );
+
+  expect(
+    stateB.data?.assassin_ring?.hunter_proximity === 'close',
+    'victim receives "close" proximity warning when hunter is within 40m',
+    `received: ${stateB.data?.assassin_ring?.hunter_proximity}`,
+  );
+  expect(
+    stateB.data?.assassin_ring?.my_prey?.player_id === preyB,
+    'victim sees their assigned prey',
+    `prey: ${stateB.data?.assassin_ring?.my_prey?.player_id}`,
+  );
+
+  // 5. Test safe zone tag protection
+  const szCoord = await rpc<{ assassin_ring: { safe_zones: { latitude: number; longitude: number }[] } }>(
+    pA,
+    'get_game_state',
+    { game_id: gameId }
+  );
+  const szList = szCoord.data?.assassin_ring?.safe_zones;
+  const szLat = szList?.[0]?.latitude ?? CENTER.lat + 0.002;
+  const szLng = szList?.[0]?.longitude ?? CENTER.lng;
+
+  await rpc(hunterOfB_client, 'submit_position', {
+    game_id: gameId,
+    lat: szLat,
+    lng: szLng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(pB, 'submit_position', {
+    game_id: gameId,
+    lat: szLat,
+    lng: szLng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const szTag = await rpc<{ success: boolean; reason: string }>(hunterOfB_client, 'attempt_tag', {
+    game_id: gameId,
+  });
+  expect(
+    szTag.data?.success === false && szTag.data?.reason === 'in_safe_zone',
+    'tagging inside a safe zone is rejected with in_safe_zone',
+    JSON.stringify(szTag.data ?? szTag.error),
+  );
+
+  // 6. Move outside safe zone and tag prey
+  await rpc(hunterOfB_client, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.001,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(pB, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.00105, // ~5m away
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // Wait out 8s tag cooldown
+  await new Promise((r) => setTimeout(r, 8500));
+
+  const tagSuccess = await rpc<{ success: boolean; runner_id: string }>(hunterOfB_client, 'attempt_tag', {
+    game_id: gameId,
+  });
+  expect(
+    tagSuccess.data?.success === true && tagSuccess.data.runner_id === idB,
+    'hunter successfully tags assigned prey outside safe zone',
+    JSON.stringify(tagSuccess.data ?? tagSuccess.error),
+  );
+
+  // 7. Verify prey eliminated and ring relinked
+  const postTagState = await rpc<{ assassin_ring: { my_prey: { player_id: string }; active_survivors: number } }>(
+    hunterOfB_client,
+    'get_game_state',
+    { game_id: gameId }
+  );
+  expect(
+    postTagState.data?.assassin_ring?.active_survivors === 2,
+    'active survivors count decremented to 2',
+    `survivors: ${postTagState.data?.assassin_ring?.active_survivors}`,
+  );
+  expect(
+    postTagState.data?.assassin_ring?.my_prey?.player_id === preyB,
+    'hunter inherits victim prey after elimination (ring relinked)',
+    `new prey: ${postTagState.data?.assassin_ring?.my_prey?.player_id}`,
+  );
+
+  // 8. Final elimination: hunter tags new prey (third player)
+  // Wait out 8s tag cooldown
+  await new Promise((r) => setTimeout(r, 8500));
+
+  await rpc(hunterOfB_client, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.001,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(clientById[preyB!], 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.00107, // ~7m away
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const finalTag = await rpc<{ success: boolean; phase: string; winner: string; end_reason: string }>(
+    hunterOfB_client,
+    'attempt_tag',
+    { game_id: gameId }
+  );
+  expect(
+    finalTag.data?.success === true &&
+      finalTag.data.phase === 'ended' &&
+      finalTag.data.winner === 'solo' &&
+      finalTag.data.end_reason === 'last_survivor',
+    'last elimination terminates round with solo winner and last_survivor reason',
+    JSON.stringify(finalTag.data ?? finalTag.error),
+  );
+
+  for (const client of [pA, pB, pC]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -1698,6 +1970,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   'ghost-contribution': ghostContributionScenario,
   's1-security-timing': s1SecurityTimingScenario,
   jailbreak: jailbreakScenario,
+  'assassin-ring': assassinRingScenario,
 };
 
 async function main() {

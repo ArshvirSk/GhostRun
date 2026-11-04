@@ -5,7 +5,7 @@
  * can render the same configuration without duplicating validation.
  */
 
-export type TeamId = 'runner' | 'hunter';
+export type TeamId = 'runner' | 'hunter' | 'solo';
 
 export type ModeDefinition = {
   id: string;
@@ -126,6 +126,31 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       },
       enabled: true,
     },
+    {
+      id: 'assassin_ring',
+      layer: 'base',
+      name: 'Assassin Ring',
+      teams: ['solo'],
+      min_players: 3,
+      compatible_roles: [],
+      compatible_modifiers: [
+        'noise_meter',
+        'dead_drops',
+        'qr_tagging',
+        'shrinking_zone',
+      ],
+      parameters: {
+        tag_radius_m: 15,
+        safe_zone_count: 2,
+        safe_zone_radius_m: 20,
+        safe_zone_max_s: 60,
+        safe_zone_cooldown_s: 120,
+        hunter_pulse_far_m: 100,
+        hunter_pulse_near_m: 40,
+        offline_relink_s: 180,
+      },
+      enabled: true,
+    },
   ],
   modifiers: [
     { id: 'noise_meter', layer: 'modifier', name: 'Noise Meter', parameters: {}, enabled: true },
@@ -202,6 +227,12 @@ export const BASE_MODE_RULES: Record<string, string[]> = {
     'Tagged runners are sent to Jail instead of elimination.',
     'Free runners can rescue all jailed teammates by holding within 10 m of the jail for 10 s.',
     'Hunters win if all runners are jailed simultaneously.',
+  ],
+  assassin_ring: [
+    'Free-for-all circular elimination ring. Each player hunts their assigned prey.',
+    'You only see radar pings of your assigned prey.',
+    'A sensory warning alerts you when your unknown hunter enters within 100 m or 40 m.',
+    'Tagging your prey eliminates them and passes their target to you. Last survivor wins.',
   ],
 };
 

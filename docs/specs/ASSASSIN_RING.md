@@ -1,6 +1,7 @@
 # B2 — Assassin Ring Mode Specification
 
-> **Status:** Draft — awaiting host approval before any code is written.
+> **Status:** Approved — implementing Phase B Milestone B2.
+> **Decisions resolved:** D9 (auto-generate 2 safe zones with lobby editing), D10 (allow 3+ players, UI recommends 6–16), D11 (standard spectator mode on elimination).
 > **MODES.md reference:** Section 4.3 (lines 423–447), compatibility matrix §2.3 (line 143), mode framework §2.1–2.2.
 > **Effort estimate:** M (1–2 weeks).
 

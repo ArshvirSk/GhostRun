@@ -45,6 +45,13 @@ type LobbyGame = {
     longitude: number;
     radius_m: number;
   } | null;
+  safe_zones?: {
+    id: string;
+    latitude: number;
+    longitude: number;
+    radius_m: number;
+    zone_index: number;
+  }[];
   area_center?: { latitude: number; longitude: number } | [number, number];
   area_radius_m?: number;
 };
@@ -157,12 +164,14 @@ export default function LobbyScreen() {
     () => state?.players.filter((player) => player.status === 'active') ?? [],
     [state],
   );
-  const hasBothTeams =
-    activePlayers.some((player) => player.team === 'runner') &&
-    activePlayers.some((player) => player.team === 'hunter');
+  const isAssassinRing = state?.game.mode_id === 'assassin_ring';
+  const hasBothTeams = isAssassinRing
+    ? activePlayers.length >= 3
+    : activePlayers.some((player) => player.team === 'runner') &&
+      activePlayers.some((player) => player.team === 'hunter');
   const everyoneReady =
-    activePlayers.length >= 2 && activePlayers.every((player) => player.is_ready);
-  const everyoneAssigned = activePlayers.every((player) => player.team !== 'unassigned');
+    activePlayers.length >= (isAssassinRing ? 3 : 2) && activePlayers.every((player) => player.is_ready);
+  const everyoneAssigned = isAssassinRing ? true : activePlayers.every((player) => player.team !== 'unassigned');
   const isJailbreak = state?.game.mode_id === 'jailbreak';
   const jailPlaced = Boolean(state?.game.jail);
   const canStart = hasBothTeams && everyoneAssigned && (!isJailbreak || jailPlaced);
@@ -637,11 +646,13 @@ export default function LobbyScreen() {
               {player.user_id === userId && <Text style={styles.playerYou}>(you)</Text>}
             </View>
             <Text style={styles.playerSub}>
-              {player.team === 'unassigned'
-                ? 'Choose a team'
-                : player.team === 'runner'
-                  ? 'Runner'
-                  : 'Hunter'}{' '}
+              {isAssassinRing
+                ? 'Assassin'
+                : player.team === 'unassigned'
+                  ? 'Choose a team'
+                  : player.team === 'runner'
+                    ? 'Runner'
+                    : 'Hunter'}{' '}
               · {player.is_ready ? 'Ready' : 'Not ready'}
             </Text>
           </View>
@@ -665,7 +676,7 @@ export default function LobbyScreen() {
               </View>
             ) : (
               <>
-                {(player.user_id === userId || isHost) && (
+                {!isAssassinRing && (player.user_id === userId || isHost) && (
                   <>
                     <TeamButton
                       label="R"
@@ -778,7 +789,9 @@ export default function LobbyScreen() {
           </Pressable>
           <Text style={styles.modeNote}>
             {!hasBothTeams
-              ? 'Assign at least one runner and one hunter before starting.'
+              ? isAssassinRing
+                ? 'At least 3 players are needed to form an elimination ring.'
+                : 'Assign at least one runner and one hunter before starting.'
               : !everyoneAssigned
                 ? 'Every player must choose a team before the round can start.'
                 : isJailbreak && !jailPlaced
@@ -795,7 +808,9 @@ export default function LobbyScreen() {
             : isJailbreak && !jailPlaced
               ? 'The host must place the jail before starting the round.'
               : canStart
-                ? 'Teams are assigned. Waiting for the host to start the round.'
+                ? isAssassinRing
+                  ? 'Ring is ready. Waiting for the host to start the round.'
+                  : 'Teams are assigned. Waiting for the host to start the round.'
                 : 'Ready up and wait for the host to start the round.'}
         </Text>
       )}

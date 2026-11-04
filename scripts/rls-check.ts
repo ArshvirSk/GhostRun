@@ -1570,6 +1570,110 @@ async function main() {
     expect(Boolean(hunterStartRescue.error), 'hunter cannot call start_rescue', 'call unexpectedly succeeded');
   }
 
+  // --- Assassin Ring Access and Secrecy Checks (B2) ---
+  const ringCreated = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'assassin_ring',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      head_start_s: 0,
+      duration_s: 300,
+      ping_interval_s: 30,
+    },
+  });
+  const ringGameId = ringCreated.data?.[0]?.game_id;
+  const ringCode = ringCreated.data?.[0]?.code;
+  expect(Boolean(ringGameId), 'assassin ring game created for RLS check', JSON.stringify(ringCreated.error));
+
+  if (ringGameId && ringCode) {
+    // 1. Safe zone setup authorization
+    const hostSafeZone = await rpc(host, 'set_safe_zone_location', {
+      p_game_id: ringGameId,
+      p_zone_index: 1,
+      p_lat: CENTER.lat + 0.001,
+      p_lng: CENTER.lng + 0.001,
+      p_radius_m: 20,
+    });
+    expect(!hostSafeZone.error, 'host can set safe zone location in lobby', JSON.stringify(hostSafeZone.error));
+
+    const outsiderSafeZone = await rpc(outsider, 'set_safe_zone_location', {
+      p_game_id: ringGameId,
+      p_zone_index: 1,
+      p_lat: CENTER.lat + 0.001,
+      p_lng: CENTER.lng + 0.001,
+    });
+    expect(Boolean(outsiderSafeZone.error), 'outsider cannot set safe zone location', 'call unexpectedly succeeded');
+
+    const hunterSafeZone = await rpc(hunter, 'set_safe_zone_location', {
+      p_game_id: ringGameId,
+      p_zone_index: 1,
+      p_lat: CENTER.lat + 0.001,
+      p_lng: CENTER.lng + 0.001,
+    });
+    expect(Boolean(hunterSafeZone.error), 'non-host player cannot set safe zone location', 'call unexpectedly succeeded');
+
+    // 2. Third player joins so ring can start (min 3 players)
+    const ringPlayer3 = await anonymousClient('RingPlayer3');
+    await rpc(hunter, 'join_game', { code: ringCode });
+    await rpc(ringPlayer3, 'join_game', { code: ringCode });
+
+    const hostPid = await playerId(host, ringGameId);
+
+    for (const client of [host, hunter, ringPlayer3]) {
+      await rpc(client, 'set_share_trail', { game_id: ringGameId, share: true });
+      await rpc(client, 'set_ready', { game_id: ringGameId, ready: true });
+    }
+
+    const startRing = await rpc(host, 'start_game', { game_id: ringGameId });
+    expect(!startRing.error, 'host starts assassin ring game with 3 players', JSON.stringify(startRing.error));
+
+    // 3. Zero-Knowledge Secrecy on ring_assignments while live/countdown
+    const hostRing = (await host.from('ring_assignments').select('*').eq('game_id', ringGameId)).data ?? [];
+    expect(
+      hostRing.length === 1 && hostRing[0].hunter_player_id === hostPid,
+      'active player can read only their own assigned prey row',
+      `visible rows: ${hostRing.length}`,
+    );
+
+    const reverseRing = (await host.from('ring_assignments').select('*').eq('game_id', ringGameId).eq('prey_player_id', hostPid)).data ?? [];
+    expect(
+      reverseRing.length === 0,
+      'active player cannot read who is hunting them from ring_assignments',
+      `reverse rows: ${reverseRing.length}`,
+    );
+
+    const outsiderRing = (await outsider.from('ring_assignments').select('*').eq('game_id', ringGameId)).data ?? [];
+    expectEmpty(outsiderRing, 'outsider cannot read ring_assignments during play');
+
+    const outsiderEntities = (await outsider.from('entities').select('*').eq('game_id', ringGameId)).data ?? [];
+    expectEmpty(outsiderEntities, 'outsider cannot read entities (safe zones) for ring game');
+
+    const memberEntities = (await host.from('entities').select('*').eq('game_id', ringGameId).eq('kind', 'safe_zone')).data ?? [];
+    expect(
+      memberEntities.length >= 2,
+      'game member can read safe zones from entities table',
+      `found: ${memberEntities.length}`,
+    );
+
+    // 4. Post-Game Secrecy Lift: when game finishes, full ring is readable by members for replay
+    await rpc(host, 'cancel_game', { game_id: ringGameId });
+
+    const postGameHostRing = (await host.from('ring_assignments').select('*').eq('game_id', ringGameId)).data ?? [];
+    expect(
+      postGameHostRing.length === 3,
+      'post-game recap lifts secrecy: all ring assignments readable by members',
+      `found: ${postGameHostRing.length}`,
+    );
+
+    const postGameOutsiderRing = (await outsider.from('ring_assignments').select('*').eq('game_id', ringGameId)).data ?? [];
+    expectEmpty(postGameOutsiderRing, 'outsider still cannot read ring_assignments after game finishes');
+
+    for (const client of [host, hunter, ringPlayer3]) {
+      await rpc(client, 'leave_game', { game_id: ringGameId });
+    }
+  }
+
   // Consent records are append-only and reachable only through the RPCs.
   const policyAck = await rpc(host, 'set_consent', {
     consent_type: 'policy_ack',

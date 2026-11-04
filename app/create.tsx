@@ -18,7 +18,7 @@ import { circleRing } from '../src/lib/geo';
 import { supabase } from '../src/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type Mode = 'classic_chase' | 'tag_hunt' | 'haunted_map' | 'jailbreak';
+type Mode = 'classic_chase' | 'tag_hunt' | 'haunted_map' | 'jailbreak' | 'assassin_ring';
 type BoundaryPenalty = 'warn' | 'extra_ping';
 
 const MAP_STYLE =
@@ -499,7 +499,9 @@ export default function CreateGameScreen() {
                   ? 'Haunted Map'
                   : mode === 'jailbreak'
                     ? 'Jailbreak'
-                    : 'Tag Hunt'}
+                    : mode === 'assassin_ring'
+                      ? 'Assassin Ring'
+                      : 'Tag Hunt'}
               )
             </Text>
             <Text style={styles.dockHint}>▲ Slide up to configure</Text>
@@ -536,6 +538,11 @@ export default function CreateGameScreen() {
                 selected={mode === 'jailbreak'}
                 label="Jailbreak"
                 onPress={() => setMode('jailbreak')}
+              />
+              <ModeButton
+                selected={mode === 'assassin_ring'}
+                label="Assassin Ring"
+                onPress={() => setMode('assassin_ring')}
               />
             </View>
 
