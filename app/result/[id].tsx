@@ -421,46 +421,44 @@ export default function ResultScreen() {
   const isAssassinRing =
     game.mode === 'assassin_ring' ||
     (game as unknown as { mode_id?: string }).mode_id === 'assassin_ring';
-  const winnerTitle =
-    isAssassinRing
-      ? 'Assassin Victorious'
-      : game.winner === 'runners'
-        ? 'Runners win'
-        : game.winner === 'hunters'
-          ? 'Hunters win'
-          : 'Round over';
-  const accent =
-    isAssassinRing
-      ? '#D97706'
-      : game.winner === 'runners'
-        ? '#059669'
-        : game.winner === 'hunters'
-          ? '#B91C1C'
-          : '#475569';
+  const winnerTitle = isAssassinRing
+    ? 'Assassin Victorious'
+    : game.winner === 'runners'
+      ? 'Runners win'
+      : game.winner === 'hunters'
+        ? 'Hunters win'
+        : 'Round over';
+  const accent = isAssassinRing
+    ? '#D97706'
+    : game.winner === 'runners'
+      ? '#059669'
+      : game.winner === 'hunters'
+        ? '#B91C1C'
+        : '#475569';
   const reasonCopy =
     game.end_reason === 'vip_eliminated'
       ? 'Hunters successfully eliminated the secret VIP!'
       : game.end_reason === 'last_survivor'
-      ? 'The last assassin standing survived the elimination ring.'
-      : game.end_reason === 'all_jailed'
-        ? 'All runners were jailed at the same time.'
-        : game.end_reason === 'extraction_complete'
-          ? 'The carrier reached the extraction point with the package!'
-          : game.end_reason === 'package_secured'
-            ? 'Hunters captured and secured the dropped package!'
-            : game.end_reason === 'target_reached'
-              ? 'A runner reached the secret target.'
-              : game.end_reason === 'all_tagged'
-                ? 'Every runner was tagged.'
-                : game.end_reason === 'all_hunters_left'
-                  ? 'Every hunter left the round.'
-                  : game.end_reason === 'time_expired'
-                    ? isAssassinRing
-                      ? 'Time ran out. The assassin with the most eliminations wins.'
-                      : game.mode === 'classic_chase'
-                        ? 'Time ran out before the runners reached the target.'
-                        : 'Time ran out. The runners stayed hidden.'
-                    : 'This round has finished.';
+        ? 'The last assassin standing survived the elimination ring.'
+        : game.end_reason === 'all_jailed'
+          ? 'All runners were jailed at the same time.'
+          : game.end_reason === 'extraction_complete'
+            ? 'The carrier reached the extraction point with the package!'
+            : game.end_reason === 'package_secured'
+              ? 'Hunters captured and secured the dropped package!'
+              : game.end_reason === 'target_reached'
+                ? 'A runner reached the secret target.'
+                : game.end_reason === 'all_tagged'
+                  ? 'Every runner was tagged.'
+                  : game.end_reason === 'all_hunters_left'
+                    ? 'Every hunter left the round.'
+                    : game.end_reason === 'time_expired'
+                      ? isAssassinRing
+                        ? 'Time ran out. The assassin with the most eliminations wins.'
+                        : game.mode === 'classic_chase'
+                          ? 'Time ran out before the runners reached the target.'
+                          : 'Time ran out. The runners stayed hidden.'
+                      : 'This round has finished.';
 
   // Time expiry is stamped when a client next reads state, which can be later
   // than the actual finish; the scheduled end is the honest round length.

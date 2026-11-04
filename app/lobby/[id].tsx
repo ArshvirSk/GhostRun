@@ -177,8 +177,11 @@ export default function LobbyScreen() {
     : activePlayers.some((player) => player.team === 'runner') &&
       activePlayers.some((player) => player.team === 'hunter');
   const everyoneReady =
-    activePlayers.length >= (isAssassinRing ? 3 : 2) && activePlayers.every((player) => player.is_ready);
-  const everyoneAssigned = isAssassinRing ? true : activePlayers.every((player) => player.team !== 'unassigned');
+    activePlayers.length >= (isAssassinRing ? 3 : 2) &&
+    activePlayers.every((player) => player.is_ready);
+  const everyoneAssigned = isAssassinRing
+    ? true
+    : activePlayers.every((player) => player.team !== 'unassigned');
   const isJailbreak = state?.game.mode_id === 'jailbreak';
   const isRelayHeist = state?.game.mode_id === 'relay_heist';
   const jailPlaced = Boolean(state?.game.jail);
@@ -645,7 +648,9 @@ export default function LobbyScreen() {
                       <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
                       <Text style={styles.jailActionText}>
-                        {state.game.jail ? 'Reset Jail to Area Center' : 'Place Jail at Area Center'}
+                        {state.game.jail
+                          ? 'Reset Jail to Area Center'
+                          : 'Place Jail at Area Center'}
                       </Text>
                     )}
                   </Pressable>
@@ -675,7 +680,9 @@ export default function LobbyScreen() {
                       <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
                       <Text style={styles.jailActionText}>
-                        {state.game.extraction ? 'Reposition Extraction Point' : 'Place Extraction Point'}
+                        {state.game.extraction
+                          ? 'Reposition Extraction Point'
+                          : 'Place Extraction Point'}
                       </Text>
                     )}
                   </Pressable>
@@ -730,8 +737,12 @@ export default function LobbyScreen() {
                 : player.team === 'unassigned'
                   ? 'Choose a team'
                   : player.team === 'runner'
-                    ? (player.is_remote ? 'Runner Operator' : 'Runner')
-                    : (player.is_remote ? 'Hunter Operator' : 'Hunter')}{' '}
+                    ? player.is_remote
+                      ? 'Runner Operator'
+                      : 'Runner'
+                    : player.is_remote
+                      ? 'Hunter Operator'
+                      : 'Hunter'}{' '}
               · {player.is_ready ? 'Ready' : 'Not ready'}
             </Text>
           </View>

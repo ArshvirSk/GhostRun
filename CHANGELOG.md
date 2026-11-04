@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-11-05
+
+### Overview
+Release 2.5.0 delivers Phase B Milestones B1 through B5, featuring 3 brand new base game modes and 2 tactical role add-ons with full server authority, zero-knowledge secrecy, and automated end-to-end simulation coverage.
+
+- **APK Artifact:** `release/GhostRun-v2.5.0.apk` (165.65 MB)
+- **APK SHA-256:** `B95519BC303B8696EB67E89E106CF4D72D38168D5A97AFC8C94EB7E3C48EA1BB`
+- **Android versionCode:** `5` | **versionName:** `2.5.0`
+
 ### Phase B: Milestone B5 — Operator Remote Role Add-on (docs/MODES.md §5.3)
 - **Role Integration & Remote Designation (D18):**
   - Added `'operator'` role to `secret_role` enum and configured `role_catalogue()` with `'operator'` role add-on.
