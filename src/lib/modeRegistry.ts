@@ -104,6 +104,28 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       parameters: { variant: 'time_trial' },
       enabled: true,
     },
+    {
+      id: 'jailbreak',
+      layer: 'base',
+      name: 'Jailbreak',
+      teams: ['runner', 'hunter'],
+      min_players: 5,
+      compatible_roles: ['double_agent'],
+      compatible_modifiers: [
+        'noise_meter',
+        'dead_drops',
+        'hot_cold',
+        'qr_tagging',
+        'shrinking_zone',
+      ],
+      parameters: {
+        jail_radius_m: 15,
+        auto_release_s: 300,
+        release_hold_s: 10,
+        release_radius_m: 10,
+      },
+      enabled: true,
+    },
   ],
   modifiers: [
     { id: 'noise_meter', layer: 'modifier', name: 'Noise Meter', parameters: {}, enabled: true },
@@ -163,14 +185,35 @@ const ROLE_RULES: Record<string, string[]> = {
   ],
 };
 
+export const BASE_MODE_RULES: Record<string, string[]> = {
+  classic_chase: [
+    'Runners reach the secret target to win. Hunters tag runners to eliminate them.',
+  ],
+  tag_hunt: [
+    'No secret target. Hunters must tag all runners before time expires.',
+  ],
+  haunted_map: [
+    'Spectral NPCs patrol the area. Evade ghosts and opponents.',
+  ],
+  ghost_duel: [
+    'Solo time trial against ghost recordings.',
+  ],
+  jailbreak: [
+    'Tagged runners are sent to Jail instead of elimination.',
+    'Free runners can rescue all jailed teammates by holding within 10 m of the jail for 10 s.',
+    'Hunters win if all runners are jailed simultaneously.',
+  ],
+};
+
 export function parameterSummary(definition: ModifierDefinition): string {
   const entries = Object.entries(definition.parameters ?? {});
   if (entries.length === 0) return '';
   return entries.map(([key, value]) => `${key.replace(/_/g, ' ')}: ${String(value)}`).join(' · ');
 }
 
-export function rulesFor(modifiers: string[], roles: string[]): string[] {
+export function rulesFor(modifiers: string[], roles: string[], modeId?: string): string[] {
   const lines: string[] = [];
+  if (modeId && BASE_MODE_RULES[modeId]) lines.push(...BASE_MODE_RULES[modeId]);
   for (const id of modifiers) lines.push(...(MODIFIER_RULES[id] ?? []));
   for (const id of roles) lines.push(...(ROLE_RULES[id] ?? []));
   return lines;

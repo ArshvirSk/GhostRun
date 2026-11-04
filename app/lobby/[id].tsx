@@ -26,19 +26,27 @@ type LobbyPlayer = {
   display_name: string;
   color: string;
   team: Team;
-  status: 'active' | 'tagged' | 'left';
+  status: 'active' | 'tagged' | 'left' | 'jailed';
   is_ready: boolean;
 };
 type LobbyGame = {
   id: string;
   code: string;
   host_id: string;
-  mode: 'classic_chase' | 'tag_hunt';
-  mode_id: 'classic_chase' | 'tag_hunt';
+  mode: string;
+  mode_id: string;
   modifiers: string[];
   roles: string[];
   mode_params: Record<string, unknown>;
   status: string;
+  jail?: {
+    id: string;
+    latitude: number;
+    longitude: number;
+    radius_m: number;
+  } | null;
+  area_center?: { latitude: number; longitude: number } | [number, number];
+  area_radius_m?: number;
 };
 type LobbyState = {
   game: LobbyGame;
@@ -155,7 +163,39 @@ export default function LobbyScreen() {
   const everyoneReady =
     activePlayers.length >= 2 && activePlayers.every((player) => player.is_ready);
   const everyoneAssigned = activePlayers.every((player) => player.team !== 'unassigned');
-  const canStart = hasBothTeams && everyoneAssigned;
+  const isJailbreak = state?.game.mode_id === 'jailbreak';
+  const jailPlaced = Boolean(state?.game.jail);
+  const canStart = hasBothTeams && everyoneAssigned && (!isJailbreak || jailPlaced);
+
+  async function placeJail(lat?: number, lng?: number) {
+    if (!supabase || !gameId) return;
+    let targetLat = lat;
+    let targetLng = lng;
+    if (targetLat === undefined || targetLng === undefined) {
+      const center = state?.game.area_center;
+      if (center) {
+        if (Array.isArray(center)) {
+          targetLng = center[0];
+          targetLat = center[1];
+        } else {
+          targetLat = center.latitude;
+          targetLng = center.longitude;
+        }
+      }
+    }
+    if (targetLat === undefined || targetLng === undefined) {
+      setErrorMessage('Could not determine play area center for jail.');
+      return;
+    }
+    await runAction('place_jail', () =>
+      supabase!.rpc('set_jail_location', {
+        game_id: gameId,
+        lat: targetLat,
+        lng: targetLng,
+      }),
+    );
+    await loadState();
+  }
 
   // The host moves everyone along; every player follows the game's phase.
   useEffect(() => {
@@ -403,7 +443,7 @@ export default function LobbyScreen() {
         const registryMode = registry.modes.find((mode) => mode.id === state.game.mode_id);
         const activeModifiers = state.game.modifiers ?? [];
         const activeRoles = state.game.roles ?? [];
-        const rules = rulesFor(activeModifiers, activeRoles);
+        const rules = rulesFor(activeModifiers, activeRoles, state.game.mode_id);
         const compatibleModifiers = registry.modifiers.filter((modifier) =>
           registryMode?.compatible_modifiers.includes(modifier.id),
         );
@@ -522,6 +562,36 @@ export default function LobbyScreen() {
                     • {line}
                   </Text>
                 ))}
+              </View>
+            )}
+
+            {isJailbreak && (
+              <View style={styles.jailSection}>
+                <View style={styles.jailHeaderRow}>
+                  <Ionicons color="#DC2626" name="lock-closed" size={16} />
+                  <Text style={styles.jailTitle}>JAIL LOCATION</Text>
+                </View>
+                <Text style={styles.jailSubtitle}>
+                  {state.game.jail
+                    ? `Jail is placed inside the play area (${state.game.jail.radius_m ?? 15}m radius).`
+                    : 'The jail must be placed before starting the round.'}
+                </Text>
+                {isHost && (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busyAction !== ''}
+                    onPress={() => void placeJail()}
+                    style={styles.jailActionButton}
+                  >
+                    {busyAction === 'place_jail' ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Text style={styles.jailActionText}>
+                        {state.game.jail ? 'Reset Jail to Area Center' : 'Place Jail at Area Center'}
+                      </Text>
+                    )}
+                  </Pressable>
+                )}
               </View>
             )}
 
@@ -711,18 +781,22 @@ export default function LobbyScreen() {
               ? 'Assign at least one runner and one hunter before starting.'
               : !everyoneAssigned
                 ? 'Every player must choose a team before the round can start.'
-                : !everyoneReady
-                  ? "Some players aren't ready. They'll be carried into the round."
-                  : 'Tag Hunt has no target. The 10-second countdown starts as soon as you press start.'}
+                : isJailbreak && !jailPlaced
+                  ? 'Place the jail inside the play area before starting.'
+                  : !everyoneReady
+                    ? "Some players aren't ready. They'll be carried into the round."
+                    : `${registry.modes.find((m) => m.id === (state?.game?.mode_id ?? state?.game?.mode))?.name ?? 'The game'} has no target. The 10-second countdown starts as soon as you press start.`}
           </Text>
         </>
       ) : (
         <Text style={styles.modeNote}>
-          {everyoneReady
+          {everyoneReady && (!isJailbreak || jailPlaced)
             ? 'Everyone is ready. The host can start the round.'
-            : canStart
-              ? 'Teams are assigned. Waiting for the host to start the round.'
-              : 'Tag Hunt has no target. Ready up and wait for the host to start the round.'}
+            : isJailbreak && !jailPlaced
+              ? 'The host must place the jail before starting the round.'
+              : canStart
+                ? 'Teams are assigned. Waiting for the host to start the round.'
+                : 'Ready up and wait for the host to start the round.'}
         </Text>
       )}
 
@@ -1124,4 +1198,41 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   cancelGameText: { color: '#B91C1C', fontSize: 14, fontWeight: '700' },
+  jailSection: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
+  },
+  jailHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  jailTitle: {
+    color: '#991B1B',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  jailSubtitle: {
+    color: '#7F1D1D',
+    fontSize: 13,
+    marginTop: 4,
+  },
+  jailActionButton: {
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    justifyContent: 'center',
+    marginTop: 8,
+    minHeight: 38,
+  },
+  jailActionText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
 });

@@ -5,6 +5,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Unreleased]
+
+### Phase B: Milestone B1 — Jailbreak Base Mode (docs/MODES.md §4.1)
+- **Base Mode Integration:**
+  - Added `jailbreak` base mode enum and registry entry in `src/lib/modeRegistry.ts` and `app/create.tsx`.
+  - Added host-authoritative `set_jail_location` RPC and interactive map placement in `app/lobby/[id].tsx`.
+- **Server Authority & Secrecy:**
+  - Migrated `jail` entity placement within the play boundary with mandatory host configuration before start.
+  - Added `'jailed'` player status: tagged runners transition to `'jailed'`, excluded from scheduled radar pings, and teammate location broadcast paused.
+  - Implemented `start_rescue`, `complete_rescue`, and `cancel_rescue` SECURITY DEFINER RPCs requiring 10-second continuous hold inside 10m radius.
+  - `rescue_started` and rescue hold events are concealed from hunters to prevent camp baiting.
+  - Implemented auto-release after `auto_release_s` (default 300s / 5 min) and automatic emergency jail evacuation if overrun by shrinking safe zone.
+  - Hunters win on `all_jailed` (all runners jailed simultaneously); runners win on match timer expiration with active runners.
+- **Client & HUD:**
+  - Rendered distinct jail boundary ring, center marker, and radius overlay on live game map.
+  - Added jailed HUD state, countdown badge, hold-to-rescue progress bar button, and audio cues.
+  - Post-round results screen displays `all_jailed` win reason and roster statuses.
+- **Verification:**
+  - Passed `npm run sim jailbreak` and full simulation suite (`npm run sim`).
+  - Added 11+ dedicated Jailbreak access control checks in `scripts/rls-check.ts` (100% pass).
+
 ## [2.4.0] — 2026-11-01
 
 ### Phase A: Stabilisation & Spec Alignment Sign-Off

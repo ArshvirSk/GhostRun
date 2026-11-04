@@ -27,9 +27,11 @@ export function RunnerQrCard({
   const [errorMsg, setErrorMsg] = useState('');
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const fetchTokenRef = useRef<() => Promise<void>>(async () => {});
 
   const fetchToken = useCallback(async () => {
     if (!supabase || !gameId) return;
+    setLoading(true);
     try {
       const { data, error } = await supabase.rpc('qr_token', { game_id: gameId });
       if (!mountedRef.current) return;
@@ -63,7 +65,7 @@ export function RunnerQrCard({
       const refreshInMs = Math.max(2000, (remainingSec - 3) * 1000);
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = setTimeout(() => {
-        void fetchToken();
+        void fetchTokenRef.current();
       }, refreshInMs);
     } catch (err) {
       if (mountedRef.current) {
@@ -74,10 +76,13 @@ export function RunnerQrCard({
   }, [gameId]);
 
   useEffect(() => {
+    fetchTokenRef.current = fetchToken;
+  }, [fetchToken]);
+
+  useEffect(() => {
     mountedRef.current = true;
     if (visible) {
-      setLoading(true);
-      void fetchToken();
+      void fetchTokenRef.current();
     }
     return () => {
       mountedRef.current = false;
