@@ -7,6 +7,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Phase B: Milestone B4 — VIP Escort Role Add-on (docs/MODES.md §5.2)
+- **Role Integration & Secrecy:**
+  - Added `'vip'` and `'bodyguard'` secret roles to `secret_role` enum and registered `'vip'` role add-on in `role_catalogue()`.
+  - Added VIP Escort role compatibility in `src/lib/modeRegistry.ts` for `tag_hunt` and `classic_chase`.
+  - Server-side role secrecy: hunter clients cannot read runner `secret_role` during live play; radar pings and positions are indistinguishable from normal runners. Secrecy is lifted post-match.
+- **Bodyguard Freeze Mechanics (D15):**
+  - Tagging a bodyguard immobilizes them for 60 seconds (`status_detail->'frozen_until' = now() + 60s`) instead of eliminating them.
+  - While frozen, bodyguards cannot move outside a 10 m dwell zone, cannot swap roles, and cannot be re-tagged (`already_frozen`).
+  - Emits `bodyguard_frozen` event: runners see teammate identity and timer; hunters receive anonymous confirmation that an escort was incapacitated.
+- **VIP Elimination & Tactical Swap (D16, D17):**
+  - Tagging the VIP eliminates them and ends the match immediately (`winner = 'hunters'`, `end_reason = 'vip_eliminated'`).
+  - Tactical physical role swap: mutual proximity ($\le 5\text{ m}$) protocol (`request_role_swap`, `confirm_role_swap`, `cancel_role_swap`) with a 15-second acceptance window and 120-second cooldown.
+  - Offline fail-safe: VIP offline $> 60\text{ s}$ triggers auto-promotion of an active bodyguard (`vip_promoted`).
+- **Client & HUD:**
+  - Runner HUD displays squad VIP tracker, distance to VIP, and bodyguard role status.
+  - Frozen bodyguard banner with real-time countdown timer and restricted movement alert.
+  - Nearby role swap prompt and mutual confirmation bottom sheet modal.
+  - Post-game results and replay screen displays VIP and GUARD badges alongside `vip_eliminated` win reason.
+- **Verification:**
+  - Simulator scenario `vip-escort` passing 10/10 automated checks.
+  - Full test suite passing: `npm run typecheck` (0 errors), `npm run lint` (0 errors), `npm run rls` (100% checks passing), and `npm run sim` (all 6 base modes and role scenarios passing).
+
 ### Phase B: Milestone B3 — Relay Heist Base Mode (docs/MODES.md §4.5)
 - **Base Mode Integration:**
   - Added `relay_heist` base mode enum, catalogue entry in `mode_catalogue()`, and mode configuration validation.

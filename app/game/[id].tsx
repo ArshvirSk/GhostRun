@@ -92,6 +92,13 @@ type GamePlayer = {
   status: 'active' | 'tagged' | 'left' | 'jailed';
   is_ready: boolean;
   jailed_at?: string | null;
+  frozen_until?: string | null;
+  secret_role?: string | null;
+  pending_role_swap?: {
+    from_player_id: string;
+    from_role: string;
+    requested_at: string;
+  } | null;
 };
 
 type RoundPosition = {
@@ -175,6 +182,10 @@ type RoundState = {
       longitude: number;
       radius_m: number;
     } | null;
+    vip_escort?: {
+      is_active: boolean;
+      vip_player_id?: string | null;
+    } | null;
   };
   players: GamePlayer[];
   my_player_id: string;
@@ -233,11 +244,13 @@ type SharingState = 'idle' | 'starting' | 'on' | 'denied' | 'error';
 
 type TagResult = {
   success: boolean;
-  reason?: 'cooldown' | 'stale_position' | 'no_target' | 'in_safe_zone' | 'no_prey_assigned';
+  reason?: 'cooldown' | 'stale_position' | 'no_target' | 'in_safe_zone' | 'no_prey_assigned' | 'already_frozen';
   runner_id?: string;
   phase?: Phase;
   winner?: 'runners' | 'hunters' | 'solo' | null;
   end_reason?: string | null;
+  frozen?: boolean;
+  frozen_seconds?: number;
 };
 
 const COUNTDOWN_LABEL = 'The round starts after a 10-second countdown.';
@@ -987,24 +1000,32 @@ export default function GameScreen() {
       const isJb = state?.game.mode_id === 'jailbreak';
       const isAr = state?.game.mode_id === 'assassin_ring';
       const isRh = state?.game.mode_id === 'relay_heist';
-      setTagMessage(
-        result.phase === 'ended'
-          ? (isJb ? 'All runners jailed! Round over.' : isAr ? 'Last survivor standing! Victory!' : isRh ? 'All runners tagged! Hunters win!' : 'Tag confirmed. The round is over.')
-          : (isJb ? 'Runner jailed!' : isAr ? 'Target eliminated! New prey assigned.' : isRh ? 'Runner tagged! Package dropped!' : 'Tag confirmed.'),
-      );
+      if (result.frozen) {
+        setTagMessage(`Bodyguard tagged! Frozen for ${result.frozen_seconds ?? 60}s.`);
+      } else {
+        setTagMessage(
+          result.phase === 'ended'
+            ? (result.end_reason === 'vip_eliminated'
+                ? 'VIP eliminated! Hunters win!'
+                : isJb ? 'All runners jailed! Round over.' : isAr ? 'Last survivor standing! Victory!' : isRh ? 'All runners tagged! Hunters win!' : 'Tag confirmed. The round is over.')
+            : (isJb ? 'Runner jailed!' : isAr ? 'Target eliminated! New prey assigned.' : isRh ? 'Runner tagged! Package dropped!' : 'Tag confirmed.'),
+        );
+      }
       await loadState();
       return;
     }
     setTagMessage(
-      result.reason === 'in_safe_zone'
-        ? 'Inside Safe Zone. Tagging is disabled.'
-        : result.reason === 'cooldown'
-          ? 'Tag cooldown. Try again in a few seconds.'
-          : result.reason === 'stale_position'
-            ? 'Waiting for a fresh GPS fix before tagging.'
-            : state?.game.mode_id === 'assassin_ring'
-              ? 'Target not in range.'
-              : 'No runner in range.',
+      result.reason === 'already_frozen'
+        ? 'Bodyguard is already frozen.'
+        : result.reason === 'in_safe_zone'
+          ? 'Inside Safe Zone. Tagging is disabled.'
+          : result.reason === 'cooldown'
+            ? 'Tag cooldown. Try again in a few seconds.'
+            : result.reason === 'stale_position'
+              ? 'Waiting for a fresh GPS fix before tagging.'
+              : state?.game.mode_id === 'assassin_ring'
+                ? 'Target not in range.'
+                : 'No runner in range.',
     );
   }
 
@@ -1033,12 +1054,16 @@ export default function GameScreen() {
     return (state?.events ?? []).slice().sort((a, b) => b.id - a.id);
   }, [state?.events]);
 
-  const ownFix: LngLat | null =
-    fix !== null
-      ? { longitude: fix.longitude, latitude: fix.latitude }
-      : state?.my_position
-        ? { longitude: state.my_position.longitude, latitude: state.my_position.latitude }
-        : null;
+  const myPosition = state?.my_position;
+  const ownFix: LngLat | null = useMemo(() => {
+    if (fix !== null) {
+      return { longitude: fix.longitude, latitude: fix.latitude };
+    }
+    if (myPosition) {
+      return { longitude: myPosition.longitude, latitude: myPosition.latitude };
+    }
+    return null;
+  }, [fix, myPosition]);
 
   const currentDistanceM = ownFix && game?.area ? distanceM(ownFix, game.area) : null;
   const isOutOfBounds =
@@ -1404,6 +1429,88 @@ export default function GameScreen() {
     }
   }, [gameId, loadState]);
 
+  // VIP Escort state
+  const isVipMode = (game?.roles ?? []).includes('vip');
+  const mySecretRole = selfPlayer?.secret_role;
+  const isVip = mySecretRole === 'vip';
+  const frozenUntil = selfPlayer?.frozen_until;
+  const isFrozen = Boolean(frozenUntil && Date.parse(frozenUntil) > serverNow);
+  const frozenRemainingS = useMemo(() => {
+    if (!frozenUntil) return null;
+    const diff = (Date.parse(frozenUntil) - serverNow) / 1000;
+    return diff > 0 ? Math.ceil(diff) : null;
+  }, [frozenUntil, serverNow]);
+
+  const vipTeammate = useMemo(() => {
+    if (!isRunner) return null;
+    return (state?.players ?? []).find(
+      (p) => p.team === 'runner' && p.secret_role === 'vip' && p.status === 'active',
+    );
+  }, [isRunner, state?.players]);
+
+  const vipPosition = useMemo(() => {
+    if (!vipTeammate) return null;
+    return (state?.positions ?? []).find((pos) => pos.player_id === vipTeammate.id);
+  }, [vipTeammate, state?.positions]);
+
+  const distanceToVip = useMemo(() => {
+    if (!ownFix || !vipPosition) return null;
+    return distanceM(ownFix, { longitude: vipPosition.longitude, latitude: vipPosition.latitude });
+  }, [ownFix, vipPosition]);
+
+  const pendingRoleSwap = selfPlayer?.pending_role_swap;
+
+  const eligibleSwapPartner = useMemo(() => {
+    if (!isRunner || !isLive || isFrozen || !ownFix || !isVipMode) return null;
+    const oppositeRole = isVip ? 'bodyguard' : 'vip';
+    const candidates = (state?.players ?? [])
+      .filter((p) => p.team === 'runner' && p.id !== myPlayerId && p.status === 'active' && p.secret_role === oppositeRole)
+      .map((p) => {
+        const pos = (state?.positions ?? []).find((entry) => entry.player_id === p.id);
+        const dist = pos ? distanceM(ownFix, { longitude: pos.longitude, latitude: pos.latitude }) : Infinity;
+        return { player: p, distance: dist };
+      })
+      .filter((c) => c.distance <= 5.0)
+      .sort((a, b) => a.distance - b.distance);
+    return candidates[0] ?? null;
+  }, [isRunner, isLive, isFrozen, ownFix, isVipMode, isVip, myPlayerId, state?.players, state?.positions]);
+
+  const handleRequestRoleSwap = useCallback(async (targetPlayerId: string) => {
+    if (!supabase || !gameId) return;
+    setBusy('request_swap');
+    const { error } = await supabase.rpc('request_role_swap', {
+      p_game_id: gameId,
+      p_target_player_id: targetPlayerId,
+    });
+    setBusy('');
+    if (error) {
+      setTagMessage(error.message);
+    } else {
+      setTagMessage('Role swap requested! Waiting for teammate to confirm...');
+      await loadState();
+    }
+  }, [gameId, loadState]);
+
+  const handleConfirmRoleSwap = useCallback(async () => {
+    if (!supabase || !gameId) return;
+    setBusy('confirm_swap');
+    const { error } = await supabase.rpc('confirm_role_swap', { p_game_id: gameId });
+    setBusy('');
+    if (error) {
+      setTagMessage(error.message);
+    } else {
+      playSound('tag');
+      setTagMessage('Roles swapped successfully!');
+      await loadState();
+    }
+  }, [gameId, loadState]);
+
+  const handleCancelRoleSwap = useCallback(async () => {
+    if (!supabase || !gameId) return;
+    await supabase.rpc('cancel_role_swap', { p_game_id: gameId });
+    await loadState();
+  }, [gameId, loadState]);
+
   const canRescue =
     isRunner &&
     !jailedSelf &&
@@ -1564,8 +1671,10 @@ export default function GameScreen() {
             ? 'Secure the dropped package!'
             : 'Intercept the carrier'
         : isRunner
-          ? (isJailbreak ? 'Evade hunters & rescue' : 'Reach the target')
-          : (isJailbreak ? 'Jail all runners' : 'Hunt the runners');
+          ? (isVipMode
+              ? (isFrozen ? 'Frozen (Bodyguard Decoy)' : isVip ? 'VIP: Evade & Extract' : 'Bodyguard: Protect VIP')
+              : (isJailbreak ? 'Evade hunters & rescue' : 'Reach the target'))
+          : (isJailbreak ? 'Jail all runners' : isVipMode ? 'Hunt & eliminate the VIP' : 'Hunt the runners');
     subtitle = isAssassinRing
       ? state?.assassin_ring?.in_safe_zone
         ? 'You are inside a Safe Zone. Tagging is disabled.'
@@ -1585,8 +1694,14 @@ export default function GameScreen() {
             ? 'Hold package location for 20 seconds to secure and win!'
             : 'Track radar pings to find and tag the package carrier.'
         : isRunner
-          ? (isJailbreak ? 'Stay out of jail. Free captured teammates at the Jail marker.' : 'Your team is on the map. Hunters only get delayed pings of your position.')
-          : (isJailbreak ? 'Tag runners to send them to Jail. Win by jailing all runners at once.' : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.');
+          ? (isVipMode
+              ? (isFrozen
+                  ? `You were tagged! Frozen as a decoy for ${frozenRemainingS ?? 60}s.`
+                  : isVip
+                    ? 'Hunters win if they tag you! Stay protected and reach extraction.'
+                    : `Shield your VIP from hunters! ${distanceToVip !== null ? `VIP is ${Math.round(distanceToVip)}m away.` : ''}`)
+              : (isJailbreak ? 'Stay out of jail. Free captured teammates at the Jail marker.' : 'Your team is on the map. Hunters only get delayed pings of your position.'))
+          : (isJailbreak ? 'Tag runners to send them to Jail. Win by jailing all runners at once.' : isVipMode ? 'Identify and tag the secret VIP runner to win the round!' : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.');
     timerLabel = 'TIME LEFT';
     timerValue = game!.ends_at ? (Date.parse(game!.ends_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'ended') {
@@ -2430,6 +2545,87 @@ export default function GameScreen() {
                         )}
                       </View>
                     )}
+                  </View>
+                )}
+              </>
+            )}
+
+            {isVipMode && isRunner && isLive && (
+              <>
+                {isFrozen && (
+                  <View style={styles.vipFrozenCard}>
+                    <View style={styles.rescueHeaderRow}>
+                      <MaterialCommunityIcons color="#3B82F6" name="snowflake" size={20} />
+                      <Text style={styles.vipFrozenTitle}>YOU ARE FROZEN (BODYGUARD)</Text>
+                    </View>
+                    <Text style={styles.vipFrozenSubtitle}>
+                      You were tagged as a bodyguard! You are frozen as a distraction for{' '}
+                      {frozenRemainingS ?? 60} more seconds.
+                    </Text>
+                  </View>
+                )}
+
+                {pendingRoleSwap && !isFrozen && (
+                  <View style={styles.vipSwapCard}>
+                    <View style={styles.rescueHeaderRow}>
+                      <MaterialCommunityIcons color="#D97706" name="swap-horizontal" size={20} />
+                      <Text style={styles.vipSwapTitle}>INCOMING ROLE SWAP REQUEST</Text>
+                    </View>
+                    <Text style={styles.vipSwapSubtitle}>
+                      A teammate has requested a physical role swap! Confirm to swap roles.
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                      <Pressable
+                        accessibilityLabel="Confirm role swap"
+                        accessibilityRole="button"
+                        disabled={busy !== ''}
+                        onPress={() => void handleConfirmRoleSwap()}
+                        style={[styles.vipSwapActionBtn, { flex: 1 }, busy !== '' && styles.disabled]}
+                      >
+                        {busy === 'confirm_swap' ? (
+                          <ActivityIndicator color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.vipSwapActionBtnText}>ACCEPT SWAP</Text>
+                        )}
+                      </Pressable>
+                      <Pressable
+                        accessibilityLabel="Decline role swap"
+                        accessibilityRole="button"
+                        onPress={() => void handleCancelRoleSwap()}
+                        style={[styles.vipSwapCancelBtn, { flex: 1 }]}
+                      >
+                        <Text style={styles.vipSwapCancelBtnText}>DECLINE</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+
+                {!pendingRoleSwap && !isFrozen && eligibleSwapPartner && (
+                  <View style={styles.vipSwapCard}>
+                    <View style={styles.rescueHeaderRow}>
+                      <MaterialCommunityIcons color="#2563EB" name="shield-sync" size={20} />
+                      <Text style={styles.vipSwapTitle}>ROLE SWAP AVAILABLE</Text>
+                    </View>
+                    <Text style={styles.vipSwapSubtitle}>
+                      {isVip
+                        ? `Bodyguard ${eligibleSwapPartner.player.display_name} is within 5m. Swap roles to throw off hunters!`
+                        : `VIP ${eligibleSwapPartner.player.display_name} is within 5m. Offer to take the VIP mantle!`}
+                    </Text>
+                    <Pressable
+                      accessibilityLabel="Request role swap with nearby teammate"
+                      accessibilityRole="button"
+                      disabled={busy !== ''}
+                      onPress={() => void handleRequestRoleSwap(eligibleSwapPartner.player.id)}
+                      style={[styles.vipSwapActionBtn, busy !== '' && styles.disabled, { marginTop: 8 }]}
+                    >
+                      {busy === 'request_swap' ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.vipSwapActionBtnText}>
+                          SWAP ROLES WITH {eligibleSwapPartner.player.display_name.toUpperCase()}
+                        </Text>
+                      )}
+                    </Pressable>
                   </View>
                 )}
               </>
@@ -3334,5 +3530,72 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     letterSpacing: 0.8,
+  },
+  vipFrozenCard: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    padding: 14,
+  },
+  vipFrozenTitle: {
+    color: '#1E40AF',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  vipFrozenSubtitle: {
+    color: '#2563EB',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  vipSwapCard: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    padding: 14,
+  },
+  vipSwapTitle: {
+    color: '#92400E',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  vipSwapSubtitle: {
+    color: '#B45309',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  vipSwapActionBtn: {
+    alignItems: 'center',
+    backgroundColor: '#D97706',
+    borderRadius: 12,
+    height: 48,
+    justifyContent: 'center',
+  },
+  vipSwapActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  vipSwapCancelBtn: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FCD34D',
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: 'center',
+  },
+  vipSwapCancelBtnText: {
+    color: '#92400E',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

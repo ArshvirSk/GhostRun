@@ -164,7 +164,36 @@ Immediately following each outdoor play session, ask each participant:
   - 60-second advance warning banner warns all players.
   - Effective boundary strictly enforces updated coordinates without shifting center.
 
-### 3.6 Secret Role: Double Agent
+### 3.7 VIP Escort Role Add-on (docs/MODES.md §5.2)
+* **Recommended Group:** 5–12 players (minimum 1 hunter, 2 runners; recommended 2+ hunters, 4+ runners).
+* **Setting:** Campus, park, or urban neighborhood (radius 300–600 m).
+* **Pre-Flight & Setup:**
+  - [ ] Host enables **VIP Escort** role add-on in lobby settings on a Classic Chase or Tag Hunt match.
+  - [ ] Verify that starting the game with fewer than 2 active runners gracefully removes the role with a clear explanation (`role_disabled`).
+* **Phase & Role Assignment:**
+  - [ ] At start, exactly one runner is secretly designated as the **VIP**, and all other active runners become **Bodyguards**.
+  - [ ] Verify that hunter HUD and radar show identical dots and ping markers for all runners (no visual VIP cues).
+  - [ ] Verify that runner HUD clearly indicates the VIP badge and bodyguard status for squad teammates.
+* **Freeze Mechanics & Protection:**
+  - [ ] Hunter tags a bodyguard. Confirm:
+    - [ ] Bodyguard is NOT eliminated; instead enters a 60-second immobilized freeze state (`frozen_until`).
+    - [ ] Bodyguard HUD displays "FREEZE IMMOBILIZED" with active countdown timer.
+    - [ ] Bodyguard must remain within 10 m dwell zone.
+    - [ ] Bodyguard cannot perform role swaps while frozen.
+    - [ ] Hunter attempting to tag the frozen bodyguard receives `already_frozen`.
+    - [ ] Hunters receive an anonymous broadcast confirming a bodyguard was frozen.
+* **Tactical Role Swap:**
+  - [ ] VIP and bodyguard approach within 5 m.
+  - [ ] Either player presses "Request Role Swap".
+  - [ ] Partner receives prompt and confirms within 15 seconds.
+  - [ ] Roles are exchanged (`vip` $\leftrightarrow$ `bodyguard`); both players receive a 120-second swap cooldown.
+* **Win Conditions & Disconnection:**
+  - [ ] Hunter tags the VIP: immediate **Hunters Win (`vip_eliminated`)**.
+  - [ ] Classic Chase: VIP reaches secret target: immediate **Runners Win (`arrival`)**.
+  - [ ] Tag Hunt: Match timer expires with VIP alive: **Runners Win (`time_expired`)**.
+  - [ ] VIP offline fail-safe: VIP disconnects for $> 60\text{ s}$; confirm active bodyguard is auto-promoted to VIP (`vip_promoted`).
+
+### 3.8 Secret Role: Double Agent (§5.1)
 - [ ] Exactly one hunter is secretly assigned `secret_role = 'agent'` when enabled ($\ge 2$ hunters).
 - [ ] Agent HUD reveals secret **Whisper** and **Scramble** controls.
 - [ ] **Whisper:** Accurately reveals the target's cardinal quadrant (`North`, `South`, `East`, `West`).

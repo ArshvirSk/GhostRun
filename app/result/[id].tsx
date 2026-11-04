@@ -438,7 +438,9 @@ export default function ResultScreen() {
           ? '#B91C1C'
           : '#475569';
   const reasonCopy =
-    game.end_reason === 'last_survivor'
+    game.end_reason === 'vip_eliminated'
+      ? 'Hunters successfully eliminated the secret VIP!'
+      : game.end_reason === 'last_survivor'
       ? 'The last assassin standing survived the elimination ring.'
       : game.end_reason === 'all_jailed'
         ? 'All runners were jailed at the same time.'
@@ -835,6 +837,18 @@ export default function ResultScreen() {
                       <Text style={styles.agentBadgeText}>AGENT</Text>
                     </View>
                   )}
+                  {player.secret_role === 'vip' && (
+                    <View style={styles.vipBadge}>
+                      <MaterialCommunityIcons color="#D97706" name="crown" size={12} />
+                      <Text style={styles.vipBadgeText}>VIP</Text>
+                    </View>
+                  )}
+                  {player.secret_role === 'bodyguard' && (
+                    <View style={styles.bodyguardBadge}>
+                      <MaterialCommunityIcons color="#2563EB" name="shield-account" size={12} />
+                      <Text style={styles.bodyguardBadgeText}>GUARD</Text>
+                    </View>
+                  )}
                   {player.id === state.my_player_id && <Text style={styles.playerYou}>(you)</Text>}
                 </View>
                 <Text style={styles.playerSub}>
@@ -1180,5 +1194,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     lineHeight: 17,
+  },
+  vipBadge: {
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  vipBadgeText: {
+    color: '#D97706',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  bodyguardBadge: {
+    alignItems: 'center',
+    backgroundColor: '#DBEAFE',
+    borderRadius: 6,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  bodyguardBadgeText: {
+    color: '#2563EB',
+    fontSize: 10,
+    fontWeight: '800',
   },
 });
