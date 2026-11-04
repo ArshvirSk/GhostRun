@@ -1775,6 +1775,114 @@ async function main() {
     }
   }
 
+  // --- VIP Escort Role Secrecy Checks (B4) ---
+  const vipCreated = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      roles: ['vip'],
+      head_start_s: 0,
+      ping_interval_s: 30,
+    },
+  });
+  const vipGameId = vipCreated.data?.[0]?.game_id;
+  const vipCode = vipCreated.data?.[0]?.code;
+  expect(Boolean(vipGameId), 'vip escort game created for RLS check', JSON.stringify(vipCreated.error));
+
+  if (vipGameId && vipCode) {
+    const vipRunner2 = await anonymousClient('VIPRunner2');
+    await rpc(hunter, 'join_game', { code: vipCode });
+    await rpc(vipRunner2, 'join_game', { code: vipCode });
+
+    const vipHostPid = await playerId(host, vipGameId);
+    const vipRunner2Pid = await playerId(vipRunner2, vipGameId);
+    const vipHunterPid = await playerId(hunter, vipGameId);
+
+    await rpc(host, 'set_team', { game_id: vipGameId, player_id: vipHostPid, team: 'runner' });
+    await rpc(vipRunner2, 'set_team', { game_id: vipGameId, player_id: vipRunner2Pid, team: 'runner' });
+    await rpc(hunter, 'set_team', { game_id: vipGameId, player_id: vipHunterPid, team: 'hunter' });
+
+    for (const client of [host, vipRunner2, hunter]) {
+      await rpc(client, 'set_share_trail', { game_id: vipGameId, share: true });
+      await rpc(client, 'set_ready', { game_id: vipGameId, ready: true });
+    }
+
+    const startVip = await rpc(host, 'start_game', { game_id: vipGameId });
+    expect(!startVip.error, 'host starts VIP Escort game', JSON.stringify(startVip.error));
+
+    // Wait for countdown to expire so game enters live status
+    await new Promise((r) => setTimeout(r, 11000));
+
+    // 1. Runner secrecy check:
+    // Host (runner) inspects get_game_state -> sees secret_role for self and runner teammate
+    const hostState = await rpc<{ players: Array<{ id: string; team: string; secret_role?: string | null }> }>(
+      host,
+      'get_game_state',
+      { game_id: vipGameId },
+    );
+    const hostPlayers = hostState.data?.players ?? [];
+    const runnerRolesVisible = hostPlayers
+      .filter((p) => p.team === 'runner')
+      .every((p) => p.secret_role === 'vip' || p.secret_role === 'bodyguard');
+    expect(runnerRolesVisible, 'runners can see teammates secret_role (vip/bodyguard)', JSON.stringify(hostPlayers));
+
+    // 2. Hunter secrecy check:
+    // Hunter inspects get_game_state -> must NOT see runner secret_role (must be null)
+    const hunterState = await rpc<{ players: Array<{ id: string; team: string; secret_role?: string | null }> }>(
+      hunter,
+      'get_game_state',
+      { game_id: vipGameId },
+    );
+    const hunterPlayers = hunterState.data?.players ?? [];
+    const hunterSeesNoRunnerRoles = hunterPlayers
+      .filter((p) => p.team === 'runner')
+      .every((p) => p.secret_role === null || p.secret_role === undefined);
+    expect(
+      hunterSeesNoRunnerRoles,
+      'hunter CANNOT see runner secret_role during live play (RLS secrecy)',
+      JSON.stringify(hunterPlayers.map((p) => ({ id: p.id, team: p.team, role: p.secret_role }))),
+    );
+
+    // 3. Direct game_players table check (RLS)
+    const hunterDirectPlayers = (await hunter.from('players').select('id, team, secret_role').eq('game_id', vipGameId)).data ?? [];
+    const hunterDirectSeesNoSecret = hunterDirectPlayers
+      .filter((p) => p.team === 'runner')
+      .every((p) => p.secret_role === null || p.secret_role === undefined);
+    expect(
+      hunterDirectSeesNoSecret,
+      'hunter direct players select cannot read runner secret_role during live play',
+      JSON.stringify(hunterDirectPlayers),
+    );
+
+    // 4. Role swap authorization:
+    // Outsider cannot request role swap
+    const outsiderSwap = await rpc(outsider, 'request_role_swap', {
+      p_game_id: vipGameId,
+      p_target_player_id: vipRunner2Pid,
+    });
+    expect(Boolean(outsiderSwap.error), 'outsider cannot call request_role_swap', 'call unexpectedly succeeded');
+
+    // Hunter cannot request role swap
+    const hunterSwap = await rpc(hunter, 'request_role_swap', {
+      p_game_id: vipGameId,
+      p_target_player_id: vipHostPid,
+    });
+    expect(Boolean(hunterSwap.error), 'hunter cannot call request_role_swap', 'call unexpectedly succeeded');
+
+    // Runner cannot swap with hunter
+    const swapWithHunter = await rpc(host, 'request_role_swap', {
+      p_game_id: vipGameId,
+      p_target_player_id: vipHunterPid,
+    });
+    expect(Boolean(swapWithHunter.error), 'runner cannot swap role with hunter', 'call unexpectedly succeeded');
+
+    for (const client of [host, vipRunner2, hunter]) {
+      await rpc(client, 'leave_game', { game_id: vipGameId });
+    }
+  }
+
   // Consent records are append-only and reachable only through the RPCs.
   const policyAck = await rpc(host, 'set_consent', {
     consent_type: 'policy_ack',

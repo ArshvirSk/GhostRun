@@ -112,7 +112,7 @@ async function modeFrameworkScenario() {
     });
 
   const incompatible = await rpc<unknown>(host, 'create_game', {
-    mode: 'tag_hunt',
+    mode: 'assassin_ring',
     lat: CENTER.lat,
     lng: CENTER.lng,
     radius_m: 600,
@@ -633,6 +633,15 @@ async function hotColdScenario() {
   await rpc(host, 'submit_position', {
     game_id: gameId,
     lat: CENTER.lat + 0.0035,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // Hunter refreshes position
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
     lng: CENTER.lng,
     accuracy: 5,
     recorded_at: new Date().toISOString(),
@@ -1674,6 +1683,13 @@ async function jailbreakScenario() {
     accuracy: 4,
     recorded_at: new Date().toISOString(),
   });
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.002,
+    lng: CENTER.lng + 0.002,
+    accuracy: 4,
+    recorded_at: new Date().toISOString(),
+  });
   const finalTag = await rpc<{ success: boolean; phase: string; winner: string; end_reason: string }>(
     hunter,
     'attempt_tag',
@@ -2267,6 +2283,225 @@ async function relayHeistScenario() {
   }
 }
 
+/** Scripted: B4 VIP Escort role scenarios (role assignment, secrecy, 5m role swap, bodyguard freeze, freeze tag rejection, VIP elimination). */
+async function vipEscortScenario() {
+  console.log('\n--- Scenario: vip-escort (B4 VIP Escort Role Add-on) ---');
+  const host = await newPlayer('VipHost'); // Runner 1
+  const runner2 = await newPlayer('VipRunner2'); // Runner 2
+  const hunter = await newPlayer('VipHunter'); // Hunter
+
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      roles: ['vip'],
+      head_start_s: 0,
+      ping_interval_s: 30,
+    },
+  });
+
+  if (created.error || !created.data?.[0]?.game_id) {
+    throw new Error(`vip_escort create failed: ${created.error?.message}`);
+  }
+  const gameId = created.data[0].game_id;
+  const code = created.data[0].code;
+
+  await rpc(runner2, 'join_game', { code });
+  await rpc(hunter, 'join_game', { code });
+
+  const hostPid = await playerId(host, gameId);
+  const runner2Pid = await playerId(runner2, gameId);
+  const hunterPid = await playerId(hunter, gameId);
+
+  await rpc(host, 'set_team', { game_id: gameId, player_id: hostPid, team: 'runner' });
+  await rpc(runner2, 'set_team', { game_id: gameId, player_id: runner2Pid, team: 'runner' });
+  await rpc(hunter, 'set_team', { game_id: gameId, player_id: hunterPid, team: 'hunter' });
+
+  for (const client of [host, runner2, hunter]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
+  // 1. Start game and verify countdown -> live
+  const started = await rpc(host, 'start_game', { game_id: gameId });
+  expect(!started.error, 'VIP Escort game starts cleanly in countdown', JSON.stringify(started.error));
+
+  await new Promise((r) => setTimeout(r, 11000));
+
+  // 2. Verify role assignment (1 VIP, 1 Bodyguard)
+  const hostState = await rpc<{ players: Array<{ id: string; team: string; secret_role?: string | null }> }>(
+    host,
+    'get_game_state',
+    { game_id: gameId },
+  );
+  const runners = (hostState.data?.players ?? []).filter((p) => p.team === 'runner');
+  const vipRunner = runners.find((p) => p.secret_role === 'vip');
+  const bodyguardRunner = runners.find((p) => p.secret_role === 'bodyguard');
+
+  expect(
+    Boolean(vipRunner && bodyguardRunner),
+    'exactly 1 VIP and 1 Bodyguard assigned among runners',
+    JSON.stringify(runners),
+  );
+
+  // 3. Verify secrecy: Hunter sees secret_role = null
+  const hunterState = await rpc<{ players: Array<{ id: string; team: string; secret_role?: string | null }> }>(
+    hunter,
+    'get_game_state',
+    { game_id: gameId },
+  );
+  const hunterRunnerViews = (hunterState.data?.players ?? []).filter((p) => p.team === 'runner');
+  const hunterSeesNoRoles = hunterRunnerViews.every((p) => p.secret_role === null || p.secret_role === undefined);
+  expect(
+    hunterSeesNoRoles,
+    'hunter cannot see runner secret roles during live play',
+    JSON.stringify(hunterRunnerViews),
+  );
+
+  const vipClient = vipRunner?.id === hostPid ? host : runner2;
+  const bodyguardClient = bodyguardRunner?.id === hostPid ? host : runner2;
+  const vipId = vipRunner!.id;
+  const bodyguardId = bodyguardRunner!.id;
+
+  // 4. Test Role Swap
+  // Both runners submit positions within 2.5m of each other
+  await rpc(vipClient, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(bodyguardClient, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.00002, // ~2.2m
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const requestSwap = await rpc(bodyguardClient, 'request_role_swap', {
+    p_game_id: gameId,
+    p_target_player_id: vipId,
+  });
+  expect(!requestSwap.error, 'bodyguard requests role swap with VIP within 5m', JSON.stringify(requestSwap.error));
+
+  const confirmSwap = await rpc(vipClient, 'confirm_role_swap', {
+    p_game_id: gameId,
+  });
+  expect(!confirmSwap.error, 'VIP confirms role swap with bodyguard', JSON.stringify(confirmSwap.error));
+
+  // Verify roles swapped
+  const postSwapState = await rpc<{ players: Array<{ id: string; team: string; secret_role?: string | null }> }>(
+    host,
+    'get_game_state',
+    { game_id: gameId },
+  );
+  const postSwapRunners = (postSwapState.data?.players ?? []).filter((p) => p.team === 'runner');
+  const newVip = postSwapRunners.find((p) => p.secret_role === 'vip');
+  const newBodyguard = postSwapRunners.find((p) => p.secret_role === 'bodyguard');
+
+  expect(
+    newVip?.id === bodyguardId && newBodyguard?.id === vipId,
+    'VIP and bodyguard roles successfully swapped between players',
+    `new VIP: ${newVip?.id}, new Bodyguard: ${newBodyguard?.id}`,
+  );
+
+  const activeVipClient = newVip?.id === hostPid ? host : runner2;
+  const activeBodyguardClient = newBodyguard?.id === hostPid ? host : runner2;
+  const activeVipId = newVip!.id;
+  const activeBodyguardId = newBodyguard!.id;
+
+  // 5. Test Bodyguard Freeze Tag
+  // Move active bodyguard to hunter position; move active VIP 100m away
+  await rpc(activeVipClient, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.001, // ~111m away
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(activeBodyguardClient, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.00001,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const freezeTag = await rpc<{ success: boolean; frozen: boolean; frozen_seconds: number; tagged_player_id?: string; runner_id?: string }>(
+    hunter,
+    'attempt_tag',
+    { game_id: gameId },
+  );
+  expect(
+    freezeTag.data?.success === true &&
+      freezeTag.data?.frozen === true &&
+      (freezeTag.data?.runner_id === activeBodyguardId || freezeTag.data?.tagged_player_id === activeBodyguardId),
+    'tagging bodyguard freezes bodyguard for 60s without ending game',
+    JSON.stringify(freezeTag.data ?? freezeTag.error),
+  );
+
+  // 6. Test Tag Rejection on Frozen Bodyguard
+  const repeatTag = await rpc<{ success: boolean; reason: string }>(hunter, 'attempt_tag', { game_id: gameId });
+  expect(
+    repeatTag.data?.success === false && repeatTag.data?.reason === 'already_frozen',
+    'attempting to tag already frozen bodyguard returns already_frozen without penalty',
+    JSON.stringify(repeatTag.data ?? repeatTag.error),
+  );
+
+  // 7. Test VIP Elimination Tag
+  // Move hunter to active VIP position
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.001,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const vipTag = await rpc<{ success: boolean; game_ended?: boolean; phase?: string; winner: string; end_reason: string }>(
+    hunter,
+    'attempt_tag',
+    { game_id: gameId },
+  );
+  expect(
+    vipTag.data?.success === true &&
+      (vipTag.data?.phase === 'ended' || vipTag.data?.game_ended === true) &&
+      vipTag.data?.winner === 'hunters' &&
+      vipTag.data?.end_reason === 'vip_eliminated',
+    'tagging VIP triggers immediate hunter victory with vip_eliminated',
+    JSON.stringify(vipTag.data ?? vipTag.error),
+  );
+
+  // 8. Verify post-game secrecy lifted
+  const endedHunterState = await rpc<{ players: Array<{ id: string; team: string; secret_role?: string | null }> }>(
+    hunter,
+    'get_game_state',
+    { game_id: gameId },
+  );
+  const endedRunners = (endedHunterState.data?.players ?? []).filter((p) => p.team === 'runner');
+  const allRolesRevealed = endedRunners.every((p) => p.secret_role === 'vip' || p.secret_role === 'bodyguard');
+  expect(
+    allRolesRevealed,
+    'post-game state reveals all secret roles to hunters',
+    JSON.stringify(endedRunners),
+  );
+
+  for (const client of [host, runner2, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -2279,6 +2514,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   jailbreak: jailbreakScenario,
   'assassin-ring': assassinRingScenario,
   'relay-heist': relayHeistScenario,
+  'vip-escort': vipEscortScenario,
 };
 
 async function main() {

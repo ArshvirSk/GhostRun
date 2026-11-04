@@ -247,26 +247,34 @@
    - On successful tag, prey is marked `'tagged'` (eliminated), hunter's `elimination_count` increments, and the ring relinks ($P_{hunter} \to P_{victim's\_prey}$).
    - Last Survivor: When the active ring contracts to 1 survivor, match terminates with winner `'solo'` and reason `'last_survivor'`.
 
-## 2026-11-04 — B3: Relay Heist Base Mode (docs/MODES.md §4.5)
+## 2026-11-04 — B4: VIP Escort Role Add-on (docs/MODES.md §5.2)
 
 **Decision:**
-1. **Base Mode Integration & Extraction Placement (D12):**
-   - Added `relay_heist` value to `game_mode` enum.
-   - Host must designate the extraction point (`set_extraction_location`) within boundary before round start.
-   - Public Extraction Point (D12): Extraction point is public and visible to hunters from match start. This creates natural choke points and tactical interception opportunities without requiring runners to find hidden extraction zones.
-2. **Carrier Burden & Physical Handoffs (D13):**
-   - Exactly one active runner is designated as carrier at match start; package entity stored with `visible_to = 'runner'` for stealth.
-   - Carrier Burden: Carrying the package incurs increased radar frequency ($1.5\times$ scheduled radar ping cadence) and prevents carrier from using tactical drop items.
-   - Physical Handoff Protocol: Carrier can initiate a handoff request (`request_handoff`) when within $5\text{ m}$ of an active teammate. Teammate has a 15-second mutual confirmation window to accept (`confirm_handoff`).
-3. **Dropped Package Beacon & Drop Contest (D14):**
-   - Tagging the carrier eliminates the carrier and drops the package at their location (`status = 'dropped'`).
-   - Dropped Package Pulse (D14): Dropped packages emit a radar pulse beacon every 15 s, making it visible to both squads.
-   - Runner Recovery: Any active, un-tagged runner within $10\text{ m}$ can recover the dropped package via `pickup_package` to resume the heist.
-   - Hunter Securing: Hunters within $10\text{ m}$ can start a 20-second continuous hold (`start_securing_package`, `complete_secure_package`, `cancel_securing_package`) to secure the package.
-4. **Win Conditions:**
-   - Runners win immediately upon carrier entering extraction zone (`winner = 'runners'`, `end_reason = 'extraction_complete'`).
-   - Hunters win immediately upon completing the 20-second package secure (`winner = 'hunters'`, `end_reason = 'package_secured'`), or upon match timeout (`end_reason = 'time_expired'`).
-   - Offline fail-safe: Carrier going offline for > 60 seconds drops the package at their last fix coordinates.
+1. **Role Integration & Secrecy:**
+   - Added `'vip'` and `'bodyguard'` role values to `secret_role` enum and configured `role_catalogue` with `'vip'` role add-on.
+   - Compatible with `tag_hunt` and `classic_chase`. Requires $\ge 2$ runners (1 VIP + at least 1 bodyguard).
+   - Server-Side Secrecy: During live play, `secret_role` is visible only to runner squad teammates and the player themselves. Hunter clients receive `null` for runner `secret_role` in all live state snapshots and direct queries, ensuring the VIP's visual identity on hunter radar/map is indistinguishable from bodyguards. Role secrecy is lifted only after the match ends.
+2. **Bodyguard Freeze Mechanics (D15):**
+   - When a hunter tags a runner who is a bodyguard:
+     - The bodyguard is NOT eliminated. Instead, they enter a 60-second immobilized "freeze" state (`status_detail->'frozen_until' = now() + 60s`).
+     - While frozen, the bodyguard cannot move outside a 10m dwell zone, cannot participate in role swaps, and cannot interact with game objects.
+     - Tagging an already-frozen bodyguard fails with error `already_frozen` (preventing hunter griefing).
+     - Event Notification (D15): Emits `bodyguard_frozen` event visible to all players. Runners receive the bodyguard identity and remaining freeze time; hunters receive an anonymous confirmation that a bodyguard was successfully immobilized without leaking runner coordinates or names.
+3. **VIP Elimination & Win Conditions:**
+   - When a hunter tags the VIP:
+     - The match terminates immediately with `winner = 'hunters'` and `end_reason = 'vip_eliminated'`.
+   - In `classic_chase`, if the VIP enters the target extraction zone, runners win immediately (`winner = 'runners'`, `end_reason = 'arrival'`).
+   - In `tag_hunt`, if match timer expires with the VIP alive, runners win (`winner = 'runners'`, `end_reason = 'time_expired'`).
+4. **Physical Role Swap (High-Risk Tactical Mechanic):**
+   - Implemented `request_role_swap`, `confirm_role_swap`, and `cancel_role_swap` RPCs.
+   - Requires mutual proximity ($\le 5\text{ m}$) between VIP and an active bodyguard.
+   - 15-second mutual acceptance window and 120-second cooldown per player after a completed swap.
+   - Allows tactical misdirection (e.g., swapping attire or jackets in real life to deceive visually observing hunters).
+5. **Offline Fail-Safe Auto-Promotion (D16):**
+   - If the VIP is disconnected or offline for $> 60\text{ s}$, `advance_game` automatically promotes the longest-standing active bodyguard to VIP (`vip_promoted` event). If no bodyguards remain active, hunters win (`end_reason = 'vip_abandoned'`).
+6. **Mode Compatibility (D17):**
+   - Compatible with base modes `classic_chase` and `tag_hunt`. Incompatible with `assassin_ring` (solo free-for-all) and `relay_heist` (package carrier conflict).
+
 
 
 

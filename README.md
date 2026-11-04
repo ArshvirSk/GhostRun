@@ -130,13 +130,23 @@ GhostRun introduces an asynchronous community ghost recording system:
 
 ---
 
-## 🕵️ Secret Roles: Double Agent & Emergency Tribunal
+## 🕵️ Roles & Role Add-ons (docs/MODES.md §5)
 
-* **The Mole:** In Classic Chase matches with $\ge 2$ hunters, one hunter can be secretly designated as the **Double Agent**.
+### 1. Double Agent & Emergency Tribunal (§5.1)
+* **The Mole:** In matches with $\ge 2$ hunters, one hunter can be secretly designated as the **Double Agent**.
 * **Covert Powers:**
   - **Whisper (Once per match):** Reveals the cardinal quadrant (`North`, `South`, `East`, `West`) of the runners' extraction target.
   - **Scramble (2-min cooldown):** Jams hunters' radar on the next ping round, shifting a chosen runner's revealed coordinate by 150–250 m.
 * **Emergency Tribunal:** Suspicious hunters can convene an Emergency Tribunal and vote to eject an accused hunter. If the Double Agent is ejected, hunters gain a bonus ping round; ejecting a loyal hunter penalizes hunters with a 5-minute radar silence.
+
+### 2. VIP Escort (§5.2)
+* **The High-Value Asset:** In matches with $\ge 2$ runners (compatible with Classic Chase and Tag Hunt), one runner is secretly designated as the **VIP**, while all other runners serve as loyal **Bodyguards**.
+* **Strict Server Secrecy:** Hunter radar pings and live dot markers show identical visual signatures for all runners. Hunters cannot identify which runner is the VIP until the round concludes.
+* **Bodyguard Freeze Mechanic:** Tagging a bodyguard does not eliminate them. Instead, the bodyguard enters a **60-second immobilized freeze state** within a 10 m dwell zone. Tagging an already-frozen bodyguard fails (`already_frozen`). Hunters receive a non-locational confirmation that a bodyguard was frozen, confirming they did not tag the VIP.
+* **VIP Elimination:** Tagging the VIP eliminates them instantly and awards victory to the hunters (`winner = 'hunters'`, `end_reason = 'vip_eliminated'`).
+* **Tactical Role Swap:** When the VIP and a bodyguard are within $5\text{ m}$ of each other, either player can initiate a physical role swap. With a 15-second mutual confirmation window and 120-second cooldown, squads can swap attire and roles in real life to deceive watching hunters.
+* **Auto-Promotion Fail-Safe:** If the VIP goes offline or disconnects for $> 60\text{ s}$, an active bodyguard is automatically promoted to VIP (`vip_promoted`).
+
 
 ---
 
