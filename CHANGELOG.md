@@ -7,6 +7,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Phase B: Milestone B3 — Relay Heist Base Mode (docs/MODES.md §4.5)
+- **Base Mode Integration:**
+  - Added `relay_heist` base mode enum, catalogue entry in `mode_catalogue()`, and mode configuration validation.
+  - Added `relay_heist` mode registry rules in `src/lib/modeRegistry.ts` and lobby selection in `app/create.tsx`.
+  - Added host extraction point placement in `app/lobby/[id].tsx` with validation and boundary clamping.
+- **Server Authority & Secrecy:**
+  - Mandatory host extraction point placement (`set_extraction_location`) validated before start.
+  - Designated initial carrier randomly from active runners at match start; package entity created with `visible_to = 'runner'` for live secrecy.
+  - Physical handoff protocol (`request_handoff`, `confirm_handoff`) requiring $< 5\text{ m}$ proximity and 15-second mutual confirmation window.
+  - Carrier burden: $1.5\times$ radar ping cadence, item lock, and position broadcast to teammates.
+  - Package drop mechanics: tagging the carrier drops the package at their coordinates; dropped package pulses radar beacon every 15 s until recovered or secured.
+  - Drop contest: surviving runners can recover dropped package within 10 m (`pickup_package`); hunters can execute a 20-second continuous hold (`start_securing_package`, `complete_secure_package`, `cancel_securing_package`) to secure the package.
+  - Win conditions: extraction victory when carrier enters extraction zone (`winner = 'runners'`, `end_reason = 'extraction_complete'`); package secured victory when hunters complete hold (`winner = 'hunters'`, `end_reason = 'package_secured'`); or timeout.
+  - Inactivity auto-drop: carrier going offline for > 60 seconds drops the package at their last known fix.
+- **Client & HUD:**
+  - Rendered extraction zone fill, outline, and marker on live MapLibre map.
+  - Rendered dropped package beacon marker and radar pulse ring on map.
+  - Added carrier handoff request and receiver confirmation action cards in bottom sheet.
+  - Added runner pickup card and hunter 20-second hold-to-secure action button with animated progress.
+  - Results screen support for `extraction_complete` and `package_secured` win reasons.
+- **Verification:**
+  - Passed `npm run sim relay-heist` and full simulator suite (`npm run sim`).
+  - Added dedicated Relay Heist RLS and secrecy checks in `scripts/rls-check.ts` (100% pass).
+
 ### Phase B: Milestone B2 — Assassin Ring Base Mode (docs/MODES.md §4.3)
 - **Base Mode Integration:**
   - Added `assassin_ring` base mode enum, team type `'solo'`, and mode catalogue entry in `mode_catalogue()`.

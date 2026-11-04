@@ -45,6 +45,12 @@ type LobbyGame = {
     longitude: number;
     radius_m: number;
   } | null;
+  extraction?: {
+    id: string;
+    latitude: number;
+    longitude: number;
+    radius_m: number;
+  } | null;
   safe_zones?: {
     id: string;
     latitude: number;
@@ -173,8 +179,39 @@ export default function LobbyScreen() {
     activePlayers.length >= (isAssassinRing ? 3 : 2) && activePlayers.every((player) => player.is_ready);
   const everyoneAssigned = isAssassinRing ? true : activePlayers.every((player) => player.team !== 'unassigned');
   const isJailbreak = state?.game.mode_id === 'jailbreak';
+  const isRelayHeist = state?.game.mode_id === 'relay_heist';
   const jailPlaced = Boolean(state?.game.jail);
   const canStart = hasBothTeams && everyoneAssigned && (!isJailbreak || jailPlaced);
+
+  async function placeExtraction(lat?: number, lng?: number) {
+    if (!supabase || !gameId) return;
+    let targetLat = lat;
+    let targetLng = lng;
+    if (targetLat === undefined || targetLng === undefined) {
+      const center = state?.game.area_center;
+      if (center) {
+        if (Array.isArray(center)) {
+          targetLng = center[0];
+          targetLat = center[1];
+        } else {
+          targetLat = center.latitude;
+          targetLng = center.longitude;
+        }
+      }
+    }
+    if (targetLat === undefined || targetLng === undefined) {
+      setErrorMessage('Could not determine play area center for extraction.');
+      return;
+    }
+    await runAction('place_extraction', () =>
+      supabase!.rpc('set_extraction_location', {
+        p_game_id: gameId,
+        p_lat: targetLat,
+        p_lng: targetLng,
+      }),
+    );
+    await loadState();
+  }
 
   async function placeJail(lat?: number, lng?: number) {
     if (!supabase || !gameId) return;
@@ -597,6 +634,36 @@ export default function LobbyScreen() {
                     ) : (
                       <Text style={styles.jailActionText}>
                         {state.game.jail ? 'Reset Jail to Area Center' : 'Place Jail at Area Center'}
+                      </Text>
+                    )}
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {isRelayHeist && (
+              <View style={styles.jailSection}>
+                <View style={styles.jailHeaderRow}>
+                  <Ionicons color="#10B981" name="flag" size={16} />
+                  <Text style={[styles.jailTitle, { color: '#10B981' }]}>EXTRACTION POINT</Text>
+                </View>
+                <Text style={styles.jailSubtitle}>
+                  {state.game.extraction
+                    ? `Extraction point is established (${state.game.extraction.radius_m ?? 25}m radius).`
+                    : 'Auto-placed inside boundary perimeter or set by host.'}
+                </Text>
+                {isHost && (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busyAction !== ''}
+                    onPress={() => void placeExtraction()}
+                    style={[styles.jailActionButton, { backgroundColor: '#059669' }]}
+                  >
+                    {busyAction === 'place_extraction' ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Text style={styles.jailActionText}>
+                        {state.game.extraction ? 'Reposition Extraction Point' : 'Place Extraction Point'}
                       </Text>
                     )}
                   </Pressable>

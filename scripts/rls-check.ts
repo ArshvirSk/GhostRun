@@ -1674,6 +1674,107 @@ async function main() {
     }
   }
 
+  // --- Relay Heist Access and Secrecy Checks (B3) ---
+  const rhCreated = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'relay_heist',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      head_start_s: 0,
+      ping_interval_s: 30,
+    },
+  });
+  const rhGameId = rhCreated.data?.[0]?.game_id;
+  const rhCode = rhCreated.data?.[0]?.code;
+  expect(Boolean(rhGameId), 'relay heist game created for RLS check', JSON.stringify(rhCreated.error));
+
+  if (rhGameId && rhCode) {
+    const rhRunner2 = await anonymousClient('RelayRunner2');
+    await rpc(hunter, 'join_game', { code: rhCode });
+    await rpc(rhRunner2, 'join_game', { code: rhCode });
+
+    const rhHostPid = await playerId(host, rhGameId);
+    const rhRunner2Pid = await playerId(rhRunner2, rhGameId);
+    const rhHunterPid = await playerId(hunter, rhGameId);
+
+    await rpc(host, 'set_team', { game_id: rhGameId, player_id: rhHostPid, team: 'runner' });
+    await rpc(rhRunner2, 'set_team', { game_id: rhGameId, player_id: rhRunner2Pid, team: 'runner' });
+    await rpc(hunter, 'set_team', { game_id: rhGameId, player_id: rhHunterPid, team: 'hunter' });
+
+    // 1. Extraction placement authorization
+    const outsiderExtraction = await rpc(outsider, 'set_extraction_location', {
+      p_game_id: rhGameId,
+      p_lat: CENTER.lat + 0.001,
+      p_lng: CENTER.lng + 0.001,
+    });
+    expect(Boolean(outsiderExtraction.error), 'outsider cannot set extraction location', 'call unexpectedly succeeded');
+
+    const hunterExtraction = await rpc(hunter, 'set_extraction_location', {
+      p_game_id: rhGameId,
+      p_lat: CENTER.lat + 0.001,
+      p_lng: CENTER.lng + 0.001,
+    });
+    expect(Boolean(hunterExtraction.error), 'hunter cannot set extraction location', 'call unexpectedly succeeded');
+
+    const hostExtraction = await rpc(host, 'set_extraction_location', {
+      p_game_id: rhGameId,
+      p_lat: CENTER.lat + 0.001,
+      p_lng: CENTER.lng + 0.001,
+      p_radius_m: 25,
+    });
+    expect(!hostExtraction.error, 'host can set extraction location inside boundary', JSON.stringify(hostExtraction.error));
+
+    // 2. Start game and verify carrier secrecy
+    for (const client of [host, rhRunner2, hunter]) {
+      await rpc(client, 'set_share_trail', { game_id: rhGameId, share: true });
+      await rpc(client, 'set_ready', { game_id: rhGameId, ready: true });
+    }
+
+    const startRh = await rpc(host, 'start_game', { game_id: rhGameId });
+    expect(!startRh.error, 'host starts relay heist game', JSON.stringify(startRh.error));
+
+    // Fast-forward countdown
+    await new Promise((r) => setTimeout(r, 11000));
+
+    // 3. Entity table secrecy: package is visible_to = 'runner' while carried
+    const hostEntities = (await host.from('entities').select('*').eq('game_id', rhGameId)).data ?? [];
+    const hostPackageEntity = hostEntities.find((e) => e.kind === 'package');
+    expect(
+      Boolean(hostPackageEntity),
+      'runner member can read package entity from entities table while carried',
+      `found entities: ${hostEntities.map((e) => e.kind).join(', ')}`,
+    );
+
+    const hunterEntities = (await hunter.from('entities').select('*').eq('game_id', rhGameId)).data ?? [];
+    const hunterPackageEntity = hunterEntities.find((e) => e.kind === 'package');
+    expect(
+      !hunterPackageEntity,
+      'hunter CANNOT read carried package entity from entities table (RLS secrecy)',
+      `hunter unexpectedly saw: ${JSON.stringify(hunterPackageEntity)}`,
+    );
+
+    const outsiderEntities = (await outsider.from('entities').select('*').eq('game_id', rhGameId)).data ?? [];
+    expectEmpty(outsiderEntities, 'outsider cannot read entities table for relay heist game');
+
+    // 4. Role RPC authorization
+    const hunterHandoff = await rpc(hunter, 'request_handoff', {
+      p_game_id: rhGameId,
+      p_target_player_id: rhHostPid,
+    });
+    expect(Boolean(hunterHandoff.error), 'hunter cannot call request_handoff', 'call unexpectedly succeeded');
+
+    const outsiderPickup = await rpc(outsider, 'pickup_package', { p_game_id: rhGameId });
+    expect(Boolean(outsiderPickup.error), 'outsider cannot call pickup_package', 'call unexpectedly succeeded');
+
+    const runnerSecuring = await rpc(host, 'start_securing_package', { p_game_id: rhGameId });
+    expect(Boolean(runnerSecuring.error), 'runner cannot call start_securing_package', 'call unexpectedly succeeded');
+
+    for (const client of [host, rhRunner2, hunter]) {
+      await rpc(client, 'leave_game', { game_id: rhGameId });
+    }
+  }
+
   // Consent records are append-only and reachable only through the RPCs.
   const policyAck = await rpc(host, 'set_consent', {
     consent_type: 'policy_ack',

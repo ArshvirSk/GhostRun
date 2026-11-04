@@ -1960,6 +1960,313 @@ async function assassinRingScenario() {
   }
 }
 
+/** Scripted: B3 Relay Heist mode scenarios (extraction placement, carrier assignment, physical handoff, package drop, recover, extraction win). */
+async function relayHeistScenario() {
+  console.log('\n--- Scenario: relay-heist (B3 Relay Heist Base Mode) ---');
+  const host = await newPlayer('HeistHost'); // Runner 1
+  const runner2 = await newPlayer('HeistRunner2'); // Runner 2
+  const hunter = await newPlayer('HeistHunter'); // Hunter
+
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'relay_heist',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      head_start_s: 0,
+      ping_interval_s: 30,
+      mode_params: {
+        relay_heist: {
+          extraction_radius_m: 25,
+          handoff_radius_m: 5,
+          drop_pickup_radius_m: 10,
+          hunter_secure_hold_s: 20,
+        },
+      },
+    },
+  });
+
+  if (created.error || !created.data?.[0]?.game_id) {
+    throw new Error(`relay_heist create failed: ${created.error?.message}`);
+  }
+  const gameId = created.data[0].game_id;
+  const code = created.data[0].code;
+
+  await rpc(runner2, 'join_game', { code });
+  await rpc(hunter, 'join_game', { code });
+
+  const hostPid = await playerId(host, gameId);
+  const runner2Pid = await playerId(runner2, gameId);
+  const hunterPid = await playerId(hunter, gameId);
+
+  await rpc(host, 'set_team', { game_id: gameId, player_id: hostPid, team: 'runner' });
+  await rpc(runner2, 'set_team', { game_id: gameId, player_id: runner2Pid, team: 'runner' });
+  await rpc(hunter, 'set_team', { game_id: gameId, player_id: hunterPid, team: 'hunter' });
+
+  for (const client of [host, runner2, hunter]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
+  // 1. Attempt start before extraction placement fails
+  const earlyStart = await rpc(host, 'start_game', { game_id: gameId });
+  expect(
+    Boolean(earlyStart.error) && /place the extraction point/i.test(earlyStart.error?.message ?? ''),
+    'start requires extraction point placement in Relay Heist mode',
+    String(earlyStart.error?.message ?? 'unexpected success'),
+  );
+
+  // 2. set_extraction_location outside area fails
+  const outsideExtraction = await rpc(host, 'set_extraction_location', {
+    p_game_id: gameId,
+    p_lat: CENTER.lat + 0.05,
+    p_lng: CENTER.lng + 0.05,
+  });
+  expect(
+    Boolean(outsideExtraction.error),
+    'setting extraction point outside area fails',
+    String(outsideExtraction.error?.message ?? 'unexpected success'),
+  );
+
+  // 3. Set extraction inside area succeeds (approx 220m north)
+  const extractionLat = CENTER.lat + 0.002;
+  const extractionLng = CENTER.lng;
+  const validExtraction = await rpc(host, 'set_extraction_location', {
+    p_game_id: gameId,
+    p_lat: extractionLat,
+    p_lng: extractionLng,
+    p_radius_m: 25,
+  });
+  expect(
+    !validExtraction.error,
+    'setting extraction point inside area succeeds',
+    String(validExtraction.error?.message ?? ''),
+  );
+
+  // 4. Start game -> countdown -> live
+  const started = await rpc<{ status: string }>(host, 'start_game', { game_id: gameId });
+  expect(
+    !started.error && started.data?.status === 'countdown',
+    'Relay Heist game starts cleanly in countdown',
+    String(started.error?.message ?? started.data?.status),
+  );
+
+  // Fast forward past countdown to live
+  await new Promise((r) => setTimeout(r, 11000));
+
+  type RelayGameState = {
+    game: { status: string };
+    relay_heist?: {
+      extraction?: { latitude: number; longitude: number; radius_m: number };
+      package?: {
+        status: 'carried' | 'dropped';
+        carrier_player_id?: string;
+        is_carrier?: boolean;
+        latitude?: number;
+        longitude?: number;
+      };
+      is_carrier?: boolean;
+      handoff_pending_from?: string;
+    };
+  };
+
+  const hostLiveState = await rpc<RelayGameState>(host, 'get_game_state', { game_id: gameId });
+  const runner2LiveState = await rpc<RelayGameState>(runner2, 'get_game_state', { game_id: gameId });
+  const hunterLiveState = await rpc<RelayGameState>(hunter, 'get_game_state', { game_id: gameId });
+
+  expect(
+    hostLiveState.data?.game.status === 'live',
+    'Relay Heist round reaches live status',
+    JSON.stringify(hostLiveState.data?.game),
+  );
+
+  expect(
+    Boolean(hostLiveState.data?.relay_heist?.extraction),
+    'extraction point is present in runner state',
+    JSON.stringify(hostLiveState.data?.relay_heist?.extraction),
+  );
+
+  expect(
+    Boolean(hunterLiveState.data?.relay_heist?.extraction),
+    'extraction point is public and present in hunter state from start',
+    JSON.stringify(hunterLiveState.data?.relay_heist?.extraction),
+  );
+
+  // Verify carrier assignment
+  const hostIsCarrier = hostLiveState.data?.relay_heist?.is_carrier;
+  const runner2IsCarrier = runner2LiveState.data?.relay_heist?.is_carrier;
+  expect(
+    Boolean((hostIsCarrier && !runner2IsCarrier) || (!hostIsCarrier && runner2IsCarrier)),
+    'exactly one runner is designated as carrier at match start',
+    `host=${hostIsCarrier}, runner2=${runner2IsCarrier}`,
+  );
+
+  const initialCarrierClient = hostIsCarrier ? host : runner2;
+  const initialCarrierPid = hostIsCarrier ? hostPid : runner2Pid;
+  const otherRunnerClient = hostIsCarrier ? runner2 : host;
+  const otherRunnerPid = hostIsCarrier ? runner2Pid : hostPid;
+
+  // 5. Physical Handoff Test
+  // Initial carrier submits position at CENTER
+  await rpc(initialCarrierClient, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // Other runner submits position ~33m away (too far for 5m handoff)
+  await rpc(otherRunnerClient, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.0003,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const distantHandoff = await rpc<{ success: boolean; reason: string }>(initialCarrierClient, 'request_handoff', {
+    p_game_id: gameId,
+    p_target_player_id: otherRunnerPid,
+  });
+  expect(
+    distantHandoff.data?.success === false && distantHandoff.data?.reason === 'too_far',
+    'handoff request rejected when teammates are > 5m apart',
+    JSON.stringify(distantHandoff.data ?? distantHandoff.error),
+  );
+
+  // Other runner moves to within 2.5m (approx 0.00002 deg lat ~ 2.2m)
+  await rpc(otherRunnerClient, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.00002,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const validHandoffReq = await rpc(initialCarrierClient, 'request_handoff', {
+    p_game_id: gameId,
+    p_target_player_id: otherRunnerPid,
+  });
+  expect(
+    !validHandoffReq.error,
+    'handoff request accepted when within 5m',
+    String(validHandoffReq.error?.message ?? ''),
+  );
+
+  // Other runner confirms handoff
+  const confirmHandoffRes = await rpc(otherRunnerClient, 'confirm_handoff', {
+    p_game_id: gameId,
+  });
+  expect(
+    !confirmHandoffRes.error,
+    'handoff confirmed by receiver',
+    String(confirmHandoffRes.error?.message ?? ''),
+  );
+
+  // Verify carrier swap
+  const swappedState = await rpc<RelayGameState>(otherRunnerClient, 'get_game_state', { game_id: gameId });
+  expect(
+    swappedState.data?.relay_heist?.is_carrier === true,
+    'receiving runner is now the active package carrier',
+    `is_carrier=${swappedState.data?.relay_heist?.is_carrier}`,
+  );
+
+  // 6. Carrier Tag & Package Drop Test
+  // Hunter moves within 5m of new carrier
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.00003,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const tagCarrier = await rpc<{ success: boolean; phase: string }>(hunter, 'attempt_tag', {
+    game_id: gameId,
+  });
+  expect(
+    tagCarrier.data?.success === true,
+    'hunter successfully tags package carrier',
+    JSON.stringify(tagCarrier.data ?? tagCarrier.error),
+  );
+
+  // Inspect state: package should now be dropped on ground
+  const dropState = await rpc<RelayGameState>(hunter, 'get_game_state', { game_id: gameId });
+  expect(
+    dropState.data?.relay_heist?.package?.status === 'dropped' &&
+      dropState.data.relay_heist.package.latitude !== undefined,
+    'package drops to ground and becomes visible to hunter',
+    JSON.stringify(dropState.data?.relay_heist?.package),
+  );
+
+  // 7. Drop Contest: Hunter Securing
+  const startSecuring = await rpc(hunter, 'start_securing_package', { p_game_id: gameId });
+  expect(
+    !startSecuring.error,
+    'hunter within 10m can start securing dropped package',
+    String(startSecuring.error?.message ?? ''),
+  );
+
+  const cancelSecuring = await rpc(hunter, 'cancel_securing_package', { p_game_id: gameId });
+  expect(
+    !cancelSecuring.error,
+    'hunter can cancel securing hold cleanly',
+    String(cancelSecuring.error?.message ?? ''),
+  );
+
+  // 8. Runner Recovery: Surviving runner recovers package
+  // Initial carrier (who is not tagged) moves within 3m of dropped package
+  await rpc(initialCarrierClient, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.00002,
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const recoverRes = await rpc(initialCarrierClient, 'pickup_package', { p_game_id: gameId });
+  expect(
+    !recoverRes.error,
+    'surviving runner recovers dropped package',
+    String(recoverRes.error?.message ?? ''),
+  );
+
+  const recoveredState = await rpc<RelayGameState>(initialCarrierClient, 'get_game_state', { game_id: gameId });
+  expect(
+    recoveredState.data?.relay_heist?.is_carrier === true &&
+      recoveredState.data?.relay_heist?.package?.status === 'carried',
+    'recovering runner is now active carrier with carried package',
+    JSON.stringify(recoveredState.data?.relay_heist),
+  );
+
+  // 9. Extraction Victory: Carrier reaches extraction zone
+  await rpc(initialCarrierClient, 'submit_position', {
+    game_id: gameId,
+    lat: extractionLat,
+    lng: extractionLng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const extractionState = await rpc<{ game: { status: string; winner: string; end_reason: string } }>(
+    initialCarrierClient,
+    'get_game_state',
+    { game_id: gameId }
+  );
+  expect(
+    extractionState.data?.game.status === 'ended' &&
+      extractionState.data.game.winner === 'runners' &&
+      extractionState.data.game.end_reason === 'extraction_complete',
+    'carrier reaching extraction zone triggers runners victory with extraction_complete',
+    JSON.stringify(extractionState.data?.game),
+  );
+
+  for (const client of [host, runner2, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -1971,6 +2278,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   's1-security-timing': s1SecurityTimingScenario,
   jailbreak: jailbreakScenario,
   'assassin-ring': assassinRingScenario,
+  'relay-heist': relayHeistScenario,
 };
 
 async function main() {

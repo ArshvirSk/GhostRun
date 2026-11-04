@@ -205,6 +205,28 @@ type RoundState = {
     in_safe_zone: boolean;
     active_survivors: number;
   } | null;
+  relay_heist?: {
+    extraction?: {
+      id: string;
+      longitude: number;
+      latitude: number;
+      radius_m: number;
+    } | null;
+    package?: {
+      status: 'carried' | 'dropped';
+      carrier_player_id?: string | null;
+      is_carrier?: boolean;
+      longitude?: number;
+      latitude?: number;
+      dropped_at?: string | null;
+      securing_hunter_id?: string | null;
+      securing_started_at?: string | null;
+      handoff_pending_to?: string | null;
+      handoff_expires_at?: string | null;
+    } | null;
+    is_carrier: boolean;
+    handoff_pending_from?: string | null;
+  } | null;
 };
 
 type SharingState = 'idle' | 'starting' | 'on' | 'denied' | 'error';
@@ -964,10 +986,11 @@ export default function GameScreen() {
       playSound('tag');
       const isJb = state?.game.mode_id === 'jailbreak';
       const isAr = state?.game.mode_id === 'assassin_ring';
+      const isRh = state?.game.mode_id === 'relay_heist';
       setTagMessage(
         result.phase === 'ended'
-          ? (isJb ? 'All runners jailed! Round over.' : isAr ? 'Last survivor standing! Victory!' : 'Tag confirmed. The round is over.')
-          : (isJb ? 'Runner jailed!' : isAr ? 'Target eliminated! New prey assigned.' : 'Tag confirmed.'),
+          ? (isJb ? 'All runners jailed! Round over.' : isAr ? 'Last survivor standing! Victory!' : isRh ? 'All runners tagged! Hunters win!' : 'Tag confirmed. The round is over.')
+          : (isJb ? 'Runner jailed!' : isAr ? 'Target eliminated! New prey assigned.' : isRh ? 'Runner tagged! Package dropped!' : 'Tag confirmed.'),
       );
       await loadState();
       return;
@@ -1192,6 +1215,195 @@ export default function GameScreen() {
       ? distanceM(ownFix, { longitude: jailLongitude, latitude: jailLatitude })
       : null;
 
+  const isRelayHeist = state?.game?.mode_id === 'relay_heist';
+  const extraction = state?.relay_heist?.extraction;
+  const packageState = state?.relay_heist?.package;
+  const isCarrier = Boolean(state?.relay_heist?.is_carrier);
+  const handoffPendingFrom = state?.relay_heist?.handoff_pending_from;
+
+  const extractionRingData = useMemo(() => {
+    if (!extraction) return null;
+    return circleRing(
+      { longitude: extraction.longitude, latitude: extraction.latitude },
+      extraction.radius_m ?? 25,
+    );
+  }, [extraction]);
+
+  const extractionPointData: PointCollection | null = useMemo(() => {
+    if (!extraction) return null;
+    return {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'Point',
+            coordinates: [extraction.longitude, extraction.latitude],
+          },
+        },
+      ],
+    };
+  }, [extraction]);
+
+  const droppedPackagePointData: PointCollection | null = useMemo(() => {
+    if (
+      !packageState ||
+      packageState.status !== 'dropped' ||
+      packageState.longitude === undefined ||
+      packageState.latitude === undefined
+    ) {
+      return null;
+    }
+    return {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'Point',
+            coordinates: [packageState.longitude, packageState.latitude],
+          },
+        },
+      ],
+    };
+  }, [packageState]);
+
+  const distanceToDroppedPackage =
+    ownFix && packageState?.status === 'dropped' && packageState.longitude !== undefined && packageState.latitude !== undefined
+      ? distanceM(ownFix, { longitude: packageState.longitude, latitude: packageState.latitude })
+      : null;
+
+  const distanceToExtraction =
+    ownFix && extraction
+      ? distanceM(ownFix, { longitude: extraction.longitude, latitude: extraction.latitude })
+      : null;
+
+  let nearestTeammateRunner: { player: GamePlayer; distance: number } | null = null;
+  if (isRunner && ownFix && isCarrier) {
+    for (const p of state?.players ?? []) {
+      if (p.id !== selfPlayer?.id && p.team === 'runner' && p.status === 'active') {
+        const pos = state?.positions.find((pos) => pos.player_id === p.id);
+        if (pos) {
+          const dist = distanceM(ownFix, { longitude: pos.longitude, latitude: pos.latitude });
+          if (!nearestTeammateRunner || dist < nearestTeammateRunner.distance) {
+            nearestTeammateRunner = { player: p, distance: dist };
+          }
+        }
+      }
+    }
+  }
+
+  const [securingHolding, setSecuringHolding] = useState(false);
+  const [securingProgress, setSecuringProgress] = useState(0);
+  const securingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const securingStartRef = useRef<number>(0);
+
+  const completeSecuringAction = useCallback(async () => {
+    setSecuringHolding(false);
+    setSecuringProgress(0);
+    if (!supabase || !gameId) return;
+    const { error } = await supabase.rpc('complete_secure_package', { p_game_id: gameId });
+    if (error) {
+      setTagMessage(error.message);
+    } else {
+      playSound('victory');
+      try {
+        Vibration.vibrate([0, 200, 100, 200]);
+      } catch {
+        // ignore
+      }
+      setTagMessage('Package secured! Hunters win!');
+      await loadState();
+    }
+  }, [gameId, loadState]);
+
+  const startSecuringHold = useCallback(async () => {
+    if (!supabase || !gameId || securingHolding) return;
+    setSecuringHolding(true);
+    setSecuringProgress(0);
+    securingStartRef.current = Date.now();
+
+    const { error } = await supabase.rpc('start_securing_package', { p_game_id: gameId });
+    if (error) {
+      setSecuringHolding(false);
+      setTagMessage(error.message);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - securingStartRef.current) / 1000;
+      const progress = Math.min(1, elapsed / 20.0);
+      setSecuringProgress(progress);
+
+      if (progress >= 1) {
+        clearInterval(interval);
+        securingTimerRef.current = null;
+        void completeSecuringAction();
+      }
+    }, 100);
+    securingTimerRef.current = interval;
+  }, [gameId, securingHolding, completeSecuringAction]);
+
+  const cancelSecuringHold = useCallback(async () => {
+    if (securingTimerRef.current) {
+      clearInterval(securingTimerRef.current);
+      securingTimerRef.current = null;
+    }
+    if (securingHolding) {
+      setSecuringHolding(false);
+      setSecuringProgress(0);
+      if (supabase && gameId) {
+        await supabase.rpc('cancel_securing_package', { p_game_id: gameId });
+      }
+    }
+  }, [gameId, securingHolding]);
+
+  const handleRequestHandoff = useCallback(async (targetPlayerId: string) => {
+    if (!supabase || !gameId) return;
+    setBusy('handoff');
+    const { error } = await supabase.rpc('request_handoff', {
+      p_game_id: gameId,
+      p_target_player_id: targetPlayerId,
+    });
+    setBusy('');
+    if (error) {
+      setTagMessage(error.message);
+    } else {
+      setTagMessage('Handoff requested! Waiting for teammate to confirm...');
+      await loadState();
+    }
+  }, [gameId, loadState]);
+
+  const handleConfirmHandoff = useCallback(async () => {
+    if (!supabase || !gameId) return;
+    setBusy('confirm_handoff');
+    const { error } = await supabase.rpc('confirm_handoff', { p_game_id: gameId });
+    setBusy('');
+    if (error) {
+      setTagMessage(error.message);
+    } else {
+      playSound('tag');
+      setTagMessage('Package received! You are now the carrier.');
+      await loadState();
+    }
+  }, [gameId, loadState]);
+
+  const handlePickupPackage = useCallback(async () => {
+    if (!supabase || !gameId) return;
+    setBusy('pickup');
+    const { error } = await supabase.rpc('pickup_package', { p_game_id: gameId });
+    setBusy('');
+    if (error) {
+      setTagMessage(error.message);
+    } else {
+      playSound('tag');
+      setTagMessage('Package recovered! You are now the carrier.');
+      await loadState();
+    }
+  }, [gameId, loadState]);
+
   const canRescue =
     isRunner &&
     !jailedSelf &&
@@ -1303,11 +1515,13 @@ export default function GameScreen() {
   let eyebrow =
     isAssassinRing
       ? 'ASSASSIN RING'
-      : game!.mode_id === 'jailbreak'
-        ? 'JAILBREAK'
-        : game!.mode === 'classic_chase'
-          ? 'CLASSIC CHASE'
-          : 'TAG HUNT';
+      : isRelayHeist
+        ? 'RELAY HEIST'
+        : game!.mode_id === 'jailbreak'
+          ? 'JAILBREAK'
+          : game!.mode === 'classic_chase'
+            ? 'CLASSIC CHASE'
+            : 'TAG HUNT';
   let title = '';
   let subtitle = '';
   let timerLabel = '';
@@ -1320,24 +1534,38 @@ export default function GameScreen() {
     timerLabel = 'COUNTDOWN';
     timerValue = game!.head_start_at ? (Date.parse(game!.head_start_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'head_start') {
-    accent = isAssassinRing ? '#D97706' : isRunner ? '#059669' : '#B45309';
+    accent = isAssassinRing ? '#D97706' : isRelayHeist ? '#059669' : isRunner ? '#059669' : '#B45309';
     title = isAssassinRing ? 'Disperse' : isRunner ? 'Head start' : 'Hunters locked';
     subtitle = isAssassinRing
       ? 'Move away from other players. The ring activates when the timer reaches zero.'
-      : isRunner
-        ? 'Move away from the target and stay inside the play area. Hunters cannot see you yet.'
-        : 'The runners are moving. The map unlocks when the timer reaches zero.';
+      : isRelayHeist
+        ? isRunner
+          ? (isCarrier ? 'You have the package! Move toward extraction or plan handoffs.' : 'Escort your carrier or prepare for a relay handoff.')
+          : 'Hunters locked. The package and runners will activate when the countdown ends.'
+        : isRunner
+          ? 'Move away from the target and stay inside the play area. Hunters cannot see you yet.'
+          : 'The runners are moving. The map unlocks when the timer reaches zero.';
     timerLabel = isRunner ? 'HUNTERS UNLOCK IN' : 'UNLOCKING IN';
     timerValue = game!.live_at ? (Date.parse(game!.live_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'live') {
-    accent = isAssassinRing ? '#D97706' : '#DB2777';
+    accent = isAssassinRing ? '#D97706' : isRelayHeist ? (isRunner ? '#059669' : '#DC2626') : '#DB2777';
     title = isAssassinRing
       ? state?.assassin_ring?.my_prey
         ? `Hunt: ${state.assassin_ring.my_prey.display_name}`
         : 'Hunt your assigned prey'
-      : isRunner
-        ? (isJailbreak ? 'Evade hunters & rescue' : 'Reach the target')
-        : (isJailbreak ? 'Jail all runners' : 'Hunt the runners');
+      : isRelayHeist
+        ? isRunner
+          ? isCarrier
+            ? 'Deliver package to extraction'
+            : packageState?.status === 'dropped'
+              ? 'Recover dropped package!'
+              : 'Escort carrier & be ready for handoff'
+          : packageState?.status === 'dropped'
+            ? 'Secure the dropped package!'
+            : 'Intercept the carrier'
+        : isRunner
+          ? (isJailbreak ? 'Evade hunters & rescue' : 'Reach the target')
+          : (isJailbreak ? 'Jail all runners' : 'Hunt the runners');
     subtitle = isAssassinRing
       ? state?.assassin_ring?.in_safe_zone
         ? 'You are inside a Safe Zone. Tagging is disabled.'
@@ -1346,9 +1574,19 @@ export default function GameScreen() {
           : state?.assassin_ring?.hunter_proximity === 'near'
             ? 'CAUTION: Your hunter is within 100m.'
             : 'Track your assigned prey. Stay alert for your unknown hunter.'
-      : isRunner
-        ? (isJailbreak ? 'Stay out of jail. Free captured teammates at the Jail marker.' : 'Your team is on the map. Hunters only get delayed pings of your position.')
-        : (isJailbreak ? 'Tag runners to send them to Jail. Win by jailing all runners at once.' : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.');
+      : isRelayHeist
+        ? isRunner
+          ? isCarrier
+            ? `Reach the green extraction point (${distanceToExtraction !== null ? Math.round(distanceToExtraction) + 'm away' : 'on map'}). Pass to a teammate if hunters close in.`
+            : packageState?.status === 'dropped'
+              ? 'The package was dropped! Rush to recover it before hunters secure it.'
+              : 'Stay close to your carrier for handoffs or draw hunters away.'
+          : packageState?.status === 'dropped'
+            ? 'Hold package location for 20 seconds to secure and win!'
+            : 'Track radar pings to find and tag the package carrier.'
+        : isRunner
+          ? (isJailbreak ? 'Stay out of jail. Free captured teammates at the Jail marker.' : 'Your team is on the map. Hunters only get delayed pings of your position.')
+          : (isJailbreak ? 'Tag runners to send them to Jail. Win by jailing all runners at once.' : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.');
     timerLabel = 'TIME LEFT';
     timerValue = game!.ends_at ? (Date.parse(game!.ends_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'ended') {
@@ -1363,10 +1601,14 @@ export default function GameScreen() {
             ? 'Hunters win'
             : 'Round over';
     subtitle =
-      game!.end_reason === 'last_survivor'
-        ? 'The final survivor won the elimination ring.'
-        : game!.end_reason === 'all_jailed'
-          ? 'All runners were jailed.'
+      game!.end_reason === 'extraction_complete'
+        ? 'The runners delivered the package to extraction!'
+        : game!.end_reason === 'package_secured'
+          ? 'The hunters secured the dropped package!'
+          : game!.end_reason === 'last_survivor'
+            ? 'The final survivor won the elimination ring.'
+            : game!.end_reason === 'all_jailed'
+              ? 'All runners were jailed.'
           : game!.end_reason === 'time_expired'
             ? isAssassinRing
               ? 'Time ran out. The assassin with the most eliminations wins.'
@@ -1641,6 +1883,69 @@ export default function GameScreen() {
                 'line-color': '#059669',
                 'line-width': 2,
                 'line-dasharray': [3, 2],
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {extractionRingData && (
+          <GeoJSONSource id="extraction-radius" data={extractionRingData}>
+            <Layer
+              id="extraction-radius-fill"
+              type="fill"
+              paint={{ 'fill-color': '#10B981', 'fill-opacity': 0.15 }}
+            />
+            <Layer
+              id="extraction-radius-line"
+              type="line"
+              paint={{ 'line-color': '#059669', 'line-width': 2.5, 'line-dasharray': [3, 2] }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {extractionPointData && (
+          <GeoJSONSource id="extraction-point" data={extractionPointData}>
+            <Layer
+              id="extraction-point-halo"
+              type="circle"
+              paint={{
+                'circle-radius': 18,
+                'circle-color': '#10B981',
+                'circle-opacity': 0.3,
+              }}
+            />
+            <Layer
+              id="extraction-point-circle"
+              type="circle"
+              paint={{
+                'circle-radius': 10,
+                'circle-color': '#059669',
+                'circle-stroke-width': 3,
+                'circle-stroke-color': '#FFFFFF',
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {droppedPackagePointData && (
+          <GeoJSONSource id="dropped-package-point" data={droppedPackagePointData}>
+            <Layer
+              id="dropped-package-halo"
+              type="circle"
+              paint={{
+                'circle-radius': 24,
+                'circle-color': '#F59E0B',
+                'circle-opacity': 0.35,
+              }}
+            />
+            <Layer
+              id="dropped-package-circle"
+              type="circle"
+              paint={{
+                'circle-radius': 11,
+                'circle-color': '#D97706',
+                'circle-stroke-width': 3,
+                'circle-stroke-color': '#FFFFFF',
               }}
             />
           </GeoJSONSource>
@@ -1985,6 +2290,149 @@ export default function GameScreen() {
                   </View>
                 )}
               </View>
+            )}
+
+            {isLive && isRelayHeist && !taggedSelf && (
+              <>
+                {isRunner && isCarrier && (
+                  <View style={styles.heistCarrierCard}>
+                    <View style={styles.rescueHeaderRow}>
+                      <MaterialCommunityIcons color="#059669" name="package-variant-closed" size={20} />
+                      <Text style={styles.heistCarrierTitle}>YOU HAVE THE PACKAGE</Text>
+                    </View>
+                    <Text style={styles.heistCarrierSubtitle}>
+                      {distanceToExtraction !== null
+                        ? `Extraction zone is ${Math.round(distanceToExtraction)}m away. Move inside the zone to secure victory.`
+                        : 'Move to the green extraction zone on the map.'}
+                    </Text>
+                    {nearestTeammateRunner && (
+                      <View style={{ marginTop: 8 }}>
+                        {nearestTeammateRunner.distance <= 5.0 ? (
+                          <Pressable
+                            accessibilityLabel="Hand off package to teammate"
+                            accessibilityRole="button"
+                            disabled={busy !== ''}
+                            onPress={() => void handleRequestHandoff(nearestTeammateRunner.player.id)}
+                            style={[styles.heistActionBtn, busy !== '' && styles.disabled]}
+                          >
+                            {busy === 'handoff' ? (
+                              <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.heistActionBtnText}>
+                                HAND OFF TO {nearestTeammateRunner.player.display_name.toUpperCase()}
+                              </Text>
+                            )}
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.rescueSubtitle}>
+                            Teammate {nearestTeammateRunner.player.display_name} is {Math.round(nearestTeammateRunner.distance)}m away (get within 5m to hand off).
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {isRunner && !isCarrier && handoffPendingFrom && (
+                  <View style={styles.heistCarrierCard}>
+                    <View style={styles.rescueHeaderRow}>
+                      <MaterialCommunityIcons color="#059669" name="handshake" size={20} />
+                      <Text style={styles.heistCarrierTitle}>INCOMING PACKAGE HANDOFF</Text>
+                    </View>
+                    <Text style={styles.heistCarrierSubtitle}>
+                      A teammate is offering you the package! Confirm to take the carrier burden.
+                    </Text>
+                    <Pressable
+                      accessibilityLabel="Accept package handoff"
+                      accessibilityRole="button"
+                      disabled={busy !== ''}
+                      onPress={() => void handleConfirmHandoff()}
+                      style={[styles.heistActionBtn, busy !== '' && styles.disabled]}
+                    >
+                      {busy === 'confirm_handoff' ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.heistActionBtnText}>ACCEPT PACKAGE</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                )}
+
+                {packageState?.status === 'dropped' && (
+                  <View style={styles.heistDroppedCard}>
+                    <View style={styles.rescueHeaderRow}>
+                      <MaterialCommunityIcons color="#D97706" name="alert-decagram" size={20} />
+                      <Text style={styles.heistDroppedTitle}>PACKAGE DROPPED</Text>
+                    </View>
+                    <Text style={styles.heistDroppedSubtitle}>
+                      {distanceToDroppedPackage !== null
+                        ? `The package is on the ground ${Math.round(distanceToDroppedPackage)}m away.`
+                        : 'The package was dropped on the map.'}
+                    </Text>
+
+                    {isRunner && (
+                      <View style={{ marginTop: 8 }}>
+                        {distanceToDroppedPackage !== null && distanceToDroppedPackage <= 10.0 ? (
+                          <Pressable
+                            accessibilityLabel="Pick up package"
+                            accessibilityRole="button"
+                            disabled={busy !== ''}
+                            onPress={() => void handlePickupPackage()}
+                            style={[styles.heistActionBtn, busy !== '' && styles.disabled]}
+                          >
+                            {busy === 'pickup' ? (
+                              <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.heistActionBtnText}>RECOVER PACKAGE</Text>
+                            )}
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.heistDroppedSubtitle}>
+                            Move within 10m of the amber marker to recover the package!
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
+                    {!isRunner && (
+                      <View style={{ marginTop: 8 }}>
+                        {distanceToDroppedPackage !== null && distanceToDroppedPackage <= 10.0 ? (
+                          <Pressable
+                            accessibilityLabel="Hold to secure package"
+                            accessibilityRole="button"
+                            onPressIn={() => void startSecuringHold()}
+                            onPressOut={() => void cancelSecuringHold()}
+                            style={[
+                              styles.rescueButton,
+                              styles.heistActionBtnHunter,
+                              securingHolding && styles.rescueButtonHolding,
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.rescueProgressBar,
+                                {
+                                  backgroundColor: '#F59E0B',
+                                  width: `${Math.round(securingProgress * 100)}%`,
+                                },
+                              ]}
+                            />
+                            <Text style={styles.rescueButtonText}>
+                              {securingHolding
+                                ? `SECURING... ${Math.round(securingProgress * 100)}%`
+                                : 'HOLD TO SECURE PACKAGE (20s)'}
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.heistDroppedSubtitle}>
+                            Move within 10m of the amber package marker to secure it.
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
+              </>
             )}
 
             {!taggedSelf && (inPlay || game!.status === 'countdown') && (
@@ -2829,5 +3277,62 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.8,
     zIndex: 1,
+  },
+  heistCarrierCard: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    padding: 14,
+  },
+  heistCarrierTitle: {
+    color: '#065F46',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  heistCarrierSubtitle: {
+    color: '#047857',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  heistDroppedCard: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    padding: 14,
+  },
+  heistDroppedTitle: {
+    color: '#92400E',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  heistDroppedSubtitle: {
+    color: '#B45309',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  heistActionBtn: {
+    alignItems: 'center',
+    backgroundColor: '#059669',
+    borderRadius: 12,
+    height: 48,
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  heistActionBtnHunter: {
+    backgroundColor: '#D97706',
+  },
+  heistActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
 });

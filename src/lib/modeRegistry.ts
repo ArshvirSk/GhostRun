@@ -151,6 +151,32 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       },
       enabled: true,
     },
+    {
+      id: 'relay_heist',
+      layer: 'base',
+      name: 'Relay Heist',
+      teams: ['runner', 'hunter'],
+      min_players: 3,
+      compatible_roles: ['double_agent'],
+      compatible_modifiers: [
+        'noise_meter',
+        'dead_drops',
+        'hot_cold',
+        'qr_tagging',
+        'shrinking_zone',
+      ],
+      parameters: {
+        extraction_radius_m: 25,
+        carrier_ping_multiplier: 1.5,
+        handoff_distance_m: 5,
+        handoff_timeout_s: 10,
+        handoff_cooldown_s: 20,
+        pickup_distance_m: 10,
+        securing_distance_m: 10,
+        securing_hold_s: 20,
+      },
+      enabled: true,
+    },
   ],
   modifiers: [
     { id: 'noise_meter', layer: 'modifier', name: 'Noise Meter', parameters: {}, enabled: true },
@@ -233,6 +259,12 @@ export const BASE_MODE_RULES: Record<string, string[]> = {
     'You only see radar pings of your assigned prey.',
     'A sensory warning alerts you when your unknown hunter enters within 100 m or 40 m.',
     'Tagging your prey eliminates them and passes their target to you. Last survivor wins.',
+  ],
+  relay_heist: [
+    'Runners must escort a heavy package to extraction. Carrier pings at 1.5x frequency and cannot use items.',
+    'Teammates within 5 m execute physical handoffs to keep the package moving safely.',
+    'If the carrier is tagged, the package drops for any runner to recover or hunters to secure (20 s hold).',
+    'Runners win on reaching extraction; hunters win on securing the package, all tagged, or timeout.',
   ],
 };
 

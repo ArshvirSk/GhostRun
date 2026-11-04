@@ -85,6 +85,15 @@
 * **Safe Zones (Shelter):** Two safe zones are auto-placed inside the play boundary (or customized by the host). Inside safe zones, tagging is disabled, and scheduled radar pings are masked.
 * **Contract Relinking & Victory:** Tagging your assigned prey eliminates them and immediately transfers their prey contract to you ($P_{hunter} \to P_{prey's\_prey}$). The last survivor standing wins the round (`winner = 'solo'`, `end_reason = 'last_survivor'`).
 
+### 7. Relay Heist (Physical Package Handoff & Extraction)
+* **The Mission:** Runners must transport a high-value physical package across hostile territory and extract it at a known extraction point. Hunters know the extraction point from match start and must intercept the carrier before delivery.
+* **Carrier Burden:** Exactly one runner is designated as carrier at match start. Carrying the package incurs increased hunter attention ($1.5\times$ radar ping cadence) and prevents using tactical drop items.
+* **Physical Handoffs:** Carriers can transfer the package to a nearby teammate within 5 m. Both players confirm the handoff request within a 15-second window to complete the transfer.
+* **Package Drops & Contests:** Tagging the carrier causes the package to drop to the ground at their fix coordinates. Dropped packages emit a radar beacon every 15 s:
+  - **Runner Recovery:** Any active, un-tagged runner within 10 m can pick up the dropped package to resume the extraction run.
+  - **Hunter Interception:** Hunters within 10 m can initiate a 20-second continuous hold-to-secure action. If completed without interruption, hunters secure the package and win immediately (`winner = 'hunters'`, `end_reason = 'package_secured'`).
+* **Extraction Victory:** If the active carrier successfully crosses into the extraction zone (25 m radius), runners immediately win the match (`winner = 'runners'`, `end_reason = 'extraction_complete'`).
+
 ---
 
 ## 🎛️ Modifiers (Stackable Match Dynamics)
