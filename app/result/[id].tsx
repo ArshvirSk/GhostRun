@@ -442,19 +442,23 @@ export default function ResultScreen() {
       ? 'The last assassin standing survived the elimination ring.'
       : game.end_reason === 'all_jailed'
         ? 'All runners were jailed at the same time.'
-        : game.end_reason === 'target_reached'
-          ? 'A runner reached the secret target.'
-          : game.end_reason === 'all_tagged'
-            ? 'Every runner was tagged.'
-            : game.end_reason === 'all_hunters_left'
-              ? 'Every hunter left the round.'
-              : game.end_reason === 'time_expired'
-                ? isAssassinRing
-                  ? 'Time ran out. The assassin with the most eliminations wins.'
-                  : game.mode === 'classic_chase'
-                    ? 'Time ran out before the runners reached the target.'
-                    : 'Time ran out. The runners stayed hidden.'
-                : 'This round has finished.';
+        : game.end_reason === 'extraction_complete'
+          ? 'The carrier reached the extraction point with the package!'
+          : game.end_reason === 'package_secured'
+            ? 'Hunters captured and secured the dropped package!'
+            : game.end_reason === 'target_reached'
+              ? 'A runner reached the secret target.'
+              : game.end_reason === 'all_tagged'
+                ? 'Every runner was tagged.'
+                : game.end_reason === 'all_hunters_left'
+                  ? 'Every hunter left the round.'
+                  : game.end_reason === 'time_expired'
+                    ? isAssassinRing
+                      ? 'Time ran out. The assassin with the most eliminations wins.'
+                      : game.mode === 'classic_chase'
+                        ? 'Time ran out before the runners reached the target.'
+                        : 'Time ran out. The runners stayed hidden.'
+                    : 'This round has finished.';
 
   // Time expiry is stamped when a client next reads state, which can be later
   // than the actual finish; the scheduled end is the honest round length.

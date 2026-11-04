@@ -247,6 +247,27 @@
    - On successful tag, prey is marked `'tagged'` (eliminated), hunter's `elimination_count` increments, and the ring relinks ($P_{hunter} \to P_{victim's\_prey}$).
    - Last Survivor: When the active ring contracts to 1 survivor, match terminates with winner `'solo'` and reason `'last_survivor'`.
 
+## 2026-11-04 — B3: Relay Heist Base Mode (docs/MODES.md §4.5)
+
+**Decision:**
+1. **Base Mode Integration & Extraction Placement (D12):**
+   - Added `relay_heist` value to `game_mode` enum.
+   - Host must designate the extraction point (`set_extraction_location`) within boundary before round start.
+   - Public Extraction Point (D12): Extraction point is public and visible to hunters from match start. This creates natural choke points and tactical interception opportunities without requiring runners to find hidden extraction zones.
+2. **Carrier Burden & Physical Handoffs (D13):**
+   - Exactly one active runner is designated as carrier at match start; package entity stored with `visible_to = 'runner'` for stealth.
+   - Carrier Burden: Carrying the package incurs increased radar frequency ($1.5\times$ scheduled radar ping cadence) and prevents carrier from using tactical drop items.
+   - Physical Handoff Protocol: Carrier can initiate a handoff request (`request_handoff`) when within $5\text{ m}$ of an active teammate. Teammate has a 15-second mutual confirmation window to accept (`confirm_handoff`).
+3. **Dropped Package Beacon & Drop Contest (D14):**
+   - Tagging the carrier eliminates the carrier and drops the package at their location (`status = 'dropped'`).
+   - Dropped Package Pulse (D14): Dropped packages emit a radar pulse beacon every 15 s, making it visible to both squads.
+   - Runner Recovery: Any active, un-tagged runner within $10\text{ m}$ can recover the dropped package via `pickup_package` to resume the heist.
+   - Hunter Securing: Hunters within $10\text{ m}$ can start a 20-second continuous hold (`start_securing_package`, `complete_secure_package`, `cancel_securing_package`) to secure the package.
+4. **Win Conditions:**
+   - Runners win immediately upon carrier entering extraction zone (`winner = 'runners'`, `end_reason = 'extraction_complete'`).
+   - Hunters win immediately upon completing the 20-second package secure (`winner = 'hunters'`, `end_reason = 'package_secured'`), or upon match timeout (`end_reason = 'time_expired'`).
+   - Offline fail-safe: Carrier going offline for > 60 seconds drops the package at their last fix coordinates.
+
 
 
 

@@ -119,7 +119,37 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] If round duration expires, player with the highest elimination count wins (`time_expired`).
   - [ ] Inactivity fail-safe: any player who stops transmitting location fixes for > 3 minutes while live is auto-eliminated for offline timeout, and the contract ring relinks seamlessly around them.
 
-### 3.6 Modifiers Checklists
+### 3.6 Relay Heist Base Mode (docs/MODES.md §4.5)
+* **Recommended Group:** 5–12 players (minimum 1 hunter, 2 runners; recommended 2+ hunters, 4+ runners).
+* **Setting:** Campus, park, or urban neighborhood with well-defined street crossings (radius 400–800 m).
+* **Pre-Flight & Setup:**
+  - [ ] Host selects **Relay Heist** mode on game creation.
+  - [ ] Host places the extraction point on the map in the lobby; verify that starting the round before placing extraction is rejected.
+  - [ ] Confirm extraction point coordinates are visible to all players from match start.
+* **Phase & Play Dynamic:**
+  - [ ] Match starts in countdown; server designates exactly one runner as the initial package carrier (`visible_to = 'runner'`).
+  - [ ] Carrier Burden:
+    - [ ] Carrier HUD displays the active package bearer badge.
+    - [ ] Carrier position is updated to teammates, but concealed from hunters during normal play.
+    - [ ] Scheduled radar pings occur at $1.5\times$ normal frequency for the carrier.
+    - [ ] Tactical drop items are locked for the carrier.
+  - [ ] Physical Handoffs:
+    - [ ] Carrier approaches within 5 m of an active teammate.
+    - [ ] Carrier initiates a handoff request; receiver receives confirmation prompt within 15 seconds.
+    - [ ] Once confirmed, carrier status transfers seamlessly to the teammate.
+  - [ ] Carrier Tag & Package Drop:
+    - [ ] Hunter tags the carrier. The carrier is eliminated, and the package drops to the ground at their fix coordinates.
+    - [ ] Dropped package becomes visible to all players and pulses a radar beacon every 15 s.
+  - [ ] Drop Contest:
+    - [ ] Surviving runner approaches within 10 m and presses "Pick Up Package" to recover it.
+    - [ ] Hunter approaches within 10 m and holds "Secure Package" for 20 continuous seconds. If hold completes without leaving radius, hunters win (`package_secured`).
+* **Victory & Fail-Safes:**
+  - [ ] Carrier steps within the 25 m extraction zone: immediate **Runners Win (`extraction_complete`)**.
+  - [ ] Hunters secure the package: immediate **Hunters Win (`package_secured`)**.
+  - [ ] If carrier goes offline for > 60 seconds, package automatically drops at their last known coordinates.
+  - [ ] Match timer expires before extraction: **Hunters Win (`time_expired`)**.
+
+### 3.7 Modifiers Checklists
 - [ ] **Noise Meter:**
   - Fast running / sprinting smoothly increases loudness toward 100.
   - Crossing 60 sends a `noise_spark` alert to hunters.
