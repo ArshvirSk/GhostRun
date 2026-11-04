@@ -1374,6 +1374,320 @@ async function s1SecurityTimingScenario() {
   );
 }
 
+/** Scripted: B1 Jailbreak mode scenarios (jail placement, jailing, rescue hold, auto-release, all-jailed win). */
+async function jailbreakScenario() {
+  console.log('\n--- Scenario: jailbreak (B1 Jailbreak Base Mode) ---');
+  const host = await newPlayer('JailHost'); // Runner 1
+  const runner2 = await newPlayer('JailRunner2'); // Runner 2
+  const hunter = await newPlayer('JailHunter'); // Hunter
+
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'jailbreak',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      head_start_s: 0,
+      duration_s: 300,
+      ping_interval_s: 30,
+      mode_params: {
+        jailbreak: {
+          jail_radius_m: 15,
+          auto_release_s: 10,
+          release_hold_s: 2,
+          release_radius_m: 10,
+        },
+      },
+    },
+  });
+
+  if (created.error || !created.data?.[0]?.game_id) {
+    throw new Error(`jailbreak create failed: ${created.error?.message}`);
+  }
+  const gameId = created.data[0].game_id;
+  const code = created.data[0].code;
+
+  await rpc(runner2, 'join_game', { code });
+  await rpc(hunter, 'join_game', { code });
+
+  await rpc(host, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(host, gameId),
+    team: 'runner',
+  });
+  await rpc(runner2, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(runner2, gameId),
+    team: 'runner',
+  });
+  await rpc(hunter, 'set_team', {
+    game_id: gameId,
+    player_id: await playerId(hunter, gameId),
+    team: 'hunter',
+  });
+
+  for (const client of [host, runner2, hunter]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
+  // 1. start_game fails before jail is placed
+  const earlyStart = await rpc(host, 'start_game', { game_id: gameId });
+  expect(
+    Boolean(earlyStart.error) && /place the jail/i.test(earlyStart.error?.message ?? ''),
+    'start requires jail placement in Jailbreak mode',
+    String(earlyStart.error?.message ?? 'unexpected success'),
+  );
+
+  // 2. set_jail_location outside area fails
+  const outsideJail = await rpc(host, 'set_jail_location', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.2,
+    lng: CENTER.lng,
+  });
+  expect(
+    Boolean(outsideJail.error) && /inside the play area/i.test(outsideJail.error?.message ?? ''),
+    'jail placement outside boundary is rejected',
+    String(outsideJail.error?.message ?? 'unexpected success'),
+  );
+
+  // 3. set_jail_location inside area succeeds
+  const jailLat = CENTER.lat + 0.001;
+  const jailLng = CENTER.lng;
+  const placedJail = await rpc<{ jail_id: string; radius_m: number }>(host, 'set_jail_location', {
+    game_id: gameId,
+    lat: jailLat,
+    lng: jailLng,
+  });
+  expect(
+    !placedJail.error && Boolean(placedJail.data?.jail_id),
+    'jail placement inside boundary succeeds',
+    String(placedJail.error?.message ?? placedJail.data?.jail_id),
+  );
+
+  // 4. start_game succeeds now
+  const started = await rpc<{ status: string }>(host, 'start_game', { game_id: gameId });
+  expect(
+    !started.error && started.data?.status === 'countdown',
+    'Jailbreak game starts cleanly in countdown',
+    String(started.error?.message ?? started.data?.status),
+  );
+
+  // Fast forward past countdown to live
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  const liveState = await rpc<{ game: { status: string; jail: { latitude: number; longitude: number } } }>(
+    host,
+    'get_game_state',
+    { game_id: gameId }
+  );
+  expect(
+    liveState.data?.game.status === 'live' && Boolean(liveState.data?.game.jail),
+    'Jailbreak round reaches live with jail entity in state snapshot',
+    JSON.stringify(liveState.data?.game),
+  );
+
+  // 5. Hunter tags Runner 2 -> Runner 2 becomes 'jailed'
+  await rpc(runner2, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.002,
+    lng: CENTER.lng + 0.002,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.002,
+    lng: CENTER.lng + 0.002,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const tagRes = await rpc<{ success: boolean; runner_id: string; phase: string }>(
+    hunter,
+    'attempt_tag',
+    { game_id: gameId }
+  );
+  expect(
+    tagRes.data?.success === true && tagRes.data.phase === 'live',
+    'hunter tags runner 2 and game remains live',
+    JSON.stringify(tagRes.data ?? tagRes.error),
+  );
+
+  const stateAfterTag = await rpc<{ players: { id: string; status: string }[] }>(
+    host,
+    'get_game_state',
+    { game_id: gameId }
+  );
+  const runner2Player = stateAfterTag.data?.players.find((p) => p.id === tagRes.data?.runner_id);
+  expect(
+    runner2Player?.status === 'jailed',
+    'tagged runner transitions to jailed status',
+    JSON.stringify(runner2Player),
+  );
+
+  // 6. Rescue hold validates distance: runner 1 far from jail cannot start rescue
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat - 0.003, // ~330m away from jail
+    lng: CENTER.lng,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const farRescue = await rpc(host, 'start_rescue', { game_id: gameId });
+  expect(
+    Boolean(farRescue.error) && /within.*meters/i.test(farRescue.error?.message ?? ''),
+    'start_rescue fails when runner is far from jail',
+    String(farRescue.error?.message ?? 'unexpected success'),
+  );
+
+  // 7. Hunter cannot call start_rescue
+  const hunterRescue = await rpc(hunter, 'start_rescue', { game_id: gameId });
+  expect(
+    Boolean(hunterRescue.error) && /only runners/i.test(hunterRescue.error?.message ?? ''),
+    'hunters cannot call start_rescue',
+    String(hunterRescue.error?.message ?? 'unexpected success'),
+  );
+
+  // 8. Runner 1 moves to jail location and starts rescue
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: jailLat,
+    lng: jailLng,
+    accuracy: 4,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const validRescue = await rpc<{ success: boolean; hold_s: number }>(host, 'start_rescue', {
+    game_id: gameId,
+  });
+  expect(
+    validRescue.data?.success === true && validRescue.data?.hold_s === 2,
+    'runner within 10m starts rescue successfully',
+    JSON.stringify(validRescue.data ?? validRescue.error),
+  );
+
+  // Hunter does not see rescue_started event (audience 'runner')
+  const hunterEvents = (await hunter.from('events').select('*').eq('game_id', gameId)).data ?? [];
+  expect(
+    !hunterEvents.some((e) => e.type === 'rescue_started'),
+    'rescue_started event is hidden from hunters',
+    'hunter leaked rescue_started',
+  );
+
+  // 9. complete_rescue fails before hold duration
+  const earlyComplete = await rpc(host, 'complete_rescue', { game_id: gameId });
+  expect(
+    Boolean(earlyComplete.error) && /not completed/i.test(earlyComplete.error?.message ?? ''),
+    'complete_rescue fails before hold duration expires',
+    String(earlyComplete.error?.message ?? 'unexpected success'),
+  );
+
+  // 10. complete_rescue succeeds after hold duration
+  await new Promise((r) => setTimeout(r, 2200)); // hold_s is 2
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: jailLat,
+    lng: jailLng,
+    accuracy: 4,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const freedRes = await rpc<{ success: boolean; freed_count: number }>(host, 'complete_rescue', {
+    game_id: gameId,
+  });
+  expect(
+    freedRes.data?.success === true && freedRes.data.freed_count === 1,
+    'complete_rescue frees jailed runner after hold duration',
+    JSON.stringify(freedRes.data ?? freedRes.error),
+  );
+
+  const stateAfterFree = await rpc<{ players: { id: string; status: string }[] }>(
+    host,
+    'get_game_state',
+    { game_id: gameId }
+  );
+  const runner2Freed = stateAfterFree.data?.players.find((p) => p.id === runner2Player?.id);
+  expect(
+    runner2Freed?.status === 'active',
+    'previously jailed runner is restored to active status',
+    JSON.stringify(runner2Freed),
+  );
+
+  // 11. Auto-release after timeout (auto_release_s: 10)
+  // Hunter tags Runner 2 again
+  await rpc(runner2, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.002,
+    lng: CENTER.lng + 0.002,
+    accuracy: 4,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.002,
+    lng: CENTER.lng + 0.002,
+    accuracy: 4,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(hunter, 'attempt_tag', { game_id: gameId });
+
+  // Wait 11 seconds for auto_release_s (10s) to elapse
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  const stateAfterAuto = await rpc<{ players: { id: string; status: string }[] }>(
+    host,
+    'get_game_state',
+    { game_id: gameId }
+  );
+  const runner2Auto = stateAfterAuto.data?.players.find((p) => p.id === runner2Player?.id);
+  expect(
+    runner2Auto?.status === 'active',
+    'jailed runner is auto-released after auto_release_s expires',
+    JSON.stringify(runner2Auto),
+  );
+
+  // 12. All-jailed win condition
+  // Tag runner 1
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.002,
+    lng: CENTER.lng + 0.002,
+    accuracy: 4,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(hunter, 'attempt_tag', { game_id: gameId });
+
+  // Tag runner 2 (both now jailed)
+  await rpc(runner2, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.002,
+    lng: CENTER.lng + 0.002,
+    accuracy: 4,
+    recorded_at: new Date().toISOString(),
+  });
+  const finalTag = await rpc<{ success: boolean; phase: string; winner: string; end_reason: string }>(
+    hunter,
+    'attempt_tag',
+    { game_id: gameId }
+  );
+  expect(
+    finalTag.data?.success === true &&
+      finalTag.data.phase === 'ended' &&
+      finalTag.data.winner === 'hunters' &&
+      finalTag.data.end_reason === 'all_jailed',
+    'tagging the last free runner ends Jailbreak game with all_jailed for hunters',
+    JSON.stringify(finalTag.data ?? finalTag.error),
+  );
+
+  for (const client of [host, runner2, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -1383,6 +1697,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   'haunted-map': hauntedMapScenario,
   'ghost-contribution': ghostContributionScenario,
   's1-security-timing': s1SecurityTimingScenario,
+  jailbreak: jailbreakScenario,
 };
 
 async function main() {

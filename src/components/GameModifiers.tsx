@@ -1098,7 +1098,7 @@ export function AgentControls({
   onActionComplete,
 }: {
   gameId: string;
-  mode: 'classic_chase' | 'tag_hunt';
+  mode: string;
   status: MyModifierStatus | null;
   runners: { id: string; display_name: string }[];
   onActionComplete?: () => void;

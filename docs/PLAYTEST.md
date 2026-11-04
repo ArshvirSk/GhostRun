@@ -64,7 +64,33 @@ Immediately following each outdoor play session, ask each participant:
 - [ ] All runners receive an anonymous `heat_used` banner without revealing distance or hunter identity.
 - [ ] No exact coordinates or distances are leaked in network logs.
 
-### 3.4 Modifiers Checklists
+### 3.4 Jailbreak Base Mode (docs/MODES.md §4.1)
+* **Recommended Group:** 5 players (2 Hunters, 3 Runners).
+* **Setting:** Open park or campus grounds with a central landmark for the Jail (radius $\ge 250\text{ m}$).
+* **Pre-Flight & Setup:**
+  - [ ] Host selects **Jailbreak** mode on game creation.
+  - [ ] In the lobby, verify the host cannot start the game until placing the Jail marker.
+  - [ ] Verify placing the Jail outside the play boundary is rejected by the server.
+  - [ ] Host taps inside the play boundary to place the Jail (15 m visual ring). Start button unlocks once all players ready up.
+* **Phase & Play Dynamic:**
+  - [ ] 10-second countdown initiates; runners disperse while hunters' screens remain locked.
+  - [ ] Hunters pursue runners. First tagged runner transitions to `jailed` state instead of spectator/eliminated.
+  - [ ] Verify the jailed runner's map shows the jail overlay, location broadcasting to teammates pauses, and auto-release countdown begins (default 300 s / 5 min).
+  - [ ] Hunter tags a second runner; both jailed runners see the jail HUD and cannot trigger tags.
+  - [ ] Remaining free runner infiltrates toward the Jail landmark.
+  - [ ] Approaching within 10 m of the jail unlocks the **Rescue** action button on the runner HUD.
+  - [ ] Runner presses and holds the Rescue button for 10 seconds.
+  - [ ] Verify the `rescue_started` event is hidden from hunters (no radar or banner tip-off).
+  - [ ] After 10 continuous seconds within 10 m, `complete_rescue` fires:
+    - [ ] Both jailed runners immediately receive audio cue and transition back to `active`.
+    - [ ] Rescuer and freed runners scatter to continue evasion.
+* **Victory & Fail-Safes:**
+  - [ ] If all runners are jailed simultaneously, round terminates immediately with **Hunters Win (`all_jailed`)**.
+  - [ ] If round duration expires while at least one runner is `active`, **Runners Win (`time_expired`)**.
+  - [ ] Verify auto-release: an unrescued prisoner is freed automatically after 300 seconds.
+  - [ ] Verify shrinking zone safety: if an active safe zone shrinks past the jail perimeter, all prisoners are evacuated automatically.
+
+### 3.5 Modifiers Checklists
 - [ ] **Noise Meter:**
   - Fast running / sprinting smoothly increases loudness toward 100.
   - Crossing 60 sends a `noise_spark` alert to hunters.
@@ -79,7 +105,7 @@ Immediately following each outdoor play session, ask each participant:
   - 60-second advance warning banner warns all players.
   - Effective boundary strictly enforces updated coordinates without shifting center.
 
-### 3.5 Secret Role: Double Agent
+### 3.6 Secret Role: Double Agent
 - [ ] Exactly one hunter is secretly assigned `secret_role = 'agent'` when enabled ($\ge 2$ hunters).
 - [ ] Agent HUD reveals secret **Whisper** and **Scramble** controls.
 - [ ] **Whisper:** Accurately reveals the target's cardinal quadrant (`North`, `South`, `East`, `West`).

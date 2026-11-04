@@ -33,7 +33,7 @@ export function HunterQrScanner({
   const [isError, setIsError] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
 
-  const scanLineAnim = useRef(new Animated.Value(0)).current;
+  const [scanLineAnim] = useState(() => new Animated.Value(0));
   const lastScannedToken = useRef<string | null>(null);
 
   // Viewfinder scan line sweep animation
@@ -60,11 +60,14 @@ export function HunterQrScanner({
   // Reset state when opened
   useEffect(() => {
     if (visible) {
-      setIsProcessing(false);
-      setScanMessage(null);
-      setIsError(false);
-      setScanSuccess(false);
-      lastScannedToken.current = null;
+      const timer = setTimeout(() => {
+        setIsProcessing(false);
+        setScanMessage(null);
+        setIsError(false);
+        setScanSuccess(false);
+        lastScannedToken.current = null;
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [visible]);
 

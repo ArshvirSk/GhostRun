@@ -202,5 +202,29 @@
 ### D8: Cross-Platform Strategy
 - **Decision:** Confirmed continuous reuse of the unified Expo / React Native codebase for Android and future iOS releases. iOS platform validation is scheduled for Phase B item B13.
 
+## 2026-11-04 — B1: Jailbreak Base Mode (docs/MODES.md §4.1)
+
+**Decision:**
+1. **Base Mode Integration:** Added `jailbreak` base mode enum (`game_mode`) and mode catalogue entry (`jailbreak`). Validated server-side in `mode_catalogue` and exposed in `get_mode_registry`.
+2. **Host Jail Placement:** Host sets jail location via `set_jail_location(p_game_id, p_lat, p_lng, p_radius_m)`. Stored in `entities` table (`type = 'jail'`, `visibility = 'all'`) and validated to be strictly within the active play boundary. `start_game` refuses to launch a Jailbreak game if no jail has been placed within bounds.
+3. **Jailed Player Status:** Added `'jailed'` value to `player_status` enum. When a hunter tags a runner in Jailbreak:
+   - If other active runners remain: runner transitions to `'jailed'`, `jailed_at = now()`, `active_rescuer_id = null`, and `runner_jailed` event is emitted. Jailed runners are excluded from scheduled radar pings and teammate location broadcasts.
+   - If no active runners remain: round terminates immediately via `end_game(p_game_id, 'hunter', 'all_jailed')`.
+4. **Stealth Rescue Operation:**
+   - Rescuer must be an `active` runner with fresh GPS fix within `release_radius_m` (default 10 m) of jail center.
+   - Rescuer initiates via `start_rescue(p_game_id)`. Emits `rescue_started` event visible to runners only (hunters are not notified, preventing camp baiting).
+   - Rescuer must maintain fix within `release_radius_m` for at least `release_hold_s` (default 10 s).
+   - Rescuer completes via `complete_rescue(p_game_id)`. Sets all jailed runners to `'active'` (`jailed_at = null`), emits `player_released` event with rescuer and player names, and awards stats.
+   - Rescuer moving $> 10\text{ m}$ away or being tagged cancels the rescue.
+5. **Passive Safeguards:**
+   - `advance_game` checks `auto_release_s` (default 300 s / 5 min). Expired prisoners are automatically freed and restored to `active`.
+   - Shrinking Zone Overrun: If the active safe zone shrinks past the jail perimeter (`dist(center, jail) + jail_radius > zone_radius`), `advance_game` immediately auto-releases all jailed runners to prevent trapped unwinnable states.
+6. **Time Expiry Victory:** If match timer runs out while at least one runner is `active`, runners win (`time_expired`).
+
+**Reason:** Matches the full specification in `docs/MODES.md` §4.1 while enforcing strict server-side authority, RLS secrecy, zero hunter leaks during rescue attempts, and graceful recovery from GPS drift or shrinking zone traps.
+
+**Trade-off:** Hunters must balance guarding the jail with hunting free runners. The stealth rescue window ensures runners have realistic comeback potential without hunters camping the rescue button.
+
+
 
 

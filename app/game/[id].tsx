@@ -54,7 +54,7 @@ import {
 } from '../../src/components/GameModifiers';
 import { HunterQrScanner } from '../../src/components/HunterQrScanner';
 import { RunnerQrCard } from '../../src/components/RunnerQrCard';
-import { initAudio, isAudioMuted, playSound, toggleAudioMuted } from '../../src/lib/audio';
+import { initAudio, playSound, toggleAudioMuted } from '../../src/lib/audio';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -89,8 +89,9 @@ type GamePlayer = {
   display_name: string;
   color: string;
   team: Team;
-  status: 'active' | 'tagged' | 'left';
+  status: 'active' | 'tagged' | 'left' | 'jailed';
   is_ready: boolean;
+  jailed_at?: string | null;
 };
 
 type RoundPosition = {
@@ -141,8 +142,9 @@ type RoundState = {
     id: string;
     code: string;
     host_id: string;
-    mode: 'classic_chase' | 'tag_hunt';
-    mode_id?: 'classic_chase' | 'tag_hunt';
+    mode: string;
+    mode_id?: string;
+    mode_params?: Record<string, unknown>;
     modifiers?: string[];
     roles?: string[];
     status: Phase;
@@ -167,10 +169,17 @@ type RoundState = {
     target_set: boolean;
     boundary_grace_s?: number;
     boundary_penalty?: 'warn' | 'extra_ping';
+    jail?: {
+      id: string;
+      latitude: number;
+      longitude: number;
+      radius_m: number;
+    } | null;
   };
   players: GamePlayer[];
   my_player_id: string;
   my_team: Team;
+  rescue_in_progress?: boolean;
   my_position: OwnPosition | null;
   positions: RoundPosition[];
   pings: RoundPing[];
@@ -594,6 +603,20 @@ export default function GameScreen() {
         'You are now spectating the remainder of the round.',
         [0, 250, 100, 250],
       );
+    } else if (prevStatusRef.current === 'active' && ownPlayer.status === 'jailed') {
+      playSound('tag');
+      notify(
+        "You've been jailed!",
+        'Head to the jail zone. Teammates can rescue you or wait for auto-release.',
+        [0, 300, 150, 300],
+      );
+    } else if (prevStatusRef.current === 'jailed' && ownPlayer.status === 'active') {
+      playSound('victory');
+      notify(
+        'You were rescued!',
+        'You are free! Run to safe ground.',
+        [0, 150, 80, 150],
+      );
     }
     prevStatusRef.current = ownPlayer.status;
   }, [state, notify]);
@@ -921,8 +944,11 @@ export default function GameScreen() {
     const result = data as TagResult;
     if (result.success) {
       playSound('tag');
+      const isJb = state?.game.mode_id === 'jailbreak';
       setTagMessage(
-        result.phase === 'ended' ? 'Tag confirmed. The round is over.' : 'Tag confirmed.',
+        result.phase === 'ended'
+          ? (isJb ? 'All runners jailed! Round over.' : 'Tag confirmed. The round is over.')
+          : (isJb ? 'Runner jailed!' : 'Tag confirmed.'),
       );
       await loadState();
       return;
@@ -1060,6 +1086,137 @@ export default function GameScreen() {
       }
     : null;
 
+  const jailLongitude = state?.game?.jail?.longitude;
+  const jailLatitude = state?.game?.jail?.latitude;
+  const jailRadiusM = state?.game?.jail?.radius_m ?? 15;
+
+  const jailRingData = useMemo(() => {
+    if (jailLongitude === undefined || jailLatitude === undefined) return null;
+    return circleRing(
+      { longitude: jailLongitude, latitude: jailLatitude },
+      jailRadiusM,
+    );
+  }, [jailLongitude, jailLatitude, jailRadiusM]);
+
+  const jailPointData: PointCollection | null = useMemo(() => {
+    if (jailLongitude === undefined || jailLatitude === undefined) return null;
+    return {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'Point',
+            coordinates: [jailLongitude, jailLatitude],
+          },
+        },
+      ],
+    };
+  }, [jailLongitude, jailLatitude]);
+
+  const isJailbreak = state?.game?.mode_id === 'jailbreak';
+  const isLive = state?.game?.status === 'live';
+  const jailedSelf = selfPlayer?.status === 'jailed';
+  const autoReleaseS =
+    (state?.game?.mode_params?.jailbreak as { auto_release_s?: number } | undefined)?.auto_release_s ?? 300;
+  const releaseRadiusM =
+    (state?.game?.mode_params?.jailbreak as { release_radius_m?: number } | undefined)?.release_radius_m ?? 10;
+  const releaseHoldS =
+    (state?.game?.mode_params?.jailbreak as { release_hold_s?: number } | undefined)?.release_hold_s ?? 10;
+
+  const jailedRemainingS = useMemo(() => {
+    if (!jailedSelf || !selfPlayer?.jailed_at) return null;
+    const elapsed = (serverNow - Date.parse(selfPlayer.jailed_at)) / 1000;
+    return Math.max(0, Math.ceil(autoReleaseS - elapsed));
+  }, [jailedSelf, selfPlayer?.jailed_at, autoReleaseS, serverNow]);
+
+  const jailedRunners = useMemo(() => {
+    return (state?.players ?? []).filter((p) => p.team === 'runner' && p.status === 'jailed');
+  }, [state?.players]);
+
+  const distanceToJail = useMemo(() => {
+    if (!ownFix || jailLongitude === undefined || jailLatitude === undefined) return null;
+    return distanceM(ownFix, {
+      longitude: jailLongitude,
+      latitude: jailLatitude,
+    });
+  }, [ownFix, jailLongitude, jailLatitude]);
+
+  const canRescue =
+    isRunner &&
+    !jailedSelf &&
+    !taggedSelf &&
+    isLive &&
+    jailedRunners.length > 0 &&
+    distanceToJail !== null &&
+    distanceToJail <= releaseRadiusM;
+
+  const [rescueHolding, setRescueHolding] = useState(false);
+  const [rescueProgress, setRescueProgress] = useState(0);
+  const rescueTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const rescueStartRef = useRef<number>(0);
+
+  const completeRescueAction = useCallback(async () => {
+    setRescueHolding(false);
+    setRescueProgress(0);
+    if (!supabase || !gameId) return;
+    const { data, error } = await supabase.rpc('complete_rescue', { game_id: gameId });
+    if (error) {
+      setTagMessage(error.message);
+    } else {
+      playSound('victory');
+      try {
+        Vibration.vibrate([0, 200, 100, 200]);
+      } catch {
+        // ignore
+      }
+      setTagMessage(`Rescue complete! ${(data as { freed_count?: number })?.freed_count ?? 1} runner(s) freed.`);
+      await loadState();
+    }
+  }, [gameId, loadState]);
+
+  const startRescueHold = useCallback(async () => {
+    if (!supabase || !gameId || rescueHolding) return;
+    setRescueHolding(true);
+    setRescueProgress(0);
+    rescueStartRef.current = Date.now();
+
+    const { error } = await supabase.rpc('start_rescue', { game_id: gameId });
+    if (error) {
+      setRescueHolding(false);
+      setTagMessage(error.message);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - rescueStartRef.current) / 1000;
+      const progress = Math.min(1, elapsed / releaseHoldS);
+      setRescueProgress(progress);
+
+      if (progress >= 1) {
+        clearInterval(interval);
+        rescueTimerRef.current = null;
+        void completeRescueAction();
+      }
+    }, 100);
+    rescueTimerRef.current = interval;
+  }, [gameId, rescueHolding, releaseHoldS, completeRescueAction]);
+
+  const cancelRescueHold = useCallback(async () => {
+    if (rescueTimerRef.current) {
+      clearInterval(rescueTimerRef.current);
+      rescueTimerRef.current = null;
+    }
+    if (rescueHolding) {
+      setRescueHolding(false);
+      setRescueProgress(0);
+      if (supabase && gameId) {
+        await supabase.rpc('cancel_rescue', { game_id: gameId });
+      }
+    }
+  }, [gameId, rescueHolding]);
+
   if (!state) {
     return (
       <View style={styles.centered}>
@@ -1091,11 +1248,15 @@ export default function GameScreen() {
   }
 
   const zoom = Math.max(10, Math.min(16, 15 - Math.log2(game!.area.radius_m / 200)));
-  const isLive = game!.status === 'live';
   const inPlay = ['head_start', 'live'].includes(game!.status);
   const tagRingData = isLive && !isRunner && ownFix ? circleRing(ownFix, game!.tag_radius_m) : null;
 
-  let eyebrow = game!.mode === 'classic_chase' ? 'CLASSIC CHASE' : 'TAG HUNT';
+  let eyebrow =
+    game!.mode_id === 'jailbreak'
+      ? 'JAILBREAK'
+      : game!.mode === 'classic_chase'
+        ? 'CLASSIC CHASE'
+        : 'TAG HUNT';
   let title = '';
   let subtitle = '';
   let timerLabel = '';
@@ -1117,10 +1278,10 @@ export default function GameScreen() {
     timerValue = game!.live_at ? (Date.parse(game!.live_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'live') {
     accent = '#DB2777';
-    title = isRunner ? 'Reach the target' : 'Hunt the runners';
+    title = isRunner ? (isJailbreak ? 'Evade hunters & rescue' : 'Reach the target') : (isJailbreak ? 'Jail all runners' : 'Hunt the runners');
     subtitle = isRunner
-      ? 'Your team is on the map. Hunters only get delayed pings of your position.'
-      : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.';
+      ? (isJailbreak ? 'Stay out of jail. Free captured teammates at the Jail marker.' : 'Your team is on the map. Hunters only get delayed pings of your position.')
+      : (isJailbreak ? 'Tag runners to send them to Jail. Win by jailing all runners at once.' : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.');
     timerLabel = 'TIME LEFT';
     timerValue = game!.ends_at ? (Date.parse(game!.ends_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'ended') {
@@ -1133,15 +1294,17 @@ export default function GameScreen() {
           ? 'Hunters win'
           : 'Round over';
     subtitle =
-      game!.end_reason === 'time_expired'
-        ? 'Time ran out.'
-        : game!.end_reason === 'all_tagged'
-          ? 'Every runner was tagged.'
-          : game!.end_reason === 'all_hunters_left'
-            ? 'Every hunter left the round.'
-            : game!.end_reason === 'target_reached'
-              ? 'A runner reached the secret target.'
-              : 'This round has finished.';
+      game!.end_reason === 'all_jailed'
+        ? 'All runners were jailed.'
+        : game!.end_reason === 'time_expired'
+          ? 'Time ran out.'
+          : game!.end_reason === 'all_tagged'
+            ? 'Every runner was tagged.'
+            : game!.end_reason === 'all_hunters_left'
+              ? 'Every hunter left the round.'
+              : game!.end_reason === 'target_reached'
+                ? 'A runner reached the secret target.'
+                : 'This round has finished.';
   } else if (game!.status === 'cancelled') {
     eyebrow = 'ROUND CANCELLED';
     accent = '#64748B';
@@ -1149,7 +1312,17 @@ export default function GameScreen() {
     subtitle = 'The host cancelled this round before it started.';
   }
 
-  if (taggedSelf && game!.status === 'live') {
+  if (jailedSelf && game!.status === 'live') {
+    eyebrow = 'JAILED';
+    accent = '#DC2626';
+    title = 'You are in Jail';
+    subtitle =
+      jailedRemainingS !== null
+        ? `Auto-release in ${formatClock(jailedRemainingS)}. Free teammates can rescue you at the Jail.`
+        : 'Wait for a teammate to rescue you at the Jail.';
+    timerLabel = 'JAIL TIME';
+    timerValue = jailedRemainingS;
+  } else if (taggedSelf && game!.status === 'live') {
     eyebrow = 'SPECTATING';
     accent = '#64748B';
     title = 'You were tagged';
@@ -1344,6 +1517,36 @@ export default function GameScreen() {
               paint={{
                 'circle-radius': 9,
                 'circle-color': '#1D4ED8',
+                'circle-stroke-width': 3,
+                'circle-stroke-color': '#FFFFFF',
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {jailRingData && (
+          <GeoJSONSource id="jail-radius" data={jailRingData}>
+            <Layer
+              id="jail-radius-fill"
+              type="fill"
+              paint={{ 'fill-color': '#EF4444', 'fill-opacity': 0.12 }}
+            />
+            <Layer
+              id="jail-radius-line"
+              type="line"
+              paint={{ 'line-color': '#EF4444', 'line-width': 2, 'line-dasharray': [3, 2] }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {jailPointData && (
+          <GeoJSONSource id="jail-point" data={jailPointData}>
+            <Layer
+              id="jail-point-circle"
+              type="circle"
+              paint={{
+                'circle-radius': 9,
+                'circle-color': '#DC2626',
                 'circle-stroke-width': 3,
                 'circle-stroke-color': '#FFFFFF',
               }}
@@ -1641,6 +1844,56 @@ export default function GameScreen() {
                 </Pressable>
               )}
 
+            {isLive && jailedSelf && (
+              <View style={styles.jailedBanner}>
+                <Ionicons color="#DC2626" name="lock-closed" size={20} />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.jailedBannerTitle}>YOU ARE IN JAIL</Text>
+                  <Text style={styles.jailedBannerText}>
+                    {jailedRemainingS !== null
+                      ? `Auto-release in ${formatClock(jailedRemainingS)}. Or wait for a free teammate to reach the Jail zone.`
+                      : 'Wait for a free teammate to reach the Jail zone to rescue you.'}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {isLive && isRunner && !taggedSelf && !jailedSelf && jailedRunners.length > 0 && (
+              <View style={styles.rescueCard}>
+                <View style={styles.rescueHeaderRow}>
+                  <Ionicons color="#059669" name="lock-open" size={18} />
+                  <Text style={styles.rescueTitle}>
+                    {jailedRunners.length} TEAMMATE{jailedRunners.length > 1 ? 'S' : ''} JAILED
+                  </Text>
+                </View>
+                <Text style={styles.rescueSubtitle}>
+                  {distanceToJail !== null
+                    ? distanceToJail <= releaseRadiusM
+                      ? `You are inside the rescue zone (${Math.round(distanceToJail)}m from jail). Hold the button for ${releaseHoldS}s to free them.`
+                      : `Get within ${releaseRadiusM}m of the Jail to rescue (${Math.round(distanceToJail)}m away).`
+                    : 'Move toward the Jail location on the map.'}
+                </Text>
+                {canRescue && (
+                  <View style={styles.rescueButtonContainer}>
+                    <Pressable
+                      accessibilityLabel="Hold to rescue teammates"
+                      accessibilityRole="button"
+                      onPressIn={() => void startRescueHold()}
+                      onPressOut={() => void cancelRescueHold()}
+                      style={[styles.rescueButton, rescueHolding && styles.rescueButtonHolding]}
+                    >
+                      <View style={[styles.rescueProgressBar, { width: `${Math.round(rescueProgress * 100)}%` }]} />
+                      <Text style={styles.rescueButtonText}>
+                        {rescueHolding
+                          ? `HOLDING... ${Math.round(rescueProgress * 100)}%`
+                          : `HOLD TO RESCUE (${releaseHoldS}s)`}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            )}
+
             {!taggedSelf && (inPlay || game!.status === 'countdown') && (
               <View style={styles.locationCard}>
                 <View
@@ -1762,17 +2015,20 @@ export default function GameScreen() {
                 <Text
                   style={[
                     styles.playerMeta,
+                    player.status === 'jailed' && styles.playerJailed,
                     player.status === 'tagged' && styles.playerTagged,
-                    player.team === 'runner' && player.status !== 'tagged' && styles.playerRunner,
+                    player.team === 'runner' && player.status !== 'tagged' && player.status !== 'jailed' && styles.playerRunner,
                   ]}
                 >
-                  {player.status === 'tagged'
-                    ? 'Tagged'
-                    : player.team === 'runner'
-                      ? 'Runner'
-                      : player.team === 'hunter'
-                        ? 'Hunter'
-                        : 'No team'}
+                  {player.status === 'jailed'
+                    ? 'Jailed'
+                    : player.status === 'tagged'
+                      ? 'Tagged'
+                      : player.team === 'runner'
+                        ? 'Runner'
+                        : player.team === 'hunter'
+                          ? 'Hunter'
+                          : 'No team'}
                 </Text>
               </View>
             ))}
@@ -1873,7 +2129,7 @@ export default function GameScreen() {
 }
 
 function RadarPingRipple({ active }: { active: boolean }) {
-  const anim = useRef(new Animated.Value(0)).current;
+  const [anim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (active) {
@@ -2403,5 +2659,82 @@ const styles = StyleSheet.create({
     height: 200,
     position: 'absolute',
     width: 200,
+  },
+  playerJailed: { color: '#DC2626', fontWeight: '800' },
+  jailedBanner: {
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    marginBottom: 12,
+    padding: 14,
+  },
+  jailedBannerTitle: {
+    color: '#991B1B',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  jailedBannerText: {
+    color: '#7F1D1D',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  rescueCard: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    padding: 14,
+  },
+  rescueHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  rescueTitle: {
+    color: '#166534',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  rescueSubtitle: {
+    color: '#14532D',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  rescueButtonContainer: {
+    marginTop: 10,
+  },
+  rescueButton: {
+    alignItems: 'center',
+    backgroundColor: '#059669',
+    borderRadius: 12,
+    height: 48,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  rescueButtonHolding: {
+    backgroundColor: '#047857',
+  },
+  rescueProgressBar: {
+    backgroundColor: '#10B981',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    top: 0,
+  },
+  rescueButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    zIndex: 1,
   },
 });

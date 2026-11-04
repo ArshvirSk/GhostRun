@@ -56,7 +56,14 @@
 * **Runners Win:** At least one runner survives until the match timer runs out.
 * **Hunters Win:** Every runner is located and tagged.
 
-### 3. Hot & Cold Hunt (Directionless Proximity Pulse)
+### 3. Jailbreak (Infiltration & Rescue)
+* **The Mission:** Tagged runners do not become spectators—they are imprisoned in the physical Jail zone. Free runners can stage high-risk rescue operations to break them out.
+* **Runners Win:** At least one runner survives active until the match timer runs out.
+* **Hunters Win:** All runners are jailed simultaneously (`all_jailed`).
+* **Tactical Rescue:** Active runners within 10 m of the jail can initiate a rescue hold. Holding position for 10 seconds triggers `complete_rescue`, freeing all imprisoned teammates. Rescue attempts are stealthy—hunters receive no warning.
+* **Auto-Release:** Unrescued prisoners are automatically released after 5 minutes (`auto_release_s = 300`). If a shrinking zone overruns the jail, prisoners are evacuated immediately.
+
+### 4. Hot & Cold Hunt (Directionless Proximity Pulse)
 * **The Mission:** Hunter radar receives directionless heat pulses instead of coordinate snapshots.
 * **Proximity Feedback:** Pressing `PULSE` queries runner distances within the area without exposing coordinates:
   - **HOT:** nearest runner $\le 75\text{ m}$.
@@ -64,7 +71,7 @@
   - **COLD:** nearest runner $> 175\text{ m}$.
 * **Counter-Detection:** Runners inside the $175\text{ m}$ radius receive a physical vibration and `sensed` pulse alert, warning them that hunters are closing in.
 
-### 4. Haunted Map & Ghost NPCs (Asymmetric AI Haunting)
+### 5. Haunted Map & Ghost NPCs (Asymmetric AI Haunting)
 * **The Mission:** Match dynamics are haunted by historical runner routes replayed as autonomous Ghost NPCs.
 * **Autonomous Patrol:** At countdown completion, the engine selects verified ghost routes from the library, spawning spectral entities that patrol the area with realistic physics and time-scaled velocities.
 * **Proximity Threat:** Ghosts emit radar anomalies to living runners. If a runner steps within $12\text{ m}$ of a ghost entity, they suffer an immediate haunted tag.

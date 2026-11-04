@@ -188,6 +188,18 @@ async function userId(client: SupabaseClient) {
   return data.user.id;
 }
 
+async function playerId(client: SupabaseClient, gameId: string): Promise<string> {
+  const uid = await userId(client);
+  const { data } = await client
+    .from('players')
+    .select('id')
+    .eq('game_id', gameId)
+    .eq('user_id', uid)
+    .single();
+  if (!data?.id) throw new Error(`Player row not found for user ${uid} in game ${gameId}`);
+  return data.id;
+}
+
 async function main() {
   const host = await anonymousClient('Host');
   const hunter = await anonymousClient('Hunter');
@@ -1455,6 +1467,109 @@ async function main() {
     'call unexpectedly succeeded',
   );
 
+  // --- Jailbreak Access and Secrecy Checks (B1) ---
+  const jbCreated = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'jailbreak',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      head_start_s: 0,
+      duration_s: 300,
+      ping_interval_s: 30,
+      mode_params: {
+        jailbreak: {
+          jail_radius_m: 15,
+          auto_release_s: 60,
+          release_hold_s: 5,
+          release_radius_m: 10,
+        },
+      },
+    },
+  });
+  const jbGameId = jbCreated.data?.[0]?.game_id;
+  const jbCode = jbCreated.data?.[0]?.code;
+  expect(Boolean(jbGameId), 'jailbreak game created for RLS check', JSON.stringify(jbCreated.error));
+
+  if (jbGameId && jbCode) {
+    await rpc(hunter, 'join_game', { code: jbCode });
+    const jbHunterPid = await playerId(hunter, jbGameId);
+    const jbHostPid = await playerId(host, jbGameId);
+    await rpc(hunter, 'set_team', { game_id: jbGameId, player_id: jbHunterPid, team: 'hunter' });
+    await rpc(host, 'set_team', { game_id: jbGameId, player_id: jbHostPid, team: 'runner' });
+
+    const placeJailRes = await rpc(host, 'set_jail_location', {
+      game_id: jbGameId,
+      lat: CENTER.lat + 0.001,
+      lng: CENTER.lng + 0.001,
+    });
+    expect(!placeJailRes.error, 'host can place jail in play area', JSON.stringify(placeJailRes.error));
+
+    const outsiderPlace = await rpc(outsider, 'set_jail_location', {
+      game_id: jbGameId,
+      lat: CENTER.lat + 0.001,
+      lng: CENTER.lng + 0.001,
+    });
+    expect(Boolean(outsiderPlace.error), 'outsider cannot place jail', 'call unexpectedly succeeded');
+
+    const hunterPlace = await rpc(hunter, 'set_jail_location', {
+      game_id: jbGameId,
+      lat: CENTER.lat + 0.001,
+      lng: CENTER.lng + 0.001,
+    });
+    expect(Boolean(hunterPlace.error), 'hunter cannot place jail', 'call unexpectedly succeeded');
+
+    const outsiderEntities = await outsider
+      .from('entities')
+      .select('*')
+      .eq('game_id', jbGameId);
+    expectEmpty(outsiderEntities.data, 'outsider cannot read entities table for game');
+
+    const memberEntities = await host
+      .from('entities')
+      .select('*')
+      .eq('game_id', jbGameId)
+      .eq('kind', 'jail');
+    expectRows(memberEntities.data, 'game member can read jail entity');
+
+    const hostState = await rpc<{ game: { jail?: { latitude: number; longitude: number } } }>(
+      host,
+      'get_game_state',
+      { game_id: jbGameId },
+    );
+    expect(
+      Boolean(hostState.data?.game?.jail?.latitude),
+      'host sees jail location in game state',
+      JSON.stringify(hostState.data?.game?.jail),
+    );
+
+    const hunterState = await rpc<{ game: { jail?: { latitude: number; longitude: number } } }>(
+      hunter,
+      'get_game_state',
+      { game_id: jbGameId },
+    );
+    expect(
+      Boolean(hunterState.data?.game?.jail?.latitude),
+      'hunter sees jail location in game state',
+      JSON.stringify(hunterState.data?.game?.jail),
+    );
+
+    const outsiderState = await rpc(outsider, 'get_game_state', { game_id: jbGameId });
+    expect(Boolean(outsiderState.error), 'outsider cannot read game state', 'call unexpectedly succeeded');
+
+    const outsiderStartRescue = await rpc(outsider, 'start_rescue', { game_id: jbGameId });
+    expect(Boolean(outsiderStartRescue.error), 'outsider cannot call start_rescue', 'call unexpectedly succeeded');
+
+    const outsiderCompleteRescue = await rpc(outsider, 'complete_rescue', { game_id: jbGameId });
+    expect(Boolean(outsiderCompleteRescue.error), 'outsider cannot call complete_rescue', 'call unexpectedly succeeded');
+
+    const outsiderCancelRescue = await rpc(outsider, 'cancel_rescue', { game_id: jbGameId });
+    expect(Boolean(outsiderCancelRescue.error), 'outsider cannot call cancel_rescue', 'call unexpectedly succeeded');
+
+    const hunterStartRescue = await rpc(hunter, 'start_rescue', { game_id: jbGameId });
+    expect(Boolean(hunterStartRescue.error), 'hunter cannot call start_rescue', 'call unexpectedly succeeded');
+  }
+
   // Consent records are append-only and reachable only through the RPCs.
   const policyAck = await rpc(host, 'set_consent', {
     consent_type: 'policy_ack',
@@ -1575,6 +1690,7 @@ async function main() {
     await rpc(client, 'leave_game', { game_id: phaseGameId });
     await rpc(client, 'leave_game', { game_id: arrivalGameId });
     await rpc(client, 'leave_game', { game_id: rematchGameId });
+    if (jbGameId) await rpc(client, 'leave_game', { game_id: jbGameId });
   }
 
   console.log('\n--- summary ---');
