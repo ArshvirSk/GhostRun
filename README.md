@@ -147,6 +147,15 @@ GhostRun introduces an asynchronous community ghost recording system:
 * **Tactical Role Swap:** When the VIP and a bodyguard are within $5\text{ m}$ of each other, either player can initiate a physical role swap. With a 15-second mutual confirmation window and 120-second cooldown, squads can swap attire and roles in real life to deceive watching hunters.
 * **Auto-Promotion Fail-Safe:** If the VIP goes offline or disconnects for $> 60\text{ s}$, an active bodyguard is automatically promoted to VIP (`vip_promoted`).
 
+### 3. Operator Remote Tactical Role (§5.3)
+* **Remote Tactical Oversight:** An optional add-on role compatible with Classic Chase, Tag Hunt, Jailbreak, and Relay Heist. One player per squad can be designated as the **Operator** (e.g. from home, base camp, or stationary bench).
+* **GPS Bypass & Immunity:** Remote operators bypass physical GPS tracking, are completely immune to physical tags, and cannot execute tags against runners.
+* **Tactical Markers:** Operators can place up to 3 concurrent tactical waypoints on their squad's map with a 90-second TTL. Opponents receive zero visibility (strict RLS squad isolation).
+* **Runner Tactical Sweep:** Runner Operators can execute a tactical radar sweep (90-second cooldown), revealing a **150 m fuzzed circular envelope** around the nearest active hunter, valid for 10 seconds. Raw enemy GPS coordinates are never leaked to the client.
+* **Hunter Sector Census:** Hunter Operators can select any coordinate within the play area boundary to conduct a **200 m sector census**, returning an integer count of active runners detected in that zone without revealing positions or identities.
+* **Tactical Radio Comms:** Operators can dispatch short text directives (up to 120 characters) to their squad teammates via the live event stream.
+
+
 
 ---
 

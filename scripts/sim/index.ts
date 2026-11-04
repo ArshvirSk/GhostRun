@@ -2502,6 +2502,224 @@ async function vipEscortScenario() {
   }
 }
 
+async function operatorScenario() {
+  console.log('\n--- operatorScenario (B5: Operator Remote Role Add-on) ---');
+  const host = await newPlayer('OpHost');
+  const runnerOp = await newPlayer('OpRunnerOp');
+  const hunterField = await newPlayer('OpHunterField');
+  const hunterOp = await newPlayer('OpHunterOp');
+
+  // 1. Create a game with Operator role enabled
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 500,
+    settings: {
+      roles: ['operator'],
+      head_start_s: 0,
+      ping_interval_s: 30,
+    },
+  });
+  const gameId = created.data?.[0]?.game_id;
+  const code = created.data?.[0]?.code;
+  expect(Boolean(gameId), 'create classic chase game with operator role', JSON.stringify(created.error));
+  if (!gameId || !code) return;
+
+  // 2. Join players to lobby
+  await rpc(runnerOp, 'join_game', { code });
+  await rpc(hunterField, 'join_game', { code });
+  await rpc(hunterOp, 'join_game', { code });
+
+  const hostPid = await playerId(host, gameId);
+  const runnerOpPid = await playerId(runnerOp, gameId);
+  const hunterFieldPid = await playerId(hunterField, gameId);
+  const hunterOpPid = await playerId(hunterOp, gameId);
+
+  await rpc(host, 'set_team', { game_id: gameId, player_id: hostPid, team: 'runner' });
+  await rpc(runnerOp, 'set_team', { game_id: gameId, player_id: runnerOpPid, team: 'runner' });
+  await rpc(hunterField, 'set_team', { game_id: gameId, player_id: hunterFieldPid, team: 'hunter' });
+  await rpc(hunterOp, 'set_team', { game_id: gameId, player_id: hunterOpPid, team: 'hunter' });
+
+  // 3. Test Lobby Designation & Squad Limit
+  const setRunnerOpRes = await rpc(runnerOp, 'set_player_remote', {
+    p_game_id: gameId,
+    p_is_remote: true,
+  });
+  expect(!setRunnerOpRes.error, 'runner designates remote operator', JSON.stringify(setRunnerOpRes.error));
+
+  const setHunterOpRes = await rpc(hunterOp, 'set_player_remote', {
+    p_game_id: gameId,
+    p_is_remote: true,
+  });
+  expect(!setHunterOpRes.error, 'hunter designates remote operator', JSON.stringify(setHunterOpRes.error));
+
+  // Limit check: second operator on runner squad is blocked
+  const secondOpRes = await rpc(host, 'set_player_remote', {
+    p_game_id: gameId,
+    p_is_remote: true,
+  });
+  expect(Boolean(secondOpRes.error), 'second operator per squad blocked', 'unexpectedly allowed');
+
+  // Ready-up and start game
+  for (const client of [host, runnerOp, hunterField, hunterOp]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
+  const startRes = await rpc(host, 'start_game', { game_id: gameId });
+  expect(!startRes.error, 'start_game succeeds with field + remote players', JSON.stringify(startRes.error));
+
+  // Wait countdown to expire
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  // 4. Test State and Role Exposure in get_game_state
+  const runnerOpState = await rpc<{
+    operator?: { is_operator: boolean };
+    markers?: Array<{ id: string; label: string }>;
+  }>(runnerOp, 'get_game_state', { game_id: gameId });
+  expect(
+    runnerOpState.data?.operator?.is_operator === true,
+    'remote player sees is_operator: true in round state',
+    JSON.stringify(runnerOpState.data?.operator ?? runnerOpState.error),
+  );
+
+  // Field player (host) submits GPS fix
+  const hostFix = await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.0001,
+    lng: CENTER.lng + 0.0001,
+    accuracy: 5,
+  });
+  expect(!hostFix.error, 'field runner submits valid GPS fix', JSON.stringify(hostFix.error));
+
+  // Hunter field submits GPS fix
+  const hunterFix = await rpc(hunterField, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.0003,
+    lng: CENTER.lng + 0.0003,
+    accuracy: 5,
+  });
+  expect(!hunterFix.error, 'field hunter submits valid GPS fix', JSON.stringify(hunterFix.error));
+
+  // 5. Test Tactical Markers (Placement, Pruning, Clearing)
+  const m1 = await rpc<{ marker_id: string }>(runnerOp, 'place_marker', {
+    p_game_id: gameId,
+    p_lat: CENTER.lat + 0.0002,
+    p_lng: CENTER.lng + 0.0002,
+    p_label: 'Marker Alpha',
+  });
+  expect(Boolean(m1.data?.marker_id), 'operator places marker 1', JSON.stringify(m1.data ?? m1.error));
+
+  const m2 = await rpc<{ marker_id: string }>(runnerOp, 'place_marker', {
+    p_game_id: gameId,
+    p_lat: CENTER.lat + 0.0003,
+    p_lng: CENTER.lng + 0.0003,
+    p_label: 'Marker Bravo',
+  });
+  expect(Boolean(m2.data?.marker_id), 'operator places marker 2', JSON.stringify(m2.data ?? m2.error));
+
+  const m3 = await rpc<{ marker_id: string }>(runnerOp, 'place_marker', {
+    p_game_id: gameId,
+    p_lat: CENTER.lat + 0.0004,
+    p_lng: CENTER.lng + 0.0004,
+    p_label: 'Marker Charlie',
+  });
+  expect(Boolean(m3.data?.marker_id), 'operator places marker 3', JSON.stringify(m3.data ?? m3.error));
+
+  // Placing 4th marker automatically prunes oldest (marker 1) to respect max 3 per squad
+  const m4 = await rpc<{ marker_id: string }>(runnerOp, 'place_marker', {
+    p_game_id: gameId,
+    p_lat: CENTER.lat + 0.0005,
+    p_lng: CENTER.lng + 0.0005,
+    p_label: 'Marker Delta',
+  });
+  expect(Boolean(m4.data?.marker_id), 'operator places marker 4 (prunes oldest)', JSON.stringify(m4.data ?? m4.error));
+
+  const hostStateAfterMarkers = await rpc<{ markers?: Array<{ id: string; label: string }> }>(
+    host,
+    'get_game_state',
+    { game_id: gameId },
+  );
+  const activeMarkers = hostStateAfterMarkers.data?.markers ?? [];
+  expect(
+    activeMarkers.length === 3 && !activeMarkers.some((m) => m.id === m1.data?.marker_id),
+    'max 3 active team markers maintained (oldest pruned)',
+    JSON.stringify(activeMarkers),
+  );
+
+  // Clear marker manually
+  const clearRes = await rpc(runnerOp, 'clear_marker', {
+    p_game_id: gameId,
+    p_marker_id: m4.data?.marker_id,
+  });
+  expect(!clearRes.error, 'operator clears tactical marker', JSON.stringify(clearRes.error));
+
+  // 6. Test Tactical Comms
+  const commsRes = await rpc(runnerOp, 'send_operator_message', {
+    p_game_id: gameId,
+    p_message: 'Move south to extraction corridor',
+  });
+  expect(!commsRes.error, 'operator sends tactical broadcast message', JSON.stringify(commsRes.error));
+
+  // 7. Test Reconnaissance Scans
+  // Runner operator scan produces 150m vague envelope
+  const sweepRes = await rpc<{
+    scan_type: string;
+    found: boolean;
+    radius_m: number;
+    latitude: number;
+    longitude: number;
+  }>(runnerOp, 'operator_scan', { p_game_id: gameId });
+  expect(
+    sweepRes.data?.scan_type === 'runner_sweep' && sweepRes.data?.found === true && sweepRes.data?.radius_m === 150,
+    'runner operator sweep detects hunter within 150m envelope',
+    JSON.stringify(sweepRes.data ?? sweepRes.error),
+  );
+
+  // Runner operator scan on cooldown
+  const sweepCooldown = await rpc(runnerOp, 'operator_scan', { p_game_id: gameId });
+  expect(
+    Boolean(sweepCooldown.error) && /cooldown/i.test(sweepCooldown.error?.message ?? ''),
+    'runner operator scan blocked by 90s cooldown',
+    JSON.stringify(sweepCooldown.error ?? sweepCooldown.data),
+  );
+
+  // Hunter operator census scan returns integer count within 200m
+  const censusRes = await rpc<{
+    scan_type: string;
+    count: number;
+    radius_m: number;
+  }>(hunterOp, 'operator_scan', {
+    p_game_id: gameId,
+    p_lat: CENTER.lat,
+    p_lng: CENTER.lng,
+  });
+  expect(
+    censusRes.data?.scan_type === 'hunter_census' && censusRes.data?.count >= 1 && censusRes.data?.radius_m === 200,
+    'hunter operator census returns runner count within 200m',
+    JSON.stringify(censusRes.data ?? censusRes.error),
+  );
+
+  // 8. Test Operator Immunity
+  const directTagRemote = await rpc(hunterField, 'attempt_tag', {
+    p_game_id: gameId,
+    p_runner_id: runnerOpPid,
+    p_hunter_lat: CENTER.lat + 0.0003,
+    p_hunter_lng: CENTER.lng + 0.0003,
+  });
+  expect(
+    Boolean(directTagRemote.error),
+    'attempt_tag on remote operator is rejected',
+    JSON.stringify(directTagRemote.error ?? directTagRemote.data),
+  );
+
+  for (const client of [host, runnerOp, hunterField, hunterOp]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -2515,6 +2733,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   'assassin-ring': assassinRingScenario,
   'relay-heist': relayHeistScenario,
   'vip-escort': vipEscortScenario,
+  operator: operatorScenario,
 };
 
 async function main() {

@@ -1883,6 +1883,211 @@ async function main() {
     }
   }
 
+  // --- Operator Role Secrecy and Security Checks (B5) ---
+  const opCreated = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      roles: ['operator'],
+      head_start_s: 0,
+      ping_interval_s: 30,
+    },
+  });
+  const opGameId = opCreated.data?.[0]?.game_id;
+  const opCode = opCreated.data?.[0]?.code;
+  expect(Boolean(opGameId), 'operator game created for RLS check', JSON.stringify(opCreated.error));
+
+  if (opGameId && opCode) {
+    const opRunner2 = await anonymousClient('OpRunner2');
+    const opHunter2 = await anonymousClient('OpHunter2');
+    await rpc(hunter, 'join_game', { code: opCode });
+    await rpc(opRunner2, 'join_game', { code: opCode });
+    await rpc(opHunter2, 'join_game', { code: opCode });
+
+    const opHostPid = await playerId(host, opGameId);
+    const opRunner2Pid = await playerId(opRunner2, opGameId);
+    const opHunterPid = await playerId(hunter, opGameId);
+    const opHunter2Pid = await playerId(opHunter2, opGameId);
+
+    await rpc(host, 'set_team', { game_id: opGameId, player_id: opHostPid, team: 'runner' });
+    await rpc(opRunner2, 'set_team', { game_id: opGameId, player_id: opRunner2Pid, team: 'runner' });
+    await rpc(hunter, 'set_team', { game_id: opGameId, player_id: opHunterPid, team: 'hunter' });
+    await rpc(opHunter2, 'set_team', { game_id: opGameId, player_id: opHunter2Pid, team: 'hunter' });
+
+    // 1. Lobby remote designation & limit check:
+    // Runner 2 designates as remote operator (Runner Operator)
+    const setRemoteRunner = await rpc(opRunner2, 'set_player_remote', {
+      p_game_id: opGameId,
+      p_is_remote: true,
+    });
+    expect(!setRemoteRunner.error, 'player can designate self as remote operator in lobby', JSON.stringify(setRemoteRunner.error));
+
+    // Hunter 2 designates as remote operator (Hunter Operator)
+    const setRemoteHunter = await rpc(opHunter2, 'set_player_remote', {
+      p_game_id: opGameId,
+      p_is_remote: true,
+    });
+    expect(!setRemoteHunter.error, 'hunter can designate self as remote operator in lobby', JSON.stringify(setRemoteHunter.error));
+
+    // Host attempts to also set self as remote runner operator -> must fail (limit 1 operator per team)
+    const setRemoteHostFail = await rpc(host, 'set_player_remote', {
+      p_game_id: opGameId,
+      p_is_remote: true,
+    });
+    expect(
+      Boolean(setRemoteHostFail.error),
+      'second operator on same team is rejected by set_player_remote',
+      'unexpectedly allowed multiple operators on team',
+    );
+
+    // Ready-up and start game
+    for (const client of [host, opRunner2, hunter, opHunter2]) {
+      await rpc(client, 'set_share_trail', { game_id: opGameId, share: true });
+      await rpc(client, 'set_ready', { game_id: opGameId, ready: true });
+    }
+
+    const startOp = await rpc(host, 'start_game', { game_id: opGameId });
+    expect(!startOp.error, 'host starts operator game', JSON.stringify(startOp.error));
+
+    // Fast-forward countdown so game is live
+    await new Promise((r) => setTimeout(r, 11000));
+
+    // Field runner (host) submits position
+    await rpc(host, 'submit_position', {
+      game_id: opGameId,
+      lat: CENTER.lat + 0.0001,
+      lng: CENTER.lng + 0.0001,
+      accuracy: 5,
+    });
+
+    // Field hunter submits position
+    await rpc(hunter, 'submit_position', {
+      game_id: opGameId,
+      lat: CENTER.lat + 0.0002,
+      lng: CENTER.lng + 0.0002,
+      accuracy: 5,
+    });
+
+    // 2. Tactical Markers & Team Secrecy Check
+    // Runner operator places marker
+    const markerRes = await rpc<{ marker_id?: string }>(opRunner2, 'place_marker', {
+      p_game_id: opGameId,
+      p_lat: CENTER.lat + 0.0001,
+      p_lng: CENTER.lng + 0.0001,
+      p_label: 'Rendezvous Point',
+    });
+    expect(!markerRes.error, 'runner operator places tactical marker', JSON.stringify(markerRes.error));
+
+    // Runner teammate (host) CAN see marker in entities table
+    const runnerEntities = (await host.from('entities').select('*').eq('game_id', opGameId)).data ?? [];
+    const runnerSeesMarker = runnerEntities.some(
+      (e) => e.kind === 'marker' && (e.state as { label?: string })?.label === 'Rendezvous Point',
+    );
+    expect(runnerSeesMarker, 'runner teammate can read tactical marker from entities', JSON.stringify(runnerEntities));
+
+    // Hunter CANNOT see runner tactical marker in entities table (RLS policy check)
+    const hunterEntities = (await hunter.from('entities').select('*').eq('game_id', opGameId)).data ?? [];
+    const hunterSeesRunnerMarker = hunterEntities.some(
+      (e) => e.kind === 'marker' && (e.state as { label?: string })?.label === 'Rendezvous Point',
+    );
+    expect(!hunterSeesRunnerMarker, 'hunter cannot read runner tactical marker (RLS team isolation)', JSON.stringify(hunterEntities));
+
+    // Outsider CANNOT read any entities table
+    const outsiderEntitiesOp = (await outsider.from('entities').select('*').eq('game_id', opGameId)).data ?? [];
+    expectEmpty(outsiderEntitiesOp, 'outsider cannot read entities for operator game');
+
+    // 3. Tactical Scans & Coordinate Secrecy
+    // Runner operator scan produces 150m vague envelope, NEVER returns hunter coordinates
+    const runnerScanRes = await rpc<{
+      scan_type?: string;
+      found?: boolean;
+      radius_m?: number;
+      latitude?: number;
+      longitude?: number;
+      exact_hunter_coords?: unknown;
+    }>(opRunner2, 'operator_scan', {
+      p_game_id: opGameId,
+    });
+    expect(!runnerScanRes.error, 'runner operator executes tactical scan', JSON.stringify(runnerScanRes.error));
+    expect(
+      runnerScanRes.data?.scan_type === 'runner_sweep' && runnerScanRes.data?.radius_m === 150,
+      'runner scan returns 150m envelope',
+      JSON.stringify(runnerScanRes.data),
+    );
+    expect(
+      !('exact_hunter_coords' in (runnerScanRes.data ?? {})) && !('hunter_lat' in (runnerScanRes.data ?? {})),
+      'runner scan preserves hunter coordinate secrecy (no raw hunter GPS exposed)',
+      JSON.stringify(runnerScanRes.data),
+    );
+
+    // Hunter Operator scan constraint: outside boundary fails
+    const oobHunterScan = await rpc(opHunter2, 'operator_scan', {
+      p_game_id: opGameId,
+      p_lat: CENTER.lat + 1.0, // Far outside 600m boundary
+      p_lng: CENTER.lng + 1.0,
+    });
+    expect(
+      Boolean(oobHunterScan.error),
+      'hunter operator scan outside game boundary is blocked',
+      'unexpectedly succeeded outside boundary',
+    );
+
+    // Hunter Operator scan inside boundary returns census count only
+    const validHunterScan = await rpc<{
+      scan_type?: string;
+      count?: number;
+      runner_positions?: unknown;
+    }>(opHunter2, 'operator_scan', {
+      p_game_id: opGameId,
+      p_lat: CENTER.lat,
+      p_lng: CENTER.lng,
+    });
+    expect(!validHunterScan.error, 'hunter operator executes census scan inside boundary', JSON.stringify(validHunterScan.error));
+    expect(
+      validHunterScan.data?.scan_type === 'hunter_census' && typeof validHunterScan.data?.count === 'number',
+      'hunter scan returns census count without coordinates',
+      JSON.stringify(validHunterScan.data),
+    );
+    expect(
+      !('runner_positions' in (validHunterScan.data ?? {})),
+      'hunter census exposes zero runner positions',
+      JSON.stringify(validHunterScan.data),
+    );
+
+    // 4. Operator Immunity and Tag Restriction
+    // Hunter attempts to tag remote runner operator -> must fail
+    const tagOperatorFail = await rpc(hunter, 'attempt_tag', {
+      p_game_id: opGameId,
+      p_runner_id: opRunner2Pid,
+      p_hunter_lat: CENTER.lat + 0.0001,
+      p_hunter_lng: CENTER.lng + 0.0001,
+    });
+    expect(
+      Boolean(tagOperatorFail.error),
+      'remote operator is immune to tagging',
+      'hunter unexpectedly tagged remote operator',
+    );
+
+    // Remote operator cannot tag anyone
+    const operatorAttemptTag = await rpc(opRunner2, 'attempt_tag', {
+      p_game_id: opGameId,
+      p_runner_id: opHostPid,
+      p_hunter_lat: CENTER.lat + 0.0001,
+      p_hunter_lng: CENTER.lng + 0.0001,
+    });
+    expect(
+      Boolean(operatorAttemptTag.error),
+      'remote operator cannot execute tags',
+      'remote operator unexpectedly tagged another player',
+    );
+
+    for (const client of [host, opRunner2, hunter, opHunter2]) {
+      await rpc(client, 'leave_game', { game_id: opGameId });
+    }
+  }
+
   // Consent records are append-only and reachable only through the RPCs.
   const policyAck = await rpc(host, 'set_consent', {
     consent_type: 'policy_ack',

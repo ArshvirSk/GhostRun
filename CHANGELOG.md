@@ -7,6 +7,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Phase B: Milestone B5 — Operator Remote Role Add-on (docs/MODES.md §5.3)
+- **Role Integration & Remote Designation (D18):**
+  - Added `'operator'` role to `secret_role` enum and configured `role_catalogue()` with `'operator'` role add-on.
+  - Enabled Operator role in `src/lib/modeRegistry.ts` for `classic_chase`, `tag_hunt`, `jailbreak`, and `relay_heist`.
+  - Added self/host remote operator designation RPC `set_player_remote(p_game_id, p_is_remote, p_player_id)` with a strict limit of 1 operator per squad.
+  - Enforced active field player validation in `start_game` so squads must have physical field players.
+- **Remote Operator Lifecycle & GPS Bypass:**
+  - Remote operators bypass spatial tracking: `submit_position` short-circuits immediately with zero GPS storage.
+  - Remote operators are immune to tagging (`attempt_tag` and `apply_tag` reject tags against remote players) and cannot tag others.
+  - Automatic disable of location sharing and GPS tracking on client HUD for remote operators.
+- **Tactical Markers & Team Secrecy:**
+  - Implemented `place_marker` and `clear_marker` RPCs allowing remote operators to place up to 3 tactical markers (90-second TTL, auto-prunes oldest).
+  - RLS strictly enforces squad-only visibility: runner markers are hidden from hunters and vice versa; outsiders receive 0 rows.
+- **Tactical Reconnaissance Scans (D19, D20):**
+  - Implemented `operator_scan` RPC with 90-second squad cooldown.
+  - Runner Operator Tactical Sweep: detects nearest active hunter with a fresh fix ($\le 45\text{ s}$), returning a 150 m circular envelope fuzzed pseudorandomly by 10–30 m via deterministic hash, valid for 10 seconds. Raw hunter GPS coordinates are never leaked to clients.
+  - Hunter Operator Sector Census: scans a 200 m radius at operator-chosen map coordinates strictly within boundary limits, returning an integer census count of active runners only.
+- **Tactical Radio Comms:**
+  - Implemented `send_operator_message` RPC allowing short tactical directives (up to 120 chars) broadcast to squad teammates via live event feed.
+- **Client & HUD:**
+  - Lobby UI: added remote toggle button `[Op]` in player roster with `[Operator]` sub-label and remote status indicators.
+  - Game HUD: added "MISSION CONTROL: OPERATOR" tactical banner, "+ MARK" waypoint placement mode, and "SCAN" dock action button.
+  - Map rendering: MapLibre GeoJSON layers for tactical markers with pulse animations and 150 m scan envelopes.
+- **Verification:**
+  - Simulator scenario `operator` passing 14/14 automated checks (`scripts/sim/index.ts`).
+  - RLS test suite `npm run rls` passing 100% of operator secrecy and security checks.
+
 ### Phase B: Milestone B4 — VIP Escort Role Add-on (docs/MODES.md §5.2)
 - **Role Integration & Secrecy:**
   - Added `'vip'` and `'bodyguard'` secret roles to `secret_role` enum and registered `'vip'` role add-on in `role_catalogue()`.

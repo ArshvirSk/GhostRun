@@ -275,6 +275,39 @@
 6. **Mode Compatibility (D17):**
    - Compatible with base modes `classic_chase` and `tag_hunt`. Incompatible with `assassin_ring` (solo free-for-all) and `relay_heist` (package carrier conflict).
 
+## 2026-11-05 — B5: Operator Role Add-on (docs/MODES.md §5.3)
+
+**Decision:**
+1. **Role Integration & Remote Designation (D18):**
+   - Added `'operator'` value to `secret_role` enum and configured `role_catalogue` with `'operator'` role add-on.
+   - Compatible with `classic_chase`, `tag_hunt`, `jailbreak`, and `relay_heist`. Incompatible with solo modes (`assassin_ring`, `ghost_duel`).
+   - Any player can toggle `is_remote` for themselves in the lobby (or the host can designate for anyone via `set_player_remote`).
+   - Server strictly enforces at most 1 remote Operator per squad (`runner` or `hunter`).
+   - `start_game` enforces that every squad with an active Operator also retains at least one active field player (so squads never consist purely of remote operators).
+2. **Remote Player Lifecycle & GPS Bypass:**
+   - Remote operators do not broadcast GPS fixes. `submit_position` short-circuits with an early return (`is_remote: true`), bypassing spatial tracking, speed checks, and out-of-bounds calculations.
+   - Remote operators are immune to tagging (`attempt_tag` and `apply_tag` reject tags against remote players) and cannot execute tags against other players.
+   - In UI, location sharing and GPS tracking are automatically disabled for remote operators.
+3. **Tactical Markers & Team Secrecy:**
+   - Implemented `place_marker` and `clear_marker` RPCs.
+   - Remote operators can place up to 3 concurrent tactical markers (`entities.kind = 'marker'`) anywhere in or near the play area ($1.5\times \text{radius}$).
+   - TTL of 90 seconds per marker; placing a 4th marker prunes the oldest.
+   - RLS strictly enforces team isolation: runner markers are visible only to runners; hunter markers are visible only to hunters. Opponents and outsiders receive 0 rows.
+4. **Runner Operator Scan (Tactical Sweep) & Envelope Fuzzing (D19):**
+   - Implemented `operator_scan` RPC with 90-second squad cooldown.
+   - Runner Operator triggers a tactical sweep: detects the nearest active hunter with a fresh fix ($\le 45\text{ s}$).
+   - Returns a 150 m radius circular envelope (`entities.kind = 'scan_envelope'`) centered on the hunter fuzzed pseudorandomly by 10–30 m (deterministic hash of game ID, player ID, and 90-second epoch window).
+   - Valid for 10 seconds. Raw hunter GPS coordinates are strictly preserved on the server and never exposed to runner clients.
+5. **Hunter Operator Scan (Sector Proximity Census) & Boundary Constraint (D20):**
+   - Hunter Operator provides target center coordinates `(lat, lng)`.
+   - Coordinates must fall strictly within the active play area boundary.
+   - Server performs a spatial census: counts active runners with fresh fixes ($\le 45\text{ s}$) within 200 m of the target point.
+   - Returns an integer count only (`count: N`). Zero runner coordinates, identities, or directions are revealed.
+6. **Tactical Radio Messaging:**
+   - Implemented `send_operator_message` RPC.
+   - Operators can broadcast short tactical directives (up to 120 characters) delivered to squad teammates via the live event stream (`operator_message` event).
+
+
 
 
 

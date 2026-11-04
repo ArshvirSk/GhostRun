@@ -110,7 +110,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       name: 'Jailbreak',
       teams: ['runner', 'hunter'],
       min_players: 5,
-      compatible_roles: ['double_agent'],
+      compatible_roles: ['double_agent', 'operator'],
       compatible_modifiers: [
         'noise_meter',
         'dead_drops',
@@ -157,7 +157,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       name: 'Relay Heist',
       teams: ['runner', 'hunter'],
       min_players: 3,
-      compatible_roles: ['double_agent'],
+      compatible_roles: ['double_agent', 'operator'],
       compatible_modifiers: [
         'noise_meter',
         'dead_drops',
@@ -194,7 +194,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
   roles: [
     { id: 'double_agent', layer: 'role', name: 'Double Agent', enabled: true },
     { id: 'vip', layer: 'role', name: 'VIP Escort', enabled: true },
-    { id: 'operator', layer: 'role', name: 'Operator', enabled: false },
+    { id: 'operator', layer: 'role', name: 'Operator', enabled: true },
   ],
 };
 
