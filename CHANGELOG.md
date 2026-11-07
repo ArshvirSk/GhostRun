@@ -7,6 +7,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Phase C: Milestone C4 — Privacy, consent and replay sharing audit (docs/MODES.md §7.4, §7.5)
+- **Consent Matrix Audit & UI Enforcement:**
+  - Audited C1–C7 consent requirements across client screens and server RPCs:
+    - *C1 (Location):* Verified GPS position logging is strictly bounded to live match states (`head_start`, `live`) and fully halted on home/lobby.
+    - *C2 (Privacy Notice & Age Confirmation):* Verified First Run Gate on `/privacy?mode=gate`. Updated `routeAfterAuth` in `app/auth.tsx` and `load()` in `app/home.tsx` to query `get_my_consents()` and enforce `policy_ack.granted` with `policy_version >= PRIVACY_VERSION` before routing to home.
+    - *C3 (Replay Sharing Choice):* Verified mandatory lobby join sheet offering equal choice (`Share my route` vs `Keep my route private`). Enforced by server: `set_ready` and `start_game` reject if `share_trail` is NULL. Post-game opponent trails and closest call metrics hidden unless shared.
+    - *C4 (Ghost Contribution):* Result screen prompt per game offering trimmed route contribution (-150m start/end). If permanently declined (`consents.ghost = false`), prompt is suppressed. Added 3-button choice: `[ Contribute Route ] [ Not now ] [ Never ask again ]`. Added `Contribute routes to Ghost Library` toggle in Settings → Privacy (`app/privacy.tsx`).
+    - *C5 (Public Leaderboard Name):* `get_ghost_duel_leaderboard` validates consent type `leaderboard_name`. Unconsented player names automatically mask to `'Anonymous Runner'`.
+    - *C7 (Diagnostics):* Non-location diagnostics opt-in toggle in Settings → Privacy (`app/privacy.tsx`).
+- **Foreign Key Cascade Safety on Heat Presses:**
+  - Altered `public.heat_presses.hunter_id` to nullable and added `ON DELETE SET NULL` foreign key constraint. Prevents account deletion failures when a deleting player has performed hunter heat probes, keeping heat press history preserved anonymously.
+- **Account Deletion Upgrade (`delete_my_data`):**
+  - Upgraded `delete_my_data()` to purge all contributed anonymous routes from `public.ghost_library` owned by the deleting user via `public.ghost_contributions`.
+  - Ensures clean cascade of `players`, `positions`, `trails`, `consents`, and host reassignment in unfinished lobbies.
+- **Comprehensive Data Export Upgrade (`export_my_data`):**
+  - Upgraded `export_my_data()` to return a complete personal JSON archive: `profile`, `consents`, `games` (with team, status, share choice, game metadata), `trail_points` (capped at 50,000 recent points), `tags`, `sos_events`, `ghost_contributions`, `ghost_duel_scores`, `drop_claims`, and `heat_presses`.
+- **Database Migrations Applied to Production:**
+  - `20261118005000_c4_privacy_consent_audit.sql`: Initial C4 schema and RPC updates.
+  - `20261118005100_c4_fix_export_my_data.sql`: Aggregate grouping subquery fix on `sos_events`.
+  - `20261118005200_c4_fix_export_my_data.sql`: Drop claims column mapping correction (`drop_id`, `started_at`).
+- **Verification:**
+  - Added `privacyConsentAuditScenario()` in `scripts/sim/index.ts` covering C2 policy gate, C4 ghost consent, C5 leaderboard masking, C7 diagnostics, C3 lobby join gate, complete `export_my_data` payload, and cascade safety of `delete_my_data()`. All simulator checks passed with 100% success.
+
+
 ### Phase C: Milestone C3 — Replay and stats upgrades (docs/MODES.md §7.3)
 - **Per-Mode Recap Cards (`get_game_stats` & `app/result/[id].tsx`):**
   - Upgraded `get_game_stats(game_id uuid)` to return enhanced post-match metrics:

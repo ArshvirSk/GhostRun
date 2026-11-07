@@ -202,6 +202,12 @@ export default function PrivacyScreen() {
           <Text style={styles.cardEyebrow}>YOUR CHOICES</Text>
 
           <ChoiceRow
+            busy={busy === 'ghost'}
+            label="Contribute routes to Ghost Library"
+            onValueChange={(value) => void setConsent('ghost', value)}
+            value={consents?.ghost?.granted ?? true}
+          />
+          <ChoiceRow
             busy={busy === 'leaderboard_name'}
             label="Public leaderboard name"
             onValueChange={(value) => void setConsent('leaderboard_name', value)}

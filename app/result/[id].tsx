@@ -212,6 +212,7 @@ export default function ResultScreen() {
   const [ghostBusy, setGhostBusy] = useState(false);
   const [ghostSuccess, setGhostSuccess] = useState(false);
   const [ghostDismissed, setGhostDismissed] = useState(false);
+  const [ghostPermanentlyDeclined, setGhostPermanentlyDeclined] = useState(false);
   const [ghostScore, setGhostScore] = useState<GhostDuelScore | null>(null);
   const [ghostLeaderboard, setGhostLeaderboard] = useState<GhostDuelLeaderboardEntry[]>([]);
   const mountedRef = useRef(true);
@@ -258,15 +259,23 @@ export default function ResultScreen() {
       (snapshot.game as unknown as { mode_id?: string }).mode_id === 'ghost_duel';
 
     setLoadingTrails(true);
-    const [trailRes, statsRes, ghostRes] = await Promise.all([
+    const [trailRes, statsRes, ghostRes, consentsRes] = await Promise.all([
       supabase.rpc('get_game_trails', { game_id: gameId }),
       supabase.rpc('get_game_stats', { game_id: gameId }),
       snapshot.my_team === 'runner' || isGhostDuel
         ? supabase.rpc('preview_ghost', { game_id: gameId })
         : Promise.resolve({ data: null, error: null }),
+      supabase.rpc('get_my_consents'),
     ]);
 
     if (!mountedRef.current) return;
+
+    if (!consentsRes.error && consentsRes.data) {
+      const c4 = (consentsRes.data as any)?.ghost;
+      if (c4?.granted === false) {
+        setGhostPermanentlyDeclined(true);
+      }
+    }
 
     if (trailRes.error) {
       setTrailError(trailRes.error.message);
@@ -319,6 +328,17 @@ export default function ResultScreen() {
       return;
     }
     setGhostSuccess(true);
+  }
+
+  async function handleNeverAskGhost() {
+    if (!supabase) return;
+    setGhostDismissed(true);
+    setGhostPermanentlyDeclined(true);
+    await supabase.rpc('set_consent', {
+      consent_type: 'ghost',
+      granted: false,
+      policy_version: null,
+    });
   }
 
   useEffect(() => {
@@ -1138,74 +1158,84 @@ export default function ResultScreen() {
           </View>
         )}
 
-        {ghostPreview && ghostPreview.can_contribute && !ghostDismissed && (
-          <View style={styles.ghostContributionCard}>
-            <View style={styles.ghostHeaderRow}>
-              <MaterialCommunityIcons color="#7C3AED" name="ghost" size={20} />
-              <Text style={styles.ghostCardTitle}>Contribute to Ghost Library</Text>
-            </View>
-            {ghostSuccess || ghostPreview.already_contributed ? (
-              <View style={styles.ghostSuccessBox}>
-                <Ionicons color="#059669" name="checkmark-circle" size={18} />
-                <Text style={styles.ghostSuccessText}>
-                  {ghostSuccess
-                    ? 'Thank you! Your route was trimmed by 150m and added to the ghost library.'
-                    : 'You have already contributed this route to the ghost library.'}
-                </Text>
+        {ghostPreview &&
+          ghostPreview.can_contribute &&
+          !ghostDismissed &&
+          !ghostPermanentlyDeclined && (
+            <View style={styles.ghostContributionCard}>
+              <View style={styles.ghostHeaderRow}>
+                <MaterialCommunityIcons color="#7C3AED" name="ghost" size={20} />
+                <Text style={styles.ghostCardTitle}>Contribute to Ghost Library</Text>
               </View>
-            ) : (
-              <>
-                <Text style={styles.ghostCardBody}>
-                  Help solo players practice! Your route is anonymized and trimmed by 150m at the
-                  start and end to keep your exact locations private.
-                </Text>
-                <View style={styles.ghostStatsRow}>
-                  <View style={styles.ghostStatCol}>
-                    <Text style={styles.ghostStatLabel}>TRIMMED LENGTH</Text>
-                    <Text style={styles.ghostStatValue}>
-                      {ghostPreview.trimmed_length_m >= 1000
-                        ? `${(ghostPreview.trimmed_length_m / 1000).toFixed(1)} km`
-                        : `${ghostPreview.trimmed_length_m} m`}
-                    </Text>
-                  </View>
-                  <View style={styles.ghostStatCol}>
-                    <Text style={styles.ghostStatLabel}>DURATION</Text>
-                    <Text style={styles.ghostStatValue}>
-                      {formatDuration(ghostPreview.duration_s)}
-                    </Text>
-                  </View>
-                  <View style={styles.ghostStatCol}>
-                    <Text style={styles.ghostStatLabel}>DIFFICULTY</Text>
-                    <Text style={[styles.ghostStatValue, { textTransform: 'capitalize' }]}>
-                      {ghostPreview.difficulty}
-                    </Text>
-                  </View>
+              {ghostSuccess || ghostPreview.already_contributed ? (
+                <View style={styles.ghostSuccessBox}>
+                  <Ionicons color="#059669" name="checkmark-circle" size={18} />
+                  <Text style={styles.ghostSuccessText}>
+                    {ghostSuccess
+                      ? 'Thank you! Your route was trimmed by 150m and added to the ghost library.'
+                      : 'You have already contributed this route to the ghost library.'}
+                  </Text>
                 </View>
-                <View style={styles.ghostButtonRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={ghostBusy}
-                    onPress={() => void handleContributeGhost()}
-                    style={styles.ghostContributeBtn}
-                  >
-                    {ghostBusy ? (
-                      <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : (
-                      <Text style={styles.ghostContributeBtnText}>Contribute Route</Text>
-                    )}
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setGhostDismissed(true)}
-                    style={styles.ghostDismissBtn}
-                  >
-                    <Text style={styles.ghostDismissBtnText}>Not now</Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
-          </View>
-        )}
+              ) : (
+                <>
+                  <Text style={styles.ghostCardBody}>
+                    Help solo players practice! Your route is anonymized and trimmed by 150m at the
+                    start and end to keep your exact locations private.
+                  </Text>
+                  <View style={styles.ghostStatsRow}>
+                    <View style={styles.ghostStatCol}>
+                      <Text style={styles.ghostStatLabel}>TRIMMED LENGTH</Text>
+                      <Text style={styles.ghostStatValue}>
+                        {ghostPreview.trimmed_length_m >= 1000
+                          ? `${(ghostPreview.trimmed_length_m / 1000).toFixed(1)} km`
+                          : `${ghostPreview.trimmed_length_m} m`}
+                      </Text>
+                    </View>
+                    <View style={styles.ghostStatCol}>
+                      <Text style={styles.ghostStatLabel}>DURATION</Text>
+                      <Text style={styles.ghostStatValue}>
+                        {formatDuration(ghostPreview.duration_s)}
+                      </Text>
+                    </View>
+                    <View style={styles.ghostStatCol}>
+                      <Text style={styles.ghostStatLabel}>DIFFICULTY</Text>
+                      <Text style={[styles.ghostStatValue, { textTransform: 'capitalize' }]}>
+                        {ghostPreview.difficulty}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.ghostButtonRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={ghostBusy}
+                      onPress={() => void handleContributeGhost()}
+                      style={styles.ghostContributeBtn}
+                    >
+                      {ghostBusy ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <Text style={styles.ghostContributeBtnText}>Contribute Route</Text>
+                      )}
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setGhostDismissed(true)}
+                      style={styles.ghostDismissBtn}
+                    >
+                      <Text style={styles.ghostDismissBtnText}>Not now</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => void handleNeverAskGhost()}
+                      style={styles.ghostDismissBtn}
+                    >
+                      <Text style={styles.ghostDismissBtnText}>Never ask again</Text>
+                    </Pressable>
+                  </View>
+                </>
+              )}
+            </View>
+          )}
 
         <Text style={styles.sectionLabel}>FINAL POSITIONS · {positions.length}</Text>
         {players.map((player) => {

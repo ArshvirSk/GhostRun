@@ -6,6 +6,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'rea
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { PRIVACY_VERSION } from '../src/lib/privacy';
 import { supabase } from '../src/lib/supabase';
 
 const GHOSTRUN_LOGO = require('../assets/logos/android-chrome-512x512.png');
@@ -31,14 +32,29 @@ export default function HomeScreen() {
       if (supabase) {
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user) {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('display_name, color')
-            .eq('id', userData.user.id)
-            .maybeSingle();
+          const [{ data, error }, { data: consents }] = await Promise.all([
+            supabase
+              .from('profiles')
+              .select('display_name, color')
+              .eq('id', userData.user.id)
+              .maybeSingle(),
+            supabase.rpc('get_my_consents'),
+          ]);
           if (mounted) {
             if (error) setProfileError(error.message);
             else setProfile(data);
+
+            const ack = (
+              consents as Record<
+                string,
+                { granted?: boolean; policy_version?: number } | undefined
+              > | null
+            )?.policy_ack;
+            const acknowledgedVersion = ack?.granted ? (ack.policy_version ?? 0) : 0;
+            if (acknowledgedVersion < PRIVACY_VERSION) {
+              router.replace('/privacy?mode=gate' as any);
+              return;
+            }
           }
         }
       }

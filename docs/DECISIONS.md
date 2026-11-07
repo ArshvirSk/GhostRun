@@ -402,4 +402,25 @@ Rather than cramming ad-hoc mode metadata into root JSON, `get_game_stats` provi
 **Decision D40 — Replay MapLibre Vector Sources & Interactive Layer Toggles:**
 In `app/replay/[id].tsx`, vector layers for territory zones (radial sectors with controller fills), ghost NPC paths (dashed purple line string + entity blips), tactical supply drops, and hunter heat marks (color-coded by temperature) are dynamically sourced from GeoJSON features. Interactive layer chips allow players to toggle individual layers on/off without re-querying the database or disrupting playback scrubbing.
 
+## 2026-11-08 — Milestone C4: Privacy, Consent and Replay Sharing Audit (Decisions D41–D44)
+
+**Decision D41 — Complete Consent Matrix Verification (C1–C7) & Route Sharing Gate:**
+Verified end-to-end enforcement of the consent matrix defined in `docs/MODES.md §7.4.2`:
+1. *C1 (Location during games):* Verified background/foreground GPS tracking operates strictly during active play (`head_start` or `live`), never passively on the Home or Lobby screens.
+2. *C2 (Privacy notice, terms, age confirmation):* First-run gate enforced on `/privacy?mode=gate`. Verified that `routeAfterAuth` in `app/auth.tsx` and initial load in `app/home.tsx` query `get_my_consents()` and redirect to `/privacy?mode=gate` if `policy_ack.granted` is false or `policy_version < PRIVACY_VERSION` (18+ or guardian confirmation).
+3. *C3 (Replay sharing in this game):* Route sharing choice (`share_trail`) is mandatory prior to lobby ready-up. Server-authoritative functions `set_ready` and `start_game` strictly reject uncommitted choices. Post-game opponent trails and closest call proximities remain hidden unless explicitly consented.
+4. *C4 (Ghost contribution):* Result screen prompts runner route contribution per game with 150m start/end trimming preview. Suppressed entirely if permanently declined. Added "Never ask again" button calling `set_consent('ghost', false)` and added a direct `Contribute routes to Ghost Library` toggle in Settings → Privacy (`app/privacy.tsx`).
+5. *C5 (Public leaderboard name):* `get_ghost_duel_leaderboard` validates consent type `leaderboard_name`. If ungranted, runner names mask automatically to `'Anonymous Runner'`.
+6. *C7 (Diagnostics):* Non-location telemetry toggle wired in Settings → Privacy.
+
+**Decision D42 — Foreign Key Cascade Safety on Heat Presses:**
+In `public.heat_presses`, `hunter_id` was non-nullable with a strict default foreign key, which blocked user account deletion (`delete_my_data()`) whenever a player had conducted a heat probe. `hunter_id` was relaxed to nullable with `ON DELETE SET NULL`, allowing the user profile and player rows to delete cleanly while keeping the anonymized heat probe record intact for post-game recap.
+
+**Decision D43 — Self-Service Data Purge & Anonymous Ghost Disassociation:**
+Per `docs/MODES.md §7.4.8`, `delete_my_data()` upgrades to explicitly delete contributed anonymous ghost library entries linked via `ghost_contributions` (`delete from public.ghost_library where id in (select ghost_id from public.ghost_contributions where user_id = caller_id)`). This guarantees that deleting an account completely removes their contributed paths from the ghost library, honoring user opt-out while preserving game history integrity.
+
+**Decision D44 — Comprehensive Data Export (`export_my_data`):**
+Upgraded `export_my_data()` to export all personal and tactical gameplay records associated with the authenticated user: profile, consents history, games joined with team and trail sharing choice, personal trail points (subqueried and capped at 50,000 points to avoid memory exhaustion), tag records, SOS events, ghost contributions, ghost duel scores, drop claims (`drop_id`, `started_at`), and heat presses (`variant`, `result`, `pressed_at`).
+
+
 

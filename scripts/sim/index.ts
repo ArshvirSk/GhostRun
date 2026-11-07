@@ -3827,6 +3827,163 @@ async function replayStatsUpgradesScenario() {
   }
 }
 
+/** Scripted: Milestone C4 Privacy, consent and replay sharing audit. */
+async function privacyConsentAuditScenario() {
+  console.log('\n--- Scenario: privacy-audit (Milestone C4: Privacy, consent and replay sharing audit) ---');
+  const user = await newPlayer('C4PrivacyUser');
+  const host = await newPlayer('C4LobbyHost');
+
+  // --- Test 1: Consent Matrix (C2, C4, C5, C7) & Append-Only get_my_consents ---
+  await rpc(user, 'set_consent', { consent_type: 'policy_ack', granted: true, policy_version: 1 });
+  await rpc(user, 'set_consent', { consent_type: 'ghost', granted: false, policy_version: null });
+  await rpc(user, 'set_consent', { consent_type: 'leaderboard_name', granted: true, policy_version: null });
+  await rpc(user, 'set_consent', { consent_type: 'diagnostics', granted: false, policy_version: null });
+
+  type ConsentMap = Record<string, { granted: boolean; policy_version: number | null }>;
+  const consents = await rpc<ConsentMap>(user, 'get_my_consents', {});
+  expect(
+    consents.data?.policy_ack?.granted === true && consents.data?.policy_ack?.policy_version === 1,
+    'C2 policy_ack recorded version 1',
+    JSON.stringify(consents.data?.policy_ack),
+  );
+  expect(
+    consents.data?.ghost?.granted === false,
+    'C4 ghost consent recorded as permanently declined',
+    JSON.stringify(consents.data?.ghost),
+  );
+  expect(
+    consents.data?.leaderboard_name?.granted === true,
+    'C5 leaderboard_name granted',
+    JSON.stringify(consents.data?.leaderboard_name),
+  );
+  expect(
+    consents.data?.diagnostics?.granted === false,
+    'C7 diagnostics declined',
+    JSON.stringify(consents.data?.diagnostics),
+  );
+
+  // --- Test 2: Consent C3 Gate in Lobby (set_ready & start_game) ---
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 500,
+    settings: { head_start_s: 0, duration_s: 300, ping_interval_s: 30, modifiers: ['hot_cold'] },
+  });
+  const gameId = created.data![0].game_id;
+  const hostPid = await playerId(host, gameId);
+
+  await rpc(user, 'join_game', { code: created.data![0].code });
+  const userPid = await playerId(user, gameId);
+
+  await rpc(host, 'set_team', { game_id: gameId, player_id: hostPid, team: 'hunter' });
+  await rpc(user, 'set_team', { game_id: gameId, player_id: userPid, team: 'runner' });
+
+  // user has not chosen share_trail yet -> set_ready must fail
+  const unchosenReady = await rpc(user, 'set_ready', { game_id: gameId, ready: true });
+  expect(
+    Boolean(unchosenReady.error) && /share your route/i.test(unchosenReady.error?.message ?? ''),
+    'C3 gate: set_ready blocked until route sharing choice is made',
+    unchosenReady.error?.message ?? 'unexpected success',
+  );
+
+  // Set share_trail = true for both
+  await rpc(host, 'set_share_trail', { game_id: gameId, share: true });
+  await rpc(user, 'set_share_trail', { game_id: gameId, share: true });
+
+  // Now set_ready succeeds
+  const readyRes = await rpc(user, 'set_ready', { game_id: gameId, ready: true });
+  expect(!readyRes.error, 'set_ready succeeds after C3 choice is made', String(readyRes.error?.message));
+  await rpc(host, 'set_ready', { game_id: gameId, ready: true });
+
+  const startRes = await rpc<Record<string, unknown>>(host, 'start_game', { game_id: gameId });
+  expect(
+    !startRes.error,
+    'round starts into countdown with all C3 choices resolved',
+    String(startRes.error?.message),
+  );
+
+  // Advance to live
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  // Positions and heat press
+  const nowIso = new Date().toISOString();
+  await rpc(user, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 3,
+    recorded_at: nowIso,
+  });
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.0001,
+    lng: CENTER.lng,
+    accuracy: 3,
+    recorded_at: nowIso,
+  });
+
+  await rpc(host, 'heat_press', { game_id: gameId });
+
+  // Tag runner and end round
+  await rpc(host, 'attempt_tag', { game_id: gameId });
+
+  // --- Test 3: Upgraded export_my_data (All Personal Data Bundled) ---
+  type ExportBundle = {
+    exported_at: string;
+    profile: { id: string; display_name: string };
+    consents: unknown[];
+    games: unknown[];
+    trail_points: unknown[];
+    tags: unknown[];
+    sos_events: unknown[];
+    ghost_contributions: unknown[];
+    ghost_duel_scores: unknown[];
+    drop_claims: unknown[];
+    heat_presses: unknown[];
+  };
+
+  const exportRes = await rpc<ExportBundle>(user, 'export_my_data', {});
+  expect(!exportRes.error, 'export_my_data succeeds', String(exportRes.error?.message));
+  const exp = exportRes.data!;
+  expect(Boolean(exp?.profile && exp?.profile?.display_name), 'export includes profile', exp?.profile?.display_name ?? 'none');
+  expect(Array.isArray(exp?.consents) && exp.consents.length >= 4, 'export includes consent history', String(exp?.consents?.length));
+  expect(Array.isArray(exp?.games) && exp.games.length >= 1, 'export includes games joined', String(exp?.games?.length));
+  expect(Array.isArray(exp?.trail_points) && exp.trail_points.length >= 1, 'export includes own trail points', String(exp?.trail_points?.length));
+  expect(Array.isArray(exp?.tags) && exp.tags.length >= 1, 'export includes tags', String(exp?.tags?.length));
+  expect(Array.isArray(exp?.ghost_contributions), 'export includes ghost_contributions array', String(exp?.ghost_contributions?.length));
+  expect(Array.isArray(exp?.ghost_duel_scores), 'export includes ghost_duel_scores array', String(exp?.ghost_duel_scores?.length));
+  expect(Array.isArray(exp?.drop_claims), 'export includes drop_claims array', String(exp?.drop_claims?.length));
+  expect(Array.isArray(exp?.heat_presses), 'export includes heat_presses array', String(exp?.heat_presses?.length));
+
+  // --- Test 4: delete_my_data Cascade & Host Handover ---
+  const userAuth = await user.auth.getUser();
+  const userId = userAuth.data.user?.id ?? '';
+
+  const deleteRes = await rpc<{ deleted: boolean; account_removed: boolean }>(user, 'delete_my_data', {});
+  expect(
+    !deleteRes.error && deleteRes.data?.deleted === true,
+    'delete_my_data successfully deletes account and personal data',
+    JSON.stringify(deleteRes.data ?? deleteRes.error),
+  );
+
+  // Verify user's profile is deleted
+  const { data: profileCheck } = await host.from('profiles').select('id').eq('id', userId).maybeSingle();
+  expect(profileCheck === null, 'user profile permanently deleted from profiles table', JSON.stringify(profileCheck));
+
+  // Verify match replay still readable with anonymized player
+  const replayRes = await rpc<{ tags: { runner_name?: string }[] }>(host, 'get_game_replay', { game_id: gameId });
+  expect(
+    !replayRes.error && Array.isArray(replayRes.data?.tags),
+    'game replay remains accessible to surviving players',
+    String(replayRes.data?.tags?.length),
+  );
+
+  // Cleanup
+  await rpc(host, 'leave_game', { game_id: gameId });
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -3846,6 +4003,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   'safety-guard': safetyGuardScenario,
   'ai-game-master': aiGameMasterScenario,
   'replay-stats': replayStatsUpgradesScenario,
+  'privacy-audit': privacyConsentAuditScenario,
 };
 
 async function main() {

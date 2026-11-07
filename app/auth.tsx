@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import { authErrorMessage } from '../src/lib/authErrors';
+import { PRIVACY_VERSION } from '../src/lib/privacy';
 import { getResendCooldown, setResendCooldown } from '../src/lib/resendCooldown';
 import { isSupabaseConfigured, supabase } from '../src/lib/supabase';
 
@@ -67,7 +68,22 @@ export default function AuthScreen() {
       return;
     }
 
-    router.replace(profile ? '/home' : '/welcome');
+    if (!profile) {
+      router.replace('/welcome');
+      return;
+    }
+
+    const { data: consents } = await client.rpc('get_my_consents');
+    const ack = (
+      consents as Record<
+        string,
+        { granted?: boolean; policy_version?: number } | undefined
+      > | null
+    )?.policy_ack;
+    const acknowledgedVersion = ack?.granted ? (ack.policy_version ?? 0) : 0;
+    router.replace(
+      acknowledgedVersion < PRIVACY_VERSION ? ('/privacy?mode=gate' as any) : '/home',
+    );
   }
 
   async function handleSubmit() {

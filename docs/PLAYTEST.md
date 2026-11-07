@@ -371,6 +371,19 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] **Drops & Handoffs Layer:** Confirm tactical supply crates appear on the map with claimed status coloration.
   - [ ] **Timeline Scrubber Integration:** Scrub timeline slider and confirm heat probes and game events trigger active playhead cards with formatted timestamps.
 
+### 3.16 Privacy, Consent & Replay Sharing Audit (Milestone C4)
+
+* **Consent Matrix Verification:**
+  - [ ] **C1 Location:** Verify position tracking begins only when transitioning to countdown/live, and immediately terminates upon round completion or leaving.
+  - [ ] **C2 First Run Gate:** Test fresh account onboarding; verify redirection to `/privacy?mode=gate`, requiring age confirmation (18+ or guardian) before navigating to Home.
+  - [ ] **C3 Replay Sharing Choice:** Verify mandatory join sheet in Lobby. Ensure `set_ready` rejects attempts to ready up without selecting "Share my route" or "Keep my route private".
+  - [ ] **C4 Ghost Contribution:** Verify post-game result prompt renders trimmed distance (-150m start/finish). Confirm tapping "Never ask again" sets consent permanently declined and suppresses future prompts. Verify "Contribute routes to Ghost Library" toggle in Settings → Privacy.
+  - [ ] **C5 Leaderboard Display:** Confirm unconsented players render as "Anonymous Runner" on Ghost Duel leaderboards.
+  - [ ] **C7 Diagnostics:** Confirm toggle state saves to consents table without requesting location permissions.
+* **Data Portability & Account Deletion:**
+  - [ ] **Export My Data:** Trigger "Export My Data" from Settings → Privacy. Confirm generated JSON bundle contains profile, consents, games, trail points, tags, SOS events, ghost contributions, duel scores, drops, and heat presses.
+  - [ ] **Account Deletion Safety:** Conduct test deletion using `delete_my_data()`. Verify host reassignment in unfinished lobbies, deletion of profile, CASCADE removal of personal records, SET NULL on heat presses, purge of user's ghost library entries, and automatic sign-out. Confirm surviving players can still review game replays.
+
 ---
 
 ## 4. Safety & Real-World Precautions

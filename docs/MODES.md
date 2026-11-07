@@ -687,7 +687,7 @@ Cross-mode server-authoritative safety infrastructure protecting players across 
     - 👻 Ghost NPC paths (dashed purple line strings and entity blips)
     - 📦 Drops & Handoffs (tactical supply crates and package handoffs)
 
-### 7.4 Privacy, consent and replay sharing
+### 7.4 Privacy, consent and replay sharing — ✅ AUDITED & IMPLEMENTED (Phase C Milestone C4)
 
 Location trails are sensitive personal data. Replays, ghosts, leaderboards and broadcasts all reuse them, so each reuse needs its own clear, revocable choice.
 
@@ -858,7 +858,7 @@ create table ghost_contributions (
 
 ---
 
-### 7.5 Privacy policy screen
+### 7.5 Privacy policy screen — ✅ AUDITED & IMPLEMENTED (Phase C Milestone C4)
 
 #### 7.5.1 Where it appears
 
