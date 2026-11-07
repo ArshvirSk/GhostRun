@@ -7,6 +7,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Phase B: Milestone B6 — Solo Ghost Duel Base Mode (docs/MODES.md §6.2)
+- **Mode Registration & Variant System:**
+  - Added `ghost_duel` base mode to `mode_catalogue()` with feature flag `mode.ghost_duel`.
+  - Registered `ghost_duel` in client `src/lib/modeRegistry.ts` with teams `['runner', 'hunter']` and variant picker (`time_trial`, `evade`, `mirror_chase`).
+  - Added variant selector pills in `app/create.tsx` setup sheet with `mode_params` wiring.
+  - Solo start enabled: lobby allows 1 player, auto-assigns runner/hunter team based on variant.
+- **Server Authority & Ghost Simulation:**
+  - Ghost entity spawned from `ghost_library` (or synthetic benchmark path) at game start via `spawn_ghost_npcs`.
+  - Finish target placed at terminal point of ghost path with configurable radius.
+  - Ghost position interpolated along stored path by elapsed time; exposed in `get_game_state` snapshot.
+  - `submit_position` evaluates Ghost Duel win conditions inline:
+    - **Time Trial:** target arrival within radius → scores player time, ghost time, split delta $\Delta t$, route efficiency, and composite score.
+    - **Evade:** runner within $\le 20\text{ m}$ of ghost → `end_reason = 'haunted'`, hunters win.
+    - **Mirror Chase:** `tag_ghost` RPC validates $\le 10\text{ m}$ proximity to ghost entity → `end_reason = 'ghost_tagged'`, runners win.
+  - Scoring formula: `score = max(100, 1000 + delta_s × 10 + efficiency × 200)` with route efficiency = straight-line distance / actual trail distance.
+- **Ghost Duel Scores & Leaderboard:**
+  - Created `ghost_duel_scores` table with RLS (owner-only read, server-only insert).
+  - Implemented `get_ghost_duel_leaderboard(lat, lng, radius_m, variant, row_limit)` RPC with C5 consent-aware name display.
+- **Client HUD & Game Screen:**
+  - Ghost entity rendered as cyan blip with animated pulse halo on map.
+  - Finish target rendered as emerald ring with point marker.
+  - Top HUD eyebrow with mode title, variant badge, phase-aware copy (countdown, head start, live, ended).
+  - Stats row with compact chips: Target Distance, Ghost Distance, Finish Distance, Clock.
+  - Mirror Chase floating dock action button: `TAG GHOST (X m)` enabled within 10 m.
+  - Bottom sheet Ghost Duel card with Tag Ghost button.
+- **Result Screen:**
+  - Winner titles per variant and outcome: "Ghost Beaten!", "Ghost Won", "Ghost Tagged!", "Ghost Escaped", "Haunted", "Evaded Successfully!".
+  - Dedicated Solo Ghost Duel Debrief card: Final Score, Your Time vs Ghost Time, Route Efficiency %, variant badge, Top 5 Duel Leaderboard table.
+  - Ghost Contribution preview card enabled for `ghost_duel` mode.
+- **Database Migrations (8 applied to production):**
+  - `20261114000000_b6_ghost_duel_schema.sql`: Core table, RLS, leaderboard RPC, tag_ghost RPC.
+  - `20261114001000_b6_ghost_duel_lifecycle.sql`: Mode catalogue, lifecycle handlers, scoring, end reasons.
+  - `20261114002000` through `20261114007000`: Incremental fixes for feature flag format, parameter ambiguity, enum casts, column schemas, and submit_position Ghost Duel integration.
+- **Verification:**
+  - Simulator scenario `ghost-duel` passing 10/10 automated checks across all 3 variants.
+  - `npm run typecheck` passing with 0 errors.
+
 ## [2.5.0] — 2026-11-05
 
 ### Overview

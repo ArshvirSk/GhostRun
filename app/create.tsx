@@ -18,7 +18,14 @@ import { circleRing } from '../src/lib/geo';
 import { supabase } from '../src/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type Mode = 'classic_chase' | 'tag_hunt' | 'haunted_map' | 'jailbreak' | 'assassin_ring';
+type Mode =
+  | 'classic_chase'
+  | 'tag_hunt'
+  | 'haunted_map'
+  | 'ghost_duel'
+  | 'jailbreak'
+  | 'assassin_ring'
+  | 'relay_heist';
 type BoundaryPenalty = 'warn' | 'extra_ping';
 
 const MAP_STYLE =
@@ -75,6 +82,9 @@ export default function CreateGameScreen() {
   const cameraRef = useRef<CameraRef>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mode, setMode] = useState<Mode>('classic_chase');
+  const [ghostDuelVariant, setGhostDuelVariant] = useState<
+    'time_trial' | 'evade' | 'mirror_chase'
+  >('time_trial');
   const [center, setCenter] = useState<[number, number]>(
     () => cachedMemoryLocation || DEFAULT_CENTER,
   );
@@ -314,12 +324,15 @@ export default function CreateGameScreen() {
       lng: center[0],
       radius_m: radius,
       settings: {
-        head_start_s: headStartS,
+        head_start_s: mode === 'ghost_duel' ? 0 : headStartS,
         duration_s: durationS,
         ping_interval_s: pingIntervalS,
         tag_radius_m: tagRadiusM,
         boundary_grace_s: boundaryGraceS,
         boundary_penalty: boundaryPenalty,
+        mode_params: {
+          ...(mode === 'ghost_duel' ? { ghost_duel: { variant: ghostDuelVariant } } : {}),
+        },
       },
     });
     setBusy(false);
@@ -497,11 +510,15 @@ export default function CreateGameScreen() {
                 ? 'Classic'
                 : mode === 'haunted_map'
                   ? 'Haunted Map'
-                  : mode === 'jailbreak'
-                    ? 'Jailbreak'
-                    : mode === 'assassin_ring'
-                      ? 'Assassin Ring'
-                      : 'Tag Hunt'}
+                  : mode === 'ghost_duel'
+                    ? 'Ghost Duel'
+                    : mode === 'jailbreak'
+                      ? 'Jailbreak'
+                      : mode === 'assassin_ring'
+                        ? 'Assassin Ring'
+                        : mode === 'relay_heist'
+                          ? 'Relay Heist'
+                          : 'Tag Hunt'}
               )
             </Text>
             <Text style={styles.dockHint}>▲ Slide up to configure</Text>
@@ -544,7 +561,40 @@ export default function CreateGameScreen() {
                 label="Assassin Ring"
                 onPress={() => setMode('assassin_ring')}
               />
+              <ModeButton
+                selected={mode === 'relay_heist'}
+                label="Relay Heist"
+                onPress={() => setMode('relay_heist')}
+              />
+              <ModeButton
+                selected={mode === 'ghost_duel'}
+                label="Ghost Duel (Solo)"
+                onPress={() => setMode('ghost_duel')}
+              />
             </View>
+
+            {mode === 'ghost_duel' && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.sectionLabel}>GHOST DUEL VARIANT</Text>
+                <View style={styles.row}>
+                  <ModeButton
+                    selected={ghostDuelVariant === 'time_trial'}
+                    label="Time Trial"
+                    onPress={() => setGhostDuelVariant('time_trial')}
+                  />
+                  <ModeButton
+                    selected={ghostDuelVariant === 'evade'}
+                    label="Evade"
+                    onPress={() => setGhostDuelVariant('evade')}
+                  />
+                  <ModeButton
+                    selected={ghostDuelVariant === 'mirror_chase'}
+                    label="Mirror Chase"
+                    onPress={() => setGhostDuelVariant('mirror_chase')}
+                  />
+                </View>
+              </View>
+            )}
 
             <Text style={styles.sectionLabel}>PLAY AREA RADIUS · {radius} M</Text>
             <View style={styles.row}>

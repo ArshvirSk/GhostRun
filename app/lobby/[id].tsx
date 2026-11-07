@@ -172,16 +172,20 @@ export default function LobbyScreen() {
     [state],
   );
   const isAssassinRing = state?.game.mode_id === 'assassin_ring';
-  const hasBothTeams = isAssassinRing
-    ? activePlayers.length >= 3
-    : activePlayers.some((player) => player.team === 'runner') &&
-      activePlayers.some((player) => player.team === 'hunter');
+  const isGhostDuel = state?.game.mode_id === 'ghost_duel';
+  const hasBothTeams = isGhostDuel
+    ? activePlayers.length >= 1
+    : isAssassinRing
+      ? activePlayers.length >= 3
+      : activePlayers.some((player) => player.team === 'runner') &&
+        activePlayers.some((player) => player.team === 'hunter');
   const everyoneReady =
-    activePlayers.length >= (isAssassinRing ? 3 : 2) &&
+    activePlayers.length >= (isGhostDuel ? 1 : isAssassinRing ? 3 : 2) &&
     activePlayers.every((player) => player.is_ready);
-  const everyoneAssigned = isAssassinRing
-    ? true
-    : activePlayers.every((player) => player.team !== 'unassigned');
+  const everyoneAssigned =
+    isAssassinRing || isGhostDuel
+      ? true
+      : activePlayers.every((player) => player.team !== 'unassigned');
   const isJailbreak = state?.game.mode_id === 'jailbreak';
   const isRelayHeist = state?.game.mode_id === 'relay_heist';
   const jailPlaced = Boolean(state?.game.jail);
@@ -887,9 +891,11 @@ export default function LobbyScreen() {
           </Pressable>
           <Text style={styles.modeNote}>
             {!hasBothTeams
-              ? isAssassinRing
-                ? 'At least 3 players are needed to form an elimination ring.'
-                : 'Assign at least one runner and one hunter before starting.'
+              ? isGhostDuel
+                ? 'Ready up to begin the solo duel.'
+                : isAssassinRing
+                  ? 'At least 3 players are needed to form an elimination ring.'
+                  : 'Assign at least one runner and one hunter before starting.'
               : !everyoneAssigned
                 ? 'Every player must choose a team before the round can start.'
                 : isJailbreak && !jailPlaced

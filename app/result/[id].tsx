@@ -31,6 +31,30 @@ type GhostPreview = {
   already_contributed: boolean;
 };
 
+type GhostDuelScore = {
+  id: string;
+  game_id: string;
+  user_id: string;
+  variant: 'time_trial' | 'evade' | 'mirror_chase';
+  player_time_s: number;
+  ghost_time_s: number;
+  delta_s: number;
+  efficiency: number;
+  score: number;
+  created_at: string;
+};
+
+type GhostDuelLeaderboardEntry = {
+  rank: number;
+  display_name: string;
+  score: number;
+  player_time_s: number;
+  ghost_time_s: number;
+  delta_s: number;
+  efficiency: number;
+  created_at: string;
+};
+
 type Team = 'runner' | 'hunter' | 'solo' | 'unassigned';
 
 type GamePlayer = {
@@ -159,6 +183,8 @@ export default function ResultScreen() {
   const [ghostBusy, setGhostBusy] = useState(false);
   const [ghostSuccess, setGhostSuccess] = useState(false);
   const [ghostDismissed, setGhostDismissed] = useState(false);
+  const [ghostScore, setGhostScore] = useState<GhostDuelScore | null>(null);
+  const [ghostLeaderboard, setGhostLeaderboard] = useState<GhostDuelLeaderboardEntry[]>([]);
   const mountedRef = useRef(true);
   const leavingRef = useRef(false);
 
@@ -198,11 +224,15 @@ export default function ResultScreen() {
       return;
     }
 
+    const isGhostDuel =
+      snapshot.game.mode === 'ghost_duel' ||
+      (snapshot.game as unknown as { mode_id?: string }).mode_id === 'ghost_duel';
+
     setLoadingTrails(true);
     const [trailRes, statsRes, ghostRes] = await Promise.all([
       supabase.rpc('get_game_trails', { game_id: gameId }),
       supabase.rpc('get_game_stats', { game_id: gameId }),
-      snapshot.my_team === 'runner'
+      snapshot.my_team === 'runner' || isGhostDuel
         ? supabase.rpc('preview_ghost', { game_id: gameId })
         : Promise.resolve({ data: null, error: null }),
     ]);
@@ -222,6 +252,27 @@ export default function ResultScreen() {
 
     if (!ghostRes.error && ghostRes.data) {
       setGhostPreview(ghostRes.data as GhostPreview);
+    }
+
+    if (isGhostDuel) {
+      const { data: scoreRow } = await supabase
+        .from('ghost_duel_scores')
+        .select('*')
+        .eq('game_id', gameId)
+        .maybeSingle();
+      if (!mountedRef.current) return;
+      if (scoreRow) {
+        setGhostScore(scoreRow as GhostDuelScore);
+        const { data: lb } = await supabase.rpc('get_ghost_duel_leaderboard', {
+          lat: snapshot.game.area.latitude,
+          lng: snapshot.game.area.longitude,
+          radius_m: 5000,
+          variant: scoreRow.variant,
+          row_limit: 5,
+        });
+        if (!mountedRef.current) return;
+        if (lb) setGhostLeaderboard(lb as GhostDuelLeaderboardEntry[]);
+      }
     }
 
     setLoadingTrails(false);
@@ -418,25 +469,57 @@ export default function ResultScreen() {
   const positions = state.positions;
   const zoom = Math.max(10, Math.min(16, 15 - Math.log2(game.area.radius_m / 200)));
 
+  const isGhostDuel =
+    game.mode === 'ghost_duel' ||
+    (game as unknown as { mode_id?: string }).mode_id === 'ghost_duel';
   const isAssassinRing =
     game.mode === 'assassin_ring' ||
     (game as unknown as { mode_id?: string }).mode_id === 'assassin_ring';
-  const winnerTitle = isAssassinRing
-    ? 'Assassin Victorious'
-    : game.winner === 'runners'
-      ? 'Runners win'
-      : game.winner === 'hunters'
-        ? 'Hunters win'
-        : 'Round over';
-  const accent = isAssassinRing
-    ? '#D97706'
-    : game.winner === 'runners'
+  const winnerTitle = isGhostDuel
+    ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? '')
+      ? game.end_reason === 'ghost_tagged'
+        ? 'Ghost Tagged!'
+        : game.end_reason === 'evaded'
+          ? 'Evaded Successfully!'
+          : 'Ghost Beaten!'
+      : game.end_reason === 'ghost_escaped'
+        ? 'Ghost Escaped'
+        : game.end_reason === 'haunted'
+          ? 'Haunted by Ghost'
+          : 'Ghost Won'
+    : isAssassinRing
+      ? 'Assassin Victorious'
+      : game.winner === 'runners'
+        ? 'Runners win'
+        : game.winner === 'hunters'
+          ? 'Hunters win'
+          : 'Round over';
+  const accent = isGhostDuel
+    ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? '')
       ? '#059669'
-      : game.winner === 'hunters'
-        ? '#B91C1C'
-        : '#475569';
-  const reasonCopy =
-    game.end_reason === 'vip_eliminated'
+      : '#B91C1C'
+    : isAssassinRing
+      ? '#D97706'
+      : game.winner === 'runners'
+        ? '#059669'
+        : game.winner === 'hunters'
+          ? '#B91C1C'
+          : '#475569';
+  const reasonCopy = isGhostDuel
+    ? game.end_reason === 'ghost_beaten'
+      ? 'You reached the finish line faster than the ghost runner!'
+      : game.end_reason === 'ghost_won'
+        ? 'The ghost runner beat you to the finish line.'
+        : game.end_reason === 'evaded'
+          ? 'You reached the target without getting caught by the ghost hunter!'
+          : game.end_reason === 'haunted'
+            ? 'The ghost hunter caught you within 20m!'
+            : game.end_reason === 'ghost_tagged'
+              ? 'You tagged the ghost runner before it completed the route!'
+              : game.end_reason === 'ghost_escaped'
+                ? 'The ghost runner completed the route before you could tag it.'
+                : 'The ghost duel has finished.'
+    : game.end_reason === 'vip_eliminated'
       ? 'Hunters successfully eliminated the secret VIP!'
       : game.end_reason === 'last_survivor'
         ? 'The last assassin standing survived the elimination ring.'
@@ -610,7 +693,14 @@ export default function ResultScreen() {
 
       <View style={styles.hud}>
         <Text style={[styles.eyebrow, { color: accent }]}>
-          {game.mode === 'classic_chase' ? 'CLASSIC CHASE' : 'TAG HUNT'} · {game.code}
+          {isGhostDuel
+            ? 'SOLO GHOST DUEL'
+            : isAssassinRing
+              ? 'ASSASSIN RING'
+              : game.mode === 'classic_chase'
+                ? 'CLASSIC CHASE'
+                : 'TAG HUNT'}{' '}
+          · {game.code}
         </Text>
         <Text style={[styles.title, { color: accent }]}>{winnerTitle}</Text>
         <Text style={styles.subtitle}>{reasonCopy}</Text>
@@ -622,14 +712,33 @@ export default function ResultScreen() {
               {roundSeconds !== null && roundSeconds > 0 ? formatDuration(roundSeconds) : '—'}
             </Text>
           </View>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>TAGGED</Text>
-            <Text style={styles.statValue}>{taggedCount}</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>PLAYERS</Text>
-            <Text style={styles.statValue}>{players.length}</Text>
-          </View>
+          {isGhostDuel ? (
+            <>
+              <View style={styles.stat}>
+                <Text style={styles.statLabel}>SPLIT DELTA</Text>
+                <Text style={styles.statValue}>
+                  {ghostScore?.delta_s !== undefined
+                    ? `${ghostScore.delta_s > 0 ? '+' : ''}${ghostScore.delta_s.toFixed(1)}s`
+                    : '—'}
+                </Text>
+              </View>
+              <View style={styles.stat}>
+                <Text style={styles.statLabel}>SCORE</Text>
+                <Text style={styles.statValue}>{ghostScore?.score ?? '—'}</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.stat}>
+                <Text style={styles.statLabel}>TAGGED</Text>
+                <Text style={styles.statValue}>{taggedCount}</Text>
+              </View>
+              <View style={styles.stat}>
+                <Text style={styles.statLabel}>PLAYERS</Text>
+                <Text style={styles.statValue}>{players.length}</Text>
+              </View>
+            </>
+          )}
         </View>
 
         {errorMessage !== '' && (
@@ -743,6 +852,65 @@ export default function ResultScreen() {
                 </View>
               )}
             </View>
+          </View>
+        )}
+
+        {isGhostDuel && ghostScore && (
+          <View style={styles.recapStatsContainer}>
+            <Text style={styles.sectionLabel}>SOLO GHOST DUEL DEBRIEF</Text>
+            <View style={styles.statCardsGrid}>
+              <View style={styles.statCardHighlight}>
+                <Text style={styles.statCardCategory}>FINAL SCORE</Text>
+                <Text style={styles.statCardBigValue}>{ghostScore.score}</Text>
+                <Text style={styles.statCardSub}>
+                  {ghostScore.delta_s >= 0
+                    ? `Beat ghost by ${ghostScore.delta_s.toFixed(1)}s`
+                    : `Behind ghost by ${Math.abs(ghostScore.delta_s).toFixed(1)}s`}
+                </Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statCardCategory}>YOUR TIME</Text>
+                <Text style={styles.statCardBigValue}>{formatDuration(ghostScore.player_time_s)}</Text>
+                <Text style={styles.statCardSub}>Ghost: {formatDuration(ghostScore.ghost_time_s)}</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statCardCategory}>ROUTE EFFICIENCY</Text>
+                <Text style={styles.statCardBigValue}>
+                  {Math.round(ghostScore.efficiency * 100)}%
+                </Text>
+                <Text style={styles.statCardSub}>Direct vs actual path</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statCardCategory}>VARIANT</Text>
+                <Text style={[styles.statCardBigValue, { fontSize: 16, textTransform: 'uppercase' }]}>
+                  {ghostScore.variant.replace('_', ' ')}
+                </Text>
+                <Text style={styles.statCardSub}>Solo duel mode</Text>
+              </View>
+            </View>
+
+            {ghostLeaderboard.length > 0 && (
+              <View style={{ marginTop: 14 }}>
+                <Text style={styles.sectionLabel}>TOP 5 DUEL LEADERBOARD</Text>
+                {ghostLeaderboard.map((entry) => (
+                  <View key={entry.rank} style={styles.playerRow}>
+                    <Text style={{ width: 24, fontWeight: '700', color: '#64748B' }}>
+                      #{entry.rank}
+                    </Text>
+                    <View style={styles.playerNameRow}>
+                      <Text style={styles.playerName}>{entry.display_name}</Text>
+                    </View>
+                    <Text style={[styles.playerMeta, { fontWeight: '700', color: '#0F172A' }]}>
+                      {entry.score} pts ({entry.delta_s >= 0 ? '+' : ''}
+                      {entry.delta_s.toFixed(1)}s)
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
 

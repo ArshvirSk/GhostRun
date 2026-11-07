@@ -313,3 +313,19 @@
 
 
 
+
+## 2026-11-08 — Milestone B6: Solo Ghost Duel (Decisions D21–D24)
+
+**Decision D21 — Solo game start and auto-team assignment:**
+A `ghost_duel` game allows `min_players = 1`. The solo player is auto-assigned to team `runner` for time_trial and evade variants, and to team `hunter` for mirror_chase. The ghost entity acts as the opposing team's NPC. This avoids requiring a second player for what is fundamentally an asynchronous solo experience.
+
+**Decision D22 — Scoring formula for time trial:**
+`score = max(100, 1000 + delta_s × 10 + efficiency × 200)` where `delta_s = ghost_time - player_time` and `efficiency = straight_line_distance / actual_trail_distance`. The floor of 100 prevents negative scores for very slow runs. The formula rewards both speed (delta) and route intelligence (efficiency), aligning with the "never reward running" principle.
+
+**Decision D23 — Ghost Duel win conditions evaluated in submit_position:**
+Rather than using a separate tick function, Ghost Duel collision checks (evade 20 m proximity, time trial target arrival) are evaluated inline within `submit_position`. This is acceptable because solo mode means exactly one player is submitting positions, so the additional computation is negligible and avoids pg_cron dependency.
+
+**Decision D24 — Leaderboard proximity scoping:**
+`get_ghost_duel_leaderboard` takes `(lat, lng, radius_m, variant, row_limit)` and returns scores from games whose `area_center` falls within the specified radius. This creates naturally location-scoped leaderboards ("best ghost duel scores in this park") without requiring explicit venue registration.
+
+**Trade-off:** The leaderboard currently does not distinguish between different ghost paths at the same location. A future "course" system could add path-specific scoring.

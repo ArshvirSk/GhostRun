@@ -1673,6 +1673,13 @@ async function jailbreakScenario() {
     accuracy: 4,
     recorded_at: new Date().toISOString(),
   });
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.002,
+    lng: CENTER.lng + 0.002,
+    accuracy: 4,
+    recorded_at: new Date().toISOString(),
+  });
   await rpc(hunter, 'attempt_tag', { game_id: gameId });
 
   // Tag runner 2 (both now jailed)
@@ -2720,6 +2727,271 @@ async function operatorScenario() {
   }
 }
 
+async function ghostDuelScenario() {
+  console.log('\n--- Scenario: ghost-duel (Phase B Milestone B6: Solo Ghost Duel) ---');
+  const soloRunner = await newPlayer('SoloSpeedster');
+
+  // 1. Time Trial Variant: 1-Player Creation and Solo Start
+  const created = await rpc<{ game_id: string; code: string }[]>(soloRunner, 'create_game', {
+    mode: 'ghost_duel',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      head_start_s: 0,
+      duration_s: 300,
+      ping_interval_s: 30,
+      mode_params: { ghost_duel: { variant: 'time_trial' } },
+    },
+  });
+
+  if (created.error || !created.data?.[0]?.game_id) {
+    throw new Error(`ghost_duel create failed: ${created.error?.message}`);
+  }
+  const gameId = created.data[0].game_id;
+
+  await rpc(soloRunner, 'set_share_trail', { game_id: gameId, share: true });
+  await rpc(soloRunner, 'set_ready', { game_id: gameId, ready: true });
+
+  const startRes = await rpc<Record<string, unknown>>(soloRunner, 'start_game', { game_id: gameId });
+  expect(
+    !startRes.error && startRes.data?.status === 'countdown',
+    'Solo Ghost Duel starts in countdown with 1 player',
+    String(startRes.error?.message ?? startRes.data?.status),
+  );
+
+  // Fast forward past countdown to live
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(soloRunner, 'advance_game', { game_id: gameId });
+
+  // 2. Verify state includes ghost_duel snapshot with target and ghost
+  const gameStateRes = await rpc<{
+    game: { status: string; mode_id: string };
+    ghost_duel?: {
+      variant: string;
+      target?: { latitude: number; longitude: number; radius_m: number };
+      ghost?: { latitude: number; longitude: number; duration_s: number; elapsed_s: number };
+    };
+  }>(soloRunner, 'get_game_state', { game_id: gameId });
+
+  expect(
+    gameStateRes.data?.game?.status === 'live',
+    'Ghost Duel game transitions to live phase',
+    JSON.stringify(gameStateRes.data?.game),
+  );
+
+  expect(
+    gameStateRes.data?.ghost_duel?.variant === 'time_trial' &&
+      Boolean(gameStateRes.data?.ghost_duel?.target) &&
+      Boolean(gameStateRes.data?.ghost_duel?.ghost),
+    'Ghost Duel state returns variant, target entity, and ghost entity',
+    JSON.stringify(gameStateRes.data?.ghost_duel),
+  );
+
+  const targetLat = gameStateRes.data?.ghost_duel?.target?.latitude ?? CENTER.lat;
+  const targetLng = gameStateRes.data?.ghost_duel?.target?.longitude ?? CENTER.lng;
+
+  // 3. Step ghost position in advance_game
+  await rpc(soloRunner, 'advance_game', { game_id: gameId });
+
+  // Initial fix
+  await rpc(soloRunner, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 3,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // 4. Submit player position reaching finish target -> ghost beaten!
+  const finishPosRes = await rpc<{
+    phase: string;
+    target_reached?: boolean;
+    end_reason?: string;
+  }>(soloRunner, 'submit_position', {
+    game_id: gameId,
+    lat: targetLat,
+    lng: targetLng,
+    accuracy: 3,
+    recorded_at: new Date().toISOString(),
+  });
+
+  expect(
+    finishPosRes.data?.phase === 'ended',
+    'Reaching finish target ends the ghost duel round',
+    JSON.stringify(finishPosRes.data ?? finishPosRes.error),
+  );
+
+  // 5. Verify ghost_duel_scores row and leaderboard
+  const scoreRowRes = await soloRunner
+    .from('ghost_duel_scores')
+    .select('*')
+    .eq('game_id', gameId)
+    .maybeSingle();
+
+  expect(
+    Boolean(scoreRowRes.data?.score) && scoreRowRes.data?.variant === 'time_trial',
+    'ghost_duel_scores record created with score and metrics',
+    JSON.stringify(scoreRowRes.data),
+  );
+
+  const leaderboardRes = await rpc<
+    { rank: number; display_name: string; score: number; variant: string }[]
+  >(soloRunner, 'get_ghost_duel_leaderboard', {
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 5000,
+    variant: 'time_trial',
+    row_limit: 5,
+  });
+
+  expect(
+    Array.isArray(leaderboardRes.data) && leaderboardRes.data.length > 0,
+    'get_ghost_duel_leaderboard returns top scores honoring consent',
+    JSON.stringify(leaderboardRes.data ?? leaderboardRes.error),
+  );
+
+  await rpc(soloRunner, 'leave_game', { game_id: gameId });
+
+  // 6. Test Mirror Chase Variant: Solo hunter tags ghost runner
+  const soloHunter = await newPlayer('GhostCatcher');
+  const mcCreated = await rpc<{ game_id: string; code: string }[]>(soloHunter, 'create_game', {
+    mode: 'ghost_duel',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      head_start_s: 0,
+      duration_s: 300,
+      ping_interval_s: 30,
+      mode_params: { ghost_duel: { variant: 'mirror_chase' } },
+    },
+  });
+
+  if (mcCreated.error || !mcCreated.data?.[0]?.game_id) {
+    throw new Error(`mirror_chase create failed: ${mcCreated.error?.message}`);
+  }
+  const mcGameId = mcCreated.data[0].game_id;
+
+  await rpc(soloHunter, 'set_share_trail', { game_id: mcGameId, share: true });
+  await rpc(soloHunter, 'set_ready', { game_id: mcGameId, ready: true });
+  await rpc(soloHunter, 'start_game', { game_id: mcGameId });
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(soloHunter, 'advance_game', { game_id: mcGameId });
+
+  const mcStateRes = await rpc<{
+    ghost_duel?: {
+      ghost?: { latitude: number; longitude: number };
+    };
+  }>(soloHunter, 'get_game_state', { game_id: mcGameId });
+
+  const ghostLat = mcStateRes.data?.ghost_duel?.ghost?.latitude ?? CENTER.lat;
+  const ghostLng = mcStateRes.data?.ghost_duel?.ghost?.longitude ?? CENTER.lng;
+
+  // Submit hunter position right next to ghost (within 5m)
+  await rpc(soloHunter, 'submit_position', {
+    game_id: mcGameId,
+    lat: ghostLat,
+    lng: ghostLng,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const tagRes = await rpc<{
+    success: boolean;
+    score: number;
+    game_ended: boolean;
+  }>(soloHunter, 'tag_ghost', { game_id: mcGameId });
+
+  expect(
+    tagRes.data?.success === true && tagRes.data?.game_ended === true,
+    'tag_ghost successfully catches ghost runner and ends game',
+    JSON.stringify(tagRes.data ?? tagRes.error),
+  );
+
+  const mcGameCheck = await soloHunter
+    .from('games')
+    .select('status, end_reason')
+    .eq('id', mcGameId)
+    .single();
+
+  expect(
+    mcGameCheck.data?.status === 'ended' && mcGameCheck.data?.end_reason === 'ghost_tagged',
+    'Mirror chase ends with end_reason ghost_tagged',
+    JSON.stringify(mcGameCheck.data),
+  );
+
+  await rpc(soloHunter, 'leave_game', { game_id: mcGameId });
+
+  // 7. Test Evade Variant: Runner caught by ghost hunter within 20m -> haunted
+  const soloEvader = await newPlayer('GhostDodger');
+  const evCreated = await rpc<{ game_id: string; code: string }[]>(soloEvader, 'create_game', {
+    mode: 'ghost_duel',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      head_start_s: 0,
+      duration_s: 300,
+      ping_interval_s: 30,
+      mode_params: { ghost_duel: { variant: 'evade' } },
+    },
+  });
+
+  if (evCreated.error || !evCreated.data?.[0]?.game_id) {
+    throw new Error(`evade create failed: ${evCreated.error?.message}`);
+  }
+  const evGameId = evCreated.data[0].game_id;
+
+  await rpc(soloEvader, 'set_share_trail', { game_id: evGameId, share: true });
+  await rpc(soloEvader, 'set_ready', { game_id: evGameId, ready: true });
+  await rpc(soloEvader, 'start_game', { game_id: evGameId });
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(soloEvader, 'advance_game', { game_id: evGameId });
+
+  const evStateRes = await rpc<{
+    ghost_duel?: {
+      ghost?: { latitude: number; longitude: number };
+    };
+  }>(soloEvader, 'get_game_state', { game_id: evGameId });
+
+  const hunterGhostLat = evStateRes.data?.ghost_duel?.ghost?.latitude ?? CENTER.lat;
+  const hunterGhostLng = evStateRes.data?.ghost_duel?.ghost?.longitude ?? CENTER.lng;
+
+  // Submit position right next to ghost hunter (< 20m)
+  const evadeCaughtRes = await rpc<{
+    phase: string;
+  }>(soloEvader, 'submit_position', {
+    game_id: evGameId,
+    lat: hunterGhostLat,
+    lng: hunterGhostLng,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+
+  expect(
+    evadeCaughtRes.data?.phase === 'ended',
+    'Ghost hunter catching runner in evade ends round with haunted',
+    JSON.stringify(evadeCaughtRes.data ?? evadeCaughtRes.error),
+  );
+
+  const evGameCheck = await soloEvader
+    .from('games')
+    .select('status, end_reason, winner')
+    .eq('id', evGameId)
+    .single();
+
+  expect(
+    evGameCheck.data?.status === 'ended' &&
+      evGameCheck.data?.end_reason === 'haunted' &&
+      evGameCheck.data?.winner === 'hunters',
+    'Evade collision ends with end_reason haunted and hunters victory',
+    JSON.stringify(evGameCheck.data),
+  );
+
+  await rpc(soloEvader, 'leave_game', { game_id: evGameId });
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -2734,6 +3006,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   'relay-heist': relayHeistScenario,
   'vip-escort': vipEscortScenario,
   operator: operatorScenario,
+  'ghost-duel': ghostDuelScenario,
 };
 
 async function main() {

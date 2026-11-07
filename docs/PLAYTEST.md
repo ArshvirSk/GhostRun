@@ -238,6 +238,37 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Verify all teammates receive the radio dispatch banner on screen.
 
 
+### 3.11 Solo Ghost Duel Base Mode (docs/MODES.md §6.2)
+* **Recommended Group:** 1 player (solo mode).
+* **Setting:** Any outdoor area with prior ghost recordings available, or using synthetic benchmark paths.
+* **Pre-Flight & Setup:**
+  - [ ] Player selects **Ghost Duel** mode on game creation.
+  - [ ] Variant picker displays 3 pills: Time Trial, Evade, Mirror Chase.
+  - [ ] Confirm solo start is allowed (1 player, no opponents needed).
+  - [ ] Verify ghost entity and finish target spawn correctly upon game start.
+* **Time Trial Variant:**
+  - [ ] Ghost runner blip (cyan) appears on map moving along stored path.
+  - [ ] Finish target (emerald ring) visible at end of ghost path.
+  - [ ] HUD shows Target Distance, Ghost Distance, and Clock chips.
+  - [ ] Reaching finish target within radius ends the round immediately.
+  - [ ] Score computed server-side: split delta $\Delta t$ + route efficiency.
+  - [ ] `ghost_duel_scores` record created with `player_time_s`, `ghost_time_s`, `delta_s`, `efficiency`, `score`.
+  - [ ] Beating ghost time → "Ghost Beaten!" result; losing → "Ghost Won" result.
+* **Evade Variant:**
+  - [ ] Ghost acts as hunter, moving along stored path.
+  - [ ] Player must reach finish target without entering $\le 20\text{ m}$ of ghost.
+  - [ ] Entering ghost proximity → immediate `haunted` end, hunters win.
+  - [ ] Reaching target successfully → "Evaded Successfully!" result.
+* **Mirror Chase Variant:**
+  - [ ] Player is hunter; ghost acts as runner moving along stored path.
+  - [ ] `TAG GHOST (X m)` floating dock button appears, enabled within 10 m.
+  - [ ] Pressing tag within range → `tag_ghost` RPC → `ghost_tagged` end, runners win.
+  - [ ] Ghost completing path before tag → "Ghost Escaped" result.
+* **Leaderboard & Results:**
+  - [ ] Result screen shows Solo Ghost Duel Debrief card with score, times, efficiency, variant badge.
+  - [ ] Top 5 leaderboard table displays nearby players' scores (C5 consent-aware names).
+  - [ ] Ghost Contribution preview card available for contributing route to ghost library.
+
 ---
 
 ## 4. Safety & Real-World Precautions

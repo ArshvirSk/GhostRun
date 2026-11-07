@@ -598,7 +598,7 @@ create table heat_presses (
 **Safety.** Ghosts move at recorded walking speeds, clamped to 2.0 m/s.
 **Effort:** M (shares the NPC engine with Horde).
 
-### 6.2 Ghost Duels (async solo)
+### 6.2 Ghost Duels (async solo) ✅ IMPLEMENTED (B6)
 
 **Pitch.** Play alone, anytime. Race or evade the recording of a friend's earlier run.
 
@@ -611,6 +611,19 @@ create table heat_presses (
 **Server and data.** Reuses `ghost_library`; a solo `game` has one player; scoring computed on the server from `trail_points`; leaderboards per area (names shown only with consent C5 in section 7.4).
 **Edge cases.** Cheating via vehicles: speed cap and mock-location flag. Different areas: match by an area-centre radius (500 m), or let the creator publish a "course".
 **Effort:** M.
+
+**Implementation notes (B6):**
+- Mode `ghost_duel` registered in `mode_catalogue` and client `modeRegistry.ts` with variant picker (time_trial, evade, mirror_chase).
+- Solo start enabled: lobby allows 1 player, auto-assigns runner/hunter team based on variant.
+- Server spawns ghost entity from `ghost_library` (or synthetic benchmark path) and finish target at end of ghost path.
+- Ghost entity position interpolated along stored path by elapsed time; client renders cyan ghost blip with pulse halo.
+- Finish target rendered as emerald ring with distance chip on HUD.
+- **Time Trial scoring:** `player_time_s`, `ghost_time_s`, `delta_s` (split delta), route `efficiency` (straight-line / actual), `score = max(100, 1000 + delta*10 + efficiency*200)`.
+- **Evade collision:** `submit_position` checks ≤20 m proximity to ghost entity → `end_reason = 'haunted'`, hunters win.
+- **Mirror Chase tagging:** `tag_ghost` RPC checks ≤10 m proximity to ghost entity → `end_reason = 'ghost_tagged'`, runners win.
+- `ghost_duel_scores` table with RLS, `get_ghost_duel_leaderboard` RPC honoring C5 consent.
+- Result screen shows dedicated Ghost Duel Debrief card with score, times, efficiency, variant badge, and top-5 leaderboard.
+- Simulator: 10/10 checks across all 3 variants (time trial target arrival, mirror chase ghost tag, evade collision).
 
 ---
 

@@ -217,6 +217,24 @@ type RoundState = {
     in_safe_zone: boolean;
     active_survivors: number;
   } | null;
+  ghost_duel?: {
+    variant: 'time_trial' | 'evade' | 'mirror_chase';
+    target?: {
+      id: string;
+      longitude: number;
+      latitude: number;
+      radius_m: number;
+    } | null;
+    ghost?: {
+      id: string;
+      longitude: number;
+      latitude: number;
+      duration_s: number;
+      elapsed_s: number;
+      total_length_m: number;
+      path_wkt?: string | null;
+    } | null;
+  } | null;
   relay_heist?: {
     extraction?: {
       id: string;
@@ -1221,6 +1239,61 @@ export default function GameScreen() {
 
   const isJailbreak = state?.game?.mode_id === 'jailbreak';
   const isAssassinRing = state?.game?.mode_id === 'assassin_ring';
+  const isGhostDuel = state?.game?.mode_id === 'ghost_duel';
+  const ghostDuelState = state?.ghost_duel;
+  const ghostLat = ghostDuelState?.ghost?.latitude;
+  const ghostLng = ghostDuelState?.ghost?.longitude;
+  const ghostTargetLat = ghostDuelState?.target?.latitude;
+  const ghostTargetLng = ghostDuelState?.target?.longitude;
+
+  const ghostPointData = useMemo(() => {
+    if (ghostLat === undefined || ghostLng === undefined) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [ghostLng, ghostLat] },
+          properties: {},
+        },
+      ],
+    };
+  }, [ghostLat, ghostLng]);
+
+  const ghostTargetRingData = useMemo(() => {
+    if (ghostTargetLat === undefined || ghostTargetLng === undefined) return null;
+    return circleRing({ longitude: ghostTargetLng, latitude: ghostTargetLat }, 20);
+  }, [ghostTargetLat, ghostTargetLng]);
+
+  const ghostTargetPointData = useMemo(() => {
+    if (ghostTargetLat === undefined || ghostTargetLng === undefined) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [ghostTargetLng, ghostTargetLat] },
+          properties: {},
+        },
+      ],
+    };
+  }, [ghostTargetLat, ghostTargetLng]);
+
+  const distanceToGhostM = useMemo(() => {
+    if (!ownFix || ghostLat === undefined || ghostLng === undefined) return null;
+    return distanceM(
+      { longitude: ownFix.longitude, latitude: ownFix.latitude },
+      { longitude: ghostLng, latitude: ghostLat },
+    );
+  }, [ownFix, ghostLat, ghostLng]);
+
+  const distanceToGhostTargetM = useMemo(() => {
+    if (!ownFix || ghostTargetLat === undefined || ghostTargetLng === undefined) return null;
+    return distanceM(
+      { longitude: ownFix.longitude, latitude: ownFix.latitude },
+      { longitude: ghostTargetLng, latitude: ghostTargetLat },
+    );
+  }, [ownFix, ghostTargetLat, ghostTargetLng]);
   const isLive = state?.game?.status === 'live';
   const jailedSelf = selfPlayer?.status === 'jailed';
   const autoReleaseS =
@@ -1584,6 +1657,23 @@ export default function GameScreen() {
     }
   }, [gameId, loadState]);
 
+  const handleTagGhost = useCallback(async () => {
+    if (!supabase || !gameId) return;
+    setBusy('tag_ghost');
+    const { data, error } = await supabase.rpc('tag_ghost', { game_id: gameId });
+    setBusy('');
+    if (error) {
+      notify('Tag Failed', error.message);
+      return;
+    }
+    playSound('tag');
+    notify(
+      'Ghost Tagged!',
+      `Ghost caught! Score: ${(data as { score?: number })?.score ?? 1000}`,
+    );
+    void loadState();
+  }, [gameId, loadState, notify, playSound]);
+
   // VIP Escort state
   const isVipMode = (game?.roles ?? []).includes('vip');
   const mySecretRole = selfPlayer?.secret_role;
@@ -1797,15 +1887,17 @@ export default function GameScreen() {
   const inPlay = ['head_start', 'live'].includes(game!.status);
   const tagRingData = isLive && !isRunner && ownFix ? circleRing(ownFix, game!.tag_radius_m) : null;
 
-  let eyebrow = isAssassinRing
-    ? 'ASSASSIN RING'
-    : isRelayHeist
-      ? 'RELAY HEIST'
-      : game!.mode_id === 'jailbreak'
-        ? 'JAILBREAK'
-        : game!.mode === 'classic_chase'
-          ? 'CLASSIC CHASE'
-          : 'TAG HUNT';
+  let eyebrow = isGhostDuel
+    ? `SOLO GHOST DUEL: ${ghostDuelState?.variant?.replace('_', ' ').toUpperCase() ?? 'TIME TRIAL'}`
+    : isAssassinRing
+      ? 'ASSASSIN RING'
+      : isRelayHeist
+        ? 'RELAY HEIST'
+        : game!.mode_id === 'jailbreak'
+          ? 'JAILBREAK'
+          : game!.mode === 'classic_chase'
+            ? 'CLASSIC CHASE'
+            : 'TAG HUNT';
   let title = '';
   let subtitle = '';
   let timerLabel = '';
@@ -1818,111 +1910,174 @@ export default function GameScreen() {
     timerLabel = 'COUNTDOWN';
     timerValue = game!.head_start_at ? (Date.parse(game!.head_start_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'head_start') {
-    accent = isAssassinRing
-      ? '#D97706'
-      : isRelayHeist
-        ? '#059669'
-        : isRunner
+    accent = isGhostDuel
+      ? '#06B6D4'
+      : isAssassinRing
+        ? '#D97706'
+        : isRelayHeist
           ? '#059669'
-          : '#B45309';
-    title = isAssassinRing ? 'Disperse' : isRunner ? 'Head start' : 'Hunters locked';
-    subtitle = isAssassinRing
-      ? 'Move away from other players. The ring activates when the timer reaches zero.'
-      : isRelayHeist
-        ? isRunner
-          ? isCarrier
-            ? 'You have the package! Move toward extraction or plan handoffs.'
-            : 'Escort your carrier or prepare for a relay handoff.'
-          : 'Hunters locked. The package and runners will activate when the countdown ends.'
+          : isRunner
+            ? '#059669'
+            : '#B45309';
+    title = isGhostDuel
+      ? 'Ghost Duel Starting'
+      : isAssassinRing
+        ? 'Disperse'
         : isRunner
-          ? 'Move away from the target and stay inside the play area. Hunters cannot see you yet.'
-          : 'The runners are moving. The map unlocks when the timer reaches zero.';
+          ? 'Head start'
+          : 'Hunters locked';
+    subtitle = isGhostDuel
+      ? 'Get ready to race or evade the ghost! Replay starts momentarily.'
+      : isAssassinRing
+        ? 'Move away from other players. The ring activates when the timer reaches zero.'
+        : isRelayHeist
+          ? isRunner
+            ? isCarrier
+              ? 'You have the package! Move toward extraction or plan handoffs.'
+              : 'Escort your carrier or prepare for a relay handoff.'
+            : 'Hunters locked. The package and runners will activate when the countdown ends.'
+          : isRunner
+            ? 'Move away from the target and stay inside the play area. Hunters cannot see you yet.'
+            : 'The runners are moving. The map unlocks when the timer reaches zero.';
     timerLabel = isRunner ? 'HUNTERS UNLOCK IN' : 'UNLOCKING IN';
     timerValue = game!.live_at ? (Date.parse(game!.live_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'live') {
-    accent = isAssassinRing
-      ? '#D97706'
-      : isRelayHeist
-        ? isRunner
-          ? '#059669'
-          : '#DC2626'
-        : '#DB2777';
-    title = isAssassinRing
-      ? state?.assassin_ring?.my_prey
-        ? `Hunt: ${state.assassin_ring.my_prey.display_name}`
-        : 'Hunt your assigned prey'
-      : isRelayHeist
-        ? isRunner
-          ? isCarrier
-            ? 'Deliver package to extraction'
+    accent = isGhostDuel
+      ? '#06B6D4'
+      : isAssassinRing
+        ? '#D97706'
+        : isRelayHeist
+          ? isRunner
+            ? '#059669'
+            : '#DC2626'
+          : '#DB2777';
+    title = isGhostDuel
+      ? ghostDuelState?.variant === 'mirror_chase'
+        ? 'Catch the Ghost Runner'
+        : ghostDuelState?.variant === 'evade'
+          ? 'Evade Ghost & Reach Finish'
+          : 'Race Against Ghost'
+      : isAssassinRing
+        ? state?.assassin_ring?.my_prey
+          ? `Hunt: ${state.assassin_ring.my_prey.display_name}`
+          : 'Hunt your assigned prey'
+        : isRelayHeist
+          ? isRunner
+            ? isCarrier
+              ? 'Deliver package to extraction'
+              : packageState?.status === 'dropped'
+                ? 'Recover dropped package!'
+                : 'Escort carrier & be ready for handoff'
             : packageState?.status === 'dropped'
-              ? 'Recover dropped package!'
-              : 'Escort carrier & be ready for handoff'
-          : packageState?.status === 'dropped'
-            ? 'Secure the dropped package!'
-            : 'Intercept the carrier'
-        : isRunner
-          ? isVipMode
-            ? isFrozen
-              ? 'Frozen (Bodyguard Decoy)'
-              : isVip
-                ? 'VIP: Evade & Extract'
-                : 'Bodyguard: Protect VIP'
+              ? 'Secure the dropped package!'
+              : 'Intercept the carrier'
+          : isRunner
+            ? isVipMode
+              ? isFrozen
+                ? 'Frozen (Bodyguard Decoy)'
+                : isVip
+                  ? 'VIP: Evade & Extract'
+                  : 'Bodyguard: Protect VIP'
+              : isJailbreak
+                ? 'Evade hunters & rescue'
+                : 'Reach the target'
             : isJailbreak
-              ? 'Evade hunters & rescue'
-              : 'Reach the target'
-          : isJailbreak
-            ? 'Jail all runners'
-            : isVipMode
-              ? 'Hunt & eliminate the VIP'
-              : 'Hunt the runners';
-    subtitle = isAssassinRing
-      ? state?.assassin_ring?.in_safe_zone
-        ? 'You are inside a Safe Zone. Tagging is disabled.'
-        : state?.assassin_ring?.hunter_proximity === 'close'
-          ? 'WARNING: YOUR HUNTER IS WITHIN 40m!'
-          : state?.assassin_ring?.hunter_proximity === 'near'
-            ? 'CAUTION: Your hunter is within 100m.'
-            : 'Track your assigned prey. Stay alert for your unknown hunter.'
-      : isRelayHeist
-        ? isRunner
-          ? isCarrier
-            ? `Reach the green extraction point (${distanceToExtraction !== null ? Math.round(distanceToExtraction) + 'm away' : 'on map'}). Pass to a teammate if hunters close in.`
+              ? 'Jail all runners'
+              : isVipMode
+                ? 'Hunt & eliminate the VIP'
+                : 'Hunt the runners';
+    subtitle = isGhostDuel
+      ? ghostDuelState?.variant === 'mirror_chase'
+        ? distanceToGhostM !== null
+          ? `Ghost is ${Math.round(distanceToGhostM)}m away. Tag within 10m before it reaches finish!`
+          : 'Track the ghost runner on radar and tag it before finish.'
+        : ghostDuelState?.variant === 'evade'
+          ? distanceToGhostTargetM !== null
+            ? `Finish is ${Math.round(distanceToGhostTargetM)}m away. Keep >20m away from ghost hunter!`
+            : 'Reach finish without letting ghost hunter within 20m.'
+          : distanceToGhostTargetM !== null
+            ? `Finish line is ${Math.round(distanceToGhostTargetM)}m away! Outrun the ghost replay.`
+            : 'Sprint to the finish target before the ghost does!'
+      : isAssassinRing
+        ? state?.assassin_ring?.in_safe_zone
+          ? 'You are inside a Safe Zone. Tagging is disabled.'
+          : state?.assassin_ring?.hunter_proximity === 'close'
+            ? 'WARNING: YOUR HUNTER IS WITHIN 40m!'
+            : state?.assassin_ring?.hunter_proximity === 'near'
+              ? 'CAUTION: Your hunter is within 100m.'
+              : 'Track your assigned prey. Stay alert for your unknown hunter.'
+        : isRelayHeist
+          ? isRunner
+            ? isCarrier
+              ? `Reach the green extraction point (${distanceToExtraction !== null ? Math.round(distanceToExtraction) + 'm away' : 'on map'}). Pass to a teammate if hunters close in.`
+              : packageState?.status === 'dropped'
+                ? 'The package was dropped! Rush to recover it before hunters secure it.'
+                : 'Stay close to your carrier for handoffs or draw hunters away.'
             : packageState?.status === 'dropped'
-              ? 'The package was dropped! Rush to recover it before hunters secure it.'
-              : 'Stay close to your carrier for handoffs or draw hunters away.'
-          : packageState?.status === 'dropped'
-            ? 'Hold package location for 20 seconds to secure and win!'
-            : 'Track radar pings to find and tag the package carrier.'
-        : isRunner
-          ? isVipMode
-            ? isFrozen
-              ? `You were tagged! Frozen as a decoy for ${frozenRemainingS ?? 60}s.`
-              : isVip
-                ? 'Hunters win if they tag you! Stay protected and reach extraction.'
-                : `Shield your VIP from hunters! ${distanceToVip !== null ? `VIP is ${Math.round(distanceToVip)}m away.` : ''}`
+              ? 'Hold package location for 20 seconds to secure and win!'
+              : 'Track radar pings to find and tag the package carrier.'
+          : isRunner
+            ? isVipMode
+              ? isFrozen
+                ? `You were tagged! Frozen as a decoy for ${frozenRemainingS ?? 60}s.`
+                : isVip
+                  ? 'Hunters win if they tag you! Stay protected and reach extraction.'
+                  : `Shield your VIP from hunters! ${distanceToVip !== null ? `VIP is ${Math.round(distanceToVip)}m away.` : ''}`
+              : isJailbreak
+                ? 'Stay out of jail. Free captured teammates at the Jail marker.'
+                : 'Your team is on the map. Hunters only get delayed pings of your position.'
             : isJailbreak
-              ? 'Stay out of jail. Free captured teammates at the Jail marker.'
-              : 'Your team is on the map. Hunters only get delayed pings of your position.'
-          : isJailbreak
-            ? 'Tag runners to send them to Jail. Win by jailing all runners at once.'
-            : isVipMode
-              ? 'Identify and tag the secret VIP runner to win the round!'
-              : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.';
+              ? 'Tag runners to send them to Jail. Win by jailing all runners at once.'
+              : isVipMode
+                ? 'Identify and tag the secret VIP runner to win the round!'
+                : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.';
     timerLabel = 'TIME LEFT';
     timerValue = game!.ends_at ? (Date.parse(game!.ends_at) - serverNow) / 1000 : null;
   } else if (game!.status === 'ended') {
-    eyebrow = 'ROUND OVER';
-    accent = isAssassinRing ? '#D97706' : game!.winner === 'runners' ? '#059669' : '#B91C1C';
-    title = isAssassinRing
-      ? 'Ring Survivor Victory'
-      : game!.winner === 'runners'
-        ? 'Runners win'
-        : game!.winner === 'hunters'
-          ? 'Hunters win'
-          : 'Round over';
-    subtitle =
-      game!.end_reason === 'extraction_complete'
+    eyebrow = isGhostDuel ? 'GHOST DUEL OVER' : 'ROUND OVER';
+    accent = isGhostDuel
+      ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game!.end_reason ?? '')
+        ? '#059669'
+        : '#B91C1C'
+      : isAssassinRing
+        ? '#D97706'
+        : game!.winner === 'runners'
+          ? '#059669'
+          : '#B91C1C';
+    title = isGhostDuel
+      ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game!.end_reason ?? '')
+        ? game!.end_reason === 'ghost_tagged'
+          ? 'Ghost Tagged!'
+          : game!.end_reason === 'evaded'
+            ? 'Evaded Successfully!'
+            : 'Ghost Beaten!'
+        : game!.end_reason === 'ghost_escaped'
+          ? 'Ghost Escaped'
+          : game!.end_reason === 'haunted'
+            ? 'Haunted by Ghost'
+            : 'Ghost Won'
+      : isAssassinRing
+        ? 'Ring Survivor Victory'
+        : game!.winner === 'runners'
+          ? 'Runners win'
+          : game!.winner === 'hunters'
+            ? 'Hunters win'
+            : 'Round over';
+    subtitle = isGhostDuel
+      ? game!.end_reason === 'ghost_beaten'
+        ? 'You reached the finish line faster than the ghost runner!'
+        : game!.end_reason === 'ghost_won'
+          ? 'The ghost runner beat you to the finish line.'
+          : game!.end_reason === 'evaded'
+            ? 'You reached the target without getting caught by the ghost hunter!'
+            : game!.end_reason === 'haunted'
+              ? 'The ghost hunter caught you within 20m!'
+              : game!.end_reason === 'ghost_tagged'
+                ? 'You tagged the ghost runner before it completed the route!'
+                : game!.end_reason === 'ghost_escaped'
+                  ? 'The ghost runner completed the route before you could tag it.'
+                  : 'The ghost duel has finished.'
+      : game!.end_reason === 'extraction_complete'
         ? 'The runners delivered the package to extraction!'
         : game!.end_reason === 'package_secured'
           ? 'The hunters secured the dropped package!'
@@ -2301,6 +2456,69 @@ export default function GameScreen() {
             />
           </GeoJSONSource>
         )}
+
+        {ghostTargetRingData && (
+          <GeoJSONSource id="ghost-target-ring" data={ghostTargetRingData}>
+            <Layer
+              id="ghost-target-ring-fill"
+              type="fill"
+              paint={{ 'fill-color': '#10B981', 'fill-opacity': 0.16 }}
+            />
+            <Layer
+              id="ghost-target-ring-line"
+              type="line"
+              paint={{ 'line-color': '#059669', 'line-width': 2.5, 'line-dasharray': [3, 2] }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {ghostTargetPointData && (
+          <GeoJSONSource id="ghost-target-point" data={ghostTargetPointData}>
+            <Layer
+              id="ghost-target-point-halo"
+              type="circle"
+              paint={{
+                'circle-radius': 16,
+                'circle-color': '#10B981',
+                'circle-opacity': 0.25,
+              }}
+            />
+            <Layer
+              id="ghost-target-point-circle"
+              type="circle"
+              paint={{
+                'circle-radius': 9,
+                'circle-color': '#059669',
+                'circle-stroke-width': 2.5,
+                'circle-stroke-color': '#FFFFFF',
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {ghostPointData && (
+          <GeoJSONSource id="ghost-position" data={ghostPointData}>
+            <Layer
+              id="ghost-pulse-halo"
+              type="circle"
+              paint={{
+                'circle-radius': 22,
+                'circle-color': '#06B6D4',
+                'circle-opacity': 0.35,
+              }}
+            />
+            <Layer
+              id="ghost-blip"
+              type="circle"
+              paint={{
+                'circle-radius': 9,
+                'circle-color': '#0891B2',
+                'circle-stroke-width': 3,
+                'circle-stroke-color': '#ECFEFF',
+              }}
+            />
+          </GeoJSONSource>
+        )}
       </MapLibreMap>
 
       <HeatOverlay
@@ -2327,17 +2545,36 @@ export default function GameScreen() {
             </View>
 
             <View style={styles.compactRight}>
-              {isLive && nextPingIn !== null && (
+              {isGhostDuel ? (
                 <View style={styles.compactChip}>
-                  <Text style={styles.compactChipLabel}>PING</Text>
-                  <Text style={styles.compactChipValue}>{formatClock(nextPingIn)}</Text>
+                  <Text style={styles.compactChipLabel}>
+                    {ghostDuelState?.variant === 'mirror_chase' ? 'GHOST' : 'TARGET'}
+                  </Text>
+                  <Text style={styles.compactChipValue}>
+                    {ghostDuelState?.variant === 'mirror_chase'
+                      ? distanceToGhostM !== null
+                        ? `${Math.round(distanceToGhostM)}m`
+                        : '--'
+                      : distanceToGhostTargetM !== null
+                        ? `${Math.round(distanceToGhostTargetM)}m`
+                        : '--'}
+                  </Text>
                 </View>
-              )}
-              {isLive && (
-                <View style={styles.compactChip}>
-                  <Text style={styles.compactChipLabel}>RUNNERS</Text>
-                  <Text style={styles.compactChipValue}>{runnersRemaining}</Text>
-                </View>
+              ) : (
+                <>
+                  {isLive && nextPingIn !== null && (
+                    <View style={styles.compactChip}>
+                      <Text style={styles.compactChipLabel}>PING</Text>
+                      <Text style={styles.compactChipValue}>{formatClock(nextPingIn)}</Text>
+                    </View>
+                  )}
+                  {isLive && (
+                    <View style={styles.compactChip}>
+                      <Text style={styles.compactChipLabel}>RUNNERS</Text>
+                      <Text style={styles.compactChipValue}>{runnersRemaining}</Text>
+                    </View>
+                  )}
+                </>
               )}
               <Pressable
                 accessibilityLabel={muted ? 'Unmute alerts' : 'Mute alerts'}
@@ -2408,17 +2645,52 @@ export default function GameScreen() {
                   <Text style={styles.statValue}>{formatClock(timerValue)}</Text>
                 </View>
               )}
-              {isLive && nextPingIn !== null && (
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>NEXT PING</Text>
-                  <Text style={styles.statSmall}>{formatClock(nextPingIn)}</Text>
-                </View>
-              )}
-              {isLive && (
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>RUNNERS</Text>
-                  <Text style={styles.statSmall}>{runnersRemaining}</Text>
-                </View>
+              {isGhostDuel ? (
+                <>
+                  <View style={styles.stat}>
+                    <Text style={styles.statLabel}>
+                      {ghostDuelState?.variant === 'mirror_chase' ? 'GHOST DIST' : 'TARGET DIST'}
+                    </Text>
+                    <Text style={styles.statSmall}>
+                      {ghostDuelState?.variant === 'mirror_chase'
+                        ? distanceToGhostM !== null
+                          ? `${Math.round(distanceToGhostM)}m`
+                          : '--'
+                        : distanceToGhostTargetM !== null
+                          ? `${Math.round(distanceToGhostTargetM)}m`
+                          : '--'}
+                    </Text>
+                  </View>
+                  <View style={styles.stat}>
+                    <Text style={styles.statLabel}>
+                      {ghostDuelState?.variant === 'mirror_chase' ? 'FINISH' : 'GHOST DIST'}
+                    </Text>
+                    <Text style={styles.statSmall}>
+                      {ghostDuelState?.variant === 'mirror_chase'
+                        ? distanceToGhostTargetM !== null
+                          ? `${Math.round(distanceToGhostTargetM)}m`
+                          : '--'
+                        : distanceToGhostM !== null
+                          ? `${Math.round(distanceToGhostM)}m`
+                          : '--'}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  {isLive && nextPingIn !== null && (
+                    <View style={styles.stat}>
+                      <Text style={styles.statLabel}>NEXT PING</Text>
+                      <Text style={styles.statSmall}>{formatClock(nextPingIn)}</Text>
+                    </View>
+                  )}
+                  {isLive && (
+                    <View style={styles.stat}>
+                      <Text style={styles.statLabel}>RUNNERS</Text>
+                      <Text style={styles.statSmall}>{runnersRemaining}</Text>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           </>
@@ -2486,7 +2758,7 @@ export default function GameScreen() {
                 {sheetExpanded ? '▼ Slide down to minimize' : '▲ Slide up to view'}
               </Animated.Text>
             </View>
-            {isLive && (!isRunner || isAssassinRing) && !taggedSelf && !isOperator && (
+            {isLive && !isGhostDuel && (!isRunner || isAssassinRing) && !taggedSelf && !isOperator && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 {!isAssassinRing && (game?.modifiers ?? []).includes('hot_cold') && (
                   <HeatButton
@@ -2521,6 +2793,28 @@ export default function GameScreen() {
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
                     <Text style={styles.quickTagText}>TAG ({game?.tag_radius_m ?? 20}m)</Text>
+                  )}
+                </Pressable>
+              </View>
+            )}
+            {isLive && isGhostDuel && ghostDuelState?.variant === 'mirror_chase' && !taggedSelf && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy !== '' || distanceToGhostM === null || distanceToGhostM > 10.0}
+                  onPress={() => void handleTagGhost()}
+                  style={[
+                    styles.quickTagButton,
+                    { backgroundColor: '#06B6D4' },
+                    (busy !== '' || distanceToGhostM === null || distanceToGhostM > 10.0) && styles.disabled,
+                  ]}
+                >
+                  {busy === 'tag_ghost' ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.quickTagText}>
+                      TAG GHOST ({distanceToGhostM !== null ? `${Math.round(distanceToGhostM)}m` : '--'})
+                    </Text>
                   )}
                 </Pressable>
               </View>
@@ -2637,7 +2931,7 @@ export default function GameScreen() {
               </View>
             )}
 
-            {isLive && (!isRunner || isAssassinRing) && !taggedSelf && !isOperator && (
+            {isLive && !isGhostDuel && (!isRunner || isAssassinRing) && !taggedSelf && !isOperator && (
               <>
                 <Pressable
                   accessibilityRole="button"
@@ -2660,6 +2954,50 @@ export default function GameScreen() {
                 </Text>
                 {tagMessage !== '' && <Text style={styles.tagMessage}>{tagMessage}</Text>}
               </>
+            )}
+
+            {isLive && isGhostDuel && ghostDuelState?.variant === 'mirror_chase' && !taggedSelf && (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy !== '' || distanceToGhostM === null || distanceToGhostM > 10.0}
+                  onPress={() => void handleTagGhost()}
+                  style={[
+                    styles.tagButton,
+                    { backgroundColor: '#06B6D4' },
+                    (busy !== '' || distanceToGhostM === null || distanceToGhostM > 10.0) && styles.disabled,
+                  ]}
+                >
+                  {busy === 'tag_ghost' ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.tagText}>
+                      TAG GHOST ({distanceToGhostM !== null ? `${Math.round(distanceToGhostM)}m` : '--'})
+                    </Text>
+                  )}
+                </Pressable>
+                <Text style={styles.tagHint}>
+                  Get within 10m of the ghost runner and tap to catch it before it reaches the finish line!
+                </Text>
+              </>
+            )}
+
+            {isLive && isGhostDuel && (
+              <View style={[styles.rescueCard, { borderColor: '#06B6D4', marginVertical: 8 }]}>
+                <View style={styles.rescueHeaderRow}>
+                  <MaterialCommunityIcons color="#06B6D4" name="ghost" size={20} />
+                  <Text style={[styles.rescueTitle, { color: '#0891B2' }]}>
+                    SOLO GHOST DUEL: {ghostDuelState?.variant?.replace('_', ' ').toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={styles.rescueSubtitle}>
+                  {ghostDuelState?.variant === 'time_trial'
+                    ? `Race to the finish target! Ghost is ${distanceToGhostM !== null ? Math.round(distanceToGhostM) + 'm away' : 'running'}. Finish is ${distanceToGhostTargetM !== null ? Math.round(distanceToGhostTargetM) + 'm ahead' : 'ahead'}.`
+                    : ghostDuelState?.variant === 'evade'
+                      ? `Evade the ghost hunter! Keep distance > 20m. Current distance: ${distanceToGhostM !== null ? Math.round(distanceToGhostM) + 'm' : '--'}. Finish: ${distanceToGhostTargetM !== null ? Math.round(distanceToGhostTargetM) + 'm' : '--'}.`
+                      : `Pursue the ghost runner! Intercept within 10m before it reaches the finish line. Distance: ${distanceToGhostM !== null ? Math.round(distanceToGhostM) + 'm' : '--'}.`}
+                </Text>
+              </View>
             )}
 
             {isLive &&

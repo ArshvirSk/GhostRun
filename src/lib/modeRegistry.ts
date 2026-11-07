@@ -97,11 +97,11 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       id: 'ghost_duel',
       layer: 'base',
       name: 'Ghost Duel',
-      teams: ['runner'],
+      teams: ['runner', 'hunter'],
       min_players: 1,
       compatible_roles: [],
       compatible_modifiers: ['noise_meter', 'shrinking_zone'],
-      parameters: { variant: 'time_trial' },
+      parameters: { variant: 'time_trial', variants: ['time_trial', 'evade', 'mirror_chase'] },
       enabled: true,
     },
     {
