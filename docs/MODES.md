@@ -447,7 +447,9 @@ create table heat_presses (
 
 ---
 
-### 4.4 Horde (co-op versus server-controlled enemies)
+### 4.4 Horde (co-op versus server-controlled enemies) — ⏸️ FUTURE SCOPE (Deferred)
+
+> **Status:** Deferred to future scope / post-v2 release. Milestone B7 skipped in favor of multi-team competitive territory control.
 
 **Pitch.** Everyone is on the same side. Zombies simulated by the server advance across the map. Players must complete objectives together while avoiding them. It makes the game playable with 1 to 3 people.
 
