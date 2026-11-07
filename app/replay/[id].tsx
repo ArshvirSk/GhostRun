@@ -13,6 +13,7 @@ import {
 
 import {
   circleRing,
+  type CircleFeature,
   type LngLat,
   type PointCollection,
   type PointFeature,
@@ -84,13 +85,75 @@ type ReplayPing = {
   latitude: number;
   accuracy_m: number | null;
   position_age_s: number | null;
-  reason: 'scheduled' | 'boundary' | 'noise' | 'camping' | 'item' | 'ghost_sighting';
+  reason: 'scheduled' | 'boundary' | 'noise' | 'camping' | 'item' | 'ghost_sighting' | 'ai_gm_double_ping';
   released_at: string;
+};
+
+type ReplayHeatMark = {
+  id: number;
+  hunter_id: string;
+  display_name: string;
+  color: string;
+  result: 'hot' | 'cold' | 'no_change';
+  longitude: number;
+  latitude: number;
+  nearest_runner_m: number | null;
+  pressed_at: string;
+};
+
+type ReplayZone = {
+  id: string;
+  name: string;
+  zone_index: number;
+  longitude: number;
+  latitude: number;
+  radius_m: number;
+  controller: 'runner' | 'hunter' | 'neutral' | null;
+};
+
+type ReplayPulse = {
+  id: number;
+  pulse_seq: number;
+  scores: { runner: number; hunter: number } | null;
+  controlled: Record<string, string> | null;
+  created_at: string;
+};
+
+type ReplayNpcPath = {
+  id: string;
+  kind: string;
+  path_wkt: string | null;
+  duration_s: number;
+  longitude: number;
+  latitude: number;
+};
+
+type ReplayDrop = {
+  id: string;
+  type: string;
+  claimed: boolean;
+  longitude: number;
+  latitude: number;
+  claimed_at: string | null;
+};
+
+type ReplayEventRow = {
+  id: number;
+  type: string;
+  payload: any;
+  created_at: string;
 };
 
 type ReplayData = {
   tags: ReplayTag[];
   pings: ReplayPing[];
+  heat_marks?: ReplayHeatMark[];
+  zones?: ReplayZone[];
+  pulse_history?: ReplayPulse[];
+  npc_paths?: ReplayNpcPath[];
+  handoffs?: ReplayEventRow[];
+  drops?: ReplayDrop[];
+  jail_events?: ReplayEventRow[];
 };
 
 type TrailFeature = {
@@ -105,7 +168,11 @@ type TrailCollection = {
 };
 
 type ReplayEvent =
-  { kind: 'tag'; at: number; tag: ReplayTag } | { kind: 'ping'; at: number; ping: ReplayPing };
+  | { kind: 'tag'; at: number; tag: ReplayTag }
+  | { kind: 'ping'; at: number; ping: ReplayPing }
+  | { kind: 'heat'; at: number; heat: ReplayHeatMark }
+  | { kind: 'handoff'; at: number; event: ReplayEventRow }
+  | { kind: 'jail'; at: number; event: ReplayEventRow };
 
 type TimelineMarker = {
   key: string;
@@ -122,6 +189,20 @@ function clamp(value: number, min: number, max: number) {
 function formatClock(totalSeconds: number) {
   const seconds = Math.max(0, Math.round(totalSeconds));
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function parseWktLineString(wkt: string | null): [number, number][] {
+  if (!wkt) return [];
+  const match = wkt.trim().match(/^LINESTRING\s*\((.*)\)$/i);
+  if (!match) return [];
+  const points: [number, number][] = [];
+  for (const part of match[1].split(',')) {
+    const coords = part.trim().split(/\s+/).map(Number);
+    if (coords.length >= 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+      points.push([coords[0], coords[1]]);
+    }
+  }
+  return points;
 }
 
 function TimelineScrubber({
@@ -207,6 +288,14 @@ export default function ReplayScreen() {
   const [cursor, setCursor] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(10);
+  const [visibleLayers, setVisibleLayers] = useState({
+    trails: true,
+    pings: true,
+    heat: true,
+    zones: true,
+    npc: true,
+    drops: true,
+  });
 
   const mountedRef = useRef(true);
   const cursorRef = useRef(0);
@@ -332,7 +421,7 @@ export default function ReplayScreen() {
 
   const trailFeatures = useMemo(() => {
     const features: TrailFeature[] = [];
-    if (!state) return features;
+    if (!state || !visibleLayers.trails) return features;
     for (const player of state.players) {
       const points = (trailsByPlayer.get(player.id) ?? []).filter(
         (point) => !hasTimeline || Date.parse(point.recorded_at) <= cursorMs,
@@ -348,7 +437,7 @@ export default function ReplayScreen() {
       });
     }
     return features;
-  }, [state, trailsByPlayer, cursorMs, hasTimeline]);
+  }, [state, trailsByPlayer, cursorMs, hasTimeline, visibleLayers.trails]);
 
   const taggedIds = useMemo(() => {
     const ids = new Set<string>();
@@ -397,6 +486,7 @@ export default function ReplayScreen() {
 
   const pingFeatures = useMemo(() => {
     const features: PointFeature[] = [];
+    if (!visibleLayers.pings) return features;
     for (const ping of replay?.pings ?? []) {
       const releasedAt = Date.parse(ping.released_at);
       if (hasTimeline && releasedAt > cursorMs) continue;
@@ -410,7 +500,97 @@ export default function ReplayScreen() {
       });
     }
     return features;
-  }, [replay, cursorMs, hasTimeline]);
+  }, [replay, cursorMs, hasTimeline, visibleLayers.pings]);
+
+  const heatFeatures = useMemo(() => {
+    const features: PointFeature[] = [];
+    if (!visibleLayers.heat) return features;
+    for (const mark of replay?.heat_marks ?? []) {
+      const pressedAt = Date.parse(mark.pressed_at);
+      if (hasTimeline && pressedAt > cursorMs) continue;
+      const color =
+        mark.result === 'hot' ? '#EF4444' : mark.result === 'cold' ? '#3B82F6' : '#64748B';
+      features.push({
+        type: 'Feature',
+        properties: { color, result: mark.result, hunter: mark.display_name },
+        geometry: { type: 'Point', coordinates: [mark.longitude, mark.latitude] },
+      });
+    }
+    return features;
+  }, [replay, cursorMs, hasTimeline, visibleLayers.heat]);
+
+  const zoneFeatures = useMemo(() => {
+    if (!visibleLayers.zones || !replay?.zones || replay.zones.length === 0) return [];
+    return replay.zones.map((zone) => {
+      const color =
+        zone.controller === 'runner'
+          ? '#10B981'
+          : zone.controller === 'hunter'
+            ? '#EF4444'
+            : '#94A3B8';
+      const ring = circleRing(
+        { longitude: zone.longitude, latitude: zone.latitude },
+        zone.radius_m || 60,
+      );
+      return {
+        ...ring,
+        properties: {
+          name: zone.name,
+          color,
+          controller: zone.controller ?? 'neutral',
+        },
+      };
+    });
+  }, [replay, visibleLayers.zones]);
+
+  const { npcLineFeatures, npcPointFeatures } = useMemo(() => {
+    const lines: {
+      type: 'Feature';
+      properties: { color: string; kind: string };
+      geometry: { type: 'LineString'; coordinates: [number, number][] };
+    }[] = [];
+    const points: PointFeature[] = [];
+    if (!visibleLayers.npc) return { npcLineFeatures: lines, npcPointFeatures: points };
+
+    for (const npc of replay?.npc_paths ?? []) {
+      const coords = parseWktLineString(npc.path_wkt);
+      if (coords.length >= 2) {
+        lines.push({
+          type: 'Feature',
+          properties: { color: '#8B5CF6', kind: npc.kind },
+          geometry: { type: 'LineString', coordinates: coords },
+        });
+      }
+      if (npc.longitude && npc.latitude) {
+        points.push({
+          type: 'Feature',
+          properties: { color: '#8B5CF6', kind: npc.kind },
+          geometry: { type: 'Point', coordinates: [npc.longitude, npc.latitude] },
+        });
+      }
+    }
+    return { npcLineFeatures: lines, npcPointFeatures: points };
+  }, [replay, visibleLayers.npc]);
+
+  const dropFeatures = useMemo(() => {
+    const features: PointFeature[] = [];
+    if (!visibleLayers.drops) return features;
+    for (const drop of replay?.drops ?? []) {
+      const isClaimedAtTime =
+        drop.claimed &&
+        (!hasTimeline || (drop.claimed_at && Date.parse(drop.claimed_at) <= cursorMs));
+      features.push({
+        type: 'Feature',
+        properties: {
+          claimed: isClaimedAtTime,
+          color: isClaimedAtTime ? '#64748B' : '#F59E0B',
+          type: drop.type,
+        },
+        geometry: { type: 'Point', coordinates: [drop.longitude, drop.latitude] },
+      });
+    }
+    return features;
+  }, [replay, cursorMs, hasTimeline, visibleLayers.drops]);
 
   const tagFeatures = useMemo(() => {
     const features: PointFeature[] = [];
@@ -455,6 +635,15 @@ export default function ReplayScreen() {
         top: 18,
       });
     }
+    for (const mark of replay?.heat_marks ?? []) {
+      result.push({
+        key: `heat-${mark.id}`,
+        position: offset(mark.pressed_at) / durationS,
+        color: mark.result === 'hot' ? '#EF4444' : mark.result === 'cold' ? '#3B82F6' : '#64748B',
+        height: 8,
+        top: 24,
+      });
+    }
     return result;
   }, [replay, hasTimeline, durationS, liveAtMs]);
 
@@ -467,6 +656,15 @@ export default function ReplayScreen() {
     }
     for (const ping of replay?.pings ?? []) {
       result.push({ kind: 'ping', at: offset(ping.released_at), ping });
+    }
+    for (const mark of replay?.heat_marks ?? []) {
+      result.push({ kind: 'heat', at: offset(mark.pressed_at), heat: mark });
+    }
+    for (const ev of replay?.handoffs ?? []) {
+      result.push({ kind: 'handoff', at: offset(ev.created_at), event: ev });
+    }
+    for (const ev of replay?.jail_events ?? []) {
+      result.push({ kind: 'jail', at: offset(ev.created_at), event: ev });
     }
     return result.sort((a, b) => a.at - b.at);
   }, [replay, hasTimeline, durationS, liveAtMs]);
@@ -549,6 +747,33 @@ export default function ReplayScreen() {
     type: 'FeatureCollection',
     features: pingFeatures,
   };
+  const heatData: PointCollection = {
+    type: 'FeatureCollection',
+    features: heatFeatures,
+  };
+  const zoneData: { type: 'FeatureCollection'; features: CircleFeature[] } = {
+    type: 'FeatureCollection',
+    features: zoneFeatures,
+  };
+  const npcLineData: {
+    type: 'FeatureCollection';
+    features: {
+      type: 'Feature';
+      properties: { color: string; kind: string };
+      geometry: { type: 'LineString'; coordinates: [number, number][] };
+    }[];
+  } = {
+    type: 'FeatureCollection',
+    features: npcLineFeatures,
+  };
+  const npcPointData: PointCollection = {
+    type: 'FeatureCollection',
+    features: npcPointFeatures,
+  };
+  const dropData: PointCollection = {
+    type: 'FeatureCollection',
+    features: dropFeatures,
+  };
   const tagData: PointCollection = {
     type: 'FeatureCollection',
     features: tagFeatures,
@@ -595,7 +820,13 @@ export default function ReplayScreen() {
       ? `${activeEvent.tag.hunter_name} tagged ${activeEvent.tag.runner_name}`
       : activeEvent?.kind === 'ping'
         ? `Ping · ${activeEvent.ping.display_name}`
-        : 'No event at this moment';
+        : activeEvent?.kind === 'heat'
+          ? `Heat Probe · ${activeEvent.heat.display_name}`
+          : activeEvent?.kind === 'handoff'
+            ? `Relay · ${activeEvent.event.type.replace('_', ' ')}`
+            : activeEvent?.kind === 'jail'
+              ? `Jail · ${activeEvent.event.type.replace('_', ' ')}`
+              : 'No event at this moment';
   const eventDetail =
     activeEvent?.kind === 'tag'
       ? `${formatClock(activeEvent.at)} · ${Math.round(activeEvent.tag.distance_m)} m apart`
@@ -603,7 +834,15 @@ export default function ReplayScreen() {
         ? `${formatClock(activeEvent.at)} · ${activeEvent.ping.position_age_s ?? 0}s-old fix${
             activeEvent.ping.reason === 'boundary' ? ' · boundary penalty' : ''
           }`
-        : 'Drag the timeline or press play to move through the round.';
+        : activeEvent?.kind === 'heat'
+          ? `${formatClock(activeEvent.at)} · ${activeEvent.heat.result.toUpperCase()}${
+              activeEvent.heat.nearest_runner_m !== null
+                ? ` · ${Math.round(activeEvent.heat.nearest_runner_m)}m away`
+                : ''
+            }`
+          : activeEvent?.kind === 'handoff' || activeEvent?.kind === 'jail'
+            ? `${formatClock(activeEvent.at)} · recorded game event`
+            : 'Drag the timeline or press play to move through the round.';
 
   return (
     <View style={styles.screen}>
@@ -632,6 +871,44 @@ export default function ReplayScreen() {
             paint={{ 'line-color': '#1D4ED8', 'line-width': 2, 'line-dasharray': [2, 2] }}
           />
         </GeoJSONSource>
+
+        {zoneFeatures.length > 0 && (
+          <GeoJSONSource id="replay-zones" data={zoneData}>
+            <Layer
+              id="replay-zone-fill"
+              type="fill"
+              paint={{
+                'fill-color': ['get', 'color'],
+                'fill-opacity': 0.12,
+              }}
+            />
+            <Layer
+              id="replay-zone-line"
+              type="line"
+              paint={{
+                'line-color': ['get', 'color'],
+                'line-width': 2,
+                'line-dasharray': [2, 2],
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {npcLineFeatures.length > 0 && (
+          <GeoJSONSource id="replay-npc-lines" data={npcLineData}>
+            <Layer
+              id="replay-npc-line"
+              type="line"
+              layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+              paint={{
+                'line-color': '#8B5CF6',
+                'line-width': 3,
+                'line-dasharray': [3, 3],
+                'line-opacity': 0.85,
+              }}
+            />
+          </GeoJSONSource>
+        )}
 
         {trailFeatures.length > 0 && (
           <GeoJSONSource id="replay-trails" data={trailsData}>
@@ -746,6 +1023,51 @@ export default function ReplayScreen() {
             />
           </GeoJSONSource>
         )}
+
+        {npcPointFeatures.length > 0 && (
+          <GeoJSONSource id="replay-npc-points" data={npcPointData}>
+            <Layer
+              id="replay-npc-circle"
+              type="circle"
+              paint={{
+                'circle-radius': 8,
+                'circle-color': '#8B5CF6',
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#FFFFFF',
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {dropFeatures.length > 0 && (
+          <GeoJSONSource id="replay-drops" data={dropData}>
+            <Layer
+              id="replay-drop-circle"
+              type="circle"
+              paint={{
+                'circle-radius': 8,
+                'circle-color': ['get', 'color'],
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#FFFFFF',
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {heatFeatures.length > 0 && (
+          <GeoJSONSource id="replay-heat-marks" data={heatData}>
+            <Layer
+              id="replay-heat-circle"
+              type="circle"
+              paint={{
+                'circle-radius': 9,
+                'circle-color': ['get', 'color'],
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#FFFFFF',
+              }}
+            />
+          </GeoJSONSource>
+        )}
       </MapLibreMap>
 
       <View style={styles.hud}>
@@ -783,6 +1105,94 @@ export default function ReplayScreen() {
       </View>
 
       <ScrollView style={styles.sheet} contentContainerStyle={styles.sheetContent}>
+        <Text style={styles.sectionLabel}>LAYERS</Text>
+        <View style={styles.layerRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setVisibleLayers((l) => ({ ...l, trails: !l.trails }))}
+            style={[styles.layerChip, visibleLayers.trails && styles.layerChipActive]}
+          >
+            <Text
+              style={[
+                styles.layerChipText,
+                visibleLayers.trails && styles.layerChipTextActive,
+              ]}
+            >
+              🏃 Trails
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setVisibleLayers((l) => ({ ...l, pings: !l.pings }))}
+            style={[styles.layerChip, visibleLayers.pings && styles.layerChipActive]}
+          >
+            <Text
+              style={[
+                styles.layerChipText,
+                visibleLayers.pings && styles.layerChipTextActive,
+              ]}
+            >
+              📡 Pings
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setVisibleLayers((l) => ({ ...l, heat: !l.heat }))}
+            style={[styles.layerChip, visibleLayers.heat && styles.layerChipActive]}
+          >
+            <Text
+              style={[
+                styles.layerChipText,
+                visibleLayers.heat && styles.layerChipTextActive,
+              ]}
+            >
+              🔥 Heat
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setVisibleLayers((l) => ({ ...l, zones: !l.zones }))}
+            style={[styles.layerChip, visibleLayers.zones && styles.layerChipActive]}
+          >
+            <Text
+              style={[
+                styles.layerChipText,
+                visibleLayers.zones && styles.layerChipTextActive,
+              ]}
+            >
+              🗺️ Sectors
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setVisibleLayers((l) => ({ ...l, npc: !l.npc }))}
+            style={[styles.layerChip, visibleLayers.npc && styles.layerChipActive]}
+          >
+            <Text
+              style={[
+                styles.layerChipText,
+                visibleLayers.npc && styles.layerChipTextActive,
+              ]}
+            >
+              👻 Ghost
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setVisibleLayers((l) => ({ ...l, drops: !l.drops }))}
+            style={[styles.layerChip, visibleLayers.drops && styles.layerChipActive]}
+          >
+            <Text
+              style={[
+                styles.layerChipText,
+                visibleLayers.drops && styles.layerChipTextActive,
+              ]}
+            >
+              📦 Drops
+            </Text>
+          </Pressable>
+        </View>
+
         <Text style={styles.sectionLabel}>TIMELINE</Text>
         <View style={styles.timeRow}>
           <Text style={styles.timeValue}>{formatClock(cursorS)}</Text>
@@ -870,11 +1280,17 @@ export default function ReplayScreen() {
 
         <View style={styles.legendRow}>
           <View style={[styles.legendLine, { backgroundColor: '#1D4ED8' }]} />
-          <Text style={styles.legendText}>Recorded route</Text>
+          <Text style={styles.legendText}>Route</Text>
           <View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} />
           <Text style={styles.legendText}>Tag</Text>
           <View style={[styles.legendDot, { backgroundColor: '#DB2777' }]} />
           <Text style={styles.legendText}>Ping</Text>
+          <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+          <Text style={styles.legendText}>Heat</Text>
+          <View style={[styles.legendDot, { backgroundColor: '#8B5CF6' }]} />
+          <Text style={styles.legendText}>Ghost</Text>
+          <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
+          <Text style={styles.legendText}>Drop</Text>
           {state.target && <View style={[styles.legendDot, { backgroundColor: '#DB2777' }]} />}
           {state.target && <Text style={styles.legendText}>Target</Text>}
         </View>
@@ -938,6 +1354,32 @@ const styles = StyleSheet.create({
     right: 0,
   },
   sheetContent: { padding: 20, paddingBottom: 28 },
+  layerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  layerChip: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  layerChipActive: {
+    backgroundColor: '#1E293B',
+    borderColor: '#0F172A',
+  },
+  layerChipText: {
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  layerChipTextActive: {
+    color: '#FFFFFF',
+  },
   sectionLabel: {
     color: '#475569',
     fontSize: 11,

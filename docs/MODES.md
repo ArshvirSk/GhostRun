@@ -667,10 +667,25 @@ Cross-mode server-authoritative safety infrastructure protecting players across 
 - **Night Hours Detection & Warning:** Automatic server-side detection of night operating hours (UTC 20:00–05:00), displaying reflective gear warnings on lobby creation and live game screens.
 - **Curfew Deadline Enforcement:** Optional host-configured curfew timestamp (`mode_params->safety->curfew_at`). When reached, `advance_game` gracefully terminates the match with `end_reason = 'curfew_reached'`.
 
-### 7.3 Replay and stats upgrades
+### 7.3 Replay and stats upgrades ✅ IMPLEMENTED (Milestone C3)
 
-- Per-mode recap cards: **closest call** (min distance to a hunter), longest unseen streak, loudest moment, best bluff, heat presses and hit rate, drops claimed.
-- Replay layers: pings, heat marks, zone ownership, NPC paths, handoffs.
+- **Per-mode recap cards (`get_game_stats` & `app/result/[id].tsx`):**
+  - **Closest call:** Minimum distance to an opponent during active play, strictly gated to ended rounds and `share_trail = true`.
+  - **Longest unseen streak:** Duration (seconds) without a released scheduled or double ping.
+  - **Loudest moment:** Peak noise level recorded (0–100) during live round.
+  - **Best bluff:** Evaluates psychological and evasive plays (close ghost evasion $\le 35\text{ m}$ without tag, undetected Double Agent mole, VIP bodyguard decoy tag interception).
+  - **Heat presses and hit rate:** Total heat probes, hot hits, and overall hunter accuracy percentage.
+  - **Drops claimed:** Total tactical supply crates secured by player and squad.
+  - **Mode-specific recap summaries:** Structured `mode_recap` payload returning metrics for Relay Heist (`total_handoffs`, `package_drops`, `package_secured`), Territory Pulse (`pulse_seq`, `scores`, `dominance_pct`), Jailbreak (`total_rescues`, `total_jailed`), Assassin Ring (`active_survivors`, `safe_zone_count`), Ghost Duel (`variant`), and AI Game Master (`total_events`, `max_events`, `last_event_type`, `last_narration`).
+- **Replay layers (`get_game_replay` & `app/replay/[id].tsx`):**
+  - Upgraded tactical replay payload returning `tags`, `pings`, `heat_marks`, `zones`, `pulse_history`, `npc_paths`, `handoffs`, `drops`, and `jail_events`.
+  - MapLibre dynamic vector layer sources with interactive toggle chips in the replay sheet:
+    - 🏃 Recorded player trails (with consent C3 trail filtering)
+    - 📡 Radar pings (scheduled, boundary, noise, item, AI GM double pings)
+    - 🔥 Heat marks (hot = red `#EF4444`, cold = blue `#3B82F6`, no_change = slate `#64748B`)
+    - 🗺️ Territory sectors (7 radial zones with controller fills and dashed borders)
+    - 👻 Ghost NPC paths (dashed purple line strings and entity blips)
+    - 📦 Drops & Handoffs (tactical supply crates and package handoffs)
 
 ### 7.4 Privacy, consent and replay sharing
 

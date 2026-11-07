@@ -7,6 +7,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Phase C: Milestone C3 — Replay and stats upgrades (docs/MODES.md §7.3)
+- **Per-Mode Recap Cards (`get_game_stats` & `app/result/[id].tsx`):**
+  - Upgraded `get_game_stats(game_id uuid)` to return enhanced post-match metrics:
+    - *Closest call:* Minimum distance to an opponent during active play, gated strictly to finished rounds and `share_trail = true`.
+    - *Longest unseen streak:* Seconds spent undetected between scheduled and AI GM pings.
+    - *Loudest moment:* Peak noise level rating (0–100) recorded during live play.
+    - *Best bluff:* Evaluates evasive and tactical plays: Close Ghost Evasion ($\le 35\text{ m}$ without tag), Undetected Mole (Double Agent surviving without tribunal elimination), and VIP Bodyguard Decoy (absorbing tag penalty for VIP).
+    - *Heat presses & hit rate:* Game-wide and per-player hunter probe statistics (probes, hot hits, hit rate %).
+    - *Drops claimed:* Total supply crates secured by player and squad.
+    - *Mode-specific recap summaries:* Structured `mode_recap` object with specialized metrics for Relay Heist (`total_handoffs`, `package_drops`, `package_secured`), Territory Pulse (`pulse_seq`, `scores`, `dominance_pct`), Jailbreak (`total_rescues`, `total_jailed`), Assassin Ring (`active_survivors`, `safe_zone_count`), Ghost Duel (`variant`), and AI Game Master (`total_events`, `max_events`, `last_event_type`, `last_narration`).
+  - Added Best Bluff highlight card and specialized Debrief cards in `app/result/[id].tsx` for Relay Heist, Jailbreak, and AI Game Master.
+- **Replay Layers & MapLibre Vector Sources (`get_game_replay` & `app/replay/[id].tsx`):**
+  - Upgraded `get_game_replay(game_id uuid)` to serve complete tactical datasets: `tags`, `pings`, `heat_marks`, `zones`, `pulse_history`, `npc_paths`, `handoffs`, `drops`, and `jail_events`.
+  - Added interactive layer toggle chips in `app/replay/[id].tsx` (`🏃 Trails`, `📡 Pings`, `🔥 Heat`, `🗺️ Sectors`, `👻 Ghost`, `📦 Drops`) controlling live map layers.
+  - Implemented dynamic MapLibre GeoJSON sources and styling for:
+    - Heat marks (color-coded circles: hot `#EF4444`, cold `#3B82F6`, no_change `#64748B`).
+    - Territory zones (7 radial sectors with controller fills and dashed outlines).
+    - Ghost NPC paths (parsed from WKT LineStrings into purple dashed routes `#8B5CF6`).
+    - Tactical drops (crate coordinates with claimed status).
+  - Integrated timeline scrubber markers and event cards for heat probes, package handoffs, and jail breaks.
+- **Database Migration Applied to Production:**
+  - `20261118004000_c3_replay_stats_upgrades.sql`: Upgrades `get_game_stats` and `get_game_replay` with server authority and privacy preservation.
+- **Verification:**
+  - Added `replayStatsUpgradesScenario()` in `scripts/sim/index.ts` verifying `get_game_stats` and `get_game_replay` against live Supabase backend with 100% passing checks.
+
+
 ### Phase C: Milestone C2 — AI Game Master (narration and events) (docs/MODES.md §7.1)
 - **Deterministic Event Engine Decoupling:**
   - Implemented `trigger_game_master_event(game_id, event_type)` in server-authoritative Postgres: deterministic code decides *what happens*, language model/narrator writes *how it is said*.

@@ -350,6 +350,27 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Verify match pacing strictly honors the event cap (default 12 events per round).
   - [ ] Trigger a Safety Pause (`pause_game`) and verify next event deadlines are shifted forward by the pause duration upon resuming.
 
+### 3.15 Replay & Stats Upgrades (Milestone C3)
+
+* **Post-Game Result Highlights (`app/result/[id].tsx`):**
+  - [ ] **Closest Call Card:** Verify closest opponent proximity is displayed in meters for players with `share_trail = true`. Confirm it displays "Private route" if trail sharing was declined.
+  - [ ] **Longest Unseen Card:** Verify runner undetected streak is accurately calculated across scheduled and AI GM pings.
+  - [ ] **Loudest Moment Card:** Verify peak noise rating (0–100) displays with clear category subtext.
+  - [ ] **Best Bluff Card:** When criteria are met (close evasion $\le 35\text{ m}$, undetected double agent, or bodyguard interception), confirm the highlighted Best Bluff achievement card renders with title and narrative detail.
+  - [ ] **Heat Hit Rate & Drops:** Confirm hunter heat probe hit percentage and tactical drops claimed display correctly.
+* **Mode-Specific Debrief Cards:**
+  - [ ] **Relay Heist:** Verify Package Status (Secured vs Intercepted), total handoffs, and package drop count.
+  - [ ] **Territory Pulse:** Verify Dominance vs Points victory banner, radial sectors, and synchronized pulse counts.
+  - [ ] **Jailbreak:** Verify total rescues, incarceration count, and jail break trigger debrief.
+  - [ ] **AI Game Master:** Verify dispatch count (`X/12`), last event type, and verbatim final narration transmission.
+* **Tactical Replay Screen (`app/replay/[id].tsx`):**
+  - [ ] **Interactive Layer Chips:** Tap each layer toggle chip (🏃 Trails, 📡 Pings, 🔥 Heat, 🗺️ Sectors, 👻 Ghost, 📦 Drops) and verify layers cleanly appear and disappear from the MapLibre map canvas.
+  - [ ] **Heat Probe Layer:** Confirm heat marks render as colored circles (red for hot, blue for cold, slate for no-change).
+  - [ ] **Territory Sectors Layer:** Confirm 7 radial sectors display with controller color fills and dashed boundaries.
+  - [ ] **Ghost NPC Path Layer:** Confirm recorded ghost paths display as dashed purple lines with entity coordinate blips.
+  - [ ] **Drops & Handoffs Layer:** Confirm tactical supply crates appear on the map with claimed status coloration.
+  - [ ] **Timeline Scrubber Integration:** Scrub timeline slider and confirm heat probes and game events trigger active playhead cards with formatted timestamps.
+
 ---
 
 ## 4. Safety & Real-World Precautions

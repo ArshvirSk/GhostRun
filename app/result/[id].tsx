@@ -82,12 +82,21 @@ type PlayerStat = {
   loudest_noise: number;
   peak_speed_mps: number;
   drops_claimed: number;
+  heat_presses?: number;
+  heat_hits?: number;
+  heat_hit_rate_pct?: number;
+  best_bluff?: {
+    achieved: boolean;
+    title: string;
+    detail: string;
+  } | null;
 };
 
 type GameStats = {
   game_id: string;
   status: string;
   winner: string | null;
+  end_reason: string | null;
   duration_s: number;
   players: PlayerStat[];
   heat_stats: {
@@ -96,6 +105,26 @@ type GameStats = {
     hit_rate_pct: number;
   };
   total_drops_claimed: number;
+  mode_recap?: {
+    mode_id?: string;
+    total_handoffs?: number;
+    package_drops?: number;
+    package_secured?: boolean;
+    pulse_seq?: number;
+    scores?: { runner: number; hunter: number };
+    dominance_pct?: number;
+    total_rescues?: number;
+    total_jailed?: number;
+    active_survivors?: number;
+    safe_zone_count?: number;
+    variant?: string;
+    ai_gm?: {
+      total_events: number;
+      max_events: number;
+      last_event_type: string | null;
+      last_narration: string | null;
+    };
+  };
 };
 
 type FinalPosition = {
@@ -478,6 +507,12 @@ export default function ResultScreen() {
   const isTerritoryPulse =
     game.mode === 'territory_pulse' ||
     (game as unknown as { mode_id?: string }).mode_id === 'territory_pulse';
+  const isRelayHeist =
+    game.mode === 'relay_heist' ||
+    (game as unknown as { mode_id?: string }).mode_id === 'relay_heist';
+  const isJailbreak =
+    game.mode === 'jailbreak' ||
+    (game as unknown as { mode_id?: string }).mode_id === 'jailbreak';
   const winnerTitle = game.end_reason === 'curfew_reached'
     ? 'Curfew Reached'
     : isGhostDuel
@@ -724,9 +759,13 @@ export default function ResultScreen() {
               ? 'SOLO GHOST DUEL'
               : isAssassinRing
                 ? 'ASSASSIN RING'
-                : game.mode === 'classic_chase'
-                  ? 'CLASSIC CHASE'
-                  : 'TAG HUNT'}{' '}
+                : isRelayHeist
+                  ? 'RELAY HEIST'
+                  : isJailbreak
+                    ? 'JAILBREAK'
+                    : game.mode === 'classic_chase'
+                      ? 'CLASSIC CHASE'
+                      : 'TAG HUNT'}{' '}
           · {game.code}
         </Text>
         <Text style={[styles.title, { color: accent }]}>{winnerTitle}</Text>
@@ -830,6 +869,22 @@ export default function ResultScreen() {
                       ? 'Route kept private'
                       : 'Closest opponent approach'}
                   </Text>
+                </View>
+              )}
+
+              {myPlayerStats?.best_bluff && (
+                <View
+                  style={
+                    myPlayerStats.best_bluff.achieved
+                      ? styles.statCardHighlight
+                      : styles.statCard
+                  }
+                >
+                  <Text style={styles.statCardCategory}>BEST BLUFF</Text>
+                  <Text style={[styles.statCardBigValue, { fontSize: 16 }]}>
+                    {myPlayerStats.best_bluff.title}
+                  </Text>
+                  <Text style={styles.statCardSub}>{myPlayerStats.best_bluff.detail}</Text>
                 </View>
               )}
 
@@ -972,6 +1027,113 @@ export default function ResultScreen() {
                 </Text>
                 <Text style={styles.statCardSub}>Synchronized pulses</Text>
               </View>
+            </View>
+          </View>
+        )}
+
+        {isRelayHeist && gameStats?.mode_recap && (
+          <View style={styles.recapStatsContainer}>
+            <Text style={styles.sectionLabel}>RELAY HEIST DEBRIEF</Text>
+            <View style={styles.statCardsGrid}>
+              <View style={styles.statCardHighlight}>
+                <Text style={styles.statCardCategory}>PACKAGE STATUS</Text>
+                <Text style={[styles.statCardBigValue, { fontSize: 18 }]}>
+                  {gameStats.mode_recap.package_secured
+                    ? 'SECURED'
+                    : game.end_reason === 'extraction_complete'
+                      ? 'EXTRACTED'
+                      : 'INTERCEPTED'}
+                </Text>
+                <Text style={styles.statCardSub}>
+                  {game.winner === 'runners' ? 'Heist Successful' : 'Hunters Intercepted'}
+                </Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statCardCategory}>HANDOFFS</Text>
+                <Text style={styles.statCardBigValue}>
+                  {gameStats.mode_recap.total_handoffs ?? 0}
+                </Text>
+                <Text style={styles.statCardSub}>Team exchanges</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statCardCategory}>PACKAGE DROPS</Text>
+                <Text style={styles.statCardBigValue}>
+                  {gameStats.mode_recap.package_drops ?? 0}
+                </Text>
+                <Text style={styles.statCardSub}>Carrier tag fumbles</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {isJailbreak && gameStats?.mode_recap && (
+          <View style={styles.recapStatsContainer}>
+            <Text style={styles.sectionLabel}>JAILBREAK DEBRIEF</Text>
+            <View style={styles.statCardsGrid}>
+              <View style={styles.statCardHighlight}>
+                <Text style={styles.statCardCategory}>OUTCOME</Text>
+                <Text style={[styles.statCardBigValue, { fontSize: 18 }]}>
+                  {game.end_reason === 'all_jailed' ? 'ALL JAILED' : 'PRISONERS ESCAPED'}
+                </Text>
+                <Text style={styles.statCardSub}>
+                  {game.winner === 'runners' ? 'Runners Escaped' : 'Hunters Incarceration'}
+                </Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statCardCategory}>RESCUES</Text>
+                <Text style={styles.statCardBigValue}>
+                  {gameStats.mode_recap.total_rescues ?? 0}
+                </Text>
+                <Text style={styles.statCardSub}>Jail breaks triggered</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statCardCategory}>INCARCERATIONS</Text>
+                <Text style={styles.statCardBigValue}>
+                  {gameStats.mode_recap.total_jailed ?? 0}
+                </Text>
+                <Text style={styles.statCardSub}>Runners sent to jail</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {gameStats?.mode_recap?.ai_gm && (
+          <View style={styles.recapStatsContainer}>
+            <Text style={styles.sectionLabel}>AI GAME MASTER DEBRIEF</Text>
+            <View style={styles.statCardsGrid}>
+              <View style={styles.statCardHighlight}>
+                <Text style={styles.statCardCategory}>DISPATCHES</Text>
+                <Text style={styles.statCardBigValue}>
+                  {gameStats.mode_recap.ai_gm.total_events}
+                  <Text style={{ fontSize: 13, color: '#94A3B8' }}>
+                    {' '}/ {gameStats.mode_recap.ai_gm.max_events}
+                  </Text>
+                </Text>
+                <Text style={styles.statCardSub}>Dynamic interventions</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statCardCategory}>LAST EVENT</Text>
+                <Text style={[styles.statCardBigValue, { fontSize: 15, textTransform: 'uppercase' }]}>
+                  {gameStats.mode_recap.ai_gm.last_event_type
+                    ? gameStats.mode_recap.ai_gm.last_event_type.replace('_', ' ')
+                    : 'None'}
+                </Text>
+                <Text style={styles.statCardSub}>Final intervention</Text>
+              </View>
+
+              {gameStats.mode_recap.ai_gm.last_narration && (
+                <View style={[styles.statCard, { width: '100%' }]}>
+                  <Text style={styles.statCardCategory}>LAST NARRATION</Text>
+                  <Text style={[styles.statCardSub, { color: '#0F172A', marginTop: 4 }]}>
+                    "{gameStats.mode_recap.ai_gm.last_narration}"
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         )}

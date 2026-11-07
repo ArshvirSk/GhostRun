@@ -3637,6 +3637,196 @@ async function aiGameMasterScenario() {
   }
 }
 
+/** Scripted: Milestone C3 Replay and stats upgrades. */
+async function replayStatsUpgradesScenario() {
+  console.log('\n--- Scenario: replay-stats (Milestone C3: Replay and stats upgrades) ---');
+  const host = await newPlayer('C3Host');
+  const hunter = await newPlayer('C3Hunter');
+
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 500,
+    settings: {
+      head_start_s: 0,
+      duration_s: 300,
+      ping_interval_s: 30,
+      modifiers: ['hot_cold', 'ai_gm'],
+    },
+  });
+
+  if (created.error || !created.data?.[0]?.game_id) {
+    throw new Error(`create_game failed: ${created.error?.message}`);
+  }
+  const gameId = created.data[0].game_id;
+
+  const joined = await rpc<string>(hunter, 'join_game', { code: created.data[0].code });
+  if (joined.error || joined.data !== gameId) {
+    throw new Error(`hunter join failed: ${joined.error?.message}`);
+  }
+
+  const hostPlayerId = await playerId(host, gameId);
+  const hunterPlayerId = await playerId(hunter, gameId);
+
+  await rpc(host, 'set_team', { game_id: gameId, player_id: hostPlayerId, team: 'runner' });
+  await rpc(hunter, 'set_team', { game_id: gameId, player_id: hunterPlayerId, team: 'hunter' });
+
+  // Both share trail for C3 closest call calculation
+  await rpc(host, 'set_share_trail', { game_id: gameId, share: true });
+  await rpc(hunter, 'set_share_trail', { game_id: gameId, share: true });
+
+  await rpc(host, 'set_ready', { game_id: gameId, ready: true });
+  await rpc(hunter, 'set_ready', { game_id: gameId, ready: true });
+
+  const startRes = await rpc<Record<string, unknown>>(host, 'start_game', { game_id: gameId });
+  expect(!startRes.error, 'game started in countdown', String(startRes.error?.message));
+
+  // Advance past countdown
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  // Submit runner position at CENTER
+  const nowIso = new Date().toISOString();
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 3,
+    recorded_at: nowIso,
+  });
+
+  // Submit hunter position 15m north (~0.00013 deg lat)
+  const hunterLat = CENTER.lat + 0.00013;
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: hunterLat,
+    lng: CENTER.lng,
+    accuracy: 3,
+    recorded_at: nowIso,
+  });
+
+  // Hunter presses heat
+  const heatRes = await rpc<{ result: string; hunter_id: string }>(hunter, 'heat_press', {
+    game_id: gameId,
+  });
+  expect(
+    !heatRes.error && heatRes.data?.result === 'hot',
+    'hunter heat_press returns hot within 15m of runner',
+    JSON.stringify(heatRes.data ?? heatRes.error),
+  );
+
+  // Trigger an AI GM event
+  await rpc(host, 'trigger_game_master_event', {
+    game_id: gameId,
+    event_type: 'supply_drop',
+  });
+
+  // Hunter tags runner to end the game
+  const tagRes = await rpc<{ success: boolean; reason?: string }>(hunter, 'attempt_tag', {
+    game_id: gameId,
+  });
+  expect(
+    !tagRes.error && tagRes.data?.success === true,
+    'hunter tags runner to finish match',
+    JSON.stringify(tagRes.data ?? tagRes.error),
+  );
+
+  // Step 1: Verify get_game_stats
+  type StatsPayload = {
+    game_id: string;
+    status: string;
+    winner: string;
+    duration_s: number;
+    heat_stats: { total_presses: number; hot_hits: number; hit_rate_pct: number };
+    total_drops_claimed: number;
+    mode_recap: {
+      ai_gm?: { total_events: number; max_events: number; last_event_type: string | null };
+    };
+    players: {
+      player_id: string;
+      closest_call_m: number | null;
+      longest_unseen_s: number;
+      loudest_noise: number;
+      heat_presses: number;
+      heat_hits: number;
+      heat_hit_rate_pct: number;
+      best_bluff: { achieved: boolean; title: string; detail: string } | null;
+    }[];
+  };
+
+  const statsRes = await rpc<StatsPayload>(host, 'get_game_stats', { game_id: gameId });
+  expect(!statsRes.error, 'get_game_stats succeeded', String(statsRes.error?.message));
+
+  const stats = statsRes.data!;
+  expect(
+    stats.heat_stats.total_presses >= 1 && stats.heat_stats.hot_hits >= 1 && stats.heat_stats.hit_rate_pct === 100,
+    'heat_stats correctly computed hit rate at 100%',
+    JSON.stringify(stats.heat_stats),
+  );
+
+  expect(
+    Boolean(stats.mode_recap?.ai_gm && stats.mode_recap.ai_gm.total_events >= 1),
+    'mode_recap includes ai_gm metrics',
+    JSON.stringify(stats.mode_recap),
+  );
+
+  const hunterStats = stats.players.find((p) => p.player_id === hunterPlayerId);
+  expect(
+    hunterStats?.heat_presses === 1 && hunterStats?.heat_hits === 1 && hunterStats?.heat_hit_rate_pct === 100,
+    'per-player hunter heat stats populated',
+    JSON.stringify(hunterStats),
+  );
+
+  const runnerStats = stats.players.find((p) => p.player_id === hostPlayerId);
+  expect(
+    runnerStats !== undefined && runnerStats.closest_call_m !== null && runnerStats.closest_call_m <= 35,
+    'runner closest_call_m recorded <= 35m',
+    String(runnerStats?.closest_call_m),
+  );
+
+  expect(
+    runnerStats?.best_bluff !== undefined,
+    'best_bluff structure returned for runner',
+    JSON.stringify(runnerStats?.best_bluff),
+  );
+
+  // Step 2: Verify get_game_replay
+  type ReplayPayload = {
+    tags: unknown[];
+    pings: unknown[];
+    heat_marks: { hunter_id: string; result: string; longitude: number; latitude: number }[];
+    zones: unknown[];
+    pulse_history: unknown[];
+    npc_paths: unknown[];
+    handoffs: unknown[];
+    drops: unknown[];
+    jail_events: unknown[];
+  };
+
+  const replayRes = await rpc<ReplayPayload>(host, 'get_game_replay', { game_id: gameId });
+  expect(!replayRes.error, 'get_game_replay succeeded', String(replayRes.error?.message));
+
+  const replay = replayRes.data!;
+  expect(Array.isArray(replay.tags) && replay.tags.length >= 1, 'replay includes tags array', String(replay.tags?.length));
+  expect(
+    Array.isArray(replay.heat_marks) && replay.heat_marks.length >= 1 && replay.heat_marks[0].result === 'hot',
+    'replay includes heat_marks with hot probe',
+    JSON.stringify(replay.heat_marks),
+  );
+  expect(Array.isArray(replay.pings), 'replay includes pings array', String(replay.pings?.length));
+  expect(Array.isArray(replay.zones), 'replay includes zones array', String(replay.zones?.length));
+  expect(Array.isArray(replay.npc_paths), 'replay includes npc_paths array', String(replay.npc_paths?.length));
+  expect(Array.isArray(replay.handoffs), 'replay includes handoffs array', String(replay.handoffs?.length));
+  expect(Array.isArray(replay.drops), 'replay includes drops array', String(replay.drops?.length));
+  expect(Array.isArray(replay.jail_events), 'replay includes jail_events array', String(replay.jail_events?.length));
+
+  // Cleanup
+  for (const client of [host, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -3655,6 +3845,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   'territory-pulse': territoryPulseScenario,
   'safety-guard': safetyGuardScenario,
   'ai-game-master': aiGameMasterScenario,
+  'replay-stats': replayStatsUpgradesScenario,
 };
 
 async function main() {

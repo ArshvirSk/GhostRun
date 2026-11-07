@@ -377,3 +377,29 @@ Rather than corrupting base geometry or conflicting with the `shrinking_zone` mo
 **Decision D36 — Hard Event Caps and Realtime Radio Dispatch Banner:**
 To prevent event spam, game pace inflation, and token runaway, `mode_params->'ai_gm'` maintains an explicit `event_count` enforced against `max_events` (default 12 per round). Client devices render an in-game Game Master Radio Dispatch Dock with broadcast icon, event title, and narration text, accompanied by Realtime whispers and haptic alerts, alongside an atmospheric fog overlay (`fogOverlay`) when `fog_active` is true.
 
+
+## 2026-11-08 — Milestone C3: Replay & Stats Upgrades (Decisions D37–D40)
+
+**Decision D37 — Post-Game Replay Layer Pipeline & Consent Gating:**
+Per `docs/MODES.md §7.3` and Consent C3 (`share_trail = true`), `get_game_replay(game_id)` serves comprehensive tactical replay datasets after the match terminates: `tags`, `pings`, `heat_marks`, `zones`, `pulse_history`, `npc_paths`, `handoffs`, `drops`, and `jail_events`. Raw trail points for opponent routes remain strictly hidden unless the owning player explicitly granted `share_trail = true`. Public tactical entities (pings, tags, zones, heat presses, drops, and NPC lines) are rendered on the map with discrete visibility toggle chips (`visibleLayers`).
+
+**Decision D38 — Algorithmic Best Bluff Calculation:**
+To reward psychological and evasive mastery beyond raw speed, `get_game_stats` evaluates `best_bluff`:
+1. Close Ghost Evasion: Runner approaching within $\le 35\text{ m}$ of hunters without being tagged (`achieved = true`).
+2. Undetected Mole: Double Agent surviving the round undetected without tribunal elimination.
+3. VIP Bodyguard Decoy: Bodyguard drawing a hunter tag and absorbing a freeze penalty to shield the VIP.
+4. Close Encounter: Near evasion within 50 m prior to interception (`achieved = false`).
+
+**Decision D39 — Structured Per-Mode Recap Summaries (`mode_recap`):**
+Rather than cramming ad-hoc mode metadata into root JSON, `get_game_stats` provides a structured `mode_recap` payload returning exact metrics for active modes and modifiers:
+- Relay Heist: `total_handoffs`, `package_drops`, `package_secured`.
+- Territory Pulse: `pulse_seq`, `scores`, `dominance_pct`, `end_reason`.
+- Jailbreak: `total_rescues`, `total_jailed`.
+- Assassin Ring: `active_survivors`, `safe_zone_count`.
+- Ghost Duel: `variant`.
+- AI Game Master: `total_events`, `max_events`, `last_event_type`, `last_narration`.
+
+**Decision D40 — Replay MapLibre Vector Sources & Interactive Layer Toggles:**
+In `app/replay/[id].tsx`, vector layers for territory zones (radial sectors with controller fills), ghost NPC paths (dashed purple line string + entity blips), tactical supply drops, and hunter heat marks (color-coded by temperature) are dynamically sourced from GeoJSON features. Interactive layer chips allow players to toggle individual layers on/off without re-querying the database or disrupting playback scrubbing.
+
+
