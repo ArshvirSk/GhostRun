@@ -81,7 +81,14 @@ let gameSheetDragStartY = 0;
 
 type Team = 'runner' | 'hunter' | 'solo' | 'unassigned';
 type Phase =
-  'lobby' | 'target_selection' | 'countdown' | 'head_start' | 'live' | 'ended' | 'cancelled';
+  | 'lobby'
+  | 'target_selection'
+  | 'countdown'
+  | 'head_start'
+  | 'live'
+  | 'ended'
+  | 'cancelled'
+  | 'paused';
 
 type GamePlayer = {
   id: string;
@@ -299,6 +306,17 @@ type RoundState = {
       contender: 'runner' | 'hunter' | null;
       contender_pulses: number;
     }[];
+  } | null;
+  safety?: {
+    is_paused: boolean;
+    paused_at: string | null;
+    paused_by: string | null;
+    paused_by_name: string | null;
+    pause_reason: string | null;
+    pause_votes: Record<string, boolean>;
+    curfew_at: string | null;
+    is_night: boolean;
+    vehicle_warning: boolean;
   } | null;
 };
 
@@ -892,6 +910,24 @@ export default function GameScreen() {
               `${payload.new.payload?.display_name || 'A player'} needs immediate help!`,
               [0, 500, 200, 500],
             );
+          } else if (payload.new?.type === 'game_paused') {
+            notify(
+              'GAME PAUSED',
+              `${payload.new.payload?.display_name || 'A player'} paused the game for safety.`,
+              [0, 300, 100, 300],
+            );
+          } else if (payload.new?.type === 'game_resumed') {
+            notify(
+              'GAME RESUMED',
+              `${payload.new.payload?.display_name || 'A player'} resumed the game.`,
+              [0, 200],
+            );
+          } else if (payload.new?.type === 'vehicle_warning') {
+            notify(
+              'VEHICLE SPEED WARNING',
+              `${payload.new.payload?.display_name || 'A player'} exceeded safe pedestrian speed!`,
+              [0, 400, 200, 400],
+            );
           }
           if (payload.new?.type === 'sensed') {
             setSensedActive(true);
@@ -1119,13 +1155,51 @@ export default function GameScreen() {
     else router.replace('/home');
   }
 
+  async function pauseGame(reason = 'safety_pause') {
+    if (!supabase || !gameId || busy !== '') return;
+    setBusy('pause');
+    const { error } = await supabase.rpc('pause_game', { game_id: gameId, reason });
+    setBusy('');
+    if (error) setErrorMessage(error.message);
+    else await loadState();
+  }
+
+  async function resumeGame() {
+    if (!supabase || !gameId || busy !== '') return;
+    setBusy('resume');
+    const { error } = await supabase.rpc('resume_game', { game_id: gameId });
+    setBusy('');
+    if (error) setErrorMessage(error.message);
+    else await loadState();
+  }
+
+  async function votePauseGame(vote = true) {
+    if (!supabase || !gameId || busy !== '') return;
+    setBusy('vote_pause');
+    const { error } = await supabase.rpc('vote_pause_game', { game_id: gameId, vote });
+    setBusy('');
+    if (error) setErrorMessage(error.message);
+    else await loadState();
+  }
+
   const game = state?.game ?? null;
+  const safetyState = state?.safety;
+  const isPaused = game?.status === 'paused' || Boolean(safetyState?.is_paused);
+  const isNight = safetyState?.is_night ?? false;
+  const vehicleWarning = safetyState?.vehicle_warning ?? false;
+  const pauseVotes = (safetyState?.pause_votes ?? {}) as Record<string, boolean>;
+  const myPauseVote = state?.my_player_id ? Boolean(pauseVotes[state.my_player_id]) : false;
+  const pauseVoteCount = Object.values(pauseVotes).filter(Boolean).length;
+  const curfewRemainingS = safetyState?.curfew_at
+    ? Math.max(0, Math.floor((Date.parse(safetyState.curfew_at) - serverNow) / 1000))
+    : null;
   const modifiers = useModifierState(gameId, game);
   const players = state?.players ?? [];
   const myPlayerId = state?.my_player_id ?? '';
   const myTeam = state?.my_team ?? 'unassigned';
   const isRunner = myTeam === 'runner';
   const activePlayers = players.filter((player) => player.status === 'active');
+  const majorityThreshold = Math.max(1, Math.ceil(activePlayers.length / 2));
   const runnersRemaining = activePlayers.filter((player) => player.team === 'runner').length;
   const events = useMemo(() => {
     return (state?.events ?? []).slice().sort((a, b) => b.id - a.id);
@@ -1990,7 +2064,7 @@ export default function GameScreen() {
   }
 
   const zoom = Math.max(10, Math.min(16, 15 - Math.log2(game!.area.radius_m / 200)));
-  const inPlay = ['head_start', 'live'].includes(game!.status);
+  const inPlay = ['head_start', 'live', 'paused'].includes(game!.status);
   const tagRingData = isLive && !isRunner && ownFix ? circleRing(ownFix, game!.tag_radius_m) : null;
 
   let eyebrow = isGhostDuel
@@ -2147,6 +2221,18 @@ export default function GameScreen() {
                 : 'Runners are only visible as delayed pings. Use the age, not the dot, to decide.';
     timerLabel = 'TIME LEFT';
     timerValue = game!.ends_at ? (Date.parse(game!.ends_at) - serverNow) / 1000 : null;
+  } else if (game!.status === 'paused') {
+    eyebrow = 'SAFETY PAUSE';
+    accent = '#F59E0B';
+    title = 'Game Paused';
+    const pausedByName = state?.safety?.paused_by_name || 'A player';
+    const pauseReason =
+      state?.safety?.pause_reason === 'emergency_sos'
+        ? 'EMERGENCY SOS'
+        : (state?.safety?.pause_reason || 'Safety Pause');
+    subtitle = `Paused by ${pausedByName} (${pauseReason}). Resume when all players are safe and ready.`;
+    timerLabel = 'PAUSED';
+    timerValue = null;
   } else if (game!.status === 'ended') {
     eyebrow = isGhostDuel ? 'GHOST DUEL OVER' : 'ROUND OVER';
     accent = isGhostDuel
@@ -2842,6 +2928,19 @@ export default function GameScreen() {
                   <Text style={styles.statValue}>{formatClock(timerValue)}</Text>
                 </View>
               )}
+              {curfewRemainingS !== null && game!.status !== 'ended' && game!.status !== 'cancelled' && (
+                <View style={styles.stat}>
+                  <Text style={styles.statLabel}>CURFEW</Text>
+                  <Text
+                    style={[
+                      styles.statValue,
+                      { color: curfewRemainingS < 300 ? '#EF4444' : '#F59E0B' },
+                    ]}
+                  >
+                    {formatClock(curfewRemainingS)}
+                  </Text>
+                </View>
+              )}
               {isTerritoryPulse ? (
                 <>
                   <View style={styles.stat}>
@@ -2955,6 +3054,50 @@ export default function GameScreen() {
         <View style={styles.operatorToast}>
           <Ionicons color="#92400E" name="radio" size={16} />
           <Text style={styles.operatorToastText}>{operatorBannerMsg}</Text>
+        </View>
+      )}
+
+      {vehicleWarning && !sheetExpanded && (
+        <View style={styles.vehicleWarningBanner}>
+          <MaterialCommunityIcons color="#FFFFFF" name="speedometer-slow" size={18} />
+          <Text style={styles.vehicleWarningText}>
+            SPEED WARNING: Vehicle speed detected (&gt;8 m/s). GhostRun is on-foot!
+          </Text>
+        </View>
+      )}
+
+      {isNight && !sheetExpanded && !isPaused && (
+        <View style={styles.nightModeBanner}>
+          <Ionicons color="#93C5FD" name="moon" size={14} />
+          <Text style={styles.nightModeText}>
+            Night Mode: Stay alert, watch for traffic & wear reflective gear.
+          </Text>
+        </View>
+      )}
+
+      {isPaused && (
+        <View style={styles.pauseOverlayBanner}>
+          <View style={styles.pauseBannerHeader}>
+            <MaterialCommunityIcons color="#F59E0B" name="pause-circle" size={24} />
+            <Text style={styles.pauseBannerTitle}>
+              GAME PAUSED: {safetyState?.pause_reason === 'emergency_sos' ? 'EMERGENCY SOS' : (safetyState?.pause_reason || 'SAFETY PAUSE')}
+            </Text>
+          </View>
+          <Text style={styles.pauseBannerSub}>
+            Paused by {safetyState?.paused_by_name || 'a player'}. Timers are frozen.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy !== ''}
+            onPress={() => void resumeGame()}
+            style={styles.resumeGameBannerButton}
+          >
+            {busy === 'resume' ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.resumeGameBannerButtonText}>▶ Resume Game</Text>
+            )}
+          </Pressable>
         </View>
       )}
 
@@ -3748,6 +3891,84 @@ export default function GameScreen() {
                         : ' No ping released yet.'
                     } Older rings fade.`}
               </Text>
+            )}
+
+            {(inPlay || game!.status === 'countdown') && (
+              <View style={styles.safetySection}>
+                <Text style={styles.safetySectionTitle}>SAFETY & PAUSE</Text>
+                {isPaused ? (
+                  <Pressable
+                    accessibilityLabel="Resume the game"
+                    accessibilityRole="button"
+                    disabled={busy !== ''}
+                    onPress={() => void resumeGame()}
+                    style={styles.safetyResumeButton}
+                  >
+                    {busy === 'resume' ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.safetyButtonContent}>
+                        <MaterialCommunityIcons color="#FFFFFF" name="play-circle" size={18} />
+                        <Text style={styles.safetyResumeButtonText}>RESUME GAME</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                ) : (
+                  <View style={styles.safetyButtonsRow}>
+                    <Pressable
+                      accessibilityLabel="Pause the game immediately for safety"
+                      accessibilityRole="button"
+                      disabled={busy !== ''}
+                      onPress={() => void pauseGame('safety_pause')}
+                      style={styles.safetyPauseButton}
+                    >
+                      {busy === 'pause' ? (
+                        <ActivityIndicator color="#92400E" size="small" />
+                      ) : (
+                        <View style={styles.safetyButtonContent}>
+                          <MaterialCommunityIcons color="#92400E" name="pause-circle-outline" size={16} />
+                          <Text style={styles.safetyPauseButtonText}>Safety Pause</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="Vote to pause the game"
+                      accessibilityRole="button"
+                      disabled={busy !== ''}
+                      onPress={() => void votePauseGame(!myPauseVote)}
+                      style={[
+                        styles.safetyVoteButton,
+                        myPauseVote && styles.safetyVoteButtonActive,
+                      ]}
+                    >
+                      {busy === 'vote_pause' ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <View style={styles.safetyButtonContent}>
+                          <MaterialCommunityIcons
+                            color={myPauseVote ? '#FFFFFF' : '#475569'}
+                            name={myPauseVote ? 'check-circle' : 'vote-outline'}
+                            size={16}
+                          />
+                          <Text
+                            style={[
+                              styles.safetyVoteButtonText,
+                              myPauseVote && styles.safetyVoteButtonTextActive,
+                            ]}
+                          >
+                            {myPauseVote ? 'Voted' : 'Vote'} ({pauseVoteCount}/{majorityThreshold})
+                          </Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  </View>
+                )}
+                {curfewRemainingS !== null && (
+                  <Text style={styles.curfewNotice}>
+                    Curfew in {formatClock(curfewRemainingS)} · Game automatically concludes
+                  </Text>
+                )}
+              </View>
             )}
 
             {(inPlay || game!.status === 'countdown') && (
@@ -4659,5 +4880,172 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#EF4444',
+  },
+  vehicleWarningBanner: {
+    backgroundColor: '#DC2626',
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  vehicleWarningText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    flex: 1,
+    lineHeight: 16,
+  },
+  nightModeBanner: {
+    backgroundColor: '#1E1B4B',
+    borderColor: '#3730A3',
+    borderWidth: 1,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  nightModeText: {
+    color: '#C7D2FE',
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  pauseOverlayBanner: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+    borderWidth: 2,
+    borderRadius: 14,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  pauseBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pauseBannerTitle: {
+    color: '#92400E',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  pauseBannerSub: {
+    color: '#B45309',
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  resumeGameBannerButton: {
+    alignItems: 'center',
+    backgroundColor: '#059669',
+    borderRadius: 10,
+    height: 40,
+    justifyContent: 'center',
+  },
+  resumeGameBannerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  safetySection: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    padding: 14,
+  },
+  safetySectionTitle: {
+    color: '#92400E',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  safetyResumeButton: {
+    alignItems: 'center',
+    backgroundColor: '#059669',
+    borderRadius: 12,
+    height: 46,
+    justifyContent: 'center',
+  },
+  safetyResumeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  safetyButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  safetyPauseButton: {
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FCD34D',
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    height: 44,
+    justifyContent: 'center',
+  },
+  safetyPauseButtonText: {
+    color: '#92400E',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  safetyVoteButton: {
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    height: 44,
+    justifyContent: 'center',
+  },
+  safetyVoteButtonActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#2563EB',
+  },
+  safetyVoteButtonText: {
+    color: '#475569',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  safetyVoteButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  safetyButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  curfewNotice: {
+    color: '#D97706',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

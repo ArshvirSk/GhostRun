@@ -93,6 +93,8 @@ export default function CreateGameScreen() {
   const [centerMode, setCenterMode] = useState<'my_location' | 'custom'>('my_location');
   const [locating, setLocating] = useState(true);
   const [radius, setRadius] = useState(600);
+  const [curfewMinutes, setCurfewMinutes] = useState<number | null>(null);
+  const isNightHours = [20, 21, 22, 23, 0, 1, 2, 3, 4, 5].includes(new Date().getUTCHours());
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const { height: screenHeight } = useWindowDimensions();
@@ -334,6 +336,13 @@ export default function CreateGameScreen() {
         mode_params: {
           ...(mode === 'ghost_duel' ? { ghost_duel: { variant: ghostDuelVariant } } : {}),
           ...(mode === 'territory_pulse' ? { territory_pulse: { pulse_interval_s: 90, dominance_pct: 70 } } : {}),
+          ...(curfewMinutes
+            ? {
+                safety: {
+                  curfew_at: new Date(Date.now() + curfewMinutes * 60 * 1000).toISOString(),
+                },
+              }
+            : {}),
         },
       },
     });
@@ -695,6 +704,42 @@ export default function CreateGameScreen() {
               </View>
             </View>
 
+            <View style={styles.settingRow}>
+              <Text style={styles.settingLabel}>Safety curfew</Text>
+              <View style={styles.row}>
+                {([null, 15, 30, 60] as (number | null)[]).map((val) => (
+                  <Pressable
+                    key={String(val)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: curfewMinutes === val }}
+                    onPress={() => setCurfewMinutes(val)}
+                    style={[
+                      styles.penaltyButton,
+                      curfewMinutes === val && styles.selectedButton,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.penaltyText,
+                        curfewMinutes === val && styles.selectedText,
+                      ]}
+                    >
+                      {val === null ? 'None' : `${val}m`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {isNightHours && (
+              <View style={styles.nightWarningBox}>
+                <Ionicons color="#F59E0B" name="moon" size={15} />
+                <Text style={styles.nightWarningBoxText}>
+                  Night hours active (UTC 20:00–05:00). High-vis apparel and safety pauses recommended.
+                </Text>
+              </View>
+            )}
+
             <Text style={styles.coordinateText}>
               Centre ({centerMode === 'my_location' ? 'My location' : 'Custom'}):{' '}
               {center[1].toFixed(5)}, {center[0].toFixed(5)}
@@ -949,4 +994,23 @@ const styles = StyleSheet.create({
   primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   cancelButton: { alignItems: 'center', justifyContent: 'center', minHeight: 34, marginTop: 2 },
   cancelText: { color: '#64748B', fontSize: 13, fontWeight: '600' },
+  nightWarningBox: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  nightWarningBoxText: {
+    color: '#92400E',
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 15,
+  },
 });

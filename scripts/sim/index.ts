@@ -3235,6 +3235,191 @@ async function territoryPulseScenario() {
   }
 }
 
+async function safetyGuardScenario() {
+  console.log('\n--- safetyGuardScenario (C1: Speed & Safety Guard) ---');
+  const host = await newPlayer('SafetyHost');
+  const runner = await newPlayer('SafetyRunner');
+  const hunter = await newPlayer('SafetyHunter');
+
+  // 1. Create a game with short curfew (45 seconds in the future) for curfew test
+  const curfewDate = new Date(Date.now() + 45000).toISOString();
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 400,
+    settings: {
+      duration_s: 300,
+      head_start_s: 0,
+      ping_interval_s: 30,
+      mode_params: {
+        safety: {
+          curfew_at: curfewDate,
+        },
+      },
+    },
+  });
+
+  const gameId = created.data?.[0]?.game_id;
+  const code = created.data?.[0]?.code;
+  if (!gameId || !code) {
+    fail('safety_guard_creation', 'Failed to create game: ' + JSON.stringify(created.error));
+    return;
+  }
+  pass('create game with safety parameters');
+
+  await rpc(runner, 'join_game', { code });
+  await rpc(hunter, 'join_game', { code });
+
+  const hostPid = await playerId(host, gameId);
+  const runnerPid = await playerId(runner, gameId);
+  const hunterPid = await playerId(hunter, gameId);
+
+  await rpc(host, 'set_team', { game_id: gameId, player_id: hostPid, team: 'hunter' });
+  await rpc(runner, 'set_team', { game_id: gameId, player_id: runnerPid, team: 'runner' });
+  await rpc(hunter, 'set_team', { game_id: gameId, player_id: hunterPid, team: 'hunter' });
+
+  for (const client of [host, runner, hunter]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
+  // Start game and wait 11s past countdown to live
+  await rpc(host, 'start_game', { game_id: gameId });
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  type SafetySnapshot = {
+    game: { status: string; end_reason?: string | null };
+    safety?: {
+      is_paused: boolean;
+      paused_by?: string | null;
+      paused_by_name?: string | null;
+      pause_reason?: string | null;
+      pause_votes?: Record<string, boolean>;
+      curfew_at?: string | null;
+      is_night?: boolean;
+      vehicle_warning?: boolean;
+    };
+  };
+
+  let state = await rpc<SafetySnapshot>(host, 'get_game_state', { game_id: gameId });
+  expect(state.data?.game.status === 'live', 'game is live', state.data?.game.status ?? 'unknown');
+  expect(state.data?.safety?.is_paused === false, 'safety initial is_paused is false', String(state.data?.safety?.is_paused));
+  expect(Boolean(state.data?.safety?.curfew_at), 'curfew_at is populated in safety snapshot', String(state.data?.safety?.curfew_at));
+
+  // --- Test 1: Immediate Safety Pause ---
+  const pauseRes = await rpc<{ success: boolean }>(runner, 'pause_game', {
+    game_id: gameId,
+    reason: 'twisted_ankle',
+  });
+  expect(pauseRes.data?.success === true, 'runner paused game for twisted ankle', JSON.stringify(pauseRes));
+
+  state = await rpc<SafetySnapshot>(host, 'get_game_state', { game_id: gameId });
+  expect(state.data?.game.status === 'paused', 'game status is paused', state.data?.game.status ?? 'unknown');
+  expect(state.data?.safety?.is_paused === true, 'safety.is_paused is true', String(state.data?.safety?.is_paused));
+  expect(state.data?.safety?.pause_reason === 'twisted_ankle', 'safety.pause_reason matches', String(state.data?.safety?.pause_reason));
+  expect(state.data?.safety?.paused_by_name === 'SafetyRunner', 'safety.paused_by_name matches', String(state.data?.safety?.paused_by_name));
+
+  // Verify advance_game does not alter paused state
+  await rpc(host, 'advance_game', { game_id: gameId });
+  state = await rpc<SafetySnapshot>(host, 'get_game_state', { game_id: gameId });
+  expect(state.data?.game.status === 'paused', 'advance_game preserves paused state', state.data?.game.status ?? 'unknown');
+
+  // --- Test 2: Resume Game ---
+  const resumeRes = await rpc<{ success: boolean; phase: string }>(hunter, 'resume_game', {
+    game_id: gameId,
+  });
+  expect(resumeRes.data?.success === true && resumeRes.data?.phase === 'live', 'hunter resumed game back to live', JSON.stringify(resumeRes));
+
+  state = await rpc<SafetySnapshot>(host, 'get_game_state', { game_id: gameId });
+  expect(state.data?.game.status === 'live', 'game status is back to live after resume', state.data?.game.status ?? 'unknown');
+  expect(state.data?.safety?.is_paused === false, 'safety.is_paused is false after resume', String(state.data?.safety?.is_paused));
+
+  // --- Test 3: Majority Vote Pause ---
+  // Active field players = 3, majority needed = ceil(3/2) = 2
+  const vote1 = await rpc<{ success: boolean; paused: boolean; yes_votes: number; needed: number }>(
+    runner,
+    'vote_pause_game',
+    { game_id: gameId, vote: true },
+  );
+  expect(vote1.data?.paused === false && vote1.data?.yes_votes === 1, '1 vote does not trigger pause (needs 2)', JSON.stringify(vote1.data));
+
+  const vote2 = await rpc<{ success: boolean; paused: boolean; yes_votes: number; needed: number }>(
+    hunter,
+    'vote_pause_game',
+    { game_id: gameId, vote: true },
+  );
+  expect(vote2.data?.paused === true && vote2.data?.yes_votes === 2, '2nd vote triggers auto-pause by majority', JSON.stringify(vote2.data));
+
+  state = await rpc<SafetySnapshot>(host, 'get_game_state', { game_id: gameId });
+  expect(state.data?.game.status === 'paused', 'game is paused after majority vote', state.data?.game.status ?? 'unknown');
+  expect(state.data?.safety?.pause_reason === 'majority_safety_vote', 'pause reason is majority_safety_vote', state.data?.safety?.pause_reason ?? 'unknown');
+
+  // Resume game
+  await rpc(host, 'resume_game', { game_id: gameId });
+
+  // --- Test 4: SOS Auto-Pause ---
+  const sosRes = await rpc<{ success: boolean }>(runner, 'send_sos', { game_id: gameId });
+  expect(!sosRes.error, 'send_sos succeeds', JSON.stringify(sosRes));
+
+  state = await rpc<SafetySnapshot>(host, 'get_game_state', { game_id: gameId });
+  expect(state.data?.game.status === 'paused', 'SOS auto-pauses the game', state.data?.game.status ?? 'unknown');
+  expect(state.data?.safety?.pause_reason === 'emergency_sos', 'safety pause reason is emergency_sos', state.data?.safety?.pause_reason ?? 'unknown');
+
+  // Resume game so we can test vehicle warning and curfew
+  await rpc(host, 'resume_game', { game_id: gameId });
+
+  // --- Test 5: Vehicle Speed Warning in submit_position ---
+  // Submit fix 1 with speed = 12 m/s
+  const now = Date.now();
+  await rpc(runner, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 3,
+    speed: 12.0,
+    heading: 0,
+    recorded_at: new Date(now - 12000).toISOString(),
+  });
+  // Submit fix 2 (12s later, sustained high speed)
+  const speedRes = await rpc<{ vehicle_warning?: boolean }>(runner, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.001,
+    lng: CENTER.lng + 0.001,
+    accuracy: 3,
+    speed: 12.0,
+    heading: 45,
+    recorded_at: new Date(now).toISOString(),
+  });
+  expect(speedRes.data?.vehicle_warning === true, 'submit_position flags sustained vehicle speed (>8 m/s)', JSON.stringify(speedRes.data));
+
+  state = await rpc<SafetySnapshot>(runner, 'get_game_state', { game_id: gameId });
+  expect(state.data?.safety?.vehicle_warning === true, 'safety snapshot reflects vehicle_warning for runner', String(state.data?.safety?.vehicle_warning));
+
+  // --- Test 6: Curfew Deadline ---
+  // Read current curfew and wait until it elapses
+  const currentCurfewAt = state.data?.safety?.curfew_at;
+  const curfewTime = currentCurfewAt ? Date.parse(currentCurfewAt) : Date.now();
+  const remaining = curfewTime - Date.now();
+  if (remaining > 0) {
+    await new Promise((r) => setTimeout(r, remaining + 1000));
+  }
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  state = await rpc<SafetySnapshot>(host, 'get_game_state', { game_id: gameId });
+  expect(
+    state.data?.game.status === 'ended' && state.data?.game.end_reason === 'curfew_reached',
+    'game ended with curfew_reached after curfew deadline expired',
+    JSON.stringify(state.data?.game),
+  );
+
+  // Cleanup
+  for (const client of [host, runner, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -3251,6 +3436,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   operator: operatorScenario,
   'ghost-duel': ghostDuelScenario,
   'territory-pulse': territoryPulseScenario,
+  'safety-guard': safetyGuardScenario,
 };
 
 async function main() {

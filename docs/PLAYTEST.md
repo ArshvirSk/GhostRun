@@ -299,6 +299,37 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Point victory triggers upon round duration expiration (`points_victory` or `draw`).
   - [ ] Result screen displays Territory Pulse Debrief card with final sector ownership counts and scores.
 
+### 3.13 Speed & Safety Guard (docs/MODES.md §7.2)
+
+* **Vehicle Speed Detection:**
+  - [ ] Move at vehicular speed (>8 m/s or 29 km/h) for $\ge 10\text{ s}$.
+  - [ ] Confirm prominent vehicle speed warning banner appears on HUD.
+  - [ ] Confirm `vehicle_warning` event is emitted.
+  - [ ] In games with noise modifier, confirm noise meter spikes to 100.
+* **Safety Pause & Resume:**
+  - [ ] Tap "Safety Pause" in the HUD or bottom sheet.
+  - [ ] Confirm game transitions to `paused` status for all players.
+  - [ ] Confirm all player maps show amber "Game Paused" overlay with paused-by display name.
+  - [ ] Confirm match timers, radar pings, and zone shrinkage are completely frozen.
+  - [ ] Tap "Resume Game".
+  - [ ] Confirm match returns to previous active state and all deadlines (`ends_at`, `next_ping_at`, `curfew_at`) are extended forward by the pause duration.
+* **Democratic Vote Pause:**
+  - [ ] Any player taps "Vote Pause".
+  - [ ] Confirm vote count increments (e.g. `1/2`). Game remains active.
+  - [ ] Second player taps "Vote Pause" reaching majority ($\ge 50\%$).
+  - [ ] Confirm game automatically transitions to `paused` with reason `majority_safety_vote`.
+* **SOS Auto-Pause:**
+  - [ ] Press and hold SOS button for 2 seconds.
+  - [ ] Confirm emergency dialer opens.
+  - [ ] Confirm `sos` alert event broadcasts to all players with coordinates.
+  - [ ] Confirm match automatically enters `paused` status with reason `emergency_sos`.
+* **Night Mode & Curfew:**
+  - [ ] Verify night mode indicator appears when playing during UTC 20:00–05:00.
+  - [ ] Configure lobby with a curfew deadline (e.g. 15m, 30m, 60m).
+  - [ ] Verify curfew countdown displays in HUD stats row.
+  - [ ] When curfew expires, confirm round concludes with `end_reason = 'curfew_reached'`.
+  - [ ] Verify Result screen displays amber Curfew Reached summary banner.
+
 ---
 
 ## 4. Safety & Real-World Precautions

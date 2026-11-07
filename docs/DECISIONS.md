@@ -347,3 +347,18 @@ To support both rapid decisive victories and tactical endurance matches, Territo
 1. Dominance: Controlling $\ge 70\%$ of sectors ($\ge 5$ of 7) across 2 consecutive pulses or all 7 sectors simultaneously triggers an immediate dominance victory (`end_reason = 'territory_dominance'`).
 2. Points on Timeout: Holding sectors awards +1 point per pulse. When the round timer expires, the team with strictly higher accrued points wins (`end_reason = 'points_victory'`), with equal points resolving to a draw (`end_reason = 'draw'`).
 
+
+## 2026-11-08 — Milestone C1: Speed & Safety Guard (Decisions D29–D32)
+
+**Decision D29 — Universal Safety Pause and Timer Shift Architecture:**
+Safety is the supreme constraint across all physical pedestrian gameplay. The `public.game_status` enum is extended with `'paused'`. Any active player can call `pause_game(game_id, reason)`. While paused, game tick processing (`advance_game`) returns immediately and position victory/elimination evaluations are suppressed. When resumed via `resume_game(game_id)`, all active deadline timestamps (`ends_at`, `next_ping_at`, `live_at`, `head_start_at`, `curfew_at`, and `territory_pulse.next_pulse_at`) are shifted forward by the exact elapsed pause duration (`clock_timestamp() - paused_at`), guaranteeing that no team loses playing time or tactical advantages due to a safety pause.
+
+**Decision D30 — Democratic Majority Vote Safety Pause:**
+To enable collective squad consensus in non-emergency safety situations (e.g. crossing a busy intersection, inclement weather), `vote_pause_game(game_id, vote)` allows any active player to vote to pause. When yes votes reach or exceed 50% of active field players (`ceil(v_active_players / 2.0)`), the game auto-pauses with reason `'majority_safety_vote'`. Remote/spectating players are excluded from the required quorum.
+
+**Decision D31 — SOS Override with Automatic Safety Pause:**
+Per `docs/MODES.md §7.2`, emergency SOS overrides everything. `send_sos` was upgraded from a simple event emitter to an atomic safety procedure: it broadcasts the player's last known coordinates and alert to all players, opens the device emergency dialer (112 / 911), and automatically calls `pause_game` with `pause_reason = 'emergency_sos'`.
+
+**Decision D32 — Vehicle Speed Guard & Curfew Deadline Enforcement:**
+GhostRun is strictly a pedestrian game. In `submit_position`, smoothed GPS speed exceeding $8\text{ m/s}$ ($28.8\text{ km/h}$) sustained for $\ge 10\text{ s}$ emits a `vehicle_warning` event, flags the player's `status_detail->'vehicle_warning'`, returns warning metadata to the client, and spikes the noise meter to 100 when noise mechanics are active. For nighttime safety, games optionally accept a curfew deadline (`mode_params->safety->curfew_at`); when reached, `advance_game` ends the round gracefully with `end_reason = 'curfew_reached'`.
+

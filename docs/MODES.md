@@ -646,13 +646,15 @@ create table heat_presses (
 - **Guardrails:** narration never names exact places beyond the public ping location, never reveals target direction or roles, and avoids unsafe suggestions ("run!").
   **Effort:** M–L.
 
-### 7.2 Speed and safety guard (all modes)
+### 7.2 Speed and safety guard (all modes) — ✅ IMPLEMENTED (Phase C Milestone C1)
 
-- Speed over 8 m/s for 10 s: vehicle warning, mode-specific penalty (extra noise or disqualification flag).
-- Hard speed cap for NPCs (see modes above).
-- Auto-pause vote available to any player in a safety situation.
-- SOS stays in every mode and overrides everything.
-- Night mode warning and an optional **curfew** time that ends the game.
+Cross-mode server-authoritative safety infrastructure protecting players across physical urban environments:
+- **Vehicle Speed Guard:** GPS speed tracking exceeding 8 m/s (29 km/h) sustained for 10 s emits a `vehicle_warning` event, triggers an in-game warning banner, flags the player in `status_detail->'vehicle_warning'`, and applies a max noise meter penalty (100) when noise modifiers are enabled.
+- **Safety Pause & Resume (`pause_game`, `resume_game`):** Any player can instantly pause active match timers for an emergency or physical hazard (`status = 'paused'`). Resuming adjusts all deadlines (`ends_at`, `next_ping_at`, `live_at`, `head_start_at`, `curfew_at`, and territory pulse timers) forward by the exact pause duration.
+- **Majority Vote Safety Pause (`vote_pause_game`):** Any player can call a safety pause vote requiring $\ge 50\%$ active field player agreement (`majority_safety_vote`), auto-pausing upon reaching consensus.
+- **SOS Auto-Pause (`send_sos`):** Triggering emergency SOS broadcasts coordinates to all players, opens the device emergency dialer, and automatically triggers an immediate safety pause (`pause_reason = 'emergency_sos'`).
+- **Night Hours Detection & Warning:** Automatic server-side detection of night operating hours (UTC 20:00–05:00), displaying reflective gear warnings on lobby creation and live game screens.
+- **Curfew Deadline Enforcement:** Optional host-configured curfew timestamp (`mode_params->safety->curfew_at`). When reached, `advance_game` gracefully terminates the match with `end_reason = 'curfew_reached'`.
 
 ### 7.3 Replay and stats upgrades
 

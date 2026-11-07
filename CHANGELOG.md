@@ -7,6 +7,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Phase C: Milestone C1 — Speed & Safety Guard (all modes) (docs/MODES.md §7.2)
+- **Universal Safety Pause & Deadline Shifting:**
+  - Extended `public.game_status` enum with `'paused'`.
+  - Added `pause_game(game_id, reason)` allowing any active player to immediately freeze active match play (`status = 'paused'`) and emit `game_paused` event.
+  - Added `resume_game(game_id)` restoring prior phase and dynamically shifting all deadlines (`ends_at`, `next_ping_at`, `live_at`, `head_start_at`, `curfew_at`, and `territory_pulse.next_pulse_at`) forward by the exact pause duration (`clock_timestamp() - paused_at`).
+  - Added `vote_pause_game(game_id, vote)` enabling democratic safety pausing requiring $\ge 50\%$ active field player agreement (`majority_safety_vote`).
+  - Updated `advance_game` to return immediately when game is paused.
+- **SOS Auto-Pause:**
+  - Upgraded `send_sos` to automatically trigger an immediate safety pause with reason `'emergency_sos'` while broadcasting player coordinates and launching emergency services dialer.
+- **Vehicle Speed Detection & Guard:**
+  - Enhanced `submit_position` to detect sustained speeds $> 8\text{ m/s}$ ($29\text{ km/h}$) for $\ge 10\text{ s}$.
+  - Emits `vehicle_warning` event, returns `vehicle_warning: true` in response, sets `status_detail->'vehicle_warning'`, and applies maximum noise meter penalty (100) when noise modifiers are enabled.
+  - Skips target arrival and collision victory checks while game is paused.
+- **Night Hours & Curfew Deadline:**
+  - Added night mode detection (UTC 20:00–05:00) with visual high-vis warnings in lobby creation and in-game HUD.
+  - Added optional curfew setting in `app/create.tsx` (None, 15m, 30m, 60m) wired into `mode_params.safety.curfew_at`.
+  - In `advance_game`, games reach completion gracefully when curfew is reached (`end_reason = 'curfew_reached'`).
+- **Client UI & Safety Banners:**
+  - Added full pause overlay and phase banner in `app/game/[id].tsx` with resume button, pause reason, and paused-by name.
+  - Added dedicated Safety Controls section in bottom sheet with instant Safety Pause and Vote Pause progress buttons.
+  - Added vehicle speed warning toast and night mode alert banner.
+  - Added Curfew countdown timer to HUD stats and dedicated result recap card in `app/result/[id].tsx`.
+- **Database Migrations Applied to Production:**
+  - `20261117000000_c1_safety_enum.sql`: Added `'paused'` to `public.game_status`.
+  - `20261117001000_c1_safety_guard_lifecycle.sql` & `20261117002000_c1_safety_guard_fixes.sql`: Complete server-authoritative lifecycle and RPCs with variable conflict resolution.
+- **Harness Verification:**
+  - Added `safetyGuardScenario()` in `scripts/sim/index.ts` verifying pause, resume deadline shifts, majority vote pause consensus, SOS auto-pause, sustained vehicle speed detection, and curfew deadline round conclusion.
+
 ### Phase B: Milestone B8 — Territory Pulse Base Mode (docs/MODES.md §4.6)
 - **Mode Registration & Configuration:**
   - Added enum value `territory_pulse` to `public.game_mode` and updated `games_mode_id_check` constraint.

@@ -478,7 +478,9 @@ export default function ResultScreen() {
   const isTerritoryPulse =
     game.mode === 'territory_pulse' ||
     (game as unknown as { mode_id?: string }).mode_id === 'territory_pulse';
-  const winnerTitle = isGhostDuel
+  const winnerTitle = game.end_reason === 'curfew_reached'
+    ? 'Curfew Reached'
+    : isGhostDuel
     ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? '')
       ? game.end_reason === 'ghost_tagged'
         ? 'Ghost Tagged!'
@@ -507,7 +509,9 @@ export default function ResultScreen() {
           : game.winner === 'hunters'
             ? 'Hunters win'
             : 'Round over';
-  const accent = isGhostDuel
+  const accent = game.end_reason === 'curfew_reached'
+    ? '#F59E0B'
+    : isGhostDuel
     ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? '')
       ? '#059669'
       : '#B91C1C'
@@ -518,7 +522,9 @@ export default function ResultScreen() {
         : game.winner === 'hunters'
           ? '#B91C1C'
           : '#475569';
-  const reasonCopy = isGhostDuel
+  const reasonCopy = game.end_reason === 'curfew_reached'
+    ? 'The match concluded automatically for player safety because the curfew deadline was reached.'
+    : isGhostDuel
     ? game.end_reason === 'ghost_beaten'
       ? 'You reached the finish line faster than the ghost runner!'
       : game.end_reason === 'ghost_won'
