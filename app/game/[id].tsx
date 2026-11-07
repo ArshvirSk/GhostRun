@@ -318,6 +318,19 @@ type RoundState = {
     is_night: boolean;
     vehicle_warning: boolean;
   } | null;
+  ai_gm?: {
+    is_active: boolean;
+    event_count: number;
+    max_events: number;
+    event_interval_s: number;
+    last_event_type: string | null;
+    last_title: string | null;
+    last_narration: string | null;
+    last_event_at: string | null;
+    next_event_at: string | null;
+    fog_active: boolean;
+    fog_ends_at: string | null;
+  } | null;
 };
 
 type SharingState = 'idle' | 'starting' | 'on' | 'denied' | 'error';
@@ -928,6 +941,21 @@ export default function GameScreen() {
               `${payload.new.payload?.display_name || 'A player'} exceeded safe pedestrian speed!`,
               [0, 400, 200, 400],
             );
+          } else if (payload.new?.type === 'game_master') {
+            const gmTitle = (payload.new.payload as any)?.title || 'GAME MASTER DISPATCH';
+            const gmNarration = (payload.new.payload as any)?.narration || 'Operational order updated.';
+            notify(
+              gmTitle.toUpperCase(),
+              gmNarration,
+              [0, 150, 100, 150],
+            );
+            playSound('whisper');
+          } else if (payload.new?.type === 'game_master_narration') {
+            const narrationText = (payload.new.payload as any)?.narration || '';
+            if (narrationText) {
+              notify('GAME MASTER BROADCAST', narrationText, [0, 150]);
+              playSound('whisper');
+            }
           }
           if (payload.new?.type === 'sensed') {
             setSensedActive(true);
@@ -968,7 +996,7 @@ export default function GameScreen() {
       : status === 'head_start'
         ? state?.game.live_at
         : status === 'live'
-          ? earliest(state?.game.ends_at, state?.game.next_ping_at)
+          ? earliest(state?.game.ends_at, state?.game.next_ping_at, state?.ai_gm?.next_event_at)
           : null;
 
   // Ask the server to advance at the next phase or ping boundary. Any member's
@@ -2798,6 +2826,16 @@ export default function GameScreen() {
       />
       <SensedRippleOverlay active={sensedActive} />
 
+      {state?.ai_gm?.fog_active && (
+        <View pointerEvents="none" style={styles.fogOverlay}>
+          <View style={styles.fogHaze} />
+          <View style={styles.fogNotice}>
+            <Ionicons color="#FFFFFF" name="cloudy" size={16} />
+            <Text style={styles.fogNoticeText}>ATMOSPHERIC RADAR INTERFERENCE</Text>
+          </View>
+        </View>
+      )}
+
       <Pressable
         accessibilityLabel={hudCompact ? 'Expand round details' : 'Minimize round details'}
         accessibilityRole="button"
@@ -3054,6 +3092,24 @@ export default function GameScreen() {
         <View style={styles.operatorToast}>
           <Ionicons color="#92400E" name="radio" size={16} />
           <Text style={styles.operatorToastText}>{operatorBannerMsg}</Text>
+        </View>
+      )}
+
+      {state?.ai_gm?.is_active && state.ai_gm.last_narration && !sheetExpanded && !isPaused && (
+        <View style={styles.gameMasterBanner}>
+          <View style={styles.gmBannerHeader}>
+            <MaterialCommunityIcons color="#38BDF8" name="broadcast" size={16} />
+            <Text style={styles.gmBannerTitle}>
+              {state.ai_gm.last_title ? state.ai_gm.last_title.toUpperCase() : 'GAME MASTER DISPATCH'}
+            </Text>
+            {state.ai_gm.fog_active && (
+              <View style={styles.gmFogBadge}>
+                <Ionicons color="#E0F2FE" name="cloudy" size={12} />
+                <Text style={styles.gmFogBadgeText}>RADAR FOG</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.gmBannerNarration}>{state.ai_gm.last_narration}</Text>
         </View>
       )}
 
@@ -3406,6 +3462,30 @@ export default function GameScreen() {
                     );
                   })}
                 </View>
+              </View>
+            )}
+
+            {isLive && state?.ai_gm?.is_active && (
+              <View style={[styles.rescueCard, { borderColor: '#38BDF8', marginVertical: 8 }]}>
+                <View style={styles.rescueHeaderRow}>
+                  <MaterialCommunityIcons color="#0284C7" name="broadcast" size={20} />
+                  <Text style={[styles.rescueTitle, { color: '#0284C7' }]}>
+                    AI GAME MASTER ({state.ai_gm.event_count}/{state.ai_gm.max_events} EVENTS)
+                  </Text>
+                </View>
+                <Text style={styles.rescueSubtitle}>
+                  {state.ai_gm.last_narration
+                    ? state.ai_gm.last_narration
+                    : 'Tactical Game Master monitoring active telemetry and pace.'}
+                </Text>
+                {state.ai_gm.fog_active && (
+                  <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons color="#64748B" name="cloudy" size={14} />
+                    <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600' }}>
+                      Radar Fog Active: Sensory distortion until {new Date(state.ai_gm.fog_ends_at || '').toLocaleTimeString()}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -5047,5 +5127,89 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 8,
     textAlign: 'center',
+  },
+  fogOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 99,
+  },
+  fogHaze: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(148, 163, 184, 0.45)',
+  },
+  fogNotice: {
+    position: 'absolute',
+    top: 70,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#94A3B8',
+  },
+  fogNoticeText: {
+    color: '#F8FAFC',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  gameMasterBanner: {
+    backgroundColor: '#0F172A',
+    borderColor: '#38BDF8',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  gmBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  gmBannerTitle: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    flex: 1,
+  },
+  gmFogBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(56, 189, 248, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#38BDF8',
+  },
+  gmFogBadgeText: {
+    color: '#E0F2FE',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  gmBannerNarration: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    lineHeight: 17,
   },
 });

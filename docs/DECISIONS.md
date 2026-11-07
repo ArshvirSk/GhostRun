@@ -362,3 +362,18 @@ Per `docs/MODES.md §7.2`, emergency SOS overrides everything. `send_sos` was up
 **Decision D32 — Vehicle Speed Guard & Curfew Deadline Enforcement:**
 GhostRun is strictly a pedestrian game. In `submit_position`, smoothed GPS speed exceeding $8\text{ m/s}$ ($28.8\text{ km/h}$) sustained for $\ge 10\text{ s}$ emits a `vehicle_warning` event, flags the player's `status_detail->'vehicle_warning'`, returns warning metadata to the client, and spikes the noise meter to 100 when noise mechanics are active. For nighttime safety, games optionally accept a curfew deadline (`mode_params->safety->curfew_at`); when reached, `advance_game` ends the round gracefully with `end_reason = 'curfew_reached'`.
 
+
+## 2026-11-08 — Milestone C2: AI Game Master (Decisions D33–D36)
+
+**Decision D33 — Deterministic Event Engine vs Generative Narration Decoupling:**
+Per `docs/MODES.md §7.1`, deterministic server-side Postgres logic decides *what happens*, while language model or templated narration writes *how it is said*. All 5 game master events (`supply_drop`, `double_ping`, `fog`, `rumour`, `shrink_step`) execute entirely within server-authoritative Postgres RPC `trigger_game_master_event`. This ensures total game state consistency, zero network latency dependency, zero API credential exposure to clients, and fair play across all matches.
+
+**Decision D34 — Server Authority & Zero Secret Leakage for Game Master Narration:**
+The AI Game Master receives exclusively public match state (scores, elapsed time, public pings, and coarse quadrant aggregations). It never receives or transmits unmasked GPS tracks, secret extraction targets, secret roles (e.g. VIP, Double Agent), or hidden jail coordinates. Directional rumors are calculated relative to `area_center` into 4 quadrants (North-East, North-West, South-East, South-West) without revealing exact coordinates.
+
+**Decision D35 — Boundary Contraction Scaling via Shrink Scale:**
+Rather than corrupting base geometry or conflicting with the `shrinking_zone` modifier, `shrink_step` reduces the effective area radius by 15% via `mode_params->'ai_gm'->'shrink_scale' = round(current_scale * 0.85, 3)`, clamped to a minimum radius of 60 m. `public.effective_radius_m(p_game_id)` composes this factor with existing stage shrink logic, seamlessly supporting perimeter contraction across all base modes with or without shrinking zone.
+
+**Decision D36 — Hard Event Caps and Realtime Radio Dispatch Banner:**
+To prevent event spam, game pace inflation, and token runaway, `mode_params->'ai_gm'` maintains an explicit `event_count` enforced against `max_events` (default 12 per round). Client devices render an in-game Game Master Radio Dispatch Dock with broadcast icon, event title, and narration text, accompanied by Realtime whispers and haptic alerts, alongside an atmospheric fog overlay (`fogOverlay`) when `fog_active` is true.
+

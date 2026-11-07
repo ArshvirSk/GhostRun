@@ -55,6 +55,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
         'hot_cold',
         'qr_tagging',
         'shrinking_zone',
+        'ai_gm',
       ],
       parameters: {},
       enabled: true,
@@ -72,6 +73,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
         'hot_cold',
         'qr_tagging',
         'shrinking_zone',
+        'ai_gm',
       ],
       parameters: {},
       enabled: true,
@@ -89,6 +91,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
         'hot_cold',
         'qr_tagging',
         'shrinking_zone',
+        'ai_gm',
       ],
       parameters: { ghost_count: 2, ghost_speed_mps: 1.3 },
       enabled: true,
@@ -100,7 +103,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       teams: ['runner', 'hunter'],
       min_players: 1,
       compatible_roles: [],
-      compatible_modifiers: ['noise_meter', 'shrinking_zone'],
+      compatible_modifiers: ['noise_meter', 'shrinking_zone', 'ai_gm'],
       parameters: { variant: 'time_trial', variants: ['time_trial', 'evade', 'mirror_chase'] },
       enabled: true,
     },
@@ -117,6 +120,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
         'hot_cold',
         'qr_tagging',
         'shrinking_zone',
+        'ai_gm',
       ],
       parameters: {
         jail_radius_m: 15,
@@ -133,7 +137,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       teams: ['solo'],
       min_players: 3,
       compatible_roles: [],
-      compatible_modifiers: ['noise_meter', 'dead_drops', 'qr_tagging', 'shrinking_zone'],
+      compatible_modifiers: ['noise_meter', 'dead_drops', 'qr_tagging', 'shrinking_zone', 'ai_gm'],
       parameters: {
         tag_radius_m: 15,
         safe_zone_count: 2,
@@ -159,6 +163,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
         'hot_cold',
         'qr_tagging',
         'shrinking_zone',
+        'ai_gm',
       ],
       parameters: {
         extraction_radius_m: 25,
@@ -179,7 +184,7 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       teams: ['runner', 'hunter'],
       min_players: 2,
       compatible_roles: ['operator'],
-      compatible_modifiers: ['dead_drops', 'shrinking_zone', 'qr_tagging'],
+      compatible_modifiers: ['dead_drops', 'shrinking_zone', 'qr_tagging', 'ai_gm'],
       parameters: {
         pulse_interval_s: 90,
         zone_count: 7,
@@ -199,6 +204,13 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       layer: 'modifier',
       name: 'Shrinking Zone',
       parameters: {},
+      enabled: true,
+    },
+    {
+      id: 'ai_gm',
+      layer: 'modifier',
+      name: 'AI Game Master',
+      parameters: { event_interval_s: 180, max_events: 12 },
       enabled: true,
     },
   ],
@@ -229,6 +241,10 @@ const MODIFIER_RULES: Record<string, string[]> = {
   shrinking_zone: [
     'The play area shrinks in stages near the end of the round.',
     'A warning announces each shrink before it happens.',
+  ],
+  ai_gm: [
+    'An automated tactical Game Master directs sector operations.',
+    'Paces the match with supply drops, recon sweeps, radar fog, rumors, and perimeter contractions.',
   ],
 };
 

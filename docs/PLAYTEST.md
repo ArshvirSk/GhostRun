@@ -330,6 +330,26 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] When curfew expires, confirm round concludes with `end_reason = 'curfew_reached'`.
   - [ ] Verify Result screen displays amber Curfew Reached summary banner.
 
+### 3.14 AI Game Master (Milestone C2)
+
+* **Lobby & Setup:**
+  - [ ] In lobby settings, toggle the **AI Game Master** (`ai_gm`) modifier chip across any compatible mode.
+  - [ ] Confirm modifier summary displays parameter defaults (`event_interval_s: 180`, `max_events: 12`).
+  - [ ] Start round and verify `game_master_init` event is emitted.
+* **In-Game Radio Dispatch Dock:**
+  - [ ] When an event triggers, verify the **Game Master Radio Dispatch Banner** slides in above the bottom sheet with a cyan radio broadcast icon.
+  - [ ] Verify whisper audio cue (`playSound('whisper')`) and haptic pulse fire on incoming transmissions.
+  - [ ] Verify the bottom sheet displays the operational AI Game Master status card with current sequence (`X/12 events`).
+* **Tactical Event Verification:**
+  - [ ] **Supply Drop:** Confirm a tactical supply crate marker spawns within the operation area.
+  - [ ] **Satellite Sweep (Double Ping):** Confirm an immediate extra radar ping round reveals runner positions.
+  - [ ] **Radar Fog:** Confirm the atmospheric haze overlay covers the map with a sensory distortion warning badge for 60 seconds.
+  - [ ] **Intelligence Rumour:** Confirm radio chatter dispatch announces directional quadrant runner concentration (e.g., North-East).
+  - [ ] **Perimeter Contraction Step:** Confirm the safe area boundary contracts by 15% with a HUD notification.
+* **Cap & Safety Integration:**
+  - [ ] Verify match pacing strictly honors the event cap (default 12 events per round).
+  - [ ] Trigger a Safety Pause (`pause_game`) and verify next event deadlines are shifted forward by the pause duration upon resuming.
+
 ---
 
 ## 4. Safety & Real-World Precautions

@@ -636,15 +636,26 @@ create table heat_presses (
 
 ## 7. Cross-cutting systems
 
-### 7.1 AI Game Master (narration and events)
+### 7.1 AI Game Master (narration and events) — ✅ IMPLEMENTED (Phase C Milestone C2)
 
-**Principle:** deterministic code decides _what happens_, a language model only writes _how it is said_. This keeps the game fair and cost predictable.
+**Principle:** deterministic code decides _what happens_, a language model or templated narrator only writes _how it is said_. This keeps the game fair, reliable, and cost predictable with zero secret coordinate or role leakage.
 
-- **Event engine (rules):** every 5 to 10 minutes it may trigger an event from an approved list (shrink step, supply drop, double ping, rumour, fog). It chooses by game state (long lull, one team dominating) and dice.
-- **Narrator (LLM):** receives only **public** state (pings, events, scores, phase), never secrets or positions, and writes a 1 to 2 sentence broadcast. Delivered as text and optionally spoken with on-device TTS.
-- **Cost and reliability:** templated fallback messages if the API fails. Cap calls per game (for example 12). Calls run from a server function (an Edge Function would be the first one in the project), never from the client with a secret key.
-- **Guardrails:** narration never names exact places beyond the public ping location, never reveals target direction or roles, and avoids unsafe suggestions ("run!").
-  **Effort:** M–L.
+- **Event Engine (Deterministic Rules & Cadence):** Evaluated server-side every 3–5 minutes during live matches (`clock_timestamp() >= next_event_at`, default interval 180 s, configurable down to 2–3 s for desk testing). Context-sensitive selection picks among 5 approved events based on match pacing:
+  1. `supply_drop`: Spawns a tactical supply crate (`entities.kind = 'drop'`) within $0.65 \times R_{\text{area}}$ for field players to locate and secure.
+  2. `double_ping`: Re-synchronizes orbital recon and emits an immediate secondary radar sweep of all active runners (`pings.reason = 'ai_gm_double_ping'`).
+  3. `fog`: Introduces atmospheric radar interference, blinding the HUD radar and applying a misty atmospheric overlay across the map for 60 seconds (`fog_ends_at`).
+  4. `rumour`: Analyzes runner spatial distribution relative to area center and broadcasts directional quadrant intelligence (e.g., North-East / North-West / South-East / South-West sector concentration).
+  5. `shrink_step`: Accelerates boundary containment contraction by 15% (`mode_params->'ai_gm'->'shrink_scale' = 0.85`), clamping to a minimum radius of 60 m.
+- **Narrator & Guardrails:**
+  - Standard broadcasts use hardened, military-tactical dispatches delivered over Realtime events to `all` players without secret role or precise GPS leakage.
+  - Guarded `narrate_game_master(game_id, event_type, custom_narration)` RPC clamps custom broadcasts to 250 characters and logs them to match history.
+  - Hard event cap (default 12 events per match, configurable in lobby) strictly prevents spam and event inflation.
+- **Client Radio Dispatch Banner & Fog Overlay:**
+  - Live HUD banner (`gameMasterBanner`) displays operational dispatches with broadcast icon, event title, and narration.
+  - When `fog_active` is true, an atmospheric fog overlay (`fogOverlay`) covers the map with a sensory distortion warning badge.
+  - In-game bottom sheet renders an operational AI Game Master card showing event sequence (`X/12 events`) and fog countdown.
+  - Lobby modifier chip enables/disables the `ai_gm` modifier across all 8 base modes with parameter summary.
+- **Verification:** Acceptance verified through end-to-end simulator scenario `scripts/sim/index.ts ai-game-master` covering all 5 event types (`supply_drop`, `double_ping`, `fog`, `rumour`, `shrink_step`), cap enforcement, narration overrides, and pause/resume timer shifting.
 
 ### 7.2 Speed and safety guard (all modes) — ✅ IMPLEMENTED (Phase C Milestone C1)
 

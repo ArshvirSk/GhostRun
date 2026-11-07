@@ -7,6 +7,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Phase C: Milestone C2 — AI Game Master (narration and events) (docs/MODES.md §7.1)
+- **Deterministic Event Engine Decoupling:**
+  - Implemented `trigger_game_master_event(game_id, event_type)` in server-authoritative Postgres: deterministic code decides *what happens*, language model/narrator writes *how it is said*.
+  - Added 5 approved event types:
+    1. `supply_drop`: Spawns a tactical supply crate (`entities.kind = 'drop'`) within $0.65 \times R_{\text{area}}$ for field players to locate and secure.
+    2. `double_ping`: Re-synchronizes orbital recon and emits an immediate secondary radar sweep of active runners (`pings.reason = 'ai_gm_double_ping'`).
+    3. `fog`: Activates temporary electromagnetic interference with atmospheric map fog overlay for 60 seconds (`fog_ends_at`).
+    4. `rumour`: Analyzes runner spatial distribution relative to `area_center` and broadcasts directional quadrant intelligence (North-East, North-West, South-East, South-West).
+    5. `shrink_step`: Accelerates boundary containment contraction by 15% (`shrink_scale = 0.85`), clamped to a 60 m minimum radius.
+  - Implemented context-sensitive event selection: lull detection (>2 min without pings) biases toward `double_ping` and `rumour`; late match (>65% duration) biases toward `shrink_step` and `fog`.
+  - Added strict event cap (default 12 events per match, configurable in lobby) preventing event inflation.
+- **Narrator & Guardrails:**
+  - Standard dispatches use hardened, tactical transmissions with zero secret coordinate or role leakage.
+  - Added `narrate_game_master(game_id, event_type, custom_narration)` RPC allowing guarded narrative overrides clamped to 250 characters.
+  - Updated `advance_game` to auto-trigger game master events at scheduled intervals (`next_event_at <= clock_timestamp()`).
+  - Updated `resume_game` to shift `next_event_at` and `fog_active_until` forward by exact pause durations.
+  - Updated `effective_radius_m` to compose boundary contraction (`shrink_scale`) with base and shrinking zone radiuses.
+  - Updated `get_game_state` to expose the `ai_gm` status snapshot (`is_active`, `event_count`, `max_events`, `last_event_type`, `last_title`, `last_narration`, `fog_active`, `fog_ends_at`).
+- **Catalogue & Mode Compatibility:**
+  - Added `ai_gm` modifier to `modifier_catalogue()` with parameters `{ event_interval_s: 180, max_events: 12, tts_enabled: true }`.
+  - Enabled feature flag `feature.modifier.ai_gm` in `public.app_settings`.
+  - Registered `ai_gm` in `compatible_modifiers` across all 8 base modes in `mode_catalogue()` and `src/lib/modeRegistry.ts`.
+- **Client Radio Dispatch Dock & Atmospheric Fog:**
+  - Added in-game Radio Dispatch Banner (`gameMasterBanner`) in `app/game/[id].tsx` with transmission icon, dispatch title, and narration.
+  - Added atmospheric fog overlay (`fogOverlay`) rendering misty haze and sensor distortion notice over the map when `fog_active` is true.
+  - Added AI Game Master operational status card in the bottom sheet with event count tracker (`X/12 events`).
+  - Added Realtime event listeners for `game_master` and `game_master_narration` with whisper audio chimes and haptic feedback.
+- **Database Migrations Applied to Production:**
+  - `20261118000000_c2_ai_game_master_catalogue.sql`: Catalogue and mode compatibility registration.
+  - `20261118001000_c2_ai_game_master_lifecycle.sql`: Server-authoritative event engine and lifecycle updates.
+  - `20261118002000_c2_ai_game_master_fix.sql`: PL/pgSQL variable conflict resolution.
+  - `20261118003000_c2_ai_game_master_pings_constraint.sql`: Extended `pings_reason_check` constraint with `'ai_gm_double_ping'`.
+- **Verification:**
+  - Added `aiGameMasterScenario()` in `scripts/sim/index.ts` with 100% passing checks across all 5 events, cap enforcement, narration overrides, and pause/resume shifts.
+
+
 ### Phase C: Milestone C1 — Speed & Safety Guard (all modes) (docs/MODES.md §7.2)
 - **Universal Safety Pause & Deadline Shifting:**
   - Extended `public.game_status` enum with `'paused'`.

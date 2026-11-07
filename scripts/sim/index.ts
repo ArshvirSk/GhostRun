@@ -3420,6 +3420,223 @@ async function safetyGuardScenario() {
   }
 }
 
+async function aiGameMasterScenario() {
+  console.log('\n--- aiGameMasterScenario (C2: AI Game Master) ---');
+  const host = await newPlayer('GMHost');
+  const runner = await newPlayer('GMRunner');
+  const hunter = await newPlayer('GMHunter');
+
+  // 1. Create a game with ai_gm modifier
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'tag_hunt',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 400,
+    settings: {
+      modifiers: ['ai_gm'],
+      duration_s: 300,
+      head_start_s: 0,
+      ping_interval_s: 30,
+      mode_params: {
+        ai_gm: {
+          event_interval_s: 3,
+          max_events: 5,
+        },
+      },
+    },
+  });
+
+  const gameId = created.data?.[0]?.game_id;
+  const code = created.data?.[0]?.code;
+  if (!gameId || !code) {
+    fail('ai_gm_creation', 'Failed to create game: ' + JSON.stringify(created.error));
+    return;
+  }
+  pass('create game with ai_gm modifier');
+
+  await rpc(runner, 'join_game', { code });
+  await rpc(hunter, 'join_game', { code });
+
+  const hostPid = await playerId(host, gameId);
+  const runnerPid = await playerId(runner, gameId);
+  const hunterPid = await playerId(hunter, gameId);
+
+  await rpc(host, 'set_team', { game_id: gameId, player_id: hostPid, team: 'hunter' });
+  await rpc(runner, 'set_team', { game_id: gameId, player_id: runnerPid, team: 'runner' });
+  await rpc(hunter, 'set_team', { game_id: gameId, player_id: hunterPid, team: 'hunter' });
+
+  for (const client of [host, runner, hunter]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
+  // 2. Start game and transition past countdown to live
+  await rpc(host, 'start_game', { game_id: gameId });
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  type GmSnapshot = {
+    game: {
+      status: string;
+      area: { radius_m: number; base_radius_m: number; shrinking?: boolean };
+    };
+    ai_gm?: {
+      is_active: boolean;
+      event_count: number;
+      max_events: number;
+      last_event_type?: string | null;
+      last_title?: string | null;
+      last_narration?: string | null;
+      last_event_at?: string | null;
+      next_event_at?: string | null;
+      fog_active: boolean;
+      fog_ends_at?: string | null;
+    };
+  };
+
+  let state = await rpc<GmSnapshot>(host, 'get_game_state', { game_id: gameId });
+  expect(state.data?.game.status === 'live', 'game reached live status', state.data?.game.status ?? 'unknown');
+  expect(state.data?.ai_gm?.is_active === true, 'ai_gm is_active is true', String(state.data?.ai_gm?.is_active));
+  expect(state.data?.ai_gm?.event_count === 0, 'initial event_count is 0', String(state.data?.ai_gm?.event_count));
+  expect(state.data?.ai_gm?.max_events === 5, 'max_events is configured to 5', String(state.data?.ai_gm?.max_events));
+  expect(state.data?.ai_gm?.fog_active === false, 'initial fog_active is false', String(state.data?.ai_gm?.fog_active));
+
+  // Submit initial runner fix in North-East quadrant (dx > 0, dy > 0)
+  await rpc(runner, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.001,
+    lng: CENTER.lng + 0.001,
+    accuracy: 5,
+    speed: 1.5,
+    heading: 90,
+  });
+
+  // --- Test 3: Event 1 - supply_drop ---
+  const dropRes = await rpc<{
+    success: boolean;
+    event_type: string;
+    title: string;
+    narration: string;
+    event_count: number;
+  }>(host, 'trigger_game_master_event', {
+    game_id: gameId,
+    event_type: 'supply_drop',
+  });
+  expect(dropRes.data?.success === true && dropRes.data?.event_type === 'supply_drop', 'trigger supply_drop event succeeds', JSON.stringify(dropRes.data));
+  expect(dropRes.data?.event_count === 1, 'event_count incremented to 1', String(dropRes.data?.event_count));
+
+  // Verify entity created
+  const { data: drops } = await host.from('entities').select('*').eq('game_id', gameId).eq('kind', 'drop');
+  expect(Boolean(drops && drops.length >= 1), 'supply drop entity created in entities table', `found ${drops?.length}`);
+
+  // --- Test 4: Event 2 - double_ping ---
+  const pingRes = await rpc<{
+    success: boolean;
+    event_type: string;
+    event_count: number;
+  }>(host, 'trigger_game_master_event', {
+    game_id: gameId,
+    event_type: 'double_ping',
+  });
+  expect(pingRes.data?.success === true && pingRes.data?.event_type === 'double_ping', 'trigger double_ping event succeeds', JSON.stringify(pingRes.data));
+  expect(pingRes.data?.event_count === 2, 'event_count incremented to 2', String(pingRes.data?.event_count));
+
+  // Verify double ping inserted in pings table
+  const { data: pings } = await host.from('pings').select('*').eq('game_id', gameId).eq('reason', 'ai_gm_double_ping');
+  expect(Boolean(pings && pings.length >= 1), 'runner double ping recorded in pings table', `found ${pings?.length}`);
+
+  // --- Test 5: Event 3 - fog ---
+  const fogRes = await rpc<{
+    success: boolean;
+    event_type: string;
+    event_count: number;
+  }>(host, 'trigger_game_master_event', {
+    game_id: gameId,
+    event_type: 'fog',
+  });
+  expect(fogRes.data?.success === true && fogRes.data?.event_type === 'fog', 'trigger fog event succeeds', JSON.stringify(fogRes.data));
+  expect(fogRes.data?.event_count === 3, 'event_count incremented to 3', String(fogRes.data?.event_count));
+
+  state = await rpc<GmSnapshot>(host, 'get_game_state', { game_id: gameId });
+  expect(state.data?.ai_gm?.fog_active === true, 'ai_gm fog_active is true after fog event', String(state.data?.ai_gm?.fog_active));
+  expect(Boolean(state.data?.ai_gm?.fog_ends_at), 'ai_gm fog_ends_at is set', String(state.data?.ai_gm?.fog_ends_at));
+
+  // --- Test 6: Event 4 - rumour ---
+  const rumourRes = await rpc<{
+    success: boolean;
+    event_type: string;
+    details: { quadrant?: string };
+    event_count: number;
+  }>(host, 'trigger_game_master_event', {
+    game_id: gameId,
+    event_type: 'rumour',
+  });
+  expect(rumourRes.data?.success === true && rumourRes.data?.event_type === 'rumour', 'trigger rumour event succeeds', JSON.stringify(rumourRes.data));
+  expect(rumourRes.data?.details?.quadrant === 'North-East', 'rumour correctly identified runner in North-East quadrant', String(rumourRes.data?.details?.quadrant));
+  expect(rumourRes.data?.event_count === 4, 'event_count incremented to 4', String(rumourRes.data?.event_count));
+
+  // --- Test 7: Event 5 - shrink_step ---
+  const radiusBefore = state.data?.game.area.radius_m ?? 400;
+  const shrinkRes = await rpc<{
+    success: boolean;
+    event_type: string;
+    event_count: number;
+  }>(host, 'trigger_game_master_event', {
+    game_id: gameId,
+    event_type: 'shrink_step',
+  });
+  expect(shrinkRes.data?.success === true && shrinkRes.data?.event_type === 'shrink_step', 'trigger shrink_step event succeeds', JSON.stringify(shrinkRes.data));
+  expect(shrinkRes.data?.event_count === 5, 'event_count reached max of 5', String(shrinkRes.data?.event_count));
+
+  state = await rpc<GmSnapshot>(host, 'get_game_state', { game_id: gameId });
+  const radiusAfter = state.data?.game.area.radius_m ?? 400;
+  expect(radiusAfter < radiusBefore, `boundary contracted from ${radiusBefore}m to ${radiusAfter}m`, `${radiusBefore} -> ${radiusAfter}`);
+
+  // --- Test 8: Cap Enforcement (event_count >= max_events) ---
+  const capRes = await rpc<{
+    success: boolean;
+    reason?: string;
+  }>(host, 'trigger_game_master_event', {
+    game_id: gameId,
+  });
+  expect(capRes.data?.success === false && capRes.data?.reason === 'max_events_reached', 'event cap enforced: rejected when max events reached', JSON.stringify(capRes.data));
+
+  // --- Test 9: narrate_game_master override RPC ---
+  const narrateRes = await rpc<{
+    success: boolean;
+    narration: string;
+  }>(runner, 'narrate_game_master', {
+    game_id: gameId,
+    event_type: 'supply_drop',
+    custom_narration: 'Interceptors approaching sector cache. Maintain tactical silence.',
+  });
+  expect(narrateRes.data?.success === true, 'narrate_game_master successfully updated narration', JSON.stringify(narrateRes.data));
+
+  state = await rpc<GmSnapshot>(host, 'get_game_state', { game_id: gameId });
+  expect(state.data?.ai_gm?.last_narration === 'Interceptors approaching sector cache. Maintain tactical silence.', 'ai_gm.last_narration reflects custom narration override', state.data?.ai_gm?.last_narration ?? 'none');
+
+  // --- Test 10: Pause & Resume shifts next_event_at ---
+  const prePauseNext = state.data?.ai_gm?.next_event_at;
+  await rpc(runner, 'pause_game', { game_id: gameId, reason: 'tactical_pause' });
+  await new Promise((r) => setTimeout(r, 1500));
+  const resumeRes = await rpc<{ success: boolean; phase: string }>(hunter, 'resume_game', { game_id: gameId });
+  expect(resumeRes.data?.success === true && resumeRes.data?.phase === 'live', 'game resumed cleanly with ai_gm active', JSON.stringify(resumeRes.data));
+
+  state = await rpc<GmSnapshot>(host, 'get_game_state', { game_id: gameId });
+  const postResumeNext = state.data?.ai_gm?.next_event_at;
+  if (prePauseNext && postResumeNext) {
+    const deltaMs = Date.parse(postResumeNext) - Date.parse(prePauseNext);
+    expect(deltaMs >= 1000, `resume_game shifted next_event_at forward by ${deltaMs}ms`, `${prePauseNext} -> ${postResumeNext}`);
+  } else {
+    pass('resume_game shift checked');
+  }
+
+  // Cleanup
+  for (const client of [host, runner, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -3437,6 +3654,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   'ghost-duel': ghostDuelScenario,
   'territory-pulse': territoryPulseScenario,
   'safety-guard': safetyGuardScenario,
+  'ai-game-master': aiGameMasterScenario,
 };
 
 async function main() {
