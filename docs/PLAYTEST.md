@@ -269,6 +269,36 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Top 5 leaderboard table displays nearby players' scores (C5 consent-aware names).
   - [ ] Ghost Contribution preview card available for contributing route to ghost library.
 
+### 3.12 Territory Pulse Base Mode (docs/MODES.md §4.6)
+* **Recommended Group:** 4–16 players (e.g. 2+ Runners vs 2+ Hunters; scalable up to 8v8).
+* **Setting:** Open park, recreation field, or campus quad (radius 200–500 m).
+* **Pre-Flight & Setup:**
+  - [ ] Host selects **Territory Pulse** in mode selector (`app/create.tsx`).
+  - [ ] Mode preview displays 7-sector tessellated layout description and pulse rules.
+  - [ ] Start round; confirm game transitions from countdown to live.
+* **Map & Sector Visualization:**
+  - [ ] Map renders 7 colored territory rings with dashed borders and sector markers:
+    - Sector Core at map center.
+    - 6 radial sectors (Alpha through Foxtrot) spaced at $60^\circ$ offsets.
+    - Initial sector rings render neutral slate (`#94A3B8`).
+    - Captured runner sectors render cyan (`#06B6D4`).
+    - Captured hunter sectors render red (`#EF4444`).
+* **Pulse Mechanics & Sector Capture:**
+  - [ ] Top HUD shows next pulse countdown timer (default 90 s cadence).
+  - [ ] Player standing inside a neutral sector claims it for their team when the pulse fires.
+  - [ ] Score increments (+1 point per owned sector on every pulse).
+  - [ ] Opponent presence inside an owned sector marks it as contested on pulse 1.
+  - [ ] Opponent maintaining majority across pulse 2 successfully flips sector ownership.
+* **Contest Tagging:**
+  - [ ] Hunter tags a runner within tag radius.
+  - [ ] Confirm runner is **not eliminated** from the match.
+  - [ ] Runner receives a 60-second incapacitation timer (`contest_tag` event).
+  - [ ] Runner does not contribute to sector majority counts while incapacitated.
+* **Victory & Results:**
+  - [ ] Dominance victory triggers if either team controls $\ge 70\%$ ($\ge 5$ of 7) sectors across 2 consecutive pulses, or all 7 sectors immediately (`territory_dominance`).
+  - [ ] Point victory triggers upon round duration expiration (`points_victory` or `draw`).
+  - [ ] Result screen displays Territory Pulse Debrief card with final sector ownership counts and scores.
+
 ---
 
 ## 4. Safety & Real-World Precautions

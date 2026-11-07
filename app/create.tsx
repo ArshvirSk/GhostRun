@@ -25,7 +25,8 @@ type Mode =
   | 'ghost_duel'
   | 'jailbreak'
   | 'assassin_ring'
-  | 'relay_heist';
+  | 'relay_heist'
+  | 'territory_pulse';
 type BoundaryPenalty = 'warn' | 'extra_ping';
 
 const MAP_STYLE =
@@ -332,6 +333,7 @@ export default function CreateGameScreen() {
         boundary_penalty: boundaryPenalty,
         mode_params: {
           ...(mode === 'ghost_duel' ? { ghost_duel: { variant: ghostDuelVariant } } : {}),
+          ...(mode === 'territory_pulse' ? { territory_pulse: { pulse_interval_s: 90, dominance_pct: 70 } } : {}),
         },
       },
     });
@@ -518,7 +520,9 @@ export default function CreateGameScreen() {
                         ? 'Assassin Ring'
                         : mode === 'relay_heist'
                           ? 'Relay Heist'
-                          : 'Tag Hunt'}
+                          : mode === 'territory_pulse'
+                            ? 'Territory Pulse'
+                            : 'Tag Hunt'}
               )
             </Text>
             <Text style={styles.dockHint}>▲ Slide up to configure</Text>
@@ -570,6 +574,11 @@ export default function CreateGameScreen() {
                 selected={mode === 'ghost_duel'}
                 label="Ghost Duel (Solo)"
                 onPress={() => setMode('ghost_duel')}
+              />
+              <ModeButton
+                selected={mode === 'territory_pulse'}
+                label="Territory Pulse"
+                onPress={() => setMode('territory_pulse')}
               />
             </View>
 

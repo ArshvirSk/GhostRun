@@ -7,6 +7,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Phase B: Milestone B8 — Territory Pulse Base Mode (docs/MODES.md §4.6)
+- **Mode Registration & Configuration:**
+  - Added enum value `territory_pulse` to `public.game_mode` and updated `games_mode_id_check` constraint.
+  - Added `territory_pulse` to `mode_catalogue()` with feature flag `feature.mode.territory_pulse` enabled.
+  - Registered `territory_pulse` in client `src/lib/modeRegistry.ts` with teams `['runner', 'hunter']` and compatible roles/modifiers.
+  - Added mode selection button, preview card, and default `mode_params` configuration in `app/create.tsx`.
+- **Procedural Sector Spawning & Pulse Cadence:**
+  - Implemented `spawn_territory_zones(game_id)` spawning 7 tessellated sectors (`entities.kind = 'zone'`): central Sector Core and 6 radial sectors (Alpha through Foxtrot) spaced at $60^\circ$ offsets.
+  - Configurable pulse interval (default 90 s, down to 2 s for desk testing).
+  - Synchronous pulse evaluation in `advance_game`: tallies non-remote, active, non-incapacitated players in each sector via `st_dwithin`.
+  - Neutral sectors claimed immediately on strict player majority.
+  - Owned sectors require majority across 2 consecutive pulses to flip (`contender` tracking); defending clears contender.
+  - Each held sector scores +1 point per pulse for controlling team.
+- **Contest Tagging & Non-Elimination Incapacitation:**
+  - In `apply_tag`, hunter tagging a runner applies a 60-second incapacitation timer (`status_detail->'incapacitated_until'`) and emits `contest_tag` event without eliminating player from the match.
+  - Incapacitated players remain active on the field but are excluded from sector majority tallies.
+- **Dual Victory Conditions:**
+  - Dominance victory: controlling $\ge 70\%$ of sectors ($\ge 5$ of 7) across 2 consecutive pulses, or all 7 sectors simultaneously (`end_reason = 'territory_dominance'`).
+  - Points victory on match duration timeout (`end_reason = 'points_victory'`, or `'draw'`).
+- **Client Map & UI Experience:**
+  - MapLibre GeoJSON layers render 7 colored territory rings and radial points: neutral (`#94A3B8`), runner-controlled (`#06B6D4`), and hunter-controlled (`#EF4444`).
+  - Top HUD eyebrow, pulse countdown timer, real-time score tracker, and occupied sector status chip.
+  - Dedicated 7-sector status card in bottom sheet.
+  - Result screen debrief card with sector metrics and mode-specific winner titles.
+- **Database Migrations Applied to Production:**
+  - `20261116000000_b8_territory_pulse_enum.sql`: Added `territory_pulse` to `public.game_mode`.
+  - `20261116001000_b8_territory_pulse_lifecycle.sql`: Sector spawning, lifecycle, scoring, and snapshot in `get_game_state`.
+  - `20261116002000_b8_territory_pulse_tag.sql`: Contest tag support in `apply_tag`.
+  - `20261116003000_b8_territory_pulse_constraint.sql`: Added `territory_pulse` to `games_mode_id_check`.
+  - `20261116004000_b8_fix_get_game_state_color.sql`: Corrected `pr.color` column reference in `get_game_state`.
+- **Harness Verification:**
+  - Added `territoryPulseScenario()` to `scripts/sim/index.ts` verifying 7 sector spawning, neutral capture, pulse scoring, contest tagging incapacitation, exclusion of incapacitated runners, and 2-pulse flip dynamics.
+
 ### Phase B: Milestone B6 — Solo Ghost Duel Base Mode (docs/MODES.md §6.2)
 - **Mode Registration & Variant System:**
   - Added `ghost_duel` base mode to `mode_catalogue()` with feature flag `mode.ghost_duel`.

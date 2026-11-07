@@ -329,3 +329,21 @@ Rather than using a separate tick function, Ghost Duel collision checks (evade 2
 `get_ghost_duel_leaderboard` takes `(lat, lng, radius_m, variant, row_limit)` and returns scores from games whose `area_center` falls within the specified radius. This creates naturally location-scoped leaderboards ("best ghost duel scores in this park") without requiring explicit venue registration.
 
 **Trade-off:** The leaderboard currently does not distinguish between different ghost paths at the same location. A future "course" system could add path-specific scoring.
+
+
+## 2026-11-08 — Milestone B8: Territory Pulse Base Mode (Decisions D25–D28)
+
+**Decision D25 — Procedural 7-Hexagonal Sector Spatial Layout:**
+Rather than relying on runtime polygon mesh generation or external Postgres extensions like Uber H3, Territory Pulse procedurally spawns 7 sectors (`entities.kind = 'zone'`): a central Sector Core and 6 radial sectors (Alpha through Foxtrot) spaced at $60^\circ$ bearing intervals ($0^\circ, 60^\circ, 120^\circ, 180^\circ, 240^\circ, 300^\circ$) at distance $R_{\text{ring}} = R_{\text{area}} \times 0.55$, with zone radius $R_{\text{zone}} = \min(80, \max(35, R_{\text{area}} \times 0.20))$. This guarantees uniform tessellation and balanced spatial access across any game radius (100–5000 m) with zero external dependencies.
+
+**Decision D26 — Synchronous Pulse Cadence & Multi-Pulse Flip Dynamics:**
+Sector majority is evaluated exclusively during discrete pulse ticks (default 90 s, configurable in `mode_params`). A neutral sector is captured immediately upon establishing strict player majority. Flipping an opponent's held sector requires establishing majority across 2 consecutive pulses (`contender` tracking). Defending an owned sector clears contender status immediately. This prevents erratic back-and-forth flipping and gives defending teams a full pulse cycle to respond to enemy incursions.
+
+**Decision D27 — Contest Tagging as a Presence Suppressor:**
+Standard tag elimination would quickly shrink squads and cause an irreversible territorial snowball. In Territory Pulse, physical tags apply a 60-second incapacitation timer (`status_detail->'incapacitated_until'`) via `apply_tag`. Incapacitated players stay on the field and can navigate, but are strictly excluded from sector presence and majority tallies during pulses until the timer elapses.
+
+**Decision D28 — Dual Victory Pathways (Dominance vs Points):**
+To support both rapid decisive victories and tactical endurance matches, Territory Pulse supports two victory paths:
+1. Dominance: Controlling $\ge 70\%$ of sectors ($\ge 5$ of 7) across 2 consecutive pulses or all 7 sectors simultaneously triggers an immediate dominance victory (`end_reason = 'territory_dominance'`).
+2. Points on Timeout: Holding sectors awards +1 point per pulse. When the round timer expires, the team with strictly higher accrued points wins (`end_reason = 'points_victory'`), with equal points resolving to a draw (`end_reason = 'draw'`).
+

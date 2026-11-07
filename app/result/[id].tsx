@@ -475,6 +475,9 @@ export default function ResultScreen() {
   const isAssassinRing =
     game.mode === 'assassin_ring' ||
     (game as unknown as { mode_id?: string }).mode_id === 'assassin_ring';
+  const isTerritoryPulse =
+    game.mode === 'territory_pulse' ||
+    (game as unknown as { mode_id?: string }).mode_id === 'territory_pulse';
   const winnerTitle = isGhostDuel
     ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? '')
       ? game.end_reason === 'ghost_tagged'
@@ -489,11 +492,21 @@ export default function ResultScreen() {
           : 'Ghost Won'
     : isAssassinRing
       ? 'Assassin Victorious'
-      : game.winner === 'runners'
-        ? 'Runners win'
-        : game.winner === 'hunters'
-          ? 'Hunters win'
-          : 'Round over';
+      : isTerritoryPulse
+        ? game.end_reason === 'territory_dominance'
+          ? game.winner === 'runners'
+            ? 'Runners Claim Dominance!'
+            : 'Hunters Claim Dominance!'
+          : game.end_reason === 'points_victory'
+            ? game.winner === 'runners'
+              ? 'Runners Win by Points!'
+              : 'Hunters Win by Points!'
+            : 'Territory Draw'
+        : game.winner === 'runners'
+          ? 'Runners win'
+          : game.winner === 'hunters'
+            ? 'Hunters win'
+            : 'Round over';
   const accent = isGhostDuel
     ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? '')
       ? '#059669'
@@ -519,7 +532,13 @@ export default function ResultScreen() {
               : game.end_reason === 'ghost_escaped'
                 ? 'The ghost runner completed the route before you could tag it.'
                 : 'The ghost duel has finished.'
-    : game.end_reason === 'vip_eliminated'
+    : isTerritoryPulse
+      ? game.end_reason === 'territory_dominance'
+        ? 'A squad achieved territory dominance by controlling >= 70% of sectors!'
+        : game.end_reason === 'points_victory'
+          ? 'Victorious through superior sector control points accumulated across pulses.'
+          : 'Both squads finished with equal territory pulse points.'
+      : game.end_reason === 'vip_eliminated'
       ? 'Hunters successfully eliminated the secret VIP!'
       : game.end_reason === 'last_survivor'
         ? 'The last assassin standing survived the elimination ring.'
@@ -693,13 +712,15 @@ export default function ResultScreen() {
 
       <View style={styles.hud}>
         <Text style={[styles.eyebrow, { color: accent }]}>
-          {isGhostDuel
-            ? 'SOLO GHOST DUEL'
-            : isAssassinRing
-              ? 'ASSASSIN RING'
-              : game.mode === 'classic_chase'
-                ? 'CLASSIC CHASE'
-                : 'TAG HUNT'}{' '}
+          {isTerritoryPulse
+            ? 'TERRITORY PULSE'
+            : isGhostDuel
+              ? 'SOLO GHOST DUEL'
+              : isAssassinRing
+                ? 'ASSASSIN RING'
+                : game.mode === 'classic_chase'
+                  ? 'CLASSIC CHASE'
+                  : 'TAG HUNT'}{' '}
           · {game.code}
         </Text>
         <Text style={[styles.title, { color: accent }]}>{winnerTitle}</Text>
@@ -911,6 +932,41 @@ export default function ResultScreen() {
                 ))}
               </View>
             )}
+          </View>
+        )}
+
+        {isTerritoryPulse && (
+          <View style={styles.recapStatsContainer}>
+            <Text style={styles.sectionLabel}>TERRITORY PULSE DEBRIEF</Text>
+            <View style={styles.statCardsGrid}>
+              <View style={styles.statCardHighlight}>
+                <Text style={styles.statCardCategory}>OUTCOME</Text>
+                <Text style={[styles.statCardBigValue, { fontSize: 18 }]}>
+                  {game.end_reason === 'territory_dominance' ? 'DOMINANCE' : 'POINTS'}
+                </Text>
+                <Text style={styles.statCardSub}>
+                  {game.winner === 'runners'
+                    ? 'Runners Victory'
+                    : game.winner === 'hunters'
+                      ? 'Hunters Victory'
+                      : 'Draw'}
+                </Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statCardCategory}>SECTORS</Text>
+                <Text style={styles.statCardBigValue}>7</Text>
+                <Text style={styles.statCardSub}>Radial map sectors</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Text style={styles.statCardCategory}>WIN CONDITION</Text>
+                <Text style={[styles.statCardBigValue, { fontSize: 15 }]}>
+                  {game.end_reason === 'territory_dominance' ? '70% CONTROL' : 'FINAL SCORE'}
+                </Text>
+                <Text style={styles.statCardSub}>Synchronized pulses</Text>
+              </View>
+            </View>
           </View>
         )}
 

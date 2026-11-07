@@ -2992,6 +2992,249 @@ async function ghostDuelScenario() {
   await rpc(soloEvader, 'leave_game', { game_id: evGameId });
 }
 
+async function territoryPulseScenario() {
+  console.log('\n--- territoryPulseScenario (B8: Territory Pulse Base Mode) ---');
+  const host = await newPlayer('TerritoryHost');
+  const runner2 = await newPlayer('TerritoryRunner2');
+  const hunter = await newPlayer('TerritoryHunter');
+
+  // 1. Create a Territory Pulse game with 2s pulse interval for simulation testing
+  const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'territory_pulse',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 300,
+    settings: {
+      duration_s: 300,
+      head_start_s: 0,
+      ping_interval_s: 30,
+      mode_params: {
+        territory_pulse: {
+          pulse_interval_s: 2,
+        },
+      },
+    },
+  });
+
+  const gameId = created.data?.[0]?.game_id;
+  const code = created.data?.[0]?.code;
+  if (!gameId || !code) {
+    fail('territory_pulse_creation', 'Failed to create game: ' + JSON.stringify(created.error));
+    return;
+  }
+  pass('create territory_pulse game');
+
+  // 2. Join players into teams and mark ready
+  await rpc(runner2, 'join_game', { code });
+  await rpc(hunter, 'join_game', { code });
+
+  const hostPid = await playerId(host, gameId);
+  const runner2Pid = await playerId(runner2, gameId);
+  const hunterPid = await playerId(hunter, gameId);
+
+  await rpc(host, 'set_team', { game_id: gameId, player_id: hostPid, team: 'runner' });
+  await rpc(runner2, 'set_team', { game_id: gameId, player_id: runner2Pid, team: 'runner' });
+  await rpc(hunter, 'set_team', { game_id: gameId, player_id: hunterPid, team: 'hunter' });
+
+  for (const client of [host, runner2, hunter]) {
+    await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
+  // 3. Start game and transition past countdown to live
+  const startRes = await rpc<Record<string, unknown>>(host, 'start_game', { game_id: gameId });
+  expect(
+    !startRes.error && startRes.data?.status === 'countdown',
+    'territory_pulse starts in countdown',
+    String(startRes.error?.message ?? startRes.data?.status),
+  );
+
+  await new Promise((r) => setTimeout(r, 11000));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  // 4. Verify initial Territory Pulse state and 7 spawned zones
+  type TerritorySnapshot = {
+    territory_pulse?: {
+      pulse_seq: number;
+      pulse_interval_s: number;
+      scores: { runner: number; hunter: number };
+      zones: Array<{
+        id: string;
+        name: string;
+        zone_index: number;
+        latitude: number;
+        longitude: number;
+        radius_m: number;
+        controller: string | null;
+        contender: string | null;
+        contender_pulses: number;
+      }>;
+    };
+    game: { status: string };
+  };
+
+  const initState = await rpc<TerritorySnapshot>(host, 'get_game_state', { game_id: gameId });
+  const tp = initState.data?.territory_pulse;
+
+  expect(
+    initState.data?.game.status === 'live',
+    'game transitioned to live',
+    initState.data?.game.status ?? 'unknown',
+  );
+  expect(
+    Array.isArray(tp?.zones) && tp!.zones.length === 7,
+    '7 territory sectors spawned (Sector Core + 6 radial)',
+    String(tp?.zones?.length),
+  );
+  expect(
+    tp?.zones[0]?.name === 'Core' && tp?.zones[0]?.controller === null,
+    'Sector Core spawned in neutral control',
+    JSON.stringify(tp?.zones?.[0]),
+  );
+
+  // 5. Place host inside Sector Core and hunter & runner2 far away; trigger pulse
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(runner2, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.05,
+    lng: CENTER.lng + 0.05,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.05,
+    lng: CENTER.lng + 0.05,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // Wait for 2s pulse interval
+  await new Promise((r) => setTimeout(r, 2500));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  const pulse1State = await rpc<TerritorySnapshot>(host, 'get_game_state', { game_id: gameId });
+  const pulse1Tp = pulse1State.data?.territory_pulse;
+
+  expect(
+    pulse1Tp?.zones[0]?.controller === 'runner',
+    'runner presence in neutral Sector Core captures it on pulse',
+    JSON.stringify(pulse1Tp?.zones?.[0]),
+  );
+  expect(
+    (pulse1Tp?.scores.runner ?? 0) >= 1,
+    'runner score incremented for holding Sector Core',
+    JSON.stringify(pulse1Tp?.scores),
+  );
+
+  // 6. Test Contest Tag: Move host far away, bring runner2 and hunter to Sector Core
+  await rpc(host, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.05,
+    lng: CENTER.lng + 0.05,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(runner2, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+
+  const tagRes = await rpc<{
+    success: boolean;
+    runner_id?: string;
+    incapacitated?: boolean;
+    incapacitated_seconds?: number;
+  }>(hunter, 'attempt_tag', { game_id: gameId });
+
+  expect(
+    tagRes.data?.success === true &&
+      tagRes.data?.incapacitated === true &&
+      tagRes.data?.incapacitated_seconds === 60 &&
+      tagRes.data?.runner_id === runner2Pid,
+    'contest tag incapacitates runner2 for 60 seconds without ending game',
+    JSON.stringify(tagRes.data ?? tagRes.error),
+  );
+
+  // 7. Verify incapacitated runner does not contribute to sector majority
+  // Host is far away; runner2 is at Sector Core but incapacitated; hunter is at Sector Core
+  await rpc(runner2, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+
+  // Pulse 2: Hunter alone has active presence (runner2 incapacitated). Sector becomes contested!
+  await new Promise((r) => setTimeout(r, 2500));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  const contestState = await rpc<TerritorySnapshot>(host, 'get_game_state', { game_id: gameId });
+  const contestCore = contestState.data?.territory_pulse?.zones[0];
+
+  expect(
+    contestCore?.controller === 'runner' &&
+      contestCore?.contender === 'hunter' &&
+      contestCore?.contender_pulses === 1,
+    'hunter majority marks runner sector as contested across 1st pulse',
+    JSON.stringify(contestCore),
+  );
+
+  // Pulse 3: 2nd consecutive hunter pulse flips sector control
+  await rpc(hunter, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+  await new Promise((r) => setTimeout(r, 2500));
+  await rpc(host, 'advance_game', { game_id: gameId });
+
+  const flippedState = await rpc<TerritorySnapshot>(host, 'get_game_state', { game_id: gameId });
+  const flippedCore = flippedState.data?.territory_pulse?.zones[0];
+
+  expect(
+    flippedCore?.controller === 'hunter' && flippedCore?.contender === null,
+    'hunter majority flips sector to hunter control on 2nd pulse',
+    JSON.stringify(flippedCore),
+  );
+  expect(
+    (flippedState.data?.territory_pulse?.scores.hunter ?? 0) >= 1,
+    'hunter score incremented after flipping Sector Core',
+    JSON.stringify(flippedState.data?.territory_pulse?.scores),
+  );
+
+  // Cleanup
+  for (const client of [host, runner2, hunter]) {
+    await rpc(client, 'leave_game', { game_id: gameId });
+  }
+}
+
 const SCENARIOS: Record<string, () => Promise<void>> = {
   'mode-framework': modeFrameworkScenario,
   modifiers: modifiersScenario,
@@ -3007,6 +3250,7 @@ const SCENARIOS: Record<string, () => Promise<void>> = {
   'vip-escort': vipEscortScenario,
   operator: operatorScenario,
   'ghost-duel': ghostDuelScenario,
+  'territory-pulse': territoryPulseScenario,
 };
 
 async function main() {

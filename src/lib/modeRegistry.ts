@@ -172,6 +172,22 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       },
       enabled: true,
     },
+    {
+      id: 'territory_pulse',
+      layer: 'base',
+      name: 'Territory Pulse',
+      teams: ['runner', 'hunter'],
+      min_players: 2,
+      compatible_roles: ['operator'],
+      compatible_modifiers: ['dead_drops', 'shrinking_zone', 'qr_tagging'],
+      parameters: {
+        pulse_interval_s: 90,
+        zone_count: 7,
+        dominance_pct: 70,
+        zone_radius_m: 60,
+      },
+      enabled: true,
+    },
   ],
   modifiers: [
     { id: 'noise_meter', layer: 'modifier', name: 'Noise Meter', parameters: {}, enabled: true },
@@ -252,6 +268,13 @@ export const BASE_MODE_RULES: Record<string, string[]> = {
     'Teammates within 5 m execute physical handoffs to keep the package moving safely.',
     'If the carrier is tagged, the package drops for any runner to recover or hunters to secure (20 s hold).',
     'Runners win on reaching extraction; hunters win on securing the package, all tagged, or timeout.',
+  ],
+  territory_pulse: [
+    'The map is divided into 7 territory sectors (Core + 6 radial sectors).',
+    'Every 90 seconds, a synchronized Territory Pulse fires.',
+    'At each pulse, the team with strict player majority inside a sector captures or holds it (+1 point).',
+    'Flipping an opponent sector requires presence across 2 consecutive pulses.',
+    'Win by achieving territory dominance (>=70% sectors for 2 consecutive pulses) or highest score at timeout.',
   ],
 };
 

@@ -500,24 +500,29 @@ create table heat_presses (
 
 ---
 
-### 4.6 Territory Pulse
+### 4.6 Territory Pulse — ✅ IMPLEMENTED (Phase B Milestone B8)
 
-**Pitch.** The area is divided into hex zones. Teams claim zones by standing in them. The ownership map updates only at **pulse** moments, so control changes leak where players were, never where they are.
+**Pitch.** The area is divided into 7 tessellated sectors (Sector Core at center + 6 radial sectors Alpha through Foxtrot). Teams claim sectors by establishing player majority inside them. The ownership map updates synchronously only at **pulse** moments (default every 90 seconds), leaking where players were at the pulse tick, never where they are between pulses.
 
-**Players:** 8 minimum, 12 or more ideal. Two to four teams.
+**Players:** 2 minimum, 8–16 recommended. Two teams (Runners vs Hunters). Compatible with Operator remote role.
 
-**Rules**
-
-- Hex size about **120 to 180 m**. Zones start neutral.
-- At each **pulse** (every 2 to 3 minutes), for every zone the server counts players per team present. The team with strictly more players holds the zone (ties keep previous owner). A **capture** requires presence at **two consecutive pulses** to flip an owned zone.
-- Each held zone scores **1 point** per pulse. **Win:** most points at the end, or 70 percent zone control for 3 consecutive pulses.
-- No tagging in the base rule. Optional **contest tags**: a tagged player cannot count for presence for 2 pulses.
-- Optional **fortify** item from Dead Drops makes a zone require three consecutive pulses to flip.
-
-**Server and data.** `entities kind='zone'` with hex ids (H3 library in an RPC or precomputed grid stored at game creation). `advance_game` runs pulse scoring and emits `zone_changed` events.
-**Information design.** Teams see ownership of all zones (public), but not enemy positions. A zone flipping tells you someone was there at the pulse, not where they are now.
-**Edge cases.** Boundary zones partially outside the area (only count the inside portion). GPS noise at zone edges (use a 15 m inner buffer for presence).
-**Effort:** L (hex grid and map rendering are the main costs).
+**Rules & Implementation Architecture:**
+- **Procedural 7-Sector Layout:** Spawned via `spawn_territory_zones(game_id)` in `start_game`. Zone radius $R_{\text{zone}} = \min(80, \max(35, R_{\text{area}} \times 0.20))$ metres. Radial ring distance $R_{\text{ring}} = R_{\text{area}} \times 0.55$ at $60^\circ$ offsets: Sector Core (center), Alpha ($0^\circ$/N), Bravo ($60^\circ$/NE), Charlie ($120^\circ$/SE), Delta ($180^\circ$/S), Echo ($240^\circ$/SW), Foxtrot ($300^\circ$/NW).
+- **Synchronous Pulse Cadence:** Evaluated inside server-authoritative `advance_game`. At every pulse tick (`clock_timestamp() >= next_pulse_at`, default interval 90 s, configurable down to 2 s for desk testing):
+  - Active, non-remote, non-incapacitated players with fresh GPS fixes ($\le 45\text{ s}$) inside sector boundaries (`st_dwithin`) are counted for each team.
+  - Strict majority ($N_{\text{runner}} > N_{\text{hunter}}$ or $N_{\text{hunter}} > N_{\text{runner}}$) claims a neutral sector immediately.
+  - Flipping an opponent's sector requires maintaining majority across **2 consecutive pulses** (`contender` tracking). Successfully defending an owned sector clears any active contender.
+  - Each held sector awards **+1 point** per pulse to the controlling team.
+- **Contest Tagging:** Physical tags executed by hunters do not eliminate runners. Instead, `apply_tag` applies a 60-second incapacitation timer (`status_detail->'incapacitated_until'`) and emits a `contest_tag` event. Incapacitated runners remain active on the field but are excluded from sector majority tallies until the timer expires.
+- **Victory Conditions:**
+  1. **Dominance Victory:** Controlling $\ge 70\%$ of sectors ($\ge 5$ of 7) across 2 consecutive pulses, or controlling all 7 sectors immediately (`end_reason = 'territory_dominance'`).
+  2. **Points Victory on Timeout:** Upon round duration expiration, the team with strictly higher accrued points wins (`end_reason = 'points_victory'`), with equal points resulting in a draw (`end_reason = 'draw'`).
+- **Map & HUD Visualization:**
+  - Client map dynamically renders 7 colored territory rings with dashed borders and radial sector markers: neutral (`#94A3B8`), runner-controlled (`#06B6D4`), and hunter-controlled (`#EF4444`).
+  - Top HUD features a pulse countdown timer, real-time score tracker, and current sector occupancy chip.
+  - Bottom sheet includes a dedicated 7-sector status card displaying controller badge, contender status, and coordinates for every sector.
+  - Post-game Result screen displays winner badges ("Runners Claim Dominance!", "Hunters Win by Points!") and a detailed Territory Pulse Debrief card with sector metrics.
+- **Verification:** Acceptance verified through end-to-end simulator harness `scripts/sim/index.ts territory-pulse` testing sector spawning, neutral capture, pulse scoring, contest tagging incapacitation, exclusion of incapacitated runners from majority, and multi-pulse territory flips.
 
 ---
 

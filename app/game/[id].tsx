@@ -187,6 +187,7 @@ type RoundState = {
       is_active: boolean;
       vip_player_id?: string | null;
     } | null;
+    territory_pulse?: unknown;
   };
   players: GamePlayer[];
   my_player_id: string;
@@ -276,6 +277,28 @@ type RoundState = {
   operator?: {
     is_operator: boolean;
     scan_cooldown_s: number;
+  } | null;
+  territory_pulse?: {
+    pulse_seq: number;
+    pulse_interval_s: number;
+    next_pulse_at: string | null;
+    last_pulse_at: string | null;
+    scores: {
+      runner: number;
+      hunter: number;
+    };
+    dominance_pct: number;
+    zones: {
+      id: string;
+      name: string;
+      zone_index: number;
+      latitude: number;
+      longitude: number;
+      radius_m: number;
+      controller: 'runner' | 'hunter' | null;
+      contender: 'runner' | 'hunter' | null;
+      contender_pulses: number;
+    }[];
   } | null;
 };
 
@@ -1306,6 +1329,89 @@ export default function GameScreen() {
     (state?.game?.mode_params?.jailbreak as { release_hold_s?: number } | undefined)
       ?.release_hold_s ?? 10;
 
+  const isTerritoryPulse = state?.game?.mode_id === 'territory_pulse';
+  const territoryPulseState = state?.territory_pulse;
+  const territoryZones = territoryPulseState?.zones ?? [];
+  const territoryScores = territoryPulseState?.scores ?? { runner: 0, hunter: 0 };
+  const nextPulseAt = territoryPulseState?.next_pulse_at;
+  const pulseSeq = territoryPulseState?.pulse_seq ?? 0;
+
+  const secondsToNextPulse = useMemo(() => {
+    if (!nextPulseAt) return 0;
+    const diff = (new Date(nextPulseAt).getTime() - serverNow) / 1000;
+    return Math.max(0, Math.ceil(diff));
+  }, [nextPulseAt, serverNow]);
+
+  const currentOccupiedZone = useMemo(() => {
+    if (!isTerritoryPulse || !ownFix || territoryZones.length === 0) return null;
+    for (const z of territoryZones) {
+      const dist = distanceM(
+        { longitude: ownFix.longitude, latitude: ownFix.latitude },
+        { longitude: z.longitude, latitude: z.latitude },
+      );
+      if (dist <= z.radius_m) {
+        return { ...z, distance_m: dist };
+      }
+    }
+    return null;
+  }, [isTerritoryPulse, ownFix, territoryZones]);
+
+  const runnerZonesRingData = useMemo(() => {
+    if (!isTerritoryPulse || territoryZones.length === 0) return null;
+    const runnerZones = territoryZones.filter((z) => z.controller === 'runner');
+    if (runnerZones.length === 0) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: runnerZones.map((z) =>
+        circleRing({ longitude: z.longitude, latitude: z.latitude }, z.radius_m),
+      ),
+    };
+  }, [isTerritoryPulse, territoryZones]);
+
+  const hunterZonesRingData = useMemo(() => {
+    if (!isTerritoryPulse || territoryZones.length === 0) return null;
+    const hunterZones = territoryZones.filter((z) => z.controller === 'hunter');
+    if (hunterZones.length === 0) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: hunterZones.map((z) =>
+        circleRing({ longitude: z.longitude, latitude: z.latitude }, z.radius_m),
+      ),
+    };
+  }, [isTerritoryPulse, territoryZones]);
+
+  const neutralZonesRingData = useMemo(() => {
+    if (!isTerritoryPulse || territoryZones.length === 0) return null;
+    const neutralZones = territoryZones.filter((z) => !z.controller);
+    if (neutralZones.length === 0) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: neutralZones.map((z) =>
+        circleRing({ longitude: z.longitude, latitude: z.latitude }, z.radius_m),
+      ),
+    };
+  }, [isTerritoryPulse, territoryZones]);
+
+  const territoryPointsData = useMemo(() => {
+    if (!isTerritoryPulse || territoryZones.length === 0) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: territoryZones.map((z) => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [z.longitude, z.latitude],
+        },
+        properties: {
+          id: z.id,
+          name: z.name,
+          color:
+            z.controller === 'runner' ? '#06B6D4' : z.controller === 'hunter' ? '#EF4444' : '#94A3B8',
+        },
+      })),
+    };
+  }, [isTerritoryPulse, territoryZones]);
+
   const safeZones = state?.assassin_ring?.safe_zones;
   const safeZonesData = useMemo(() => {
     if (!safeZones || safeZones.length === 0) return null;
@@ -1950,7 +2056,9 @@ export default function GameScreen() {
           ? isRunner
             ? '#059669'
             : '#DC2626'
-          : '#DB2777';
+          : isTerritoryPulse
+            ? '#3B82F6'
+            : '#DB2777';
     title = isGhostDuel
       ? ghostDuelState?.variant === 'mirror_chase'
         ? 'Catch the Ghost Runner'
@@ -1971,7 +2079,9 @@ export default function GameScreen() {
             : packageState?.status === 'dropped'
               ? 'Secure the dropped package!'
               : 'Intercept the carrier'
-          : isRunner
+          : isTerritoryPulse
+            ? `${territoryScores.runner} RUNNERS · ${territoryScores.hunter} HUNTERS`
+            : isRunner
             ? isVipMode
               ? isFrozen
                 ? 'Frozen (Bodyguard Decoy)'
@@ -2016,6 +2126,10 @@ export default function GameScreen() {
             : packageState?.status === 'dropped'
               ? 'Hold package location for 20 seconds to secure and win!'
               : 'Track radar pings to find and tag the package carrier.'
+          : isTerritoryPulse
+            ? currentOccupiedZone
+              ? `Inside Sector ${currentOccupiedZone.name} (${currentOccupiedZone.controller ? currentOccupiedZone.controller.toUpperCase() : 'NEUTRAL'}) · Pulse in ${formatClock(secondsToNextPulse)}`
+              : `Next Pulse in ${formatClock(secondsToNextPulse)} · Stand inside a sector to capture!`
           : isRunner
             ? isVipMode
               ? isFrozen
@@ -2058,11 +2172,21 @@ export default function GameScreen() {
             : 'Ghost Won'
       : isAssassinRing
         ? 'Ring Survivor Victory'
-        : game!.winner === 'runners'
-          ? 'Runners win'
-          : game!.winner === 'hunters'
-            ? 'Hunters win'
-            : 'Round over';
+        : isTerritoryPulse
+          ? game!.end_reason === 'territory_dominance'
+            ? game!.winner === 'runners'
+              ? 'Runners Claim Dominance!'
+              : 'Hunters Claim Dominance!'
+            : game!.end_reason === 'points_victory'
+              ? game!.winner === 'runners'
+                ? 'Runners Win by Points!'
+                : 'Hunters Win by Points!'
+              : 'Territory Draw'
+          : game!.winner === 'runners'
+            ? 'Runners win'
+            : game!.winner === 'hunters'
+              ? 'Hunters win'
+              : 'Round over';
     subtitle = isGhostDuel
       ? game!.end_reason === 'ghost_beaten'
         ? 'You reached the finish line faster than the ghost runner!'
@@ -2519,6 +2643,66 @@ export default function GameScreen() {
             />
           </GeoJSONSource>
         )}
+
+        {runnerZonesRingData && (
+          <GeoJSONSource id="territory-runner-zones" data={runnerZonesRingData}>
+            <Layer
+              id="territory-runner-fill"
+              type="fill"
+              paint={{ 'fill-color': '#06B6D4', 'fill-opacity': 0.22 }}
+            />
+            <Layer
+              id="territory-runner-line"
+              type="line"
+              paint={{ 'line-color': '#06B6D4', 'line-width': 2.5 }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {hunterZonesRingData && (
+          <GeoJSONSource id="territory-hunter-zones" data={hunterZonesRingData}>
+            <Layer
+              id="territory-hunter-fill"
+              type="fill"
+              paint={{ 'fill-color': '#EF4444', 'fill-opacity': 0.22 }}
+            />
+            <Layer
+              id="territory-hunter-line"
+              type="line"
+              paint={{ 'line-color': '#EF4444', 'line-width': 2.5 }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {neutralZonesRingData && (
+          <GeoJSONSource id="territory-neutral-zones" data={neutralZonesRingData}>
+            <Layer
+              id="territory-neutral-fill"
+              type="fill"
+              paint={{ 'fill-color': '#94A3B8', 'fill-opacity': 0.1 }}
+            />
+            <Layer
+              id="territory-neutral-line"
+              type="line"
+              paint={{ 'line-color': '#CBD5E1', 'line-width': 2, 'line-dasharray': [3, 2] }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {territoryPointsData && (
+          <GeoJSONSource id="territory-points" data={territoryPointsData}>
+            <Layer
+              id="territory-points-circle"
+              type="circle"
+              paint={{
+                'circle-radius': 6,
+                'circle-color': '#FFFFFF',
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#1E293B',
+              }}
+            />
+          </GeoJSONSource>
+        )}
       </MapLibreMap>
 
       <HeatOverlay
@@ -2545,7 +2729,20 @@ export default function GameScreen() {
             </View>
 
             <View style={styles.compactRight}>
-              {isGhostDuel ? (
+              {isTerritoryPulse ? (
+                <>
+                  <View style={styles.compactChip}>
+                    <Text style={styles.compactChipLabel}>PULSE</Text>
+                    <Text style={styles.compactChipValue}>{formatClock(secondsToNextPulse)}</Text>
+                  </View>
+                  <View style={styles.compactChip}>
+                    <Text style={styles.compactChipLabel}>SCORE</Text>
+                    <Text
+                      style={styles.compactChipValue}
+                    >{`${territoryScores.runner}-${territoryScores.hunter}`}</Text>
+                  </View>
+                </>
+              ) : isGhostDuel ? (
                 <View style={styles.compactChip}>
                   <Text style={styles.compactChipLabel}>
                     {ghostDuelState?.variant === 'mirror_chase' ? 'GHOST' : 'TARGET'}
@@ -2645,7 +2842,32 @@ export default function GameScreen() {
                   <Text style={styles.statValue}>{formatClock(timerValue)}</Text>
                 </View>
               )}
-              {isGhostDuel ? (
+              {isTerritoryPulse ? (
+                <>
+                  <View style={styles.stat}>
+                    <Text style={styles.statLabel}>NEXT PULSE</Text>
+                    <Text style={styles.statSmall}>{formatClock(secondsToNextPulse)}</Text>
+                  </View>
+                  <View style={styles.stat}>
+                    <Text style={styles.statLabel}>RUNNER PTS</Text>
+                    <Text style={[styles.statSmall, { color: '#06B6D4' }]}>
+                      {territoryScores.runner}
+                    </Text>
+                  </View>
+                  <View style={styles.stat}>
+                    <Text style={styles.statLabel}>HUNTER PTS</Text>
+                    <Text style={[styles.statSmall, { color: '#EF4444' }]}>
+                      {territoryScores.hunter}
+                    </Text>
+                  </View>
+                  <View style={styles.stat}>
+                    <Text style={styles.statLabel}>SECTOR</Text>
+                    <Text style={styles.statSmall}>
+                      {currentOccupiedZone ? currentOccupiedZone.name : 'None'}
+                    </Text>
+                  </View>
+                </>
+              ) : isGhostDuel ? (
                 <>
                   <View style={styles.stat}>
                     <Text style={styles.statLabel}>
@@ -2997,6 +3219,50 @@ export default function GameScreen() {
                       ? `Evade the ghost hunter! Keep distance > 20m. Current distance: ${distanceToGhostM !== null ? Math.round(distanceToGhostM) + 'm' : '--'}. Finish: ${distanceToGhostTargetM !== null ? Math.round(distanceToGhostTargetM) + 'm' : '--'}.`
                       : `Pursue the ghost runner! Intercept within 10m before it reaches the finish line. Distance: ${distanceToGhostM !== null ? Math.round(distanceToGhostM) + 'm' : '--'}.`}
                 </Text>
+              </View>
+            )}
+
+            {isLive && isTerritoryPulse && (
+              <View style={[styles.rescueCard, { borderColor: '#3B82F6', marginVertical: 8 }]}>
+                <View style={styles.rescueHeaderRow}>
+                  <MaterialCommunityIcons color="#3B82F6" name="hexagon-multiple" size={20} />
+                  <Text style={[styles.rescueTitle, { color: '#2563EB' }]}>
+                    TERRITORY PULSE: SECTORS ({territoryZones.length})
+                  </Text>
+                </View>
+                <Text style={styles.rescueSubtitle}>
+                  {currentOccupiedZone
+                    ? `Occupying Sector ${currentOccupiedZone.name}! (${currentOccupiedZone.controller ? currentOccupiedZone.controller.toUpperCase() : 'NEUTRAL'}${currentOccupiedZone.contender ? ' · CONTESTED' : ''})`
+                    : 'Not inside any sector. Stand inside a sector perimeter before the pulse fires!'}
+                </Text>
+                <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {territoryZones.map((z) => {
+                    const badgeColor =
+                      z.controller === 'runner'
+                        ? '#06B6D4'
+                        : z.controller === 'hunter'
+                          ? '#EF4444'
+                          : '#64748B';
+                    return (
+                      <View
+                        key={z.id}
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 6,
+                          backgroundColor: badgeColor + '20',
+                          borderWidth: 1,
+                          borderColor: badgeColor,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: badgeColor }}>
+                          {z.name}: {z.controller ? z.controller.toUpperCase() : 'NEUTRAL'}
+                          {z.contender ? ' ⚔' : ''}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
             )}
 
