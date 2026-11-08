@@ -344,7 +344,7 @@ grant execute on function public.start_game(uuid) to authenticated;
 
 -- 2. Canonical advance_game with restored Ghost NPC stepping -------------------
 create or replace function public.advance_game(game_id uuid)
-returns text
+returns public.game_status
 language plpgsql
 security definer
 set search_path = public, extensions
@@ -361,6 +361,8 @@ declare
   carrier_rec record;
   ping_count integer;
   active_survivors integer;
+  active_runners integer;
+  active_hunters integer;
   v_r_score integer;
   v_h_score integer;
   v_ratio double precision;

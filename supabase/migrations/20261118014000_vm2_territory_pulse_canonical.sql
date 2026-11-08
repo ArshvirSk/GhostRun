@@ -343,7 +343,7 @@ grant execute on function public.start_game(uuid) to authenticated;
 
 -- 2. Canonical advance_game with restored Territory Pulse 2-pulse loop ---------
 create or replace function public.advance_game(game_id uuid)
-returns text
+returns public.game_status
 language plpgsql
 security definer
 set search_path = public, extensions
