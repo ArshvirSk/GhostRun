@@ -264,6 +264,10 @@ Immediately following each outdoor play session, ask each participant:
 * **Tactical Radio Comms:**
   - [ ] Operator sends a broadcast message (e.g., "Hunter approaching west gate").
   - [ ] Verify all teammates receive the radio dispatch banner on screen.
+* **Physical Device & Environmental Verification:**
+  - [ ] **Daylight Readability:** Confirm amber dashed scan envelope (`#F59E0B`, 150 m radius) is clearly distinguishable against OpenFreeMap Liberty vector tiles in bright daylight.
+  - [ ] **Stationary Battery Optimization:** Verify that remote operator client acquires no location wake-locks and battery consumption remains low while monitoring from home/base camp.
+  - [ ] **Emergency SOS Interruption:** Verify that if any field runner or hunter triggers SOS, the Operator's Mission Control view immediately displays the high-priority red alert banner with distress details.
 
 
 ### 3.11 Solo Ghost Duel Base Mode (docs/MODES.md §6.2)

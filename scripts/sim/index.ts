@@ -2843,6 +2843,65 @@ async function operatorScenario() {
     JSON.stringify(directTagRemote.error ?? directTagRemote.data),
   );
 
+  // 9. Negative Operator Restrictions (VM2)
+  // Field player cannot place tactical markers
+  const fieldMarkerFail = await rpc(host, 'place_marker', {
+    p_game_id: gameId,
+    p_lat: CENTER.lat + 0.0001,
+    p_lng: CENTER.lng + 0.0001,
+    p_label: 'Field Marker',
+  });
+  expect(
+    Boolean(fieldMarkerFail.error),
+    'sim: field runner cannot place tactical markers',
+    'unexpectedly succeeded placing marker as field player',
+  );
+
+  // Field player cannot clear tactical markers
+  const fieldClearFail = await rpc(host, 'clear_marker', {
+    p_game_id: gameId,
+    p_marker_id: m4.data?.marker_id,
+  });
+  expect(
+    Boolean(fieldClearFail.error),
+    'sim: field runner cannot clear tactical markers',
+    'unexpectedly succeeded clearing marker as field player',
+  );
+
+  // Field player cannot trigger operator scan
+  const fieldScanFail = await rpc(host, 'operator_scan', {
+    p_game_id: gameId,
+  });
+  expect(
+    Boolean(fieldScanFail.error),
+    'sim: field runner cannot trigger operator scan',
+    'unexpectedly succeeded triggering scan as field player',
+  );
+
+  // Field player cannot send operator comms
+  const fieldCommsFail = await rpc(host, 'send_operator_message', {
+    p_game_id: gameId,
+    p_message: 'Unauthorized Comms',
+  });
+  expect(
+    Boolean(fieldCommsFail.error),
+    'sim: field runner cannot send operator comms',
+    'unexpectedly succeeded sending comms as field player',
+  );
+
+  // Operator cannot place marker outside 1.5x boundary
+  const oobMarkerFail = await rpc(runnerOp, 'place_marker', {
+    p_game_id: gameId,
+    p_lat: CENTER.lat + 1.0,
+    p_lng: CENTER.lng + 1.0,
+    p_label: 'Far Marker',
+  });
+  expect(
+    Boolean(oobMarkerFail.error),
+    'sim: operator marker beyond 1.5x boundary is rejected',
+    'unexpectedly placed marker outside 1.5x boundary',
+  );
+
   for (const client of [host, runnerOp, hunterField, hunterOp]) {
     await rpc(client, 'leave_game', { game_id: gameId });
   }

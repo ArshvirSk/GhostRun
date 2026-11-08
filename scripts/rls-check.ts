@@ -2211,6 +2211,128 @@ async function main() {
       'remote operator unexpectedly tagged another player',
     );
 
+    // 5. Negative Access & Input Validation Tests (VM2)
+    // Field runner (host) cannot place tactical markers
+    const fieldPlaceMarker = await rpc(host, 'place_marker', {
+      p_game_id: opGameId,
+      p_lat: CENTER.lat + 0.0001,
+      p_lng: CENTER.lng + 0.0001,
+      p_label: 'Illegal Field Marker',
+    });
+    expect(
+      Boolean(fieldPlaceMarker.error),
+      'field player cannot place tactical markers (operator only)',
+      'field player unexpectedly placed marker',
+    );
+
+    // Field runner (host) cannot clear tactical markers
+    const fieldClearMarker = await rpc(host, 'clear_marker', {
+      p_game_id: opGameId,
+      p_marker_id: markerRes.data?.marker_id,
+    });
+    expect(
+      Boolean(fieldClearMarker.error),
+      'field player cannot clear tactical markers (operator only)',
+      'field player unexpectedly cleared marker',
+    );
+
+    // Field runner (host) cannot execute operator scan
+    const fieldScan = await rpc(host, 'operator_scan', {
+      p_game_id: opGameId,
+    });
+    expect(
+      Boolean(fieldScan.error),
+      'field player cannot trigger operator scan (operator only)',
+      'field player unexpectedly executed scan',
+    );
+
+    // Field runner (host) cannot send operator tactical comms
+    const fieldComms = await rpc(host, 'send_operator_message', {
+      p_game_id: opGameId,
+      p_message: 'Illegal Comms',
+    });
+    expect(
+      Boolean(fieldComms.error),
+      'field player cannot send operator messages (operator only)',
+      'field player unexpectedly sent operator message',
+    );
+
+    // Remote operator cannot place marker beyond 1.5x boundary
+    const oobMarker = await rpc(opRunner2, 'place_marker', {
+      p_game_id: opGameId,
+      p_lat: CENTER.lat + 1.0, // Far outside boundary
+      p_lng: CENTER.lng + 1.0,
+      p_label: 'OOB Marker',
+    });
+    expect(
+      Boolean(oobMarker.error),
+      'operator marker outside 1.5x boundary is rejected',
+      'operator unexpectedly placed OOB marker',
+    );
+
+    // Remote operator cannot send empty or overly long comms message (> 200 chars)
+    const emptyComms = await rpc(opRunner2, 'send_operator_message', {
+      p_game_id: opGameId,
+      p_message: '   ',
+    });
+    expect(
+      Boolean(emptyComms.error),
+      'empty operator message is rejected',
+      'operator unexpectedly sent whitespace-only message',
+    );
+
+    const longComms = await rpc(opRunner2, 'send_operator_message', {
+      p_game_id: opGameId,
+      p_message: 'A'.repeat(201),
+    });
+    expect(
+      Boolean(longComms.error),
+      'operator message exceeding 200 characters is rejected',
+      'operator unexpectedly sent 201-char message',
+    );
+
+    // Hunter operator scan missing lat/lng is rejected
+    const hunterMissingCoordsScan = await rpc(opHunter2, 'operator_scan', {
+      p_game_id: opGameId,
+    });
+    expect(
+      Boolean(hunterMissingCoordsScan.error),
+      'hunter operator scan without coordinates is rejected',
+      'hunter operator unexpectedly executed scan without coordinates',
+    );
+
+    // Outsider cannot call place_marker, operator_scan, or send_operator_message
+    const outsiderMarker = await rpc(outsider, 'place_marker', {
+      p_game_id: opGameId,
+      p_lat: CENTER.lat,
+      p_lng: CENTER.lng,
+      p_label: 'Outsider Marker',
+    });
+    expect(
+      Boolean(outsiderMarker.error),
+      'outsider cannot place tactical marker',
+      'outsider unexpectedly placed marker',
+    );
+
+    const outsiderScan = await rpc(outsider, 'operator_scan', {
+      p_game_id: opGameId,
+    });
+    expect(
+      Boolean(outsiderScan.error),
+      'outsider cannot execute operator scan',
+      'outsider unexpectedly executed scan',
+    );
+
+    const outsiderComms = await rpc(outsider, 'send_operator_message', {
+      p_game_id: opGameId,
+      p_message: 'Outsider Comms',
+    });
+    expect(
+      Boolean(outsiderComms.error),
+      'outsider cannot send operator comms',
+      'outsider unexpectedly sent comms',
+    );
+
     for (const client of [host, opRunner2, hunter, opHunter2]) {
       await rpc(client, 'leave_game', { game_id: opGameId });
     }
