@@ -28,5 +28,5 @@
 | 2026-11-08 | VM3 | Hide unreleased modes (haunted_map, qr_tagging, horde, manhunt) from UI and catalogue, migration 155, and negative tests | verified | approved |
 | 2026-11-08 | VM4 | Field-test plan (docs/FIELD_TEST_PLAN.md): testing matrices, real-world failure vectors, 1-page checklists, and Go/No-Go criteria | verified | approved |
 | 2026-11-09 | UI-M0 | UI Audit and baseline (docs/UI_AUDIT.md, docs/PHYSICAL_CHECKLIST.md, test baselines, U-D1 to U-D13 recommendations) | verified | approved |
-| 2026-11-09 | UI-M1 | Token architecture, ThemeProvider, Text primitive, mode registry & modules, RulesCard, ParamField, dev preview, drift test | verified | pending |
+| 2026-11-09 | UI-M1 | Token architecture, ThemeProvider, Text primitive, mode registry & modules, RulesCard, ParamField, dev preview, drift test | verified | approved |
 
