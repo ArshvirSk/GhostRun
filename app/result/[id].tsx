@@ -44,17 +44,6 @@ type GhostDuelScore = {
   created_at: string;
 };
 
-type GhostDuelLeaderboardEntry = {
-  rank: number;
-  display_name: string;
-  score: number;
-  player_time_s: number;
-  ghost_time_s: number;
-  delta_s: number;
-  efficiency: number;
-  created_at: string;
-};
-
 type Team = 'runner' | 'hunter' | 'solo' | 'unassigned';
 
 type GamePlayer = {
@@ -214,7 +203,6 @@ export default function ResultScreen() {
   const [ghostDismissed, setGhostDismissed] = useState(false);
   const [ghostPermanentlyDeclined, setGhostPermanentlyDeclined] = useState(false);
   const [ghostScore, setGhostScore] = useState<GhostDuelScore | null>(null);
-  const [ghostLeaderboard, setGhostLeaderboard] = useState<GhostDuelLeaderboardEntry[]>([]);
   const mountedRef = useRef(true);
   const leavingRef = useRef(false);
 
@@ -301,15 +289,7 @@ export default function ResultScreen() {
       if (!mountedRef.current) return;
       if (scoreRow) {
         setGhostScore(scoreRow as GhostDuelScore);
-        const { data: lb } = await supabase.rpc('get_ghost_duel_leaderboard', {
-          lat: snapshot.game.area.latitude,
-          lng: snapshot.game.area.longitude,
-          radius_m: 5000,
-          variant: scoreRow.variant,
-          row_limit: 5,
-        });
-        if (!mountedRef.current) return;
-        if (lb) setGhostLeaderboard(lb as GhostDuelLeaderboardEntry[]);
+        // Public local leaderboard fetch suppressed pending user reporting & blocking infrastructure (Phase D)
       }
     }
 
@@ -994,25 +974,7 @@ export default function ResultScreen() {
               </View>
             </View>
 
-            {ghostLeaderboard.length > 0 && (
-              <View style={{ marginTop: 14 }}>
-                <Text style={styles.sectionLabel}>TOP 5 DUEL LEADERBOARD</Text>
-                {ghostLeaderboard.map((entry) => (
-                  <View key={entry.rank} style={styles.playerRow}>
-                    <Text style={{ width: 24, fontWeight: '700', color: '#64748B' }}>
-                      #{entry.rank}
-                    </Text>
-                    <View style={styles.playerNameRow}>
-                      <Text style={styles.playerName}>{entry.display_name}</Text>
-                    </View>
-                    <Text style={[styles.playerMeta, { fontWeight: '700', color: '#0F172A' }]}>
-                      {entry.score} pts ({entry.delta_s >= 0 ? '+' : ''}
-                      {entry.delta_s.toFixed(1)}s)
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
+            {/* Public leaderboard hidden pending user reporting & blocking infrastructure (Phase D) */}
           </View>
         )}
 

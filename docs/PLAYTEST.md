@@ -303,8 +303,14 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Ghost completing path before tag → "Ghost Escaped" result.
 * **Leaderboard & Results:**
   - [ ] Result screen shows Solo Ghost Duel Debrief card with score, times, efficiency, variant badge.
-  - [ ] Top 5 leaderboard table displays nearby players' scores (C5 consent-aware names).
+  - [ ] Confirm public top-5 leaderboard table is safely hidden in UI pending user reporting/blocking tools (Phase D).
   - [ ] Ghost Contribution preview card available for contributing route to ghost library.
+* **Physical Device & Environmental Verification:**
+  - [ ] **Solo Outdoor Navigation:** Verify HUD distance chip updates smoothly while running outdoors toward the finish target without requiring continuous screen inspection.
+  - [ ] **Finish Target Visual Contrast:** Confirm emerald finish circle (`#10B981`) and cyan ghost blip (`#06B6D4`) maintain high contrast in direct sunlight on mobile displays.
+  - [ ] **Mirror Chase Tag Haptics:** Verify heavy tactile vibration feedback occurs immediately upon successful `tag_ghost` execution.
+  - [ ] **Evade Collision Warning:** Verify urgent haptic and audio alert when runner approaches within 35 m of the ghost hunter before the 20 m haunt collision triggers.
+  - [ ] **Emergency SOS Interruption:** Verify triggering SOS terminates ghost duel tracking immediately and broadcasts distress coordinates.
 
 ### 3.12 Territory Pulse Base Mode (docs/MODES.md §4.6)
 * **Recommended Group:** 4–16 players (e.g. 2+ Runners vs 2+ Hunters; scalable up to 8v8).

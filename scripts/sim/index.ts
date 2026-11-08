@@ -3097,6 +3097,21 @@ async function ghostDuelScenario() {
   const ghostLat = mcStateRes.data?.ghost_duel?.ghost?.latitude ?? CENTER.lat;
   const ghostLng = mcStateRes.data?.ghost_duel?.ghost?.longitude ?? CENTER.lng;
 
+  // Negative check: hunter > 10m away from ghost is rejected by tag_ghost
+  await rpc(soloHunter, 'submit_position', {
+    game_id: mcGameId,
+    lat: ghostLat + 0.002, // ~220m away
+    lng: ghostLng,
+    accuracy: 2,
+    recorded_at: new Date().toISOString(),
+  });
+  const outOfRangeTag = await rpc<{ success: boolean; reason: string }>(soloHunter, 'tag_ghost', { game_id: mcGameId });
+  expect(
+    outOfRangeTag.data?.success === false && outOfRangeTag.data?.reason === 'out_of_range',
+    'sim: tag_ghost beyond 10m is rejected with out_of_range',
+    JSON.stringify(outOfRangeTag.data ?? outOfRangeTag.error),
+  );
+
   // Submit hunter position right next to ghost (within 5m)
   await rpc(soloHunter, 'submit_position', {
     game_id: mcGameId,

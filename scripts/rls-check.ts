@@ -2525,6 +2525,56 @@ async function main() {
     }
   }
 
+  // Ghost Duel (ghost_duel) RLS Secrecy & Security Checks
+  {
+    // 1. Direct write/update/delete on ghost_duel_scores is rejected (server RPC only)
+    const directScoreInsert = await host.from('ghost_duel_scores').insert({
+      game_id: gameId,
+      user_id: hostUserId,
+      variant: 'time_trial',
+      area_center: `POINT(${CENTER.lng} ${CENTER.lat})`,
+      player_time_s: 120,
+      ghost_time_s: 150,
+      delta_s: 30,
+      efficiency: 0.95,
+      score: 1500,
+    });
+    expect(
+      Boolean(directScoreInsert.error),
+      'ghost_duel_scores is not directly insertable by clients',
+      'direct insert unexpectedly succeeded',
+    );
+
+    const directScoreUpdate = await host.from('ghost_duel_scores').update({ score: 9999 }).eq('user_id', hostUserId);
+    expect(
+      Boolean(directScoreUpdate.error),
+      'ghost_duel_scores is not directly updatable by clients',
+      'direct update unexpectedly succeeded',
+    );
+
+    const directScoreDelete = await host.from('ghost_duel_scores').delete().eq('user_id', hostUserId);
+    expect(
+      Boolean(directScoreDelete.error),
+      'ghost_duel_scores is not directly deletable by clients',
+      'direct delete unexpectedly succeeded',
+    );
+
+    // 2. tag_ghost access restrictions
+    const outsiderTagGhost = await rpc(outsider, 'tag_ghost', { game_id: gameId });
+    expect(
+      Boolean(outsiderTagGhost.error),
+      'outsider cannot call tag_ghost',
+      String(outsiderTagGhost.error?.message ?? ''),
+    );
+
+    const nonDuelTagGhost = await rpc(host, 'tag_ghost', { game_id: gameId });
+    expect(
+      Boolean(nonDuelTagGhost.error),
+      'tag_ghost on non-ghost_duel game is rejected',
+      String(nonDuelTagGhost.error?.message ?? ''),
+    );
+  }
+
   // Consent records are append-only and reachable only through the RPCs.
   const policyAck = await rpc(host, 'set_consent', {
     consent_type: 'policy_ack',
