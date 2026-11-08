@@ -36,3 +36,12 @@ This document tracks all physical device, multi-device, GPS, sensor, and human v
 | P-021 | UI-M0 | Rematch Lobby Transition | Tap "Play Again" on result screen | `rematch_game` creates new lobby, all players automatically navigate to new lobby | deferred |
 | P-022 | UI-M0 | Emergency SOS | Press SOS button during live game | Confirmation triggers, emits `emergency_sos`, initiates 112/911 dialer, auto-pauses match | deferred |
 | P-023 | UI-M0 | Data Export & Deletion | In Settings, tap "Export my data", then confirm "Delete account" | JSON export shares via OS share sheet; account deletion purges profile and signs out | deferred |
+
+---
+
+## UI-M1: Foundations Device Checklist
+
+| ID | Milestone | Item to Check | How to Test | Expected Result | Status |
+|---|---|---|---|---|---|
+| P-024 | UI-M1 | Dev Preview Screen Rendering | Navigate to `/dev-preview` on physical test device | All shipping base modes, modifiers, and roles render in selectable chip list; RulesCard and interactive ParamField (steppers, switches, pills) display with today's token colors and typography | deferred |
+

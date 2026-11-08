@@ -431,5 +431,27 @@ Per `docs/MODES.md §7.4.8`, `delete_my_data()` upgrades to explicitly delete co
 **Record C4-4 — Comprehensive Data Export (`export_my_data`):**
 Upgraded `export_my_data()` to export all personal and tactical gameplay records associated with the authenticated user: profile, consents history, games joined with team and trail sharing choice, personal trail points (subqueried and capped at 50,000 points to avoid memory exhaustion), tag records, SOS events, ghost contributions, ghost duel scores, drop claims (`drop_id`, `started_at`), and heat presses (`variant`, `result`, `pressed_at`).
 
+## 2026-11-09 — UI-M0: UI Restructure Foundations & Registry Architecture
+
+### Decision UI-D1: Registry Source of Truth (Option b)
+**Decision:** Adopt Option (b) for mode architecture. Maintain a typed client-side registry in `src/modes/` containing rich presentation metadata (copy, icons, widgets, difficulty ratings, rules sections, tour beats) coupled with an automated drift test (`scripts/registry-drift.ts`) wired into `package.json`. The drift test queries `public.mode_catalogue()`, `public.modifier_catalogue()`, and `public.role_catalogue()` on the server, strictly asserting that:
+1. Every enabled base mode, modifier, and role in the database is present and enabled in the client registry.
+2. Parameter keys, defaults, types, and validation boundaries match 1:1 with the server catalogue definitions.
+3. Any disabled or unapproved items in the deny list are verified to remain disabled/hidden in the client.
+
+**Reason:** Enables fast, offline rendering of wizard cards, rules cards, and in-game widgets while guaranteeing that client definitions never drift from server-authoritative rules.
+
+**Trade-off:** Parameter changes must be reflected in both the server migration and the client registry module, caught immediately by the automated drift test.
+
+### Decision UI-D2: Client Deny List for Unreleased / Experimental Modes
+**Decision:** Maintain an explicit client-side deny list in `src/modes/registry.ts`:
+- `haunted_map`: Hidden (relies on server-simulated NPC patrol engine; requires physical outdoor safety audit).
+- `horde`: Hidden (future scope; requires server swarm simulation stress testing).
+- `manhunt`: Hidden (marketing pitch copy in onboarding only; no programmatic engine exists or is needed).
+- `qr_tagging`: Hidden (feature flag `false` until physical daylight camera reliability testing is performed).
+
+**Reason:** Respects Addendum B and Standing Decisions: prevents exposing unapproved or untested experiences to players.
+
+
 
 
