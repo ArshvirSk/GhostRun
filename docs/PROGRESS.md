@@ -22,4 +22,5 @@
 | 2026-11-08 | VM1 (ghost_duel) | Spec check and discrepancy analysis for Solo Ghost Duel base mode (docs/specs/ghost_duel.md) | verified | approved |
 | 2026-11-08 | VM2 (ghost_duel) | Fix Ghost NPC stepping in advance_game, unconditional team assignment, hide public leaderboard, negative tests, and PLAYTEST.md | fixed in code, needs device test | approved |
 | 2026-11-08 | VM1 (territory_pulse) | Spec check and discrepancy analysis for Territory Pulse base mode (docs/specs/territory_pulse.md) | verified | approved |
-| 2026-11-08 | VM2 (territory_pulse) | Fix Territory Pulse advance_game canonical 2-pulse flip, negative tests, and PLAYTEST.md | fixed in code, needs device test | pending |
+| 2026-11-08 | VM2 (territory_pulse) | Fix Territory Pulse advance_game canonical 2-pulse flip, negative tests, and PLAYTEST.md | fixed in code, needs device test | approved |
+| 2026-11-08 | VM1 (ai_gm) | Spec check and forensic audit for AI Game Master modifier (docs/specs/ai_gm.md) | verified | pending |
