@@ -20,4 +20,5 @@
 | 2026-11-08 | VM1 (double_agent) | Spec check and discrepancy analysis for Double Agent role add-on (docs/specs/double_agent.md) | verified | approved |
 | 2026-11-08 | VM2 (double_agent) | Fix Double Agent scramble displacement in advance_game, negative tests, and PLAYTEST.md | fixed in code, needs device test | approved |
 | 2026-11-08 | VM1 (ghost_duel) | Spec check and discrepancy analysis for Solo Ghost Duel base mode (docs/specs/ghost_duel.md) | verified | approved |
-| 2026-11-08 | VM2 (ghost_duel) | Fix Ghost NPC stepping in advance_game, unconditional team assignment, hide public leaderboard, negative tests, and PLAYTEST.md | fixed in code, needs device test | pending |
+| 2026-11-08 | VM2 (ghost_duel) | Fix Ghost NPC stepping in advance_game, unconditional team assignment, hide public leaderboard, negative tests, and PLAYTEST.md | fixed in code, needs device test | approved |
+| 2026-11-08 | VM1 (territory_pulse) | Spec check and discrepancy analysis for Territory Pulse base mode (docs/specs/territory_pulse.md) | verified | pending |
