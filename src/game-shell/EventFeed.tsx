@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '../ui/Text';
 import { useTheme } from '../theme/ThemeProvider';
+import { colors } from '../theme/tokens';
 import type { GameEvent } from './types';
 
 interface EventFeedProps {
@@ -14,23 +15,23 @@ function getEventIcon(type: string): { icon: string; library: 'ionic' | 'materia
   switch (type) {
     case 'tag':
     case 'attempt_tag':
-      return { icon: 'hand-left', library: 'ionic', color: '#EF4444' };
+      return { icon: 'hand-left', library: 'ionic', color: colors.danger };
     case 'rescue_started':
     case 'player_released':
-      return { icon: 'key', library: 'ionic', color: '#10B981' };
+      return { icon: 'key', library: 'ionic', color: colors.success };
     case 'package_picked_up':
     case 'package_dropped':
     case 'package_secured':
-      return { icon: 'briefcase', library: 'ionic', color: '#F59E0B' };
+      return { icon: 'briefcase', library: 'ionic', color: colors.warning };
     case 'operator_message':
-      return { icon: 'radio', library: 'ionic', color: '#38BDF8' };
+      return { icon: 'radio', library: 'ionic', color: colors.radarScan };
     case 'game_master_event':
-      return { icon: 'broadcast', library: 'material', color: '#A855F7' };
+      return { icon: 'broadcast', library: 'material', color: colors.ghostTrail };
     case 'sos':
     case 'emergency_sos':
-      return { icon: 'alert-circle', library: 'ionic', color: '#DC2626' };
+      return { icon: 'alert-circle', library: 'ionic', color: colors.danger };
     default:
-      return { icon: 'information-circle', library: 'ionic', color: '#8A9BA8' };
+      return { icon: 'information-circle', library: 'ionic', color: colors.textMuted };
   }
 }
 
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderWidth: 1,
-    shadowColor: '#000',
+    shadowColor: colors.backgroundDark,
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 2,

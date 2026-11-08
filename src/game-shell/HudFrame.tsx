@@ -8,6 +8,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../ui/Text';
 import { useTheme } from '../theme/ThemeProvider';
+import { colors } from '../theme/tokens';
 import type { RoundState } from './types';
 import {
   selectNextPingIn,
@@ -236,7 +237,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    shadowColor: '#000',
+    shadowColor: colors.backgroundDark,
     shadowOpacity: 0.35,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -283,12 +284,12 @@ const styles = StyleSheet.create({
   },
   chipLabel: {
     fontSize: 9,
-    color: '#8A9BA8',
+    color: colors.textMuted,
   },
   chipValue: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.textLight,
   },
   iconButton: {
     padding: 4,
@@ -321,7 +322,7 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: 10,
-    color: '#8A9BA8',
+    color: colors.textMuted,
   },
   statsGrid: {
     flexDirection: 'row',

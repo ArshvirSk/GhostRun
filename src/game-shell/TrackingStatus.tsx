@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../ui/Text';
 import { useTheme } from '../theme/ThemeProvider';
+import { colors } from '../theme/tokens';
 
 export type SharingState = 'idle' | 'starting' | 'on' | 'error' | 'denied';
 
@@ -98,7 +99,7 @@ const styles = StyleSheet.create({
   },
   subtext: {
     fontSize: 11,
-    color: '#8A9BA8',
+    color: colors.textMuted,
   },
   actionBtn: {
     paddingHorizontal: 10,
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   btnText: {
-    color: '#FFFFFF',
+    color: colors.textLight,
     fontSize: 11,
     fontWeight: '700',
   },

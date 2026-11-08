@@ -2,6 +2,7 @@ import React, { memo, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../lib/map';
 import { circleRing, type LngLat, type PointCollection } from '../lib/geo';
+import { colors } from '../theme/tokens';
 import type { GameArea, RoundPing, RoundPosition } from './types';
 
 const MAP_STYLE =
@@ -74,7 +75,7 @@ export const MapView = memo(function MapView({
         properties: {
           id: mate.player_id,
           name: mate.display_name,
-          color: mate.color || '#3B82F6',
+          color: mate.color || colors.heatCold,
         },
       })),
     };
@@ -136,12 +137,12 @@ export const MapView = memo(function MapView({
           <Layer
             id="play-area-fill"
             type="fill"
-            paint={{ 'fill-color': '#1D4ED8', 'fill-opacity': 0.06 }}
+            paint={{ 'fill-color': colors.heatCold, 'fill-opacity': 0.06 }}
           />
           <Layer
             id="play-area-outline"
             type="line"
-            paint={{ 'line-color': '#1D4ED8', 'line-width': 2, 'line-dasharray': [2, 2] }}
+            paint={{ 'line-color': colors.heatCold, 'line-width': 2, 'line-dasharray': [2, 2] }}
           />
         </GeoJSONSource>
 
@@ -151,12 +152,12 @@ export const MapView = memo(function MapView({
             <Layer
               id="tag-radius-fill"
               type="fill"
-              paint={{ 'fill-color': '#DC2626', 'fill-opacity': 0.05 }}
+              paint={{ 'fill-color': colors.danger, 'fill-opacity': 0.05 }}
             />
             <Layer
               id="tag-radius-line"
               type="line"
-              paint={{ 'line-color': '#DC2626', 'line-width': 1.5, 'line-dasharray': [2, 2] }}
+              paint={{ 'line-color': colors.danger, 'line-width': 1.5, 'line-dasharray': [2, 2] }}
             />
           </GeoJSONSource>
         )}
@@ -167,12 +168,12 @@ export const MapView = memo(function MapView({
             <Layer
               id="target-radius-fill"
               type="fill"
-              paint={{ 'fill-color': '#DB2777', 'fill-opacity': 0.08 }}
+              paint={{ 'fill-color': colors.ghostTrail, 'fill-opacity': 0.08 }}
             />
             <Layer
               id="target-radius-line"
               type="line"
-              paint={{ 'line-color': '#DB2777', 'line-width': 1.5, 'line-dasharray': [2, 2] }}
+              paint={{ 'line-color': colors.ghostTrail, 'line-width': 1.5, 'line-dasharray': [2, 2] }}
             />
           </GeoJSONSource>
         )}
@@ -184,9 +185,9 @@ export const MapView = memo(function MapView({
               type="circle"
               paint={{
                 'circle-radius': 9,
-                'circle-color': '#DB2777',
+                'circle-color': colors.ghostTrail,
                 'circle-stroke-width': 3,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>
@@ -202,7 +203,7 @@ export const MapView = memo(function MapView({
                 'circle-radius': 8,
                 'circle-color': ['get', 'color'],
                 'circle-stroke-width': 2,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>
@@ -219,28 +220,28 @@ export const MapView = memo(function MapView({
                 'circle-color': [
                   'case',
                   ['==', ['get', 'reason'], 'boundary'],
-                  '#F59E0B',
+                  colors.warning,
                   ['==', ['get', 'reason'], 'noise'],
-                  '#DC2626',
+                  colors.danger,
                   ['==', ['get', 'reason'], 'camping'],
-                  '#EA580C',
+                  colors.hunter,
                   ['==', ['get', 'reason'], 'item'],
-                  '#7C3AED',
-                  '#DB2777',
+                  colors.ghostTrail,
+                  colors.ghostTrail,
                 ],
                 'circle-opacity': 0.25,
                 'circle-stroke-width': 2,
                 'circle-stroke-color': [
                   'case',
                   ['==', ['get', 'reason'], 'boundary'],
-                  '#F59E0B',
+                  colors.warning,
                   ['==', ['get', 'reason'], 'noise'],
-                  '#DC2626',
+                  colors.danger,
                   ['==', ['get', 'reason'], 'camping'],
-                  '#EA580C',
+                  colors.hunter,
                   ['==', ['get', 'reason'], 'item'],
-                  '#7C3AED',
-                  '#DB2777',
+                  colors.ghostTrail,
+                  colors.ghostTrail,
                 ],
                 'circle-stroke-opacity': 0.65,
               }}
@@ -253,17 +254,17 @@ export const MapView = memo(function MapView({
                 'circle-color': [
                   'case',
                   ['==', ['get', 'reason'], 'boundary'],
-                  '#F59E0B',
+                  colors.warning,
                   ['==', ['get', 'reason'], 'noise'],
-                  '#DC2626',
+                  colors.danger,
                   ['==', ['get', 'reason'], 'camping'],
-                  '#EA580C',
+                  colors.hunter,
                   ['==', ['get', 'reason'], 'item'],
-                  '#7C3AED',
-                  '#DB2777',
+                  colors.ghostTrail,
+                  colors.ghostTrail,
                 ],
                 'circle-stroke-width': 2.5,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>
@@ -277,9 +278,9 @@ export const MapView = memo(function MapView({
               type="circle"
               paint={{
                 'circle-radius': 9,
-                'circle-color': '#1D4ED8',
+                'circle-color': colors.heatCold,
                 'circle-stroke-width': 3,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>

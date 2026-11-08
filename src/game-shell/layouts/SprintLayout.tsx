@@ -26,15 +26,15 @@ export const SprintLayout = memo(function SprintLayout({
   const timerLabel = selectTimerLabel(state);
 
   const isRunner = myRole === 'runner';
-  const roleColor = isRunner ? tokens.colors.accent : tokens.colors.danger;
+  const roleColor = isRunner ? tokens.colors.accent : tokens.colors.hunter;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: tokens.colors.background }]}>
       {/* Top Header Bar */}
       <View style={styles.header}>
-        <View style={styles.badge}>
-          <MaterialCommunityIcons color="#000000" name="run-fast" size={16} />
-          <Text variant="mono" style={styles.badgeText}>
+        <View style={[styles.badge, { backgroundColor: tokens.colors.accent }]}>
+          <MaterialCommunityIcons color={tokens.colors.backgroundDark} name="run-fast" size={16} />
+          <Text variant="mono" style={[styles.badgeText, { color: tokens.colors.backgroundDark }]}>
             SPRINT MODE
           </Text>
         </View>
@@ -43,10 +43,16 @@ export const SprintLayout = memo(function SprintLayout({
           accessibilityLabel="Exit Sprint Mode"
           accessibilityRole="button"
           onPress={onExitSprint}
-          style={styles.exitButton}
+          style={[
+            styles.exitButton,
+            {
+              backgroundColor: tokens.colors.surface,
+              borderColor: tokens.colors.border,
+            },
+          ]}
         >
-          <Ionicons color="#FFFFFF" name="close" size={20} />
-          <Text variant="label" style={{ color: '#FFFFFF' }}>
+          <Ionicons color={tokens.colors.textLight} name="close" size={20} />
+          <Text variant="label" style={{ color: tokens.colors.textLight }}>
             Standard View
           </Text>
         </Pressable>
@@ -54,10 +60,10 @@ export const SprintLayout = memo(function SprintLayout({
 
       {/* Oversized Critical HUD Data */}
       <View style={styles.centerBlock}>
-        <Text variant="mono" style={styles.timerLabel}>
+        <Text variant="mono" style={[styles.timerLabel, { color: tokens.colors.textMuted }]}>
           {timerLabel}
         </Text>
-        <Text variant="display" style={styles.giantTimer}>
+        <Text variant="display" style={[styles.giantTimer, { color: tokens.colors.textLight }]}>
           {timerValue !== null ? formatClock(timerValue) : '--:--'}
         </Text>
 
@@ -69,9 +75,9 @@ export const SprintLayout = memo(function SprintLayout({
 
         {/* Direction cue / target proximity */}
         {state.target && isRunner && (
-          <View style={styles.cueBox}>
-            <Ionicons color="#00FF66" name="navigate" size={28} />
-            <Text variant="title" style={{ color: '#FFFFFF' }}>
+          <View style={[styles.cueBox, { backgroundColor: tokens.colors.surfaceElevated }]}>
+            <Ionicons color={tokens.colors.accent} name="navigate" size={28} />
+            <Text variant="title" style={{ color: tokens.colors.textLight }}>
               TARGET ACTIVE
             </Text>
           </View>
@@ -83,8 +89,16 @@ export const SprintLayout = memo(function SprintLayout({
         {primaryAction ? (
           <View style={styles.primaryActionSlot}>{primaryAction}</View>
         ) : (
-          <View style={styles.infoPill}>
-            <Text variant="title" style={{ color: '#FFFFFF' }}>
+          <View
+            style={[
+              styles.infoPill,
+              {
+                backgroundColor: tokens.colors.surfaceElevated,
+                borderColor: tokens.colors.border,
+              },
+            ]}
+          >
+            <Text variant="title" style={{ color: tokens.colors.textLight }}>
               KEEP MOVING
             </Text>
           </View>
@@ -95,10 +109,10 @@ export const SprintLayout = memo(function SprintLayout({
           accessibilityLabel="Emergency SOS"
           accessibilityRole="button"
           onPress={onOpenSos}
-          style={styles.sosButton}
+          style={[styles.sosButton, { backgroundColor: tokens.colors.danger }]}
         >
-          <Ionicons color="#FFFFFF" name="alert-circle" size={20} />
-          <Text variant="label" style={styles.sosText}>
+          <Ionicons color={tokens.colors.textLight} name="alert-circle" size={20} />
+          <Text variant="label" style={[styles.sosText, { color: tokens.colors.textLight }]}>
             SOS
           </Text>
         </Pressable>
@@ -114,7 +128,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#050709',
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 30,
@@ -130,7 +143,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#3DFFA2',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -138,7 +150,6 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#000000',
   },
   exitButton: {
     flexDirection: 'row',
@@ -148,8 +159,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#334155',
-    backgroundColor: '#0F172A',
   },
   centerBlock: {
     alignItems: 'center',
@@ -159,13 +168,11 @@ const styles = StyleSheet.create({
   timerLabel: {
     fontSize: 16,
     letterSpacing: 2,
-    color: '#94A3B8',
     fontWeight: '700',
   },
   giantTimer: {
     fontSize: 72,
     fontWeight: '900',
-    color: '#FFFFFF',
     fontVariant: ['tabular-nums'],
     letterSpacing: -1,
   },
@@ -180,7 +187,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#1E293B',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 16,
@@ -200,22 +206,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 20,
     borderRadius: 16,
-    backgroundColor: '#1E293B',
     borderWidth: 1,
-    borderColor: '#334155',
   },
   sosButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#DC2626',
     paddingHorizontal: 24,
     paddingVertical: 20,
     borderRadius: 16,
   },
   sosText: {
-    color: '#FFFFFF',
     fontWeight: '900',
     fontSize: 16,
   },

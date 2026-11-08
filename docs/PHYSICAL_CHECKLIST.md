@@ -68,4 +68,18 @@ This document tracks all physical device, multi-device, GPS, sensor, and human v
 | P-039 | UI-M2 | Modifier Widgets | Play with Hot/Cold, AI GM, Shrinking Zone | Heat probe action emits hot/cold wash; AI GM dispatch banner displays broadcast narration + fog overlay; boundary shrinks | deferred |
 | P-040 | UI-M2 | Role Add-on Widgets | Play with VIP Escort / Double Agent | Bodyguard swap request triggers prompt; Double Agent whisper reveals quadrant and scramble targets runner | deferred |
 
+---
+
+## UI-M3: Design System & Motion Device Checklist
+
+| ID | Milestone | Item to Check | How to Test | Expected Result | Status |
+|---|---|---|---|---|---|
+| P-041 | UI-M3 | Visual Direction A Sunlight Contrast | Inspect UI primitives and HUD layouts outdoors under direct midday sunlight | Deep charcoal `#050709` background and `#3DFFA2` phosphor green text/accents exceed WCAG AAA (15.8:1) and remain crisply readable | deferred |
+| P-042 | UI-M3 | Native Motor Haptic Feedback | Trigger haptic events in `/debug/hud-gallery` (ping arrival, tag confirmed, heat hot/cold, role reveal, button tap, error, SOS, noise) | Distinct tactile vibration cadence and intensity for each event on physical Android motor | deferred |
+| P-043 | UI-M3 | 60fps Animation Concurrency | Run simultaneous RadarSweep ambient rotation, PingRipple expansion, and CountUp counter in `/debug/hud-gallery` | Smooth 60fps GPU-accelerated rendering (`useNativeDriver: true`) without frame stutter or main-thread locking | deferred |
+| P-044 | UI-M3 | OS Reduced-Motion Setting Compliance | Enable "Remove animations" in Android OS Accessibility settings and observe `/debug/hud-gallery` | Radar sweep and ping ripple gracefully degrade to static dashed radar rings; role reveal skips radar scan and renders role card immediately | deferred |
+| P-045 | UI-M3 | Interactive HUD Gallery Screen | Launch `/debug/hud-gallery` cold on physical test device | All design tokens, UI primitives (Button, Card, Chip, Sheet, Toast, CodeBoxes, SegmentBar, BriefingCard), motion components, and 5 role layouts render interactively | deferred |
+| P-046 | UI-M3 | Tour Player Beat Progression | Play Briefing tour player in `/debug/hud-gallery` through all 8 canonical beats | Offline scripted beats advance smoothly with story segments, mock radar markers render on radar frame, and tour exits cleanly | deferred |
+
+
 

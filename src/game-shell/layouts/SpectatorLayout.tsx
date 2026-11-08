@@ -34,6 +34,7 @@ export const SpectatorLayout = memo(function SpectatorLayout({
               backgroundColor: tokens.colors.surface,
               borderColor: tokens.colors.border,
               borderRadius: tokens.radii.card,
+              shadowColor: tokens.colors.backgroundDark,
             },
           ]}
         >
@@ -76,7 +77,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    shadowColor: '#000',
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,

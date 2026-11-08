@@ -1,61 +1,68 @@
 /**
- * GhostRun Design Tokens — Phase 1 Foundations (Today's Values)
+ * GhostRun Design Tokens — Direction A: "Night Radar" (Phase 2 Design System)
  *
- * Captures the existing palette, typography scale, spacing, and radii currently in use.
- * Phase 2 will refine these to the "Night Radar" visual direction.
+ * Implements the verified Night Radar aesthetic:
+ * Deep charcoal canvas (#050709), pitch-black card surfaces (#0D1117, #161B22),
+ * phosphor mint for runners (#3DFFA2), tactical amber for hunters (#FF5C00),
+ * heat wash (#FF4D3D / #3D8BFF), radar scan cyan (#38BDF8), and ghost purple (#A855F7).
  */
 
 export const colors = {
-  // Screen & Surface
-  background: '#E2E8F0',
-  backgroundDark: '#0B1120',
-  surface: '#FFFFFF',
-  surfaceDark: '#1E293B',
-  surfaceMuted: '#F8FAFC',
-  surfaceAlt: '#1E293B',
+  // Screen & Surface (Night Radar dark canvas)
+  background: '#050709',
+  backgroundDark: '#020406',
+  surface: '#0D1117',
+  surfaceDark: '#080B0E',
+  surfaceElevated: '#161B22',
+  surfaceMuted: '#1F242C',
+  surfaceAlt: '#161B22',
 
   // Borders
-  border: '#CBD5E1',
-  borderDark: '#334155',
-  borderLight: '#F1F5F9',
+  border: '#21262D',
+  borderDark: '#30363D',
+  borderLight: '#161B22',
+  borderAccent: 'rgba(61, 255, 162, 0.4)',
+  borderHunter: 'rgba(255, 92, 0, 0.4)',
 
   // Text
-  text: '#0F172A',
+  text: '#E8F0EC',
   textLight: '#FFFFFF',
-  textMuted: '#64748B',
-  textSubtle: '#94A3B8',
+  textMuted: '#8A9AA3',
+  textSubtle: '#58656E',
 
   // Primary & Team Actions
-  primary: '#1D4ED8',
-  primaryHover: '#1E40AF',
-  primaryLight: '#EFF6FF',
-  accent: '#00FF66',
-  runner: '#10B981',
-  hunter: '#F59E0B',
-  warning: '#F59E0B',
+  primary: '#3DFFA2',
+  primaryHover: '#2CE08C',
+  primaryLight: 'rgba(61, 255, 162, 0.12)',
+  accent: '#3DFFA2',
+  runner: '#3DFFA2',
+  hunter: '#FF5C00',
+  warning: '#FFB020',
 
   // Feedback & Tactical
-  success: '#10B981',
-  successText: '#065F46',
-  danger: '#DC2626',
-  dangerText: '#991B1B',
-  dangerSurface: '#FEF2F2',
-  dangerBorder: '#FECACA',
-  dangerDisabled: '#FCA5A5',
+  success: '#3DFFA2',
+  successText: '#052917',
+  danger: '#FF4D3D',
+  dangerText: '#FFE5E3',
+  dangerSurface: '#240C0B',
+  dangerBorder: '#5C1D1A',
+  dangerDisabled: '#3D1513',
 
-  // Tactical Overlays (Hot & Cold, Radar)
+  // Tactical Overlays (Hot & Cold, Radar, Echo)
   heatHot: '#FF4D3D',
   heatCold: '#3D8BFF',
   radarScan: '#38BDF8',
-  ghostTrail: '#8B5CF6',
+  ghostTrail: '#A855F7',
+  ripple: 'rgba(56, 189, 248, 0.25)',
+  fogHaze: 'rgba(255, 255, 255, 0.08)',
 
-  // 8-Color Player Palette (Welcome screen)
+  // 8-Color Player Palette (Welcome screen & player pins)
   palette: [
     '#38BDF8', // Cyan
     '#F43F5E', // Rose
-    '#10B981', // Emerald
-    '#F59E0B', // Amber
-    '#8B5CF6', // Purple
+    '#3DFFA2', // Phosphor Mint
+    '#FFB020', // Amber
+    '#A855F7', // Purple
     '#EC4899', // Pink
     '#06B6D4', // Sky
     '#84CC16', // Lime
@@ -77,12 +84,19 @@ export const radii = {
   none: 0,
   xs: 4,
   sm: 8,
-  md: 10,
-  lg: 12,
+  md: 12,
   button: 12,
-  card: 16,
+  lg: 20,
+  card: 28, // Cards use 28dp per §4.2
   pill: 24,
   full: 9999,
+} as const;
+
+export const motion = {
+  feedback: 120, // Button taps, toggles
+  transition: 240, // Screen transitions, sheets
+  reveal: 600, // Role reveal, result reveal
+  ambient: 1500, // Radar sweep, breathing glow
 } as const;
 
 export const typography = {
@@ -95,7 +109,7 @@ export const typography = {
     title: 20,
     headline: 24,
     display: 28,
-    hero: 32,
+    hero: 34,
   },
   fontWeights: {
     normal: '400',
@@ -111,6 +125,13 @@ export const typography = {
     body: 22,
     heading: 26,
     display: 34,
+    hero: 42,
+  },
+  letterSpacing: {
+    normal: 0,
+    wide: 0.5,
+    caps: 1.2,
+    mono: 1.5,
   },
 } as const;
 
@@ -118,6 +139,7 @@ export const tokens = {
   colors,
   spacing,
   radii,
+  motion,
   typography,
 } as const;
 

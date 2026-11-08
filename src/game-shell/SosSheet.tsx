@@ -10,6 +10,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '../ui/Text';
 import { useTheme } from '../theme/ThemeProvider';
+import { colors } from '../theme/tokens';
 import type { ShellActions } from './types';
 
 interface SosSheetProps {
@@ -83,10 +84,10 @@ export const SosSheet = memo(function SosSheet({
             style={[styles.sosButton, { backgroundColor: tokens.colors.danger }]}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.textLight} />
             ) : (
               <>
-                <Ionicons color="#FFFFFF" name="call" size={20} />
+                <Ionicons color={colors.textLight} name="call" size={20} />
                 <Text variant="label" style={styles.buttonText}>
                   TRIGGER SOS & CALL 112 / 911
                 </Text>
@@ -133,7 +134,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 2,
     gap: 16,
-    shadowColor: '#000',
+    shadowColor: colors.backgroundDark,
     shadowOpacity: 0.5,
     shadowRadius: 15,
     elevation: 10,
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#8A9BA8',
+    color: colors.textMuted,
   },
   sosButton: {
     flexDirection: 'row',
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: colors.textLight,
     fontWeight: '800',
     letterSpacing: 0.5,
   },

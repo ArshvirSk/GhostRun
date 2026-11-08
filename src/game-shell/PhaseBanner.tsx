@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '../ui/Text';
 import { useTheme } from '../theme/ThemeProvider';
+import { colors } from '../theme/tokens';
 import type { RoundState, ShellActions } from './types';
 import {
   selectCurfewRemainingS,
@@ -75,7 +76,7 @@ export const PhaseBanner = memo(function PhaseBanner({
           style={[styles.resumeButton, { backgroundColor: tokens.colors.primary }]}
         >
           {resuming ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
+            <ActivityIndicator color={colors.textLight} size="small" />
           ) : (
             <Text variant="label" style={styles.resumeText}>
               ▶ Resume Game
@@ -171,7 +172,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     zIndex: 15,
-    shadowColor: '#000',
+    shadowColor: colors.backgroundDark,
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 4,
@@ -188,7 +189,7 @@ const styles = StyleSheet.create({
   },
   bannerBody: {
     fontSize: 12,
-    color: '#8A9BA8',
+    color: colors.textMuted,
   },
   resumeButton: {
     paddingHorizontal: 16,
@@ -199,7 +200,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   resumeText: {
-    color: '#FFFFFF',
+    color: colors.textLight,
     fontWeight: '700',
   },
   vehicleBanner: {},

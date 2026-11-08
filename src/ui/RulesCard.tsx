@@ -24,6 +24,18 @@ export function RulesCard({
 
   const difficultyStars = '★'.repeat(module.difficulty) + '☆'.repeat(3 - module.difficulty);
 
+  const layerBg =
+    module.layer === 'base'
+      ? colors.primaryLight
+      : colors.surfaceElevated;
+
+  const layerColor =
+    module.layer === 'base'
+      ? colors.primary
+      : module.layer === 'role'
+        ? colors.ghostTrail
+        : colors.warning;
+
   return (
     <View
       style={[
@@ -33,6 +45,7 @@ export function RulesCard({
           borderRadius: radii.card,
           borderColor: colors.border,
           padding: spacing.base,
+          shadowColor: colors.backgroundDark,
         },
       ]}
     >
@@ -44,31 +57,17 @@ export function RulesCard({
               style={[
                 styles.layerBadge,
                 {
-                  backgroundColor:
-                    module.layer === 'base'
-                      ? colors.primaryLight
-                      : module.layer === 'role'
-                        ? '#F3E8FF'
-                        : '#FEF3C7',
+                  backgroundColor: layerBg,
                 },
               ]}
             >
-              <Text
-                color={
-                  module.layer === 'base'
-                    ? colors.primary
-                    : module.layer === 'role'
-                      ? '#7E22CE'
-                      : '#B45309'
-                }
-                variant="label"
-              >
+              <Text color={layerColor} variant="label">
                 {module.layer.toUpperCase()}
               </Text>
             </View>
             {module.complexity === 'high' && (
-              <View style={[styles.complexityBadge, { backgroundColor: '#FEE2E2' }]}>
-                <Text color="#991B1B" variant="label">
+              <View style={[styles.complexityBadge, { backgroundColor: colors.dangerSurface }]}>
+                <Text color={colors.danger} variant="label">
                   HIGH COMPLEXITY
                 </Text>
               </View>
@@ -101,10 +100,10 @@ export function RulesCard({
             {module.idealPlayers}
           </Text>
         </View>
-        <View style={styles.metaDivider} />
+        <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
         <View style={styles.metaCol}>
           <Text variant="label">DIFFICULTY</Text>
-          <Text color="#D97706" style={styles.metaVal} variant="body" weight="bold">
+          <Text color={colors.warning} style={styles.metaVal} variant="body" weight="bold">
             {difficultyStars}
           </Text>
         </View>
@@ -153,12 +152,12 @@ export function RulesCard({
 
               {/* Safety Notes */}
               {module.safetyNotes.length > 0 && (
-                <View style={[styles.safetyBlock, { backgroundColor: '#F0FDF4' }]}>
-                  <Text color="#166534" variant="label">
+                <View style={[styles.safetyBlock, { backgroundColor: colors.surfaceElevated }]}>
+                  <Text color={colors.success} variant="label">
                     SAFETY INTEL
                   </Text>
                   {module.safetyNotes.map((note, idx) => (
-                    <Text key={idx} color="#15803D" style={styles.safetyItem} variant="body">
+                    <Text key={idx} color={colors.textMuted} style={styles.safetyItem} variant="body">
                       • {note}
                     </Text>
                   ))}
@@ -183,7 +182,7 @@ export function RulesCard({
           ]}
         >
           <Text
-            color={acknowledged ? '#FFFFFF' : colors.primary}
+            color={acknowledged ? colors.textLight : colors.primary}
             variant="label"
             weight="bold"
           >
@@ -200,7 +199,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     elevation: 2,
     marginBottom: 14,
-    shadowColor: '#0F172A',
     shadowOpacity: 0.05,
     shadowRadius: 6,
   },
@@ -246,7 +244,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   metaDivider: {
-    backgroundColor: '#CBD5E1',
     width: 1,
   },
   summaryBox: {

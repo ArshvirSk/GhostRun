@@ -61,8 +61,8 @@ export function ParamField({ param, value, onChange, disabled = false }: ParamFi
           <Switch
             disabled={disabled}
             onValueChange={(val) => onChange(param.key, val)}
-            thumbColor={Boolean(currentValue) ? colors.primary : '#F1F5F9'}
-            trackColor={{ false: '#CBD5E1', true: colors.primaryLight }}
+            thumbColor={Boolean(currentValue) ? colors.primary : colors.textMuted}
+            trackColor={{ false: colors.border, true: colors.primaryLight }}
             value={Boolean(currentValue)}
           />
         )}
@@ -156,7 +156,7 @@ export function ParamField({ param, value, onChange, disabled = false }: ParamFi
                 ]}
               >
                 <Text
-                  color={isSelected ? '#FFFFFF' : colors.text}
+                  color={isSelected ? colors.backgroundDark : colors.text}
                   variant="label"
                   weight={isSelected ? 'bold' : 'normal'}
                 >

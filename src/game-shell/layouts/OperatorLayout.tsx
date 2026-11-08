@@ -37,6 +37,7 @@ export const OperatorLayout = memo(function OperatorLayout({
               backgroundColor: tokens.colors.surface,
               borderColor: tokens.colors.accent,
               borderRadius: tokens.radii.card,
+              shadowColor: tokens.colors.backgroundDark,
             },
           ]}
         >
@@ -67,6 +68,7 @@ export const OperatorLayout = memo(function OperatorLayout({
                 backgroundColor: tokens.colors.surface,
                 borderColor: tokens.colors.accent,
                 borderRadius: tokens.radii.card,
+                shadowColor: tokens.colors.backgroundDark,
               },
             ]}
           >
@@ -99,7 +101,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    shadowColor: '#000',
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,
@@ -119,7 +120,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderWidth: 1,
-    shadowColor: '#000',
     shadowOpacity: 0.4,
     shadowRadius: 10,
     elevation: 6,

@@ -46,6 +46,7 @@ export const HunterLayout = memo(function HunterLayout({
                 backgroundColor: tokens.colors.surface,
                 borderColor: tokens.colors.danger,
                 borderRadius: tokens.radii.card,
+                shadowColor: tokens.colors.backgroundDark,
               },
             ]}
           >
@@ -85,7 +86,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderWidth: 1,
-    shadowColor: '#000',
     shadowOpacity: 0.4,
     shadowRadius: 10,
     elevation: 6,

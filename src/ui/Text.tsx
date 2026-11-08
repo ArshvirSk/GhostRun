@@ -7,7 +7,18 @@ import {
 } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 
-export type TextVariant = 'display' | 'title' | 'body' | 'label' | 'mono' | 'numeric';
+export type TextVariant =
+  | 'hero'
+  | 'display'
+  | 'headline'
+  | 'title'
+  | 'subtitle'
+  | 'body'
+  | 'sub'
+  | 'caption'
+  | 'label'
+  | 'mono'
+  | 'numeric';
 
 export interface TextProps extends RNTextProps {
   variant?: TextVariant;
@@ -30,10 +41,26 @@ export function Text({
 
   const variantStyle: TextStyle = React.useMemo(() => {
     switch (variant) {
+      case 'hero':
+        return {
+          fontSize: typography.fontSizes.hero,
+          fontWeight: typography.fontWeights.black as TextStyle['fontWeight'],
+          lineHeight: typography.lineHeights.hero,
+          letterSpacing: -0.5,
+          color: colors.text,
+        };
       case 'display':
         return {
           fontSize: typography.fontSizes.display,
           fontWeight: typography.fontWeights.black as TextStyle['fontWeight'],
+          lineHeight: typography.lineHeights.display,
+          letterSpacing: -0.3,
+          color: colors.text,
+        };
+      case 'headline':
+        return {
+          fontSize: typography.fontSizes.headline,
+          fontWeight: typography.fontWeights.heavy as TextStyle['fontWeight'],
           lineHeight: typography.lineHeights.display,
           color: colors.text,
         };
@@ -44,11 +71,32 @@ export function Text({
           lineHeight: typography.lineHeights.heading,
           color: colors.text,
         };
+      case 'subtitle':
+        return {
+          fontSize: typography.fontSizes.subtitle,
+          fontWeight: typography.fontWeights.semibold as TextStyle['fontWeight'],
+          lineHeight: typography.lineHeights.body,
+          color: colors.text,
+        };
+      case 'caption':
+        return {
+          fontSize: typography.fontSizes.caption,
+          fontWeight: typography.fontWeights.medium as TextStyle['fontWeight'],
+          lineHeight: typography.lineHeights.tight,
+          color: colors.textMuted,
+        };
+      case 'sub':
+        return {
+          fontSize: typography.fontSizes.sub,
+          fontWeight: typography.fontWeights.normal as TextStyle['fontWeight'],
+          lineHeight: typography.lineHeights.sub,
+          color: colors.textMuted,
+        };
       case 'label':
         return {
           fontSize: typography.fontSizes.caption,
           fontWeight: typography.fontWeights.heavy as TextStyle['fontWeight'],
-          letterSpacing: 1.1,
+          letterSpacing: 1.2,
           textTransform: 'uppercase',
           color: colors.textMuted,
         };
@@ -57,6 +105,7 @@ export function Text({
           fontSize: typography.fontSizes.sub,
           fontWeight: typography.fontWeights.medium as TextStyle['fontWeight'],
           fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+          letterSpacing: 0.5,
           color: colors.text,
         };
       case 'numeric':
@@ -64,7 +113,7 @@ export function Text({
           fontSize: typography.fontSizes.headline,
           fontWeight: typography.fontWeights.black as TextStyle['fontWeight'],
           fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-          letterSpacing: 1.2,
+          letterSpacing: 1.5,
           color: colors.text,
         };
       case 'body':
