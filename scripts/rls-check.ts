@@ -2620,6 +2620,44 @@ async function main() {
     );
   }
 
+  // AI Game Master (ai_gm) Security & Guardrail Checks (VM2)
+  {
+    // 1. trigger_game_master_event with invalid event type is rejected
+    const invalidTypeRes = await rpc(host, 'trigger_game_master_event', {
+      game_id: gameId,
+      event_type: 'orbital_nuke',
+    });
+    expect(
+      Boolean(invalidTypeRes.error) || (invalidTypeRes.data as Record<string, unknown> | null)?.success === false,
+      'trigger_game_master_event with invalid event type is rejected',
+      String(invalidTypeRes.error?.message ?? JSON.stringify(invalidTypeRes.data)),
+    );
+
+    // 2. narrate_game_master called by outsider is rejected
+    const outsiderNarrate = await rpc(outsider, 'narrate_game_master', {
+      game_id: gameId,
+      event_type: 'supply_drop',
+      custom_narration: 'Outsider trying to spoof radio dispatch.',
+    });
+    expect(
+      Boolean(outsiderNarrate.error),
+      'outsider cannot broadcast game master narration',
+      String(outsiderNarrate.error?.message ?? ''),
+    );
+
+    // 3. narrate_game_master with empty narration is rejected
+    const emptyNarrate = await rpc(host, 'narrate_game_master', {
+      game_id: gameId,
+      event_type: 'supply_drop',
+      custom_narration: '   ',
+    });
+    expect(
+      Boolean(emptyNarrate.error),
+      'empty custom narration is rejected by server guardrail',
+      String(emptyNarrate.error?.message ?? ''),
+    );
+  }
+
   // Consent records are append-only and reachable only through the RPCs.
   const policyAck = await rpc(host, 'set_consent', {
     consent_type: 'policy_ack',

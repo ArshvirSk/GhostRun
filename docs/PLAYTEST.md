@@ -387,17 +387,18 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Start round and verify `game_master_init` event is emitted.
 * **In-Game Radio Dispatch Dock:**
   - [ ] When an event triggers, verify the **Game Master Radio Dispatch Banner** slides in above the bottom sheet with a cyan radio broadcast icon.
+  - [ ] **Daylight Readability:** Confirm dispatch banner title and narration text remain clearly legible under direct outdoor sunlight.
   - [ ] Verify whisper audio cue (`playSound('whisper')`) and haptic pulse fire on incoming transmissions.
-  - [ ] Verify the bottom sheet displays the operational AI Game Master status card with current sequence (`X/12 events`).
+  - [ ] Verify the bottom sheet displays the operational AI Game Master status card with current sequence (`X/12 events`) and real-time countdown to next event.
 * **Tactical Event Verification:**
-  - [ ] **Supply Drop:** Confirm a tactical supply crate marker spawns within the operation area.
+  - [ ] **Supply Drop:** Confirm a tactical supply crate marker spawns within the operation area (strictly inside inner 65% radius).
   - [ ] **Satellite Sweep (Double Ping):** Confirm an immediate extra radar ping round reveals runner positions.
-  - [ ] **Radar Fog:** Confirm the atmospheric haze overlay covers the map with a sensory distortion warning badge for 60 seconds.
+  - [ ] **Radar Fog:** Confirm the atmospheric haze overlay covers the map with a sensory distortion warning badge for 60 seconds. Confirm radar blips are obscured on physical screen.
   - [ ] **Intelligence Rumour:** Confirm radio chatter dispatch announces directional quadrant runner concentration (e.g., North-East).
-  - [ ] **Perimeter Contraction Step:** Confirm the safe area boundary contracts by 15% with a HUD notification.
+  - [ ] **Perimeter Contraction Step:** Confirm the safe area boundary contracts by 15% with a HUD notification, clamped to never drop below 60 m radius.
 * **Cap & Safety Integration:**
-  - [ ] Verify match pacing strictly honors the event cap (default 12 events per round).
-  - [ ] Trigger a Safety Pause (`pause_game`) and verify next event deadlines are shifted forward by the pause duration upon resuming.
+  - [ ] Verify match pacing strictly honors the event cap (default 12 events per round; subsequent triggers rejected).
+  - [ ] **Safety Pause Preservation:** Trigger an Emergency SOS Pause (`pause_game`) and verify GM event timers and fog countdowns are halted immediately, then shifted forward by the exact pause duration upon resuming.
 
 ### 3.15 Replay & Stats Upgrades (Milestone C3)
 
