@@ -26,4 +26,4 @@
 | 2026-11-08 | VM1 (ai_gm) | Spec check and forensic audit for AI Game Master modifier (docs/specs/ai_gm.md) | verified | approved |
 | 2026-11-08 | VM2 (ai_gm) | Fix AI Game Master negative tests, playtest checklist, and mode status | fixed in code, needs device test | approved |
 | 2026-11-08 | VM3 | Hide unreleased modes (haunted_map, qr_tagging, horde, manhunt) from UI and catalogue, migration 155, and negative tests | verified | approved |
-| 2026-11-08 | VM4 | Field-test plan (docs/FIELD_TEST_PLAN.md): testing matrices, real-world failure vectors, 1-page checklists, and Go/No-Go criteria | verified | pending |
+| 2026-11-08 | VM4 | Field-test plan (docs/FIELD_TEST_PLAN.md): testing matrices, real-world failure vectors, 1-page checklists, and Go/No-Go criteria | verified | approved |
