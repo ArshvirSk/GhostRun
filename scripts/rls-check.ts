@@ -1793,6 +1793,14 @@ async function main() {
     });
     expect(Boolean(hunterExtraction.error), 'hunter cannot set extraction location', 'call unexpectedly succeeded');
 
+    const outsideExtraction = await rpc(host, 'set_extraction_location', {
+      p_game_id: rhGameId,
+      p_lat: CENTER.lat + 0.05,
+      p_lng: CENTER.lng + 0.05,
+      p_radius_m: 25,
+    });
+    expect(Boolean(outsideExtraction.error), 'host cannot set extraction location outside boundary', 'call unexpectedly succeeded');
+
     const hostExtraction = await rpc(host, 'set_extraction_location', {
       p_game_id: rhGameId,
       p_lat: CENTER.lat + 0.001,
@@ -1840,11 +1848,30 @@ async function main() {
     });
     expect(Boolean(hunterHandoff.error), 'hunter cannot call request_handoff', 'call unexpectedly succeeded');
 
+    const hunterConfirm = await rpc(hunter, 'confirm_handoff', { p_game_id: rhGameId });
+    expect(Boolean(hunterConfirm.error), 'hunter cannot call confirm_handoff', 'call unexpectedly succeeded');
+
+    const outsiderConfirm = await rpc(outsider, 'confirm_handoff', { p_game_id: rhGameId });
+    expect(Boolean(outsiderConfirm.error), 'outsider cannot call confirm_handoff', 'call unexpectedly succeeded');
+
+    const hunterPickup = await rpc(hunter, 'pickup_package', { p_game_id: rhGameId });
+    expect(Boolean(hunterPickup.error), 'hunter cannot call pickup_package', 'call unexpectedly succeeded');
+
     const outsiderPickup = await rpc(outsider, 'pickup_package', { p_game_id: rhGameId });
     expect(Boolean(outsiderPickup.error), 'outsider cannot call pickup_package', 'call unexpectedly succeeded');
 
     const runnerSecuring = await rpc(host, 'start_securing_package', { p_game_id: rhGameId });
     expect(Boolean(runnerSecuring.error), 'runner cannot call start_securing_package', 'call unexpectedly succeeded');
+
+    const runnerCompleteSecure = await rpc(host, 'complete_secure_package', { p_game_id: rhGameId });
+    expect(Boolean(runnerCompleteSecure.error), 'runner cannot call complete_secure_package', 'call unexpectedly succeeded');
+
+    const outsiderCompleteSecure = await rpc(outsider, 'complete_secure_package', { p_game_id: rhGameId });
+    expect(Boolean(outsiderCompleteSecure.error), 'outsider cannot call complete_secure_package', 'call unexpectedly succeeded');
+
+    // 5. Event secrecy: runner-audience events cannot be read by hunters
+    const hunterRunnerEvents = (await hunter.from('events').select('*').eq('game_id', rhGameId).eq('audience', 'runner')).data ?? [];
+    expectEmpty(hunterRunnerEvents, 'hunter cannot read runner-audience events from events table');
 
     for (const client of [host, rhRunner2, hunter]) {
       await rpc(client, 'leave_game', { game_id: rhGameId });

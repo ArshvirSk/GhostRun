@@ -2150,6 +2150,17 @@ async function relayHeistScenario() {
   const otherRunnerPid = hostIsCarrier ? runner2Pid : hostPid;
 
   // 5. Physical Handoff Test
+  // Negative check: carrier cannot handoff to self
+  const selfHandoff = await rpc<{ success: boolean; reason: string }>(initialCarrierClient, 'request_handoff', {
+    p_game_id: gameId,
+    p_target_player_id: initialCarrierPid,
+  });
+  expect(
+    selfHandoff.data?.success === false && selfHandoff.data?.reason === 'cannot_handoff_to_self',
+    'carrier cannot handoff to self',
+    JSON.stringify(selfHandoff.data ?? selfHandoff.error),
+  );
+
   // Initial carrier submits position at CENTER
   await rpc(initialCarrierClient, 'submit_position', {
     game_id: gameId,
@@ -2244,11 +2255,35 @@ async function relayHeistScenario() {
   );
 
   // 7. Drop Contest: Hunter Securing
+  // Negative check: runner cannot call start_securing_package (hunter-only)
+  const runnerSecuringAttempt = await rpc(otherRunnerClient, 'start_securing_package', { p_game_id: gameId });
+  expect(
+    Boolean(runnerSecuringAttempt.error),
+    'runner cannot call start_securing_package (hunter-only)',
+    String(runnerSecuringAttempt.error?.message ?? 'unexpected success'),
+  );
+
+  // Negative check: hunter cannot call pickup_package (runner-only)
+  const hunterPickupAttempt = await rpc(hunter, 'pickup_package', { p_game_id: gameId });
+  expect(
+    Boolean(hunterPickupAttempt.error),
+    'hunter cannot call pickup_package (runner-only)',
+    String(hunterPickupAttempt.error?.message ?? 'unexpected success'),
+  );
+
   const startSecuring = await rpc(hunter, 'start_securing_package', { p_game_id: gameId });
   expect(
     !startSecuring.error,
     'hunter within 10m can start securing dropped package',
     String(startSecuring.error?.message ?? ''),
+  );
+
+  // Negative check: hunter cannot complete securing before 20s hold elapses
+  const prematureComplete = await rpc<{ success: boolean; reason: string }>(hunter, 'complete_secure_package', { p_game_id: gameId });
+  expect(
+    prematureComplete.data?.success === false && prematureComplete.data?.reason === 'hold_incomplete',
+    'hunter cannot complete securing package before 20s hold elapses',
+    JSON.stringify(prematureComplete.data ?? prematureComplete.error),
   );
 
   const cancelSecuring = await rpc(hunter, 'cancel_securing_package', { p_game_id: gameId });

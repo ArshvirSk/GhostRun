@@ -162,6 +162,13 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Hunters secure the package: immediate **Hunters Win (`package_secured`)**.
   - [ ] If carrier goes offline for > 60 seconds, package automatically drops at their last known coordinates.
   - [ ] Match timer expires before extraction: **Hunters Win (`time_expired`)**.
+* **Physical Device & Environmental Verification:**
+  - [ ] **5m Handoff Usability Outdoors:** Test the physical 5 m proximity handoff button when two runners rendezvous outdoors under full daylight; verify that GPS accuracy offset ($\le 5\text{ m}$) absorbs normal outdoor pedestrian jitter without spurious "too_far" rejections.
+  - [ ] **20s Securing Hold Usability:** Verify holding the hunter "Secure Package" onscreen button for 20 continuous seconds functions reliably outdoors with sweaty fingers without premature touch cancellation.
+  - [ ] **Audio & Haptic Feedback:** Confirm distinct audio tones and haptics trigger upon: becoming initial carrier, receiving a handoff request, successful handoff completion, package dropped banner, and securing countdown ticks.
+  - [ ] **Dropped Beacon Visibility:** Confirm that when a package drops, its coordinates render immediately on all players' maps as a high-contrast pulsing beacon icon with live distance indicator.
+  - [ ] **Site & Extraction Safety Buffer:** Confirm that host-placed extraction points are strictly located $\ge 50\text{ m}$ away from vehicle roads, traffic intersections, active construction, and water hazards.
+  - [ ] **SOS Interruption:** Verify pressing the emergency SOS button at any point during package carry, handoff, or hunter secure hold immediately pauses the match, shifts all timers, and notifies all participants.
 
 ### 3.7 Modifiers Checklists
 - [ ] **Noise Meter:**
