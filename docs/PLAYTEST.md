@@ -326,8 +326,10 @@ Immediately following each outdoor play session, ask each participant:
     - Initial sector rings render neutral slate (`#94A3B8`).
     - Captured runner sectors render cyan (`#06B6D4`).
     - Captured hunter sectors render red (`#EF4444`).
+  - [ ] **Daylight Readability:** Confirm sector border rings and center badges remain clearly distinguishable under direct outdoor sunlight without needing max screen brightness.
 * **Pulse Mechanics & Sector Capture:**
   - [ ] Top HUD shows next pulse countdown timer (default 90 s cadence).
+  - [ ] **Pulse Haptics:** Verify phone triggers a distinct double-buzz haptic pattern upon each pulse evaluation tick.
   - [ ] Player standing inside a neutral sector claims it for their team when the pulse fires.
   - [ ] Score increments (+1 point per owned sector on every pulse).
   - [ ] Opponent presence inside an owned sector marks it as contested on pulse 1.
@@ -336,7 +338,11 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Hunter tags a runner within tag radius.
   - [ ] Confirm runner is **not eliminated** from the match.
   - [ ] Runner receives a 60-second incapacitation timer (`contest_tag` event).
+  - [ ] **Incapacitation Banner:** Tagged runner HUD displays persistent 60s countdown banner with amber border overlay.
   - [ ] Runner does not contribute to sector majority counts while incapacitated.
+* **Safety & Emergency Controls:**
+  - [ ] Emergency SOS button remains accessible on screen at all times during sector contests.
+  - [ ] Activating SOS pauses game timer and halts pulse score accumulation immediately.
 * **Victory & Results:**
   - [ ] Dominance victory triggers if either team controls $\ge 70\%$ ($\ge 5$ of 7) sectors across 2 consecutive pulses, or all 7 sectors immediately (`territory_dominance`).
   - [ ] Point victory triggers upon round duration expiration (`points_victory` or `draw`).

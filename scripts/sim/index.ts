@@ -3358,6 +3358,23 @@ async function territoryPulseScenario() {
   );
 
   // 6. Test Contest Tag: Move host far away, bring runner2 and hunter to Sector Core
+  // Negative check 1: Runner cannot call attempt_tag
+  const runnerTagAttempt = await rpc(runner2, 'attempt_tag', { game_id: gameId });
+  expect(
+    Boolean(runnerTagAttempt.error),
+    'runner cannot execute attempt_tag in territory_pulse',
+    String(runnerTagAttempt.error?.message ?? ''),
+  );
+
+  // Negative check 2: Outsider cannot call attempt_tag
+  const outsider = await newPlayer('TerritoryOutsider');
+  const outsiderTag = await rpc(outsider, 'attempt_tag', { game_id: gameId });
+  expect(
+    Boolean(outsiderTag.error),
+    'outsider cannot execute attempt_tag in territory_pulse',
+    String(outsiderTag.error?.message ?? ''),
+  );
+
   await rpc(host, 'submit_position', {
     game_id: gameId,
     lat: CENTER.lat + 0.05,
@@ -3394,6 +3411,16 @@ async function territoryPulseScenario() {
       tagRes.data?.runner_id === runner2Pid,
     'contest tag incapacitates runner2 for 60 seconds without ending game',
     JSON.stringify(tagRes.data ?? tagRes.error),
+  );
+
+  // Negative check 3: Hunter attempting to tag when only in-range runner is already incapacitated
+  const repeatTagFail = await rpc<{ success: boolean; reason?: string }>(hunter, 'attempt_tag', {
+    game_id: gameId,
+  });
+  expect(
+    repeatTagFail.data?.success === false,
+    'hunter cannot tag when only in-range runner is already incapacitated or on cooldown',
+    JSON.stringify(repeatTagFail.data ?? repeatTagFail.error),
   );
 
   // 7. Verify incapacitated runner does not contribute to sector majority

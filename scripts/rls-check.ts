@@ -2575,6 +2575,51 @@ async function main() {
     );
   }
 
+  // Territory Pulse (territory_pulse) RLS Secrecy & Security Checks (VM2)
+  {
+    // 1. Direct write/update/delete on entities (kind = 'zone') is rejected (server RPC only)
+    const directZoneInsert = await host.from('entities').insert({
+      game_id: gameId,
+      kind: 'zone',
+      geog: `POINT(${CENTER.lng} ${CENTER.lat})`,
+      visible_to: 'all',
+      state: { name: 'Rogue Zone', controller: 'hunter' },
+    });
+    expect(
+      Boolean(directZoneInsert.error),
+      'entities table is not directly insertable by clients',
+      'direct insert into entities unexpectedly succeeded',
+    );
+
+    const directZoneUpdate = await host
+      .from('entities')
+      .update({ state: { controller: 'hunter' } })
+      .eq('game_id', gameId);
+    expect(
+      Boolean(directZoneUpdate.error),
+      'entities table is not directly updatable by clients',
+      'direct update on entities unexpectedly succeeded',
+    );
+
+    const directZoneDelete = await host
+      .from('entities')
+      .delete()
+      .eq('game_id', gameId);
+    expect(
+      Boolean(directZoneDelete.error),
+      'entities table is not directly deletable by clients',
+      'direct delete on entities unexpectedly succeeded',
+    );
+
+    // 2. Outsider attempt_tag is rejected
+    const outsiderTagAttempt = await rpc(outsider, 'attempt_tag', { game_id: gameId });
+    expect(
+      Boolean(outsiderTagAttempt.error),
+      'outsider cannot execute attempt_tag in game',
+      String(outsiderTagAttempt.error?.message ?? ''),
+    );
+  }
+
   // Consent records are append-only and reachable only through the RPCs.
   const policyAck = await rpc(host, 'set_consent', {
     consent_type: 'policy_ack',
