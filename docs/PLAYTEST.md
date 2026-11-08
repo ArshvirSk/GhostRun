@@ -125,6 +125,13 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] Tagging the final prey terminates the game immediately with **Solo Victory (`last_survivor`)**.
   - [ ] If round duration expires, player with the highest elimination count wins (`time_expired`).
   - [ ] Inactivity fail-safe: any player who stops transmitting location fixes for > 3 minutes while live is auto-eliminated for offline timeout, and the contract ring relinks seamlessly around them.
+* **Physical Device & Environmental Verification:**
+  - [ ] **Directionless Proximity Haptics:** Verify the phone in pocket emits distinct haptic patterns without needing to look at the screen: subtle single buzz at $\le 100\text{ m}$ ("near") and urgent rapid double-buzz at $\le 40\text{ m}$ ("close").
+  - [ ] **Prey Contract Audio Tone:** Confirm a distinct audio sound effect triggers immediately when your target is eliminated and you inherit a new contract.
+  - [ ] **Strict No-Contact Compliance:** Verify that tags can be completed cleanly at 10–14 m distance, ensuring players never need to make physical contact or invade personal space.
+  - [ ] **Screen Readability in Bright Sunlight:** Test HUD target banner legibility outdoors under full daylight.
+  - [ ] **Safe Zone Site Safety:** Confirm safe zones are placed in open, well-lit gathering spaces $\ge 50\text{ m}$ away from vehicle roads, water bodies, or steep terrain.
+  - [ ] **SOS Interruption:** Verify pressing the in-app SOS button while hunting immediately halts the round, pauses timers, and alerts all participants.
 
 ### 3.6 Relay Heist Base Mode (docs/MODES.md §4.5)
 * **Recommended Group:** 5–12 players (minimum 1 hunter, 2 runners; recommended 2+ hunters, 4+ runners).

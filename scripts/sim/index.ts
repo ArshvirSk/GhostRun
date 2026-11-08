@@ -1957,6 +1957,14 @@ async function assassinRingScenario() {
     `new prey: ${postTagState.data?.assassin_ring?.my_prey?.player_id}`,
   );
 
+  // Eliminated player cannot call attempt_tag
+  const spectatorTag = await rpc(pB, 'attempt_tag', { game_id: gameId });
+  expect(
+    Boolean(spectatorTag.error) && /not an active player/i.test(spectatorTag.error?.message ?? ''),
+    'eliminated player cannot call attempt_tag',
+    String(spectatorTag.error?.message ?? 'unexpected success'),
+  );
+
   // 8. Final elimination: hunter tags new prey (third player)
   // Wait out 8s tag cooldown
   await new Promise((r) => setTimeout(r, 8500));

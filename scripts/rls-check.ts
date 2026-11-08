@@ -1677,6 +1677,18 @@ async function main() {
     });
     expect(Boolean(hunterSafeZone.error), 'non-host player cannot set safe zone location', 'call unexpectedly succeeded');
 
+    const outsideSafeZone = await rpc(host, 'set_safe_zone_location', {
+      p_game_id: ringGameId,
+      p_zone_index: 1,
+      p_lat: CENTER.lat + 0.5,
+      p_lng: CENTER.lng,
+      p_radius_m: 20,
+    });
+    expect(Boolean(outsideSafeZone.error), 'safe zone outside play area boundary is rejected', 'call unexpectedly succeeded');
+
+    const outsiderTag = await rpc(outsider, 'attempt_tag', { game_id: ringGameId });
+    expect(Boolean(outsiderTag.error), 'outsider cannot call attempt_tag in assassin ring', 'call unexpectedly succeeded');
+
     // 2. Third player joins so ring can start (min 3 players)
     const ringPlayer3 = await anonymousClient('RingPlayer3');
     await rpc(hunter, 'join_game', { code: ringCode });
