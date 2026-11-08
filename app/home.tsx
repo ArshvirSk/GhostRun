@@ -85,7 +85,7 @@ export default function HomeScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [router]);
 
   async function signOut() {
     if (!supabase || signingOut) return;

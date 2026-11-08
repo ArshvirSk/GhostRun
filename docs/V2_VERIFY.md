@@ -136,7 +136,7 @@ Upon receiving user decisions on D1 through D8:
    - Ghost NPC fairness gates: 3 s continuous dwell time, GPS accuracy gate ($\le 30\text{ m}$), velocity clamp ($\le 2.0\text{ m/s}$), play boundary clamping, and `ghost_mode` (`'haunt'` vs. `'assist'`).
    - Mock location detection emits `mock_location_detected` event.
    - Universal vehicle speed warning ($\ge 8\text{ m/s}$ for 10 s).
-   - Guest sign-in enabled with mandatory consent gate, age confirmation (16+), and self-service export/deletion parity.
+   - Guest sign-in enabled with mandatory consent gate, age confirmation (18 or older, or supervised by a guardian), and self-service export/deletion parity.
    - All tests passing (`npm run sim`, `npm run rls`, `npm run typecheck`).
 2. **Milestone S2 (Mode & Spec Alignment) — COMPLETED:**
    - Enabled `double_agent` role in [src/lib/modeRegistry.ts](file:///c:/ASK_Main/ASK/Projects/GhostRun/src/lib/modeRegistry.ts#L122).

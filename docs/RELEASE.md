@@ -94,3 +94,27 @@ gh release create vX.Y.Z "android/app/build/outputs/apk/release/app-release.apk#
 ```
 
 3. Confirm that the release is marked as public, immutable, and the APK artifact is downloadable.
+
+---
+
+## 7. Mandatory Outdoor Field Test & Physical Sign-Off Gate
+
+> [!IMPORTANT]
+> **No Release Without Physical Sign-Off:**
+> An automated simulation suite, unit tests, and local Gradle compilation produce a **Release Candidate (RC)**, not a signed-off release.
+> A build may only be promoted to a final release after:
+> 1. An outdoor physical test session with 6 or more human players across supported gameplay modes.
+> 2. Explicit physical test review and sign-off by the project owner.
+> 
+> The current build is labeled: **`v2.5.0-rc1` (Unverified Release Candidate)**.
+
+---
+
+## 8. GitHub Releases & Remote Tag Relabeling Proposal
+
+*Current state:* Remote repository contains tags `v2.0.0`, `v2.1.0`, `v2.2.0`, `v2.3.0`. Neither `v2.4.0` nor `v2.5.0` has been created or pushed.
+
+*Proposed relabeling plan (pending user approval before any outward action):*
+1. Do not push `v2.5.0` tag until physical field test sign-off is complete.
+2. If distributing the current build for outdoor field testing, tag as `v2.5.0-rc1` locally.
+3. If publishing a GitHub Release for field testing, mark explicitly as **"Pre-release"** with title `GhostRun v2.5.0-rc1 (Release Candidate 1)`.

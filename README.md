@@ -162,6 +162,7 @@ GhostRun introduces an asynchronous community ghost recording system:
 ## 🔒 Privacy, Consent & Retention Architecture
 
 GhostRun v2 implements rigorous, transparent privacy controls:
+- **Age Confirmation & Supervision Gate:** Mandatory first-run gate requiring explicit confirmation that the player is 18 or older, or supervised by a guardian.
 - **C1–C6 Consent Architecture:** Formal consent states for location, policy acknowledgment, ghost replays, leaderboard names, diagnostics, and spectator feeds.
 - **Route Sharing Choice (Consent C3):** Every player explicitly chooses whether to share their replay breadcrumb trail (`Share Route` or `Keep Private`) before readying up.
 - **Data Minimization:** Private trails are omitted from post-match recaps, opponent views, and closest-call statistics.

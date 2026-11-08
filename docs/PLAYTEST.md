@@ -410,7 +410,7 @@ Before testing with real players:
 
 ## 6. Playtest Verification & Sign-Off
 
-- **Field Playtest Status:** ✅ Completed. Verified in real-world outdoor physical playtest with multi-player group testing Classic Chase, Tag Hunt, Hot & Cold, Noise Meter, Dead Drops, and QR Tagging.
+- **Field Playtest Status:** ⏳ Pending User Physical Sign-Off. Requires physical outdoor test session with 6+ players and explicit sign-off by project owner. Automated simulation or built APKs constitute release candidates, not signed-off releases.
 - **External Cron Automation:** ✅ Completed. External keep-alive cron job configured and active, triggering the `cleanup_old_games()` retention sweep.
 - **Official Contact Email:** `arshvirsk26@gmail.com`
 

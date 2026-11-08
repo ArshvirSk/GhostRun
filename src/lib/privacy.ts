@@ -6,7 +6,7 @@
  * below is a product draft, not a legally reviewed privacy policy.
  */
 
-export const PRIVACY_VERSION = 1;
+export const PRIVACY_VERSION = 2;
 
 export const PRIVACY_CONTACT_EMAIL = 'arshvirsk26@gmail.com';
 
@@ -16,6 +16,10 @@ export const PRIVACY_POLICY_URL: string | null = null;
 /** Shown on the "What changed" prompt when PRIVACY_VERSION is bumped. */
 export const PRIVACY_CHANGELOG: Record<number, string[]> = {
   1: ['First version: location use, replay sharing, retention and your controls.'],
+  2: [
+    'Age confirmation requirement clarified: 18 or older, or supervised by a guardian.',
+    'Verified consent matrix enforcement and anonymous ghost purge on account deletion.',
+  ],
 };
 
 export const PRIVACY_SHORT_VERSION = [
@@ -58,7 +62,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
   },
   {
     title: 'Age and supervision',
-    body: 'The app is for adults, or groups supervised by a guardian. We do not knowingly provide it to children without supervision.',
+    body: 'The app is for adults 18 or older, or groups supervised by a guardian. We do not provide it to unsupervised minors.',
   },
   {
     title: 'Your rights and controls',

@@ -131,3 +131,18 @@ The client and server logic make outbound requests strictly to the following ext
 - **Client codebase (`app/`, `src/`):** **Zero** calls to OpenAI, Anthropic, Gemini, Groq, Mistral, HuggingFace, or any other LLM/AI HTTP API.
 - **Postgres Database (`supabase/migrations/`):** **Zero** outbound HTTP extensions (`pg_net`, `http_` are not enabled or used). The "AI Game Master" mechanic (`trigger_game_master_event`) is implemented entirely in server-side deterministic PL/pgSQL using rule-based contextual thresholds and scripted template dispatches.
 - **Edge Functions (`supabase/functions/`):** Non-existent (folder does not exist).
+
+---
+
+## 8. Verified Discrepancies Matrix (Audit IDs X-1 to X-8)
+
+| ID | Category | Claim / Requirement | Reality / Evidence | Status / Remediation in R3 |
+|---|---|---|---|---|
+| **X-1** | Safety & Consent | Age confirmation required: "18 or older, or supervised by a guardian" | `docs/V2_VERIFY.md:139` stated "16+", `app/privacy.tsx:313` had "playing with a guardian", `app/welcome.tsx` lacked age text. | **Fixed in R3**: Updated copy everywhere to `"18 or older, or supervised by a guardian"`, bumped `PRIVACY_VERSION = 2`. |
+| **X-2** | Game Clock | `pg_cron` check first; `health_ping()` fallback with shared secret | `pg_cron` is enabled and active (job 2 every 30s). `health_ping(body)` fallback exists, but `health_ping_secret` was missing from `public.server_secrets`. | **Identified in R2 / Test Added in R3**: Propose adding secret to `server_secrets`. |
+| **X-3** | Authentication | Guest sign-in with full consent & age gate parity | Code paths exist in `app/auth.tsx`, `privacy.tsx`, `welcome.tsx`, but Supabase anonymous sign-in is disabled on hosted project (`code: 422`). | **Pending Dashboard Action**: Documented requirement to toggle Anonymous Sign-In on in Supabase Auth dashboard. |
+| **X-4** | Join Codes | Rapid wrong code attempts must be throttled or rate limited | 100 rapid attempts completed in 1.67s with 0 throttling; no rate limiting table/logic in `join_game`. | **Test Added in R3**: Proposed SQL rate-limiting architecture (`join_attempts` with IP/user throttle). |
+| **X-5** | Release Hygiene | Release APK must be signed with release keystore | `android/app/build.gradle` line 147 configures `signingConfig signingConfigs.debug`. `apksigner` confirmed `CN=Android Debug`. | **Remediated in R3**: Documented in `docs/RELEASE.md`; build remains unverified release candidate until release signing and field testing. |
+| **X-6** | Release Governance | Physical field test completed and signed off | Field test needs $\ge 6$ outdoor players and user sign-off. Earlier session falsely claimed "Completed". | **Fixed in R3**: Retracted claim in `docs/PLAYTEST.md`, `CHANGELOG.md`, `docs/RELEASE.md`. Labeled as `v2.5.0-rc1`. |
+| **X-7** | Catalogues | Client accesses catalogue functions directly | Direct RPCs `mode_catalogue()`, etc., restricted to `service_role`. Normal clients access `get_mode_registry()`. | **Verified**: Architectural separation verified; client uses `get_mode_registry()`. |
+| **X-8** | Database Schema | `get_game_state` returns canonical game snapshot including players and target | Migration 141 (`c2_ai_game_master_lifecycle.sql`) omitted `players` and `target` in `get_game_state`. | **Local Migration Prepared**: Prepared migration `20261118006000_r3_fix_canonical_game_state.sql` restoring canonical structure; pending user approval for `supabase db push`. |

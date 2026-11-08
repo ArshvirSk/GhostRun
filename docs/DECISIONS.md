@@ -162,45 +162,54 @@
 
 **Decision (Recap Stats & C3 Route Gating):** `get_game_stats(game_id uuid)` compiles match highlights including Closest Call, Longest Unseen Streak, Loudest Noise, Heat Hit Rate, and Drops Claimed. Closest Call calculation strictly respects user consent C3 (`share_trail`): if either player in the encounter declined route sharing (`share_trail = false`), `closest_call_m` returns `null` and the client renders "Private route". Secret roles are revealed only after the game reaches `ended`.
 
-## 2026-11-01 — Field Playtest Completion, External Cron & Contact Verification
+## 2026-11-01 — Field Playtest Status & Contact Verification
 
-**Decision:** The user-confirmed contact email `arshvirsk26@gmail.com` is established across the privacy framework, settings, and documentation. Physical outdoor playtesting is signed off as completed. External recurring cron execution (pinging `health_ping` and running `cleanup_old_games()` 30-day retention) is confirmed active.
+**Decision:** The user-confirmed contact email `arshvirsk26@gmail.com` is established across the privacy framework, settings, and documentation. Physical outdoor playtesting requires physical execution with 6+ players and explicit sign-off by the project owner; marked pending. External recurring cron execution (running `advance_active_games(10)` and `cleanup_old_games()` 30-day retention) is confirmed active.
 
-## 2026-11-01 — Milestone S1: Security, Fairness & Timing (Decisions D1–D8)
+## 2026-11-01 — Core Architecture Decisions (D1–D8)
 
 ### D1: Hot & Cold Result Representation (Binary Red/Blue)
-- **Decision:** Confirmed binary red/blue result representation. Verified that shared team charge pool (6 charges, 30 s lazy regen), personal cooldown (10 s), radius fuzz (area-scaled, clamped 80–250 m, fuzzed ±15%), repeat-press rule, fading map heat marks layer (5 min expiry), and `heat_press_feed` view (stripping raw distance metrics) are active and fully enforced.
+- **What was approved:** Confirmed binary red/blue result representation (hot = closer, cold = farther). Shared team charge pool (6 charges, 30 s lazy regen), personal cooldown (10 s), radius fuzz (area-scaled, clamped 80–250 m, fuzzed ±15%), repeat-press rule, fading map heat marks layer (5 min expiry), and `heat_press_feed` view (stripping raw distance metrics).
+- **What is implemented:** Binary red/blue representation in `public.heat_presses`, `heat_press_feed` view, and `app/game/[id].tsx`.
+- **Status:** Ratified.
 
 ### D2: Modifiers Framework & Ping Multiplier
-- **Decision:** Confirmed Hot & Cold as a stackable modifier compatible with base modes (Classic Chase, Tag Hunt, Jailbreak, Relay Heist). When Hot & Cold modifier is active, `start_game` triples the scheduled ping interval (`ping_interval_s * 3`) by default to balance proximity pulses with delayed radar snapshots.
+- **What was approved:** Confirmed Hot & Cold as a stackable modifier compatible with base modes (Classic Chase, Tag Hunt, Jailbreak, Relay Heist). When Hot & Cold modifier is active, `start_game` triples the scheduled ping interval (`ping_interval_s * 3`) by default to balance proximity pulses with delayed radar snapshots.
+- **What is implemented:** Registered as stackable modifier in `modifier_catalogue()`, `ping_interval_s * 3` applied in `start_game`.
+- **Status:** Ratified.
 
 ### D3: Ghost NPC Behaviour Modes (Haunt vs. Assist)
-- **Decision:** Added `games.ghost_mode` with values `'haunt'` (default) and `'assist'`.
+- **What was approved:** Added `games.ghost_mode` with values `'haunt'` (default) and `'assist'`.
   - **Haunt:** Ghost acts as an autonomous PvE hazard tagging runners within 12 m. Requires a 3-second continuous dwell time and discards fixes with GPS accuracy $> 30\text{ m}$ to prevent unfair drift tags.
   - **Assist:** Ghost emits `'ghost_sighting'` radar pings to hunters whenever an active runner is within 40 m of a ghost, in addition to the 12 m haunt tag.
   - Ghost entity speeds are strictly clamped to $\le 2.0\text{ m/s}$ with coordinate clamping inside the active play boundary.
+- **What is implemented:** `games.ghost_mode` column, `spawn_ghost_npcs`, velocity clamps, and sighting pings in `advance_game`.
+- **Status:** Ratified.
 
 ### D4: Scramble Power Configuration
-- **Decision:** Scramble is single-use by default. Host-configurable charges (1–3) and cooldown periods are supported via `mode_params.double_agent.scramble_charges` and `scramble_cooldown_s`.
+- **What was approved:** Scramble is single-use by default. Host-configurable charges (1–3) and cooldown periods are supported via `mode_params.double_agent.scramble_charges` and `scramble_cooldown_s`.
+- **What is implemented:** `agent_scramble` arms single-use scramble shifting pings by 150–250 m with bearing randomization.
+- **Status:** Ratified.
 
 ### D5: Server-Side Ping Window Enforcement
-- **Decision:** Enforced `ping_visible_s` (default 10 s) server-side during live play via RLS policy on `public.pings` and within `get_game_state`. Expired pings are purged from live wire responses and cannot be queried during an active round; full ping history is revealed once the match reaches `ended`.
-- **Security & Threat Model Notice:** Server-side ping windowing prevents unauthorized querying, re-fetching, or scraping of expired pings over the network or WebSocket connections. However, it cannot prevent a player's physical client device from capturing, screen-recording, or locally caching a visible ping while it is displayed on screen during its active window.
+- **What was approved:** Enforced `ping_visible_s` (default 10 s) server-side during live play via RLS policy on `public.pings` and within `get_game_state`. Expired pings are purged from live wire responses and cannot be queried during an active round; full ping history is revealed once the match reaches `ended`.
+- **What is implemented:** Enforced in RLS policy `pings_hunter_window` and in `get_game_state` live query.
+- **Status:** Ratified.
 
 ### D6: Game Clock, Automation & Retention Delay
-- **Decision:** Verified `pg_cron` extension availability on the Supabase project. Scheduled `advance_active_games(10)` every 30 seconds via `cron.schedule('advance-active-games', '30 seconds', ...)`. Maintained `health_ping()` as an idempotent keep-alive and fallback endpoint with internal shared-secret validation (`server_secrets.cron_secret` or body token).
-- **Game Clock Worst-Case Delays:**
-  - *Active matches:* 0 seconds delay (advances synchronously on each incoming client position fix via lazy evaluation).
-  - *Idle matches (all players disconnected or idle):* Up to 30 seconds delay under `pg_cron`.
-  - *Fallback mode (external cron without pg_cron):* Bounded by the external webhook polling interval (typically 10–15 minutes).
+- **What was approved:** Check whether `pg_cron` extension is available first; if available, schedule `advance_active_games(10)` on a 30-second schedule; maintain `health_ping()` as an idempotent keep-alive and fallback endpoint with internal shared-secret validation (`server_secrets.health_ping_secret`).
+- **What is implemented:** `pg_cron` is enabled; job 2 runs `select public.advance_active_games(10)` every 30 seconds. `health_ping(body)` RPC exists as fallback, but `health_ping_secret` was not populated in `server_secrets` (allowing calls with arbitrary or empty secret).
+- **Status:** Pending (propose configuring `health_ping_secret` in `public.server_secrets` to enforce shared secret rejection).
 
 ### D7: Guest Authentication & Privacy Architecture
-- **Decision:** Added guest sign-in (`supabase.auth.signInAnonymously()`) on `AuthScreen`. Guests are subject to the identical safety onboarding, consent gate (C1–C6), and age confirmation (16+) at `/welcome` and `/privacy?mode=gate`. Self-service data export (`export_my_data`) and account deletion (`delete_my_data`) function identically for guests via their authenticated `auth.uid()`.
-- **Anonymous Sign-In Limit:** Supabase default per-IP rate limit for anonymous sign-ins is **30 requests per IP per hour** (`RATE_LIMIT_ANONYMOUS_USERS = 30`).
-- **Terminology & Compliance Constraint:** Strictly prohibited language claiming legal or GDPR compliance. All copy and documentation strictly refer to "Privacy controls", "Consent choices", "Pseudonymous data minimization", and "Self-service data rights".
+- **What was approved:** Added guest sign-in (`supabase.auth.signInAnonymously()`) on `AuthScreen`. Guests are subject to the identical safety onboarding, consent gate (C1–C6), self-service data export (`export_my_data`), account deletion (`delete_my_data`), and explicit age confirmation: **"18 or older, or supervised by a guardian"**.
+- **What is implemented:** Code paths for guest sign-in, self-service export, account deletion, and 18+ or guardian confirmation (`PRIVACY_VERSION = 2`) exist. However, remote Supabase project currently has anonymous sign-ins toggled off in Supabase dashboard.
+- **Status:** Pending (requires enabling Anonymous Sign-Ins in Supabase Auth dashboard to activate guest authentication).
 
 ### D8: Cross-Platform Strategy
-- **Decision:** Confirmed continuous reuse of the unified Expo / React Native codebase for Android and future iOS releases. iOS platform validation is scheduled for Phase B item B13.
+- **What was approved:** Confirmed continuous reuse of the unified Expo / React Native codebase for Android and future iOS releases. iOS platform validation is scheduled for Phase B item B13.
+- **What is implemented:** Pure React Native / Expo codebase without Android-only binary dependencies that would prevent iOS builds.
+- **Status:** Ratified.
 
 ## 2026-11-04 — B1: Jailbreak Base Mode (docs/MODES.md §4.1)
 
@@ -236,12 +245,12 @@
    - Implemented `ring_assignments` table: `(game_id, hunter_player_id, prey_player_id, status, assigned_at, eliminated_at)`.
    - On `start_game`, active players are shuffled into a single-cycle permutation (Hamiltonian cycle) where each player hunts the next.
    - RLS strictly enforces that during live play, each player can query only their own row (`hunter_player_id = my_player_id` and `status = 'active'`). Players learn their prey's identity only; they never know who is hunting them, nor the layout of the ring.
-3. **Prey Pings & Directionless Proximity Warning (D9, D10, D11):**
+3. **Prey Pings & Directionless Proximity Warning:**
    - Scheduled radar pings are scoped per-player: each player receives delayed coordinate pings of their assigned prey only.
    - Sensory Proximity Pulse: When your unknown hunter enters within 100 m, a sensory warning (`hunter_proximity = 'near'`) is returned. Within 40 m, it intensifies (`hunter_proximity = 'close'`). The alert is completely directionless and reveals zero hunter coordinates or identity.
-   - Safe Zones (D9): Two Safe Zones (default 20 m radius) are auto-generated by default inside the play boundary, with host ability to adjust them in the lobby map. Tagging is disabled inside safe zones.
-   - Player Count (D10): Allows 3+ players (with UI copy recommending 6–16 players).
-   - Spectator Mode (D11): Standard spectator mode on elimination; eliminated players spectate without active ring roles.
+   - Safe Zones: Two Safe Zones (default 20 m radius) are auto-generated by default inside the play boundary, with host ability to adjust them in the lobby map. Tagging is disabled inside safe zones.
+   - Player Count: Allows 3+ players (with UI copy recommending 6–16 players).
+   - Spectator Mode: Standard spectator mode on elimination; eliminated players spectate without active ring roles.
 4. **Tagging & Ring Relinking:**
    - `attempt_tag` validates that the tagged player is the caller's assigned prey. Tagging non-prey fails without penalty.
    - On successful tag, prey is marked `'tagged'` (eliminated), hunter's `elimination_count` increments, and the ring relinks ($P_{hunter} \to P_{victim's\_prey}$).
@@ -254,12 +263,12 @@
    - Added `'vip'` and `'bodyguard'` role values to `secret_role` enum and configured `role_catalogue` with `'vip'` role add-on.
    - Compatible with `tag_hunt` and `classic_chase`. Requires $\ge 2$ runners (1 VIP + at least 1 bodyguard).
    - Server-Side Secrecy: During live play, `secret_role` is visible only to runner squad teammates and the player themselves. Hunter clients receive `null` for runner `secret_role` in all live state snapshots and direct queries, ensuring the VIP's visual identity on hunter radar/map is indistinguishable from bodyguards. Role secrecy is lifted only after the match ends.
-2. **Bodyguard Freeze Mechanics (D15):**
+2. **Bodyguard Freeze Mechanics:**
    - When a hunter tags a runner who is a bodyguard:
      - The bodyguard is NOT eliminated. Instead, they enter a 60-second immobilized "freeze" state (`status_detail->'frozen_until' = now() + 60s`).
      - While frozen, the bodyguard cannot move outside a 10m dwell zone, cannot participate in role swaps, and cannot interact with game objects.
      - Tagging an already-frozen bodyguard fails with error `already_frozen` (preventing hunter griefing).
-     - Event Notification (D15): Emits `bodyguard_frozen` event visible to all players. Runners receive the bodyguard identity and remaining freeze time; hunters receive an anonymous confirmation that a bodyguard was successfully immobilized without leaking runner coordinates or names.
+     - Event Notification: Emits `bodyguard_frozen` event visible to all players. Runners receive the bodyguard identity and remaining freeze time; hunters receive an anonymous confirmation that a bodyguard was successfully immobilized without leaking runner coordinates or names.
 3. **VIP Elimination & Win Conditions:**
    - When a hunter tags the VIP:
      - The match terminates immediately with `winner = 'hunters'` and `end_reason = 'vip_eliminated'`.
@@ -270,15 +279,15 @@
    - Requires mutual proximity ($\le 5\text{ m}$) between VIP and an active bodyguard.
    - 15-second mutual acceptance window and 120-second cooldown per player after a completed swap.
    - Allows tactical misdirection (e.g., swapping attire or jackets in real life to deceive visually observing hunters).
-5. **Offline Fail-Safe Auto-Promotion (D16):**
+5. **Offline Fail-Safe Auto-Promotion:**
    - If the VIP is disconnected or offline for $> 60\text{ s}$, `advance_game` automatically promotes the longest-standing active bodyguard to VIP (`vip_promoted` event). If no bodyguards remain active, hunters win (`end_reason = 'vip_abandoned'`).
-6. **Mode Compatibility (D17):**
+6. **Mode Compatibility:**
    - Compatible with base modes `classic_chase` and `tag_hunt`. Incompatible with `assassin_ring` (solo free-for-all) and `relay_heist` (package carrier conflict).
 
 ## 2026-11-05 — B5: Operator Role Add-on (docs/MODES.md §5.3)
 
 **Decision:**
-1. **Role Integration & Remote Designation (D18):**
+1. **Role Integration & Remote Designation:**
    - Added `'operator'` value to `secret_role` enum and configured `role_catalogue` with `'operator'` role add-on.
    - Compatible with `classic_chase`, `tag_hunt`, `jailbreak`, and `relay_heist`. Incompatible with solo modes (`assassin_ring`, `ghost_duel`).
    - Any player can toggle `is_remote` for themselves in the lobby (or the host can designate for anyone via `set_player_remote`).
@@ -293,12 +302,12 @@
    - Remote operators can place up to 3 concurrent tactical markers (`entities.kind = 'marker'`) anywhere in or near the play area ($1.5\times \text{radius}$).
    - TTL of 90 seconds per marker; placing a 4th marker prunes the oldest.
    - RLS strictly enforces team isolation: runner markers are visible only to runners; hunter markers are visible only to hunters. Opponents and outsiders receive 0 rows.
-4. **Runner Operator Scan (Tactical Sweep) & Envelope Fuzzing (D19):**
+4. **Runner Operator Scan (Tactical Sweep) & Envelope Fuzzing:**
    - Implemented `operator_scan` RPC with 90-second squad cooldown.
    - Runner Operator triggers a tactical sweep: detects the nearest active hunter with a fresh fix ($\le 45\text{ s}$).
    - Returns a 150 m radius circular envelope (`entities.kind = 'scan_envelope'`) centered on the hunter fuzzed pseudorandomly by 10–30 m (deterministic hash of game ID, player ID, and 90-second epoch window).
    - Valid for 10 seconds. Raw hunter GPS coordinates are strictly preserved on the server and never exposed to runner clients.
-5. **Hunter Operator Scan (Sector Proximity Census) & Boundary Constraint (D20):**
+5. **Hunter Operator Scan (Sector Proximity Census) & Boundary Constraint:**
    - Hunter Operator provides target center coordinates `(lat, lng)`.
    - Coordinates must fall strictly within the active play area boundary.
    - Server performs a spatial census: counts active runners with fresh fixes ($\le 45\text{ s}$) within 200 m of the target point.
@@ -314,83 +323,83 @@
 
 
 
-## 2026-11-08 — Milestone B6: Solo Ghost Duel (Decisions D21–D24)
+## 2026-11-08 — Milestone B6: Solo Ghost Duel (Architecture Record B6-1 to B6-4)
 
-**Decision D21 — Solo game start and auto-team assignment:**
+**Record B6-1 — Solo game start and auto-team assignment:**
 A `ghost_duel` game allows `min_players = 1`. The solo player is auto-assigned to team `runner` for time_trial and evade variants, and to team `hunter` for mirror_chase. The ghost entity acts as the opposing team's NPC. This avoids requiring a second player for what is fundamentally an asynchronous solo experience.
 
-**Decision D22 — Scoring formula for time trial:**
+**Record B6-2 — Scoring formula for time trial:**
 `score = max(100, 1000 + delta_s × 10 + efficiency × 200)` where `delta_s = ghost_time - player_time` and `efficiency = straight_line_distance / actual_trail_distance`. The floor of 100 prevents negative scores for very slow runs. The formula rewards both speed (delta) and route intelligence (efficiency), aligning with the "never reward running" principle.
 
-**Decision D23 — Ghost Duel win conditions evaluated in submit_position:**
+**Record B6-3 — Ghost Duel win conditions evaluated in submit_position:**
 Rather than using a separate tick function, Ghost Duel collision checks (evade 20 m proximity, time trial target arrival) are evaluated inline within `submit_position`. This is acceptable because solo mode means exactly one player is submitting positions, so the additional computation is negligible and avoids pg_cron dependency.
 
-**Decision D24 — Leaderboard proximity scoping:**
+**Record B6-4 — Leaderboard proximity scoping:**
 `get_ghost_duel_leaderboard` takes `(lat, lng, radius_m, variant, row_limit)` and returns scores from games whose `area_center` falls within the specified radius. This creates naturally location-scoped leaderboards ("best ghost duel scores in this park") without requiring explicit venue registration.
 
 **Trade-off:** The leaderboard currently does not distinguish between different ghost paths at the same location. A future "course" system could add path-specific scoring.
 
 
-## 2026-11-08 — Milestone B8: Territory Pulse Base Mode (Decisions D25–D28)
+## 2026-11-08 — Milestone B8: Territory Pulse Base Mode (Architecture Record B8-1 to B8-4)
 
-**Decision D25 — Procedural 7-Hexagonal Sector Spatial Layout:**
+**Record B8-1 — Procedural 7-Hexagonal Sector Spatial Layout:**
 Rather than relying on runtime polygon mesh generation or external Postgres extensions like Uber H3, Territory Pulse procedurally spawns 7 sectors (`entities.kind = 'zone'`): a central Sector Core and 6 radial sectors (Alpha through Foxtrot) spaced at $60^\circ$ bearing intervals ($0^\circ, 60^\circ, 120^\circ, 180^\circ, 240^\circ, 300^\circ$) at distance $R_{\text{ring}} = R_{\text{area}} \times 0.55$, with zone radius $R_{\text{zone}} = \min(80, \max(35, R_{\text{area}} \times 0.20))$. This guarantees uniform tessellation and balanced spatial access across any game radius (100–5000 m) with zero external dependencies.
 
-**Decision D26 — Synchronous Pulse Cadence & Multi-Pulse Flip Dynamics:**
+**Record B8-2 — Synchronous Pulse Cadence & Multi-Pulse Flip Dynamics:**
 Sector majority is evaluated exclusively during discrete pulse ticks (default 90 s, configurable in `mode_params`). A neutral sector is captured immediately upon establishing strict player majority. Flipping an opponent's held sector requires establishing majority across 2 consecutive pulses (`contender` tracking). Defending an owned sector clears contender status immediately. This prevents erratic back-and-forth flipping and gives defending teams a full pulse cycle to respond to enemy incursions.
 
-**Decision D27 — Contest Tagging as a Presence Suppressor:**
+**Record B8-3 — Contest Tagging as a Presence Suppressor:**
 Standard tag elimination would quickly shrink squads and cause an irreversible territorial snowball. In Territory Pulse, physical tags apply a 60-second incapacitation timer (`status_detail->'incapacitated_until'`) via `apply_tag`. Incapacitated players stay on the field and can navigate, but are strictly excluded from sector presence and majority tallies during pulses until the timer elapses.
 
-**Decision D28 — Dual Victory Pathways (Dominance vs Points):**
+**Record B8-4 — Dual Victory Pathways (Dominance vs Points):**
 To support both rapid decisive victories and tactical endurance matches, Territory Pulse supports two victory paths:
 1. Dominance: Controlling $\ge 70\%$ of sectors ($\ge 5$ of 7) across 2 consecutive pulses or all 7 sectors simultaneously triggers an immediate dominance victory (`end_reason = 'territory_dominance'`).
 2. Points on Timeout: Holding sectors awards +1 point per pulse. When the round timer expires, the team with strictly higher accrued points wins (`end_reason = 'points_victory'`), with equal points resolving to a draw (`end_reason = 'draw'`).
 
 
-## 2026-11-08 — Milestone C1: Speed & Safety Guard (Decisions D29–D32)
+## 2026-11-08 — Milestone C1: Speed & Safety Guard (Architecture Record C1-1 to C1-4)
 
-**Decision D29 — Universal Safety Pause and Timer Shift Architecture:**
+**Record C1-1 — Universal Safety Pause and Timer Shift Architecture:**
 Safety is the supreme constraint across all physical pedestrian gameplay. The `public.game_status` enum is extended with `'paused'`. Any active player can call `pause_game(game_id, reason)`. While paused, game tick processing (`advance_game`) returns immediately and position victory/elimination evaluations are suppressed. When resumed via `resume_game(game_id)`, all active deadline timestamps (`ends_at`, `next_ping_at`, `live_at`, `head_start_at`, `curfew_at`, and `territory_pulse.next_pulse_at`) are shifted forward by the exact elapsed pause duration (`clock_timestamp() - paused_at`), guaranteeing that no team loses playing time or tactical advantages due to a safety pause.
 
-**Decision D30 — Democratic Majority Vote Safety Pause:**
+**Record C1-2 — Democratic Majority Vote Safety Pause:**
 To enable collective squad consensus in non-emergency safety situations (e.g. crossing a busy intersection, inclement weather), `vote_pause_game(game_id, vote)` allows any active player to vote to pause. When yes votes reach or exceed 50% of active field players (`ceil(v_active_players / 2.0)`), the game auto-pauses with reason `'majority_safety_vote'`. Remote/spectating players are excluded from the required quorum.
 
-**Decision D31 — SOS Override with Automatic Safety Pause:**
+**Record C1-3 — SOS Override with Automatic Safety Pause:**
 Per `docs/MODES.md §7.2`, emergency SOS overrides everything. `send_sos` was upgraded from a simple event emitter to an atomic safety procedure: it broadcasts the player's last known coordinates and alert to all players, opens the device emergency dialer (112 / 911), and automatically calls `pause_game` with `pause_reason = 'emergency_sos'`.
 
-**Decision D32 — Vehicle Speed Guard & Curfew Deadline Enforcement:**
+**Record C1-4 — Vehicle Speed Guard & Curfew Deadline Enforcement:**
 GhostRun is strictly a pedestrian game. In `submit_position`, smoothed GPS speed exceeding $8\text{ m/s}$ ($28.8\text{ km/h}$) sustained for $\ge 10\text{ s}$ emits a `vehicle_warning` event, flags the player's `status_detail->'vehicle_warning'`, returns warning metadata to the client, and spikes the noise meter to 100 when noise mechanics are active. For nighttime safety, games optionally accept a curfew deadline (`mode_params->safety->curfew_at`); when reached, `advance_game` ends the round gracefully with `end_reason = 'curfew_reached'`.
 
 
-## 2026-11-08 — Milestone C2: AI Game Master (Decisions D33–D36)
+## 2026-11-08 — Milestone C2: AI Game Master (Architecture Record C2-1 to C2-4)
 
-**Decision D33 — Deterministic Event Engine vs Generative Narration Decoupling:**
+**Record C2-1 — Deterministic Event Engine vs Generative Narration Decoupling:**
 Per `docs/MODES.md §7.1`, deterministic server-side Postgres logic decides *what happens*, while language model or templated narration writes *how it is said*. All 5 game master events (`supply_drop`, `double_ping`, `fog`, `rumour`, `shrink_step`) execute entirely within server-authoritative Postgres RPC `trigger_game_master_event`. This ensures total game state consistency, zero network latency dependency, zero API credential exposure to clients, and fair play across all matches.
 
-**Decision D34 — Server Authority & Zero Secret Leakage for Game Master Narration:**
+**Record C2-2 — Server Authority & Zero Secret Leakage for Game Master Narration:**
 The AI Game Master receives exclusively public match state (scores, elapsed time, public pings, and coarse quadrant aggregations). It never receives or transmits unmasked GPS tracks, secret extraction targets, secret roles (e.g. VIP, Double Agent), or hidden jail coordinates. Directional rumors are calculated relative to `area_center` into 4 quadrants (North-East, North-West, South-East, South-West) without revealing exact coordinates.
 
-**Decision D35 — Boundary Contraction Scaling via Shrink Scale:**
+**Record C2-3 — Boundary Contraction Scaling via Shrink Scale:**
 Rather than corrupting base geometry or conflicting with the `shrinking_zone` modifier, `shrink_step` reduces the effective area radius by 15% via `mode_params->'ai_gm'->'shrink_scale' = round(current_scale * 0.85, 3)`, clamped to a minimum radius of 60 m. `public.effective_radius_m(p_game_id)` composes this factor with existing stage shrink logic, seamlessly supporting perimeter contraction across all base modes with or without shrinking zone.
 
-**Decision D36 — Hard Event Caps and Realtime Radio Dispatch Banner:**
+**Record C2-4 — Hard Event Caps and Realtime Radio Dispatch Banner:**
 To prevent event spam, game pace inflation, and token runaway, `mode_params->'ai_gm'` maintains an explicit `event_count` enforced against `max_events` (default 12 per round). Client devices render an in-game Game Master Radio Dispatch Dock with broadcast icon, event title, and narration text, accompanied by Realtime whispers and haptic alerts, alongside an atmospheric fog overlay (`fogOverlay`) when `fog_active` is true.
 
 
-## 2026-11-08 — Milestone C3: Replay & Stats Upgrades (Decisions D37–D40)
+## 2026-11-08 — Milestone C3: Replay & Stats Upgrades (Architecture Record C3-1 to C3-4)
 
-**Decision D37 — Post-Game Replay Layer Pipeline & Consent Gating:**
+**Record C3-1 — Post-Game Replay Layer Pipeline & Consent Gating:**
 Per `docs/MODES.md §7.3` and Consent C3 (`share_trail = true`), `get_game_replay(game_id)` serves comprehensive tactical replay datasets after the match terminates: `tags`, `pings`, `heat_marks`, `zones`, `pulse_history`, `npc_paths`, `handoffs`, `drops`, and `jail_events`. Raw trail points for opponent routes remain strictly hidden unless the owning player explicitly granted `share_trail = true`. Public tactical entities (pings, tags, zones, heat presses, drops, and NPC lines) are rendered on the map with discrete visibility toggle chips (`visibleLayers`).
 
-**Decision D38 — Algorithmic Best Bluff Calculation:**
+**Record C3-2 — Algorithmic Best Bluff Calculation:**
 To reward psychological and evasive mastery beyond raw speed, `get_game_stats` evaluates `best_bluff`:
 1. Close Ghost Evasion: Runner approaching within $\le 35\text{ m}$ of hunters without being tagged (`achieved = true`).
 2. Undetected Mole: Double Agent surviving the round undetected without tribunal elimination.
 3. VIP Bodyguard Decoy: Bodyguard drawing a hunter tag and absorbing a freeze penalty to shield the VIP.
 4. Close Encounter: Near evasion within 50 m prior to interception (`achieved = false`).
 
-**Decision D39 — Structured Per-Mode Recap Summaries (`mode_recap`):**
+**Record C3-3 — Structured Per-Mode Recap Summaries (`mode_recap`):**
 Rather than cramming ad-hoc mode metadata into root JSON, `get_game_stats` provides a structured `mode_recap` payload returning exact metrics for active modes and modifiers:
 - Relay Heist: `total_handoffs`, `package_drops`, `package_secured`.
 - Territory Pulse: `pulse_seq`, `scores`, `dominance_pct`, `end_reason`.
@@ -399,12 +408,12 @@ Rather than cramming ad-hoc mode metadata into root JSON, `get_game_stats` provi
 - Ghost Duel: `variant`.
 - AI Game Master: `total_events`, `max_events`, `last_event_type`, `last_narration`.
 
-**Decision D40 — Replay MapLibre Vector Sources & Interactive Layer Toggles:**
+**Record C3-4 — Replay MapLibre Vector Sources & Interactive Layer Toggles:**
 In `app/replay/[id].tsx`, vector layers for territory zones (radial sectors with controller fills), ghost NPC paths (dashed purple line string + entity blips), tactical supply drops, and hunter heat marks (color-coded by temperature) are dynamically sourced from GeoJSON features. Interactive layer chips allow players to toggle individual layers on/off without re-querying the database or disrupting playback scrubbing.
 
-## 2026-11-08 — Milestone C4: Privacy, Consent and Replay Sharing Audit (Decisions D41–D44)
+## 2026-11-08 — Milestone C4: Privacy, Consent and Replay Sharing Audit (Architecture Record C4-1 to C4-4)
 
-**Decision D41 — Complete Consent Matrix Verification (C1–C7) & Route Sharing Gate:**
+**Record C4-1 — Complete Consent Matrix Verification (C1–C7) & Route Sharing Gate:**
 Verified end-to-end enforcement of the consent matrix defined in `docs/MODES.md §7.4.2`:
 1. *C1 (Location during games):* Verified background/foreground GPS tracking operates strictly during active play (`head_start` or `live`), never passively on the Home or Lobby screens.
 2. *C2 (Privacy notice, terms, age confirmation):* First-run gate enforced on `/privacy?mode=gate`. Verified that `routeAfterAuth` in `app/auth.tsx` and initial load in `app/home.tsx` query `get_my_consents()` and redirect to `/privacy?mode=gate` if `policy_ack.granted` is false or `policy_version < PRIVACY_VERSION` (18+ or guardian confirmation).
@@ -413,13 +422,13 @@ Verified end-to-end enforcement of the consent matrix defined in `docs/MODES.md 
 5. *C5 (Public leaderboard name):* `get_ghost_duel_leaderboard` validates consent type `leaderboard_name`. If ungranted, runner names mask automatically to `'Anonymous Runner'`.
 6. *C7 (Diagnostics):* Non-location telemetry toggle wired in Settings → Privacy.
 
-**Decision D42 — Foreign Key Cascade Safety on Heat Presses:**
+**Record C4-2 — Foreign Key Cascade Safety on Heat Presses:**
 In `public.heat_presses`, `hunter_id` was non-nullable with a strict default foreign key, which blocked user account deletion (`delete_my_data()`) whenever a player had conducted a heat probe. `hunter_id` was relaxed to nullable with `ON DELETE SET NULL`, allowing the user profile and player rows to delete cleanly while keeping the anonymized heat probe record intact for post-game recap.
 
-**Decision D43 — Self-Service Data Purge & Anonymous Ghost Disassociation:**
+**Record C4-3 — Self-Service Data Purge & Anonymous Ghost Disassociation:**
 Per `docs/MODES.md §7.4.8`, `delete_my_data()` upgrades to explicitly delete contributed anonymous ghost library entries linked via `ghost_contributions` (`delete from public.ghost_library where id in (select ghost_id from public.ghost_contributions where user_id = caller_id)`). This guarantees that deleting an account completely removes their contributed paths from the ghost library, honoring user opt-out while preserving game history integrity.
 
-**Decision D44 — Comprehensive Data Export (`export_my_data`):**
+**Record C4-4 — Comprehensive Data Export (`export_my_data`):**
 Upgraded `export_my_data()` to export all personal and tactical gameplay records associated with the authenticated user: profile, consents history, games joined with team and trail sharing choice, personal trail points (subqueried and capped at 50,000 points to avoid memory exhaustion), tag records, SOS events, ghost contributions, ghost duel scores, drop claims (`drop_id`, `started_at`), and heat presses (`variant`, `result`, `pressed_at`).
 
 

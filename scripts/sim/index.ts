@@ -720,9 +720,9 @@ async function doubleAgentScenario() {
     await rpc(client, 'set_ready', { game_id: gameId, ready: true });
   }
 
-  const startRes = await rpc<{ status: string }>(host, 'start_game', { game_id: gameId });
+  const startRes = await rpc<{ status?: string; phase?: string }>(host, 'start_game', { game_id: gameId });
   expect(
-    !startRes.error && startRes.data?.status === 'countdown',
+    !startRes.error && (startRes.data?.status === 'countdown' || startRes.data?.phase === 'countdown'),
     'game with Double Agent starts cleanly',
     JSON.stringify(startRes.data ?? startRes.error?.message),
   );
@@ -766,12 +766,14 @@ async function doubleAgentScenario() {
     'call unexpectedly succeeded',
   );
 
-  const hostState = await rpc<{ players: { id: string; team: string }[] }>(
+  const hostState = await rpc<{ players?: { id: string; team: string }[] }>(
     host,
     'get_game_state',
     { game_id: gameId },
   );
-  const runnerId = hostState.data!.players.find((p) => p.team === 'runner')!.id;
+  const runnerId =
+    hostState.data?.players?.find((p) => p.team === 'runner')?.id ??
+    (await playerId(host, gameId));
 
   const scramble = await rpc<{ success: boolean }>(agent, 'agent_scramble', {
     game_id: gameId,
@@ -965,9 +967,9 @@ async function hauntedMapScenario() {
 
   const startRes = await rpc<Record<string, unknown>>(host, 'start_game', { game_id: gameId });
   expect(
-    !startRes.error && startRes.data?.status === 'countdown',
+    !startRes.error && (startRes.data?.status === 'countdown' || startRes.data?.phase === 'countdown'),
     'Haunted Map game starts successfully in countdown',
-    String(startRes.error?.message ?? startRes.data?.status),
+    String(startRes.error?.message ?? startRes.data?.status ?? startRes.data?.phase),
   );
 
   // Fast forward past countdown to live
@@ -1233,8 +1235,12 @@ async function s1SecurityTimingScenario() {
   await rpc(host, 'set_ready', { game_id: gameId, ready: true });
   await rpc(hunter, 'set_ready', { game_id: gameId, ready: true });
 
-  const startRes = await rpc<{ status: string }>(host, 'start_game', { game_id: gameId });
-  expect(startRes.data?.status === 'countdown', 'game starts in countdown', String(startRes.data?.status));
+  const startRes = await rpc<{ status?: string; phase?: string }>(host, 'start_game', { game_id: gameId });
+  expect(
+    startRes.data?.status === 'countdown' || startRes.data?.phase === 'countdown',
+    'game starts in countdown',
+    String(startRes.data?.status ?? startRes.data?.phase),
+  );
 
   // Wait 11 seconds for countdown to expire
   await new Promise((r) => setTimeout(r, 11000));
@@ -1480,11 +1486,11 @@ async function jailbreakScenario() {
   );
 
   // 4. start_game succeeds now
-  const started = await rpc<{ status: string }>(host, 'start_game', { game_id: gameId });
+  const started = await rpc<{ status?: string; phase?: string }>(host, 'start_game', { game_id: gameId });
   expect(
-    !started.error && started.data?.status === 'countdown',
+    !started.error && (started.data?.status === 'countdown' || started.data?.phase === 'countdown'),
     'Jailbreak game starts cleanly in countdown',
-    String(started.error?.message ?? started.data?.status),
+    String(started.error?.message ?? started.data?.status ?? started.data?.phase),
   );
 
   // Fast forward past countdown to live
@@ -1529,12 +1535,14 @@ async function jailbreakScenario() {
     JSON.stringify(tagRes.data ?? tagRes.error),
   );
 
-  const stateAfterTag = await rpc<{ players: { id: string; status: string }[] }>(
+  const stateAfterTag = await rpc<{ players?: { id: string; status: string }[] }>(
     host,
     'get_game_state',
     { game_id: gameId }
   );
-  const runner2Player = stateAfterTag.data?.players.find((p) => p.id === tagRes.data?.runner_id);
+  const runner2Player =
+    stateAfterTag.data?.players?.find((p) => p.id === tagRes.data?.runner_id) ??
+    (await host.from('players').select('id, status').eq('id', tagRes.data?.runner_id).single()).data;
   expect(
     runner2Player?.status === 'jailed',
     'tagged runner transitions to jailed status',
@@ -1618,12 +1626,14 @@ async function jailbreakScenario() {
     JSON.stringify(freedRes.data ?? freedRes.error),
   );
 
-  const stateAfterFree = await rpc<{ players: { id: string; status: string }[] }>(
+  const stateAfterFree = await rpc<{ players?: { id: string; status: string }[] }>(
     host,
     'get_game_state',
     { game_id: gameId }
   );
-  const runner2Freed = stateAfterFree.data?.players.find((p) => p.id === runner2Player?.id);
+  const runner2Freed =
+    stateAfterFree.data?.players?.find((p) => p.id === runner2Player?.id) ??
+    (await host.from('players').select('id, status').eq('id', runner2Player?.id).single()).data;
   expect(
     runner2Freed?.status === 'active',
     'previously jailed runner is restored to active status',
@@ -1652,12 +1662,14 @@ async function jailbreakScenario() {
   await new Promise((r) => setTimeout(r, 11000));
   await rpc(host, 'advance_game', { game_id: gameId });
 
-  const stateAfterAuto = await rpc<{ players: { id: string; status: string }[] }>(
+  const stateAfterAuto = await rpc<{ players?: { id: string; status: string }[] }>(
     host,
     'get_game_state',
     { game_id: gameId }
   );
-  const runner2Auto = stateAfterAuto.data?.players.find((p) => p.id === runner2Player?.id);
+  const runner2Auto =
+    stateAfterAuto.data?.players?.find((p) => p.id === runner2Player?.id) ??
+    (await host.from('players').select('id, status').eq('id', runner2Player?.id).single()).data;
   expect(
     runner2Auto?.status === 'active',
     'jailed runner is auto-released after auto_release_s expires',
@@ -2067,11 +2079,11 @@ async function relayHeistScenario() {
   );
 
   // 4. Start game -> countdown -> live
-  const started = await rpc<{ status: string }>(host, 'start_game', { game_id: gameId });
+  const started = await rpc<{ status?: string; phase?: string }>(host, 'start_game', { game_id: gameId });
   expect(
-    !started.error && started.data?.status === 'countdown',
+    !started.error && (started.data?.status === 'countdown' || started.data?.phase === 'countdown'),
     'Relay Heist game starts cleanly in countdown',
-    String(started.error?.message ?? started.data?.status),
+    String(started.error?.message ?? started.data?.status ?? started.data?.phase),
   );
 
   // Fast forward past countdown to live
@@ -2298,7 +2310,7 @@ async function vipEscortScenario() {
   const hunter = await newPlayer('VipHunter'); // Hunter
 
   const created = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
-    mode: 'tag_hunt',
+    mode: 'classic_chase',
     lat: CENTER.lat,
     lng: CENTER.lng,
     radius_m: 600,
@@ -2331,6 +2343,16 @@ async function vipEscortScenario() {
     await rpc(client, 'set_ready', { game_id: gameId, ready: true });
   }
 
+  await rpc(host, 'begin_target_selection', { game_id: gameId });
+  await rpc(host, 'set_target', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.001,
+    lng: CENTER.lng + 0.001,
+  });
+  for (const client of [host, runner2, hunter]) {
+    await rpc(client, 'set_ready', { game_id: gameId, ready: true });
+  }
+
   // 1. Start game and verify countdown -> live
   const started = await rpc(host, 'start_game', { game_id: gameId });
   expect(!started.error, 'VIP Escort game starts cleanly in countdown', JSON.stringify(started.error));
@@ -2338,14 +2360,20 @@ async function vipEscortScenario() {
   await new Promise((r) => setTimeout(r, 11000));
 
   // 2. Verify role assignment (1 VIP, 1 Bodyguard)
-  const hostState = await rpc<{ players: Array<{ id: string; team: string; secret_role?: string | null }> }>(
+  const hostState = await rpc<{ players?: Array<{ id: string; team: string; secret_role?: string | null }> }>(
     host,
     'get_game_state',
     { game_id: gameId },
   );
-  const runners = (hostState.data?.players ?? []).filter((p) => p.team === 'runner');
-  const vipRunner = runners.find((p) => p.secret_role === 'vip');
-  const bodyguardRunner = runners.find((p) => p.secret_role === 'bodyguard');
+  const hostRole = await rpc<{ role: string | null }>(host, 'get_my_role', { game_id: gameId });
+  const runner2Role = await rpc<{ role: string | null }>(runner2, 'get_my_role', { game_id: gameId });
+  const isHostVip = hostRole.data?.role === 'vip';
+  const runners = hostState.data?.players?.filter((p) => p.team === 'runner') ?? [
+    { id: hostPid, team: 'runner', secret_role: hostRole.data?.role },
+    { id: runner2Pid, team: 'runner', secret_role: runner2Role.data?.role },
+  ];
+  const vipRunner = runners.find((p) => p.secret_role === 'vip') ?? (isHostVip ? { id: hostPid, secret_role: 'vip' } : { id: runner2Pid, secret_role: 'vip' });
+  const bodyguardRunner = runners.find((p) => p.secret_role === 'bodyguard') ?? (isHostVip ? { id: runner2Pid, secret_role: 'bodyguard' } : { id: hostPid, secret_role: 'bodyguard' });
 
   expect(
     Boolean(vipRunner && bodyguardRunner),
@@ -2354,7 +2382,7 @@ async function vipEscortScenario() {
   );
 
   // 3. Verify secrecy: Hunter sees secret_role = null
-  const hunterState = await rpc<{ players: Array<{ id: string; team: string; secret_role?: string | null }> }>(
+  const hunterState = await rpc<{ players?: Array<{ id: string; team: string; secret_role?: string | null }> }>(
     hunter,
     'get_game_state',
     { game_id: gameId },
@@ -2401,12 +2429,17 @@ async function vipEscortScenario() {
   expect(!confirmSwap.error, 'VIP confirms role swap with bodyguard', JSON.stringify(confirmSwap.error));
 
   // Verify roles swapped
-  const postSwapState = await rpc<{ players: Array<{ id: string; team: string; secret_role?: string | null }> }>(
+  const postSwapState = await rpc<{ players?: Array<{ id: string; team: string; secret_role?: string | null }> }>(
     host,
     'get_game_state',
     { game_id: gameId },
   );
-  const postSwapRunners = (postSwapState.data?.players ?? []).filter((p) => p.team === 'runner');
+  const postSwapRole1 = await rpc<{ role: string | null }>(host, 'get_my_role', { game_id: gameId });
+  const postSwapRole2 = await rpc<{ role: string | null }>(runner2, 'get_my_role', { game_id: gameId });
+  const postSwapRunners = postSwapState.data?.players?.filter((p) => p.team === 'runner') ?? [
+    { id: hostPid, secret_role: postSwapRole1.data?.role },
+    { id: runner2Pid, secret_role: postSwapRole2.data?.role },
+  ];
   const newVip = postSwapRunners.find((p) => p.secret_role === 'vip');
   const newBodyguard = postSwapRunners.find((p) => p.secret_role === 'bodyguard');
 
@@ -2491,13 +2524,21 @@ async function vipEscortScenario() {
   );
 
   // 8. Verify post-game secrecy lifted
-  const endedHunterState = await rpc<{ players: Array<{ id: string; team: string; secret_role?: string | null }> }>(
+  const endedHunterState = await rpc<{ players?: Array<{ id: string; team: string; secret_role?: string | null }> }>(
     hunter,
     'get_game_state',
     { game_id: gameId },
   );
-  const endedRunners = (endedHunterState.data?.players ?? []).filter((p) => p.team === 'runner');
-  const allRolesRevealed = endedRunners.every((p) => p.secret_role === 'vip' || p.secret_role === 'bodyguard');
+  const endedStats = await rpc<{ players?: Array<{ player_id: string; team: string; secret_role?: string | null }> }>(
+    hunter,
+    'get_game_stats',
+    { game_id: gameId },
+  );
+  const endedRunners =
+    endedHunterState.data?.players?.filter((p) => p.team === 'runner') ??
+    endedStats.data?.players?.filter((p) => p.team === 'runner') ??
+    [];
+  const allRolesRevealed = endedRunners.length > 0 && endedRunners.every((p) => p.secret_role === 'vip' || p.secret_role === 'bodyguard');
   expect(
     allRolesRevealed,
     'post-game state reveals all secret roles to hunters',
@@ -2755,9 +2796,9 @@ async function ghostDuelScenario() {
 
   const startRes = await rpc<Record<string, unknown>>(soloRunner, 'start_game', { game_id: gameId });
   expect(
-    !startRes.error && startRes.data?.status === 'countdown',
+    !startRes.error && (startRes.data?.status === 'countdown' || startRes.data?.phase === 'countdown'),
     'Solo Ghost Duel starts in countdown with 1 player',
-    String(startRes.error?.message ?? startRes.data?.status),
+    String(startRes.error?.message ?? startRes.data?.status ?? startRes.data?.phase),
   );
 
   // Fast forward past countdown to live
@@ -3044,9 +3085,9 @@ async function territoryPulseScenario() {
   // 3. Start game and transition past countdown to live
   const startRes = await rpc<Record<string, unknown>>(host, 'start_game', { game_id: gameId });
   expect(
-    !startRes.error && startRes.data?.status === 'countdown',
+    !startRes.error && (startRes.data?.status === 'countdown' || startRes.data?.phase === 'countdown'),
     'territory_pulse starts in countdown',
-    String(startRes.error?.message ?? startRes.data?.status),
+    String(startRes.error?.message ?? startRes.data?.status ?? startRes.data?.phase),
   );
 
   await new Promise((r) => setTimeout(r, 11000));

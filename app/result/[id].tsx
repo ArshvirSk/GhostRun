@@ -1150,7 +1150,7 @@ export default function ResultScreen() {
                 <View style={[styles.statCard, { width: '100%' }]}>
                   <Text style={styles.statCardCategory}>LAST NARRATION</Text>
                   <Text style={[styles.statCardSub, { color: '#0F172A', marginTop: 4 }]}>
-                    "{gameStats.mode_recap.ai_gm.last_narration}"
+                    &quot;{gameStats.mode_recap.ai_gm.last_narration}&quot;
                   </Text>
                 </View>
               )}

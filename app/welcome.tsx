@@ -185,7 +185,9 @@ export default function WelcomeScreen() {
           <View style={[styles.checkbox, acknowledged && styles.checkboxChecked]}>
             {acknowledged && <Ionicons color="#FFFFFF" name="checkmark" size={16} />}
           </View>
-          <Text style={styles.acknowledgementText}>I understand and will play safely.</Text>
+          <Text style={styles.acknowledgementText}>
+            I confirm I am 18 or older, or supervised by a guardian, and will play safely.
+          </Text>
         </Pressable>
 
         {!isSupabaseConfigured && (

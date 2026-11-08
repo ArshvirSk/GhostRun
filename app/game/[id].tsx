@@ -1433,10 +1433,12 @@ export default function GameScreen() {
 
   const isTerritoryPulse = state?.game?.mode_id === 'territory_pulse';
   const territoryPulseState = state?.territory_pulse;
-  const territoryZones = territoryPulseState?.zones ?? [];
+  const territoryZones = useMemo(
+    () => territoryPulseState?.zones ?? [],
+    [territoryPulseState?.zones],
+  );
   const territoryScores = territoryPulseState?.scores ?? { runner: 0, hunter: 0 };
   const nextPulseAt = territoryPulseState?.next_pulse_at;
-  const pulseSeq = territoryPulseState?.pulse_seq ?? 0;
 
   const secondsToNextPulse = useMemo(() => {
     if (!nextPulseAt) return 0;
@@ -1446,16 +1448,19 @@ export default function GameScreen() {
 
   const currentOccupiedZone = useMemo(() => {
     if (!isTerritoryPulse || !ownFix || territoryZones.length === 0) return null;
-    for (const z of territoryZones) {
-      const dist = distanceM(
-        { longitude: ownFix.longitude, latitude: ownFix.latitude },
-        { longitude: z.longitude, latitude: z.latitude },
-      );
-      if (dist <= z.radius_m) {
-        return { ...z, distance_m: dist };
-      }
-    }
-    return null;
+    const match = territoryZones.find(
+      (z) =>
+        distanceM(
+          { longitude: ownFix.longitude, latitude: ownFix.latitude },
+          { longitude: z.longitude, latitude: z.latitude },
+        ) <= z.radius_m,
+    );
+    if (!match) return null;
+    const dist = distanceM(
+      { longitude: ownFix.longitude, latitude: ownFix.latitude },
+      { longitude: match.longitude, latitude: match.latitude },
+    );
+    return { ...match, distance_m: dist };
   }, [isTerritoryPulse, ownFix, territoryZones]);
 
   const runnerZonesRingData = useMemo(() => {
@@ -1880,7 +1885,7 @@ export default function GameScreen() {
       `Ghost caught! Score: ${(data as { score?: number })?.score ?? 1000}`,
     );
     void loadState();
-  }, [gameId, loadState, notify, playSound]);
+  }, [gameId, loadState, notify]);
 
   // VIP Escort state
   const isVipMode = (game?.roles ?? []).includes('vip');

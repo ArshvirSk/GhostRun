@@ -173,7 +173,7 @@ export default function PrivacyScreen() {
       )}
 
       <Text style={styles.title}>Privacy</Text>
-      <Text style={styles.versionLine}>Version {PRIVACY_VERSION}.0 · Updated 2026-11-01</Text>
+      <Text style={styles.versionLine}>Version {PRIVACY_VERSION}.0 · Updated 2026-11-08</Text>
 
       {needsAcknowledgement && (
         <View style={styles.changedCard}>
@@ -313,7 +313,7 @@ export default function PrivacyScreen() {
               size={24}
             />
             <Text style={styles.checkboxLabel}>
-              I have read this and I am 18 or older, or playing with a guardian.
+              I have read this and I am 18 or older, or supervised by a guardian.
             </Text>
           </Pressable>
           <Pressable

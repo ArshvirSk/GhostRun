@@ -191,14 +191,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Simulator scenario `ghost-duel` passing 10/10 automated checks across all 3 variants.
   - `npm run typecheck` passing with 0 errors.
 
-## [2.5.0] — 2026-11-05
+## [2.5.0-rc1] — 2026-11-08 (Release Candidate — Unverified)
+
+> [!NOTE]
+> **Release Candidate Notice:** This build is an unverified release candidate. In accordance with project governance, no build is a signed-off release until an outdoor physical field test with 6 or more human players has been conducted and signed off by the project owner.
 
 ### Overview
-Release 2.5.0 delivers Phase B Milestones B1 through B5, featuring 3 brand new base game modes and 2 tactical role add-ons with full server authority, zero-knowledge secrecy, and automated end-to-end simulation coverage.
+Release candidate 2.5.0-rc1 delivers Phase B Milestones B1 through B5, featuring 3 brand new base game modes and 2 tactical role add-ons with full server authority, zero-knowledge secrecy, and automated end-to-end simulation coverage.
 
-- **APK Artifact:** `release/GhostRun-v2.5.0.apk` (165.65 MB)
+- **APK Artifact:** `release/GhostRun-v2.5.0.apk` (165.65 MB, unverified release candidate)
 - **APK SHA-256:** `B95519BC303B8696EB67E89E106CF4D72D38168D5A97AFC8C94EB7E3C48EA1BB`
-- **Android versionCode:** `5` | **versionName:** `2.5.0`
+- **Android versionCode:** `5` | **versionName:** `2.5.0` | **Status:** Release Candidate (Pending Field Test Sign-off)
 
 ### Phase B: Milestone B5 — Operator Remote Role Add-on (docs/MODES.md §5.3)
 - **Role Integration & Remote Designation (D18):**
@@ -322,7 +325,7 @@ Release 2.5.0 delivers Phase B Milestones B1 through B5, featuring 3 brand new b
   - Added `pg_cron` schedule advancing active games every 30s; hardened `health_ping()` with bounded execution, retention cleanup, and shared-secret validation.
   - Ghost NPC fairness gates: 3-second continuous dwell requirement, GPS accuracy gate ($\le 30\text{ m}$), velocity cap ($\le 2.0\text{ m/s}$), boundary clamping, and `ghost_mode` (`haunt` vs `assist`).
   - Added mock-location detection event (`mock_location_detected`) and universal vehicle speed warnings ($\ge 8\text{ m/s}$ for 10s).
-  - Implemented guest/anonymous authentication with full parity across consent gate (C1–C6), age confirmation (16+), and self-service export/deletion.
+  - Implemented guest/anonymous authentication with full parity across consent gate (C1–C6), age confirmation (18 or older, or supervised by a guardian), and self-service export/deletion.
 - **S2 (Mode & Spec Alignment):**
   - Activated Double Agent role in lobby registry with host-configurable Scramble charges (1–3) and cooldown.
   - Aligned Dead Drops hold parameters (15m radius, 40m reveal, 4–5s claim hold) and tactical item pools.
