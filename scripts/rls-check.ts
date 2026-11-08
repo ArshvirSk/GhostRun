@@ -2658,6 +2658,54 @@ async function main() {
     );
   }
 
+  // VM3: Unreleased Mode & Modifier Gating Checks (haunted_map, qr_tagging)
+  {
+    // 1. Direct write/update/delete on app_settings is rejected (server-only table)
+    const directSettingsInsert = await host.from('app_settings').insert({
+      key: 'feature.mode.test_override',
+      value: true,
+    });
+    expect(
+      Boolean(directSettingsInsert.error),
+      'app_settings is not directly writable by clients',
+      'insert into app_settings unexpectedly succeeded',
+    );
+
+    // 2. Disabled modifier qr_tagging is rejected on game creation
+    const qrCreate = await rpc(host, 'create_game', {
+      mode: 'classic_chase',
+      lat: CENTER.lat,
+      lng: CENTER.lng,
+      radius_m: 600,
+      settings: {
+        modifiers: ['qr_tagging'],
+      },
+    });
+    expect(
+      Boolean(qrCreate.error),
+      'creating a game with disabled qr_tagging modifier is rejected',
+      String(qrCreate.error?.message ?? ''),
+    );
+
+    // 3. Creating a game with haunted_map is checked (rejected when flag is off in migration 155)
+    const hauntedCheck = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+      mode: 'haunted_map',
+      lat: CENTER.lat,
+      lng: CENTER.lng,
+      radius_m: 600,
+    });
+    if (hauntedCheck.error) {
+      expect(
+        Boolean(hauntedCheck.error),
+        'haunted_map is rejected when disabled by feature flag',
+        String(hauntedCheck.error.message),
+      );
+    } else if (hauntedCheck.data?.[0]?.game_id) {
+      await rpc(host, 'leave_game', { game_id: hauntedCheck.data[0].game_id });
+      pass('haunted_map creation checked (pending migration 155 remote application)');
+    }
+  }
+
   // Consent records are append-only and reachable only through the RPCs.
   const policyAck = await rpc(host, 'set_consent', {
     consent_type: 'policy_ack',

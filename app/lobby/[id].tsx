@@ -509,12 +509,16 @@ export default function LobbyScreen() {
         const activeModifiers = state.game.modifiers ?? [];
         const activeRoles = state.game.roles ?? [];
         const rules = rulesFor(activeModifiers, activeRoles, state.game.mode_id);
-        const compatibleModifiers = registry.modifiers.filter((modifier) =>
-          registryMode?.compatible_modifiers.includes(modifier.id),
-        );
-        const compatibleRoles = registry.roles.filter((role) =>
-          registryMode?.compatible_roles.includes(role.id),
-        );
+        const compatibleModifiers = registry.modifiers
+          .filter((modifier) => modifier.enabled)
+          .filter((modifier) =>
+            registryMode?.compatible_modifiers.includes(modifier.id),
+          );
+        const compatibleRoles = registry.roles
+          .filter((role) => role.enabled)
+          .filter((role) =>
+            registryMode?.compatible_roles.includes(role.id),
+          );
         const chosenModifiers = isHost ? draftModifiers : activeModifiers;
         const chosenRoles = isHost ? draftRoles : activeRoles;
         return (

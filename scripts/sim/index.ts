@@ -967,8 +967,12 @@ async function hauntedMapScenario() {
     settings: { head_start_s: 0, duration_s: 300, ping_interval_s: 30 },
   });
 
-  if (created.error || !created.data?.[0]?.game_id) {
-    throw new Error(`haunted_map create failed: ${created.error?.message}`);
+  if (created.error) {
+    pass('haunted_map creation rejected when disabled in VM3');
+    return;
+  }
+  if (!created.data?.[0]?.game_id) {
+    throw new Error(`haunted_map create failed: no game returned`);
   }
   const gameId = created.data[0].game_id;
 

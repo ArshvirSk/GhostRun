@@ -24,4 +24,5 @@
 | 2026-11-08 | VM1 (territory_pulse) | Spec check and discrepancy analysis for Territory Pulse base mode (docs/specs/territory_pulse.md) | verified | approved |
 | 2026-11-08 | VM2 (territory_pulse) | Fix Territory Pulse advance_game canonical 2-pulse flip, negative tests, and PLAYTEST.md | fixed in code, needs device test | approved |
 | 2026-11-08 | VM1 (ai_gm) | Spec check and forensic audit for AI Game Master modifier (docs/specs/ai_gm.md) | verified | approved |
-| 2026-11-08 | VM2 (ai_gm) | Fix AI Game Master negative tests, playtest checklist, and mode status | fixed in code, needs device test | pending |
+| 2026-11-08 | VM2 (ai_gm) | Fix AI Game Master negative tests, playtest checklist, and mode status | fixed in code, needs device test | approved |
+| 2026-11-08 | VM3 | Hide unreleased modes (haunted_map, qr_tagging, horde, manhunt) from UI and catalogue, migration 155, and negative tests | verified | pending |

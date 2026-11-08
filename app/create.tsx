@@ -21,7 +21,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 type Mode =
   | 'classic_chase'
   | 'tag_hunt'
-  | 'haunted_map'
   | 'ghost_duel'
   | 'jailbreak'
   | 'assassin_ring'
@@ -519,19 +518,17 @@ export default function CreateGameScreen() {
               Settings · {radius}m (
               {mode === 'classic_chase'
                 ? 'Classic'
-                : mode === 'haunted_map'
-                  ? 'Haunted Map'
-                  : mode === 'ghost_duel'
-                    ? 'Ghost Duel'
-                    : mode === 'jailbreak'
-                      ? 'Jailbreak'
-                      : mode === 'assassin_ring'
-                        ? 'Assassin Ring'
-                        : mode === 'relay_heist'
-                          ? 'Relay Heist'
-                          : mode === 'territory_pulse'
-                            ? 'Territory Pulse'
-                            : 'Tag Hunt'}
+                : mode === 'ghost_duel'
+                  ? 'Ghost Duel'
+                  : mode === 'jailbreak'
+                    ? 'Jailbreak'
+                    : mode === 'assassin_ring'
+                      ? 'Assassin Ring'
+                      : mode === 'relay_heist'
+                        ? 'Relay Heist'
+                        : mode === 'territory_pulse'
+                          ? 'Territory Pulse'
+                          : 'Tag Hunt'}
               )
             </Text>
             <Text style={styles.dockHint}>▲ Slide up to configure</Text>
@@ -558,11 +555,6 @@ export default function CreateGameScreen() {
                 selected={mode === 'tag_hunt'}
                 label="Tag Hunt"
                 onPress={() => setMode('tag_hunt')}
-              />
-              <ModeButton
-                selected={mode === 'haunted_map'}
-                label="Haunted Map"
-                onPress={() => setMode('haunted_map')}
               />
               <ModeButton
                 selected={mode === 'jailbreak'}
