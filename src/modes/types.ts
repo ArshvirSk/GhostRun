@@ -1,15 +1,7 @@
 import React from 'react';
+import type { Role, Phase, Slot, HudWidgetProps } from '../game-shell/types';
 
-export type Role = 'runner' | 'hunter' | 'operator' | 'spectator' | 'solo';
-export type Phase = 'countdown' | 'head_start' | 'live' | 'ended' | 'paused';
-export type Slot = 'top' | 'banner' | 'overlay' | 'actions' | 'sheet' | 'mapLayer';
-
-export interface HudWidgetProps {
-  gameId: string;
-  phase: Phase;
-  myRole: Role;
-  [key: string]: unknown;
-}
+export type { Role, Phase, Slot, HudWidgetProps };
 
 export interface HudWidget {
   id: string;

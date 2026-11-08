@@ -45,3 +45,27 @@ This document tracks all physical device, multi-device, GPS, sensor, and human v
 |---|---|---|---|---|---|
 | P-024 | UI-M1 | Dev Preview Screen Rendering | Navigate to `/dev-preview` on physical test device | All shipping base modes, modifiers, and roles render in selectable chip list; RulesCard and interactive ParamField (steppers, switches, pills) display with today's token colors and typography | deferred |
 
+---
+
+## UI-M2: Game Shell & Widgets Device Checklist
+
+| ID | Milestone | Item to Check | How to Test | Expected Result | Status |
+|---|---|---|---|---|---|
+| P-025 | UI-M2 | GameShell Screen Mounting | Launch game round from `/lobby/[id]` | Routes to `/game/[id]`, delegates cleanly to `<GameShell />`, loads initial state snapshot without crash | deferred |
+| P-026 | UI-M2 | Role Layout — Runner | Play as runner in live round | Top HUD displays remaining runners, isolated clock, and mode chips; actions slot enforces max 3 buttons; MapView displays team members | deferred |
+| P-027 | UI-M2 | Role Layout — Hunter | Play as hunter in live round | Hunter HUD displays tag-radius ring (20m), TAG button enabled when runner is in proximity, delayed ping blips render | deferred |
+| P-028 | UI-M2 | Role Layout — Operator Console | Join as remote operator | GPS upload remains completely bypassed; remote console view enables tactical marker placement (max 3) and sector scan | deferred |
+| P-029 | UI-M2 | Role Layout — Spectator | Get tagged or join as spectator | Camera switches to spectator mode; teammate dots visible; opponent live locations strictly hidden | deferred |
+| P-030 | UI-M2 | Sprint Mode HUD Layout | Toggle "Sprint Mode" in in-game HUD header | Layout switches to high-contrast oversized typography, showing only compass direction, timer, primary tag/action, and SOS | deferred |
+| P-031 | UI-M2 | Timer Isolation & Smooth Map | Observe map during live round for 60s | Clock counts down every 500ms smoothly; map tile renderer maintains steady 60fps with zero stutter or map rebuilds | deferred |
+| P-032 | UI-M2 | Classic Chase Widget | Play Classic Chase round | Secret extraction target ring renders on runner map; distance to target updates; arrival banner triggers inside target radius | deferred |
+| P-033 | UI-M2 | Tag Hunt Widget | Play Tag Hunt round | Primary TAG button and active runner counter display in hunter HUD; eliminated runners transition cleanly | deferred |
+| P-034 | UI-M2 | Jailbreak Widget | Play Jailbreak round with jail | Jail zone circle renders on map; runner within 10m holds rescue button to trigger release; auto-release timer counts down | deferred |
+| P-035 | UI-M2 | Assassin Ring Widget | Play 3-player Assassin Ring round | Safe zones render with dashed rings; prey banner displays assigned target; proximity alerts sound when hunter approaches | deferred |
+| P-036 | UI-M2 | Relay Heist Widget | Play Relay Heist round | Package blip renders when dropped; carrier holds handoff to pass to nearby teammate; hunters attempt 20s secure hold | deferred |
+| P-037 | UI-M2 | Territory Pulse Widget | Play Territory Pulse round | 7 radial sector zones render with team ownership fills; pulse countdown timer syncs; contest alert displays on contested sector | deferred |
+| P-038 | UI-M2 | Solo Ghost Duel Widget | Play Solo Ghost Duel round | Ghost NPC path and halo blip render dynamically; target distance chips display; mirror chase TAG GHOST action triggers | deferred |
+| P-039 | UI-M2 | Modifier Widgets | Play with Hot/Cold, AI GM, Shrinking Zone | Heat probe action emits hot/cold wash; AI GM dispatch banner displays broadcast narration + fog overlay; boundary shrinks | deferred |
+| P-040 | UI-M2 | Role Add-on Widgets | Play with VIP Escort / Double Agent | Bodyguard swap request triggers prompt; Double Agent whisper reveals quadrant and scramble targets runner | deferred |
+
+

@@ -12,6 +12,7 @@ export const colors = {
   surface: '#FFFFFF',
   surfaceDark: '#1E293B',
   surfaceMuted: '#F8FAFC',
+  surfaceAlt: '#1E293B',
 
   // Borders
   border: '#CBD5E1',
@@ -28,8 +29,10 @@ export const colors = {
   primary: '#1D4ED8',
   primaryHover: '#1E40AF',
   primaryLight: '#EFF6FF',
+  accent: '#00FF66',
   runner: '#10B981',
   hunter: '#F59E0B',
+  warning: '#F59E0B',
 
   // Feedback & Tactical
   success: '#10B981',
@@ -76,6 +79,7 @@ export const radii = {
   sm: 8,
   md: 10,
   lg: 12,
+  button: 12,
   card: 16,
   pill: 24,
   full: 9999,

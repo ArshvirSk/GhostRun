@@ -92,3 +92,26 @@ export function getShippingRegistry(): {
     roles: getAllRoles(),
   };
 }
+
+export function getActiveModeModules(
+  modeId: string,
+  modifiers: string[] = [],
+  roles: string[] = []
+): ModeModule[] {
+  const result: ModeModule[] = [];
+  const base = getModeModule(modeId);
+  if (base) result.push(base);
+
+  for (const modId of modifiers) {
+    const mod = getModeModule(modId);
+    if (mod) result.push(mod);
+  }
+
+  for (const roleId of roles) {
+    const role = getModeModule(roleId);
+    if (role) result.push(role);
+  }
+
+  return result;
+}
+
