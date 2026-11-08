@@ -13,4 +13,5 @@
 | 2026-11-08 | VM2 (assassin_ring) | Fix Assassin Ring RLS pings isolation policy, update tests and PLAYTEST.md | fixed in code, needs device test | approved |
 | 2026-11-08 | VM1 (relay_heist) | Spec check and discrepancy analysis for Relay Heist base mode (docs/specs/relay_heist.md) | verified | approved |
 | 2026-11-08 | VM2 (relay_heist) | Fix Relay Heist carrier drop & ping loop, negative tests, and PLAYTEST.md | fixed in code, needs device test | approved |
-| 2026-11-08 | VM1 (vip_escort) | Spec check and discrepancy analysis for VIP Escort role add-on (docs/specs/vip_escort.md) | claimed | pending |
+| 2026-11-08 | VM1 (vip_escort) | Spec check and discrepancy analysis for VIP Escort role add-on (docs/specs/vip_escort.md) | verified | approved |
+| 2026-11-08 | VM2 (vip_escort) | Fix VIP auto-promote and target arrival guard, update tests and PLAYTEST.md | fixed in code, needs device test | pending |

@@ -2542,6 +2542,43 @@ async function vipEscortScenario() {
     JSON.stringify(repeatTag.data ?? repeatTag.error),
   );
 
+  // Negative check: frozen bodyguard cannot initiate role swap
+  const frozenSwap = await rpc(activeBodyguardClient, 'request_role_swap', {
+    p_game_id: gameId,
+    p_target_player_id: activeVipId,
+  });
+  expect(
+    Boolean(frozenSwap.error),
+    'frozen bodyguard cannot initiate role swap',
+    String(frozenSwap.error?.message ?? 'unexpected success'),
+  );
+
+  // Negative check: hunter cannot call request_role_swap
+  const hunterSwapAttempt = await rpc(hunter, 'request_role_swap', {
+    p_game_id: gameId,
+    p_target_player_id: activeVipId,
+  });
+  expect(
+    Boolean(hunterSwapAttempt.error),
+    'hunter cannot call request_role_swap (runner-only)',
+    String(hunterSwapAttempt.error?.message ?? 'unexpected success'),
+  );
+
+  // Negative check: bodyguard entering target does NOT trigger target_reached
+  await rpc(activeBodyguardClient, 'submit_position', {
+    game_id: gameId,
+    lat: CENTER.lat + 0.001,
+    lng: CENTER.lng + 0.001,
+    accuracy: 5,
+    recorded_at: new Date().toISOString(),
+  });
+  const stateAfterBodyguardAtTarget = await rpc<{ game: { status: string } }>(activeBodyguardClient, 'get_game_state', { game_id: gameId });
+  expect(
+    stateAfterBodyguardAtTarget.data?.game?.status === 'live',
+    'bodyguard reaching target does NOT trigger extraction (VIP required)',
+    JSON.stringify(stateAfterBodyguardAtTarget.data?.game),
+  );
+
   // 7. Test VIP Elimination Tag
   // Move hunter to active VIP position
   await rpc(hunter, 'submit_position', {

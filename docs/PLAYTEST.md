@@ -218,12 +218,19 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] VIP and bodyguard approach within 5 m.
   - [ ] Either player presses "Request Role Swap".
   - [ ] Partner receives prompt and confirms within 15 seconds.
-  - [ ] Roles are exchanged (`vip` $\leftrightarrow$ `bodyguard`); both players receive a 120-second swap cooldown.
+  - [ ] Roles are exchanged (`vip` $\leftrightarrow$ `bodyguard`); both players receive a 180-second (3-minute) swap cooldown.
 * **Win Conditions & Disconnection:**
   - [ ] Hunter tags the VIP: immediate **Hunters Win (`vip_eliminated`)**.
-  - [ ] Classic Chase: VIP reaches secret target: immediate **Runners Win (`arrival`)**.
+  - [ ] Classic Chase: VIP reaches secret target: immediate **Runners Win (`target_reached`)**; bodyguard entering target does NOT trigger extraction.
   - [ ] Tag Hunt: Match timer expires with VIP alive: **Runners Win (`time_expired`)**.
   - [ ] VIP offline fail-safe: VIP disconnects for $> 60\text{ s}$; confirm active bodyguard is auto-promoted to VIP (`vip_promoted`).
+* **Physical Device & Environmental Verification:**
+  - [ ] **Daylight HUD Readability:** Verify clear contrast of Gold VIP banner vs Blue Shield Bodyguard HUD outdoors under direct sunlight.
+  - [ ] **5m Proximity Touch Usability:** Confirm the onscreen Role Swap dock button triggers reliably when two runners rendezvous outdoors, with GPS accuracy compensation absorbing normal $\pm 3\text{ m}$ pedestrian scatter without false "too_far" rejections.
+  - [ ] **Bodyguard Freeze Overlay & Safety:** Confirm that when a bodyguard is frozen, the frozen overlay with countdown timer appears immediately and the player is advised to walk safely away from pursuit.
+  - [ ] **Audio & Haptic Feedback:** Confirm distinct audio sound effects and haptic patterns fire upon: role assignment, incoming role swap request, completed role swap, bodyguard frozen, and VIP eliminated.
+  - [ ] **Target Extraction Guard (Classic Chase):** Verify physically that a bodyguard stepping into the target zone without the VIP does NOT trigger extraction arrival.
+  - [ ] **SOS Interruption:** Verify that pressing the emergency SOS button at any point during active play, bodyguard freeze, or role swap handshake immediately halts all timers, pauses the match, and alerts all players.
 
 ### 3.10 Operator Remote Role Add-on (docs/MODES.md §5.3)
 * **Recommended Group:** 4–12 players (e.g. 2 field runners + 1 runner operator, 2 field hunters + 1 hunter operator).

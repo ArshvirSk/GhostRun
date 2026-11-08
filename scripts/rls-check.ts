@@ -1979,12 +1979,21 @@ async function main() {
     });
     expect(Boolean(outsiderSwap.error), 'outsider cannot call request_role_swap', 'call unexpectedly succeeded');
 
-    // Hunter cannot request role swap
+    const outsiderConfirmSwap = await rpc(outsider, 'confirm_role_swap', { p_game_id: vipGameId });
+    expect(Boolean(outsiderConfirmSwap.error), 'outsider cannot call confirm_role_swap', 'call unexpectedly succeeded');
+
+    const outsiderCancelSwap = await rpc(outsider, 'cancel_role_swap', { p_game_id: vipGameId });
+    expect(Boolean(outsiderCancelSwap.error), 'outsider cannot call cancel_role_swap', 'call unexpectedly succeeded');
+
+    // Hunter cannot request or confirm role swap
     const hunterSwap = await rpc(hunter, 'request_role_swap', {
       p_game_id: vipGameId,
       p_target_player_id: vipHostPid,
     });
     expect(Boolean(hunterSwap.error), 'hunter cannot call request_role_swap', 'call unexpectedly succeeded');
+
+    const hunterConfirmSwap = await rpc(hunter, 'confirm_role_swap', { p_game_id: vipGameId });
+    expect(Boolean(hunterConfirmSwap.error), 'hunter cannot call confirm_role_swap', 'call unexpectedly succeeded');
 
     // Runner cannot swap with hunter
     const swapWithHunter = await rpc(host, 'request_role_swap', {
@@ -1992,6 +2001,10 @@ async function main() {
       p_target_player_id: vipHunterPid,
     });
     expect(Boolean(swapWithHunter.error), 'runner cannot swap role with hunter', 'call unexpectedly succeeded');
+
+    // 5. Event secrecy: Hunter cannot read runner-audience events (roles_swapped / role_swap_requested)
+    const hunterVipEvents = (await hunter.from('events').select('*').eq('game_id', vipGameId).eq('audience', 'runner')).data ?? [];
+    expectEmpty(hunterVipEvents, 'hunter cannot read runner-audience events in VIP Escort game');
 
     for (const client of [host, vipRunner2, hunter]) {
       await rpc(client, 'leave_game', { game_id: vipGameId });
