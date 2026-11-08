@@ -10,4 +10,5 @@
 | 2026-11-08 | VM1 (jailbreak) | Spec check and discrepancy analysis for Jailbreak base mode (docs/specs/jailbreak.md) | verified | approved |
 | 2026-11-08 | VM2 (jailbreak) | Fix Jailbreak mode auto-release loop, update tests and PLAYTEST.md | fixed in code, needs device test | approved |
 | 2026-11-08 | VM1 (assassin_ring) | Spec check and discrepancy analysis for Assassin Ring base mode (docs/specs/assassin_ring.md) | verified | approved |
-| 2026-11-08 | VM2 (assassin_ring) | Fix Assassin Ring RLS pings isolation policy, update tests and PLAYTEST.md | fixed in code, needs device test | pending |
+| 2026-11-08 | VM2 (assassin_ring) | Fix Assassin Ring RLS pings isolation policy, update tests and PLAYTEST.md | fixed in code, needs device test | approved |
+| 2026-11-08 | VM1 (relay_heist) | Spec check and discrepancy analysis for Relay Heist base mode (docs/specs/relay_heist.md) | claimed | pending |
