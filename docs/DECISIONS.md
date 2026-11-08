@@ -452,6 +452,29 @@ Upgraded `export_my_data()` to export all personal and tactical gameplay records
 
 **Reason:** Respects Addendum B and Standing Decisions: prevents exposing unapproved or untested experiences to players.
 
+## 2026-11-09 — UI-M2 / Phase 2 Gate Decisions
+
+### Decision UI-D7: Visual Direction A ("Night Radar")
+**Decision:** Adopt Visual Direction A "Night Radar" for Phase 2 redesign. Deep charcoal background (`#050709`), pitch-black card surfaces (`#0D1117`, `#161B22`), tactical phosphor green for runners (`#3DFFA2`), heat amber for hunters (`#FF5C00` to avoid clashing with heat wash), radar scan cyan (`#38BDF8`), and purple ghost trails (`#A855F7`). High-contrast outdoor sunlight legibility meeting WCAG AA accessible contrast ratios.
+
+### Decision UI-D8: Preserve Existing Auth & Defer Third-Party OAuth
+**Decision:** Preserve all existing authentication mechanisms (email OTP, magic link, password reset deep links, guest authentication) without modification. Defer Google Sign-in and account linking to future scope pending GCP OAuth client credentials and human console verification. Defer `@handle` step to keep user data 100% compliant with existing server schema.
+
+### Decision UI-D9: Typography Scale and Font Stack
+**Decision:** Structure typography around three roles (Display, Body, Label) accessed via `<Text variant="..." />` primitive:
+- Display / Headline: Clean geometric sans with tight tracking.
+- Body / Subtitle: High-legibility neutral grotesque.
+- Mono / Numeric / Label: Tabular monospace font for timers, room codes, GPS fixes, and tactical HUD metrics.
+
+### Decision UI-D10: Offline Deterministic Tour Engine
+**Decision:** Build the Briefing tour (`src/tour/`) with scripted mock state driving real HUD components offline. Zero network calls, zero location permission requirements, zero tracking lifecycle. Reduced motion renders static cards with fades.
+
+### Decision UI-D11 to UI-D13: Ergonomics and Layout Options
+**Decision UI-D11:** Lobby uses 3 segments (`Roster`, `Rules & Intel`, `Comms`).
+**Decision UI-D12:** Replay scrubber provides -15 s and +15 s jump controls.
+**Decision UI-D13:** Sprint Mode HUD is available as an in-game toggle in HUD settings and auto-suggested when sustained running speed (>8 m/s) is detected.
+
+
 
 
 
