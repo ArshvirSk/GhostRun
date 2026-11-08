@@ -18,4 +18,5 @@
 | 2026-11-08 | VM1 (operator) | Spec check and discrepancy analysis for Operator role add-on (docs/specs/operator.md) | verified | approved |
 | 2026-11-08 | VM2 (operator) | Fix Operator canonical get_game_state payload, negative tests, and PLAYTEST.md | fixed in code, needs device test | approved |
 | 2026-11-08 | VM1 (double_agent) | Spec check and discrepancy analysis for Double Agent role add-on (docs/specs/double_agent.md) | verified | approved |
-| 2026-11-08 | VM2 (double_agent) | Fix Double Agent scramble displacement in advance_game, negative tests, and PLAYTEST.md | fixed in code, needs device test | pending |
+| 2026-11-08 | VM2 (double_agent) | Fix Double Agent scramble displacement in advance_game, negative tests, and PLAYTEST.md | fixed in code, needs device test | approved |
+| 2026-11-08 | VM1 (ghost_duel) | Spec check and discrepancy analysis for Solo Ghost Duel base mode (docs/specs/ghost_duel.md) | verified | pending |
