@@ -2338,6 +2338,193 @@ async function main() {
     }
   }
 
+  // --- Double Agent Role & Tribunal Secrecy Checks (VM2) ---
+  const daCreated = await rpc<{ game_id: string; code: string }[]>(host, 'create_game', {
+    mode: 'classic_chase',
+    lat: CENTER.lat,
+    lng: CENTER.lng,
+    radius_m: 600,
+    settings: {
+      roles: ['double_agent'],
+      head_start_s: 0,
+      ping_interval_s: 30,
+    },
+  });
+  const daGameId = daCreated.data?.[0]?.game_id;
+  const daCode = daCreated.data?.[0]?.code;
+  expect(Boolean(daGameId), 'double agent game created for RLS check', JSON.stringify(daCreated.error));
+
+  if (daGameId && daCode) {
+    const daHunter2 = await anonymousClient('DaHunter2');
+    await rpc(hunter, 'join_game', { code: daCode });
+    await rpc(daHunter2, 'join_game', { code: daCode });
+
+    const daHostPid = await playerId(host, daGameId);
+    const daHunterPid = await playerId(hunter, daGameId);
+    const daHunter2Pid = await playerId(daHunter2, daGameId);
+
+    await rpc(host, 'set_team', { game_id: daGameId, player_id: daHostPid, team: 'runner' });
+    await rpc(hunter, 'set_team', { game_id: daGameId, player_id: daHunterPid, team: 'hunter' });
+    await rpc(daHunter2, 'set_team', { game_id: daGameId, player_id: daHunter2Pid, team: 'hunter' });
+
+    for (const client of [host, hunter, daHunter2]) {
+      await rpc(client, 'set_share_trail', { game_id: daGameId, share: true });
+      await rpc(client, 'set_ready', { game_id: daGameId, ready: true });
+    }
+
+    await rpc(host, 'begin_target_selection', { game_id: daGameId });
+    await rpc(host, 'set_target', {
+      game_id: daGameId,
+      lat: CENTER.lat + 0.002, // North quadrant
+      lng: CENTER.lng,
+    });
+
+    for (const client of [host, hunter, daHunter2]) {
+      await rpc(client, 'set_ready', { game_id: daGameId, ready: true });
+    }
+
+    const daStartRes = await rpc(host, 'start_game', { game_id: daGameId });
+    expect(!daStartRes.error, 'host starts game with double agent role', JSON.stringify(daStartRes.error));
+
+    // Fast-forward countdown so round is live
+    await new Promise((r) => setTimeout(r, 11000));
+    await rpc(host, 'advance_game', { game_id: daGameId });
+
+    // Determine which hunter is the double agent
+    const h1Status = await rpc<{ secret_role?: string; agent_powers?: unknown }>(hunter, 'get_my_status', { game_id: daGameId });
+    const h2Status = await rpc<{ secret_role?: string; agent_powers?: unknown }>(daHunter2, 'get_my_status', { game_id: daGameId });
+
+    const h1IsAgent = h1Status.data?.secret_role === 'agent';
+    const h2IsAgent = h2Status.data?.secret_role === 'agent';
+    expect(
+      (h1IsAgent && !h2IsAgent) || (!h1IsAgent && h2IsAgent),
+      'exactly 1 hunter assigned as agent',
+      `h1=${h1IsAgent}, h2=${h2IsAgent}`,
+    );
+
+    const agentClient = h1IsAgent ? hunter : daHunter2;
+    const loyalClient = h1IsAgent ? daHunter2 : hunter;
+    const agentPid = h1IsAgent ? daHunterPid : daHunter2Pid;
+    const loyalPid = h1IsAgent ? daHunter2Pid : daHunterPid;
+
+    // 1. Column-level Secrecy of secret_role:
+    // Direct select on players.secret_role fails or returns null for everyone
+    const directSelectHunters = await loyalClient.from('players').select('id, secret_role').eq('game_id', daGameId);
+    expect(
+      Boolean(directSelectHunters.error) || (directSelectHunters.data ?? []).every((p) => p.secret_role === null),
+      'players.secret_role is completely inaccessible to peers via direct SELECT',
+      JSON.stringify(directSelectHunters.data),
+    );
+
+    // 2. Ability Secrecy & Access Restrictions:
+    // Loyal hunter calling agent_whisper is rejected
+    const loyalWhisperFail = await rpc(loyalClient, 'agent_whisper', { game_id: daGameId });
+    expect(
+      Boolean(loyalWhisperFail.error),
+      'loyal hunter cannot call agent_whisper',
+      'loyal hunter unexpectedly called whisper',
+    );
+
+    // Loyal hunter calling agent_scramble is rejected
+    const loyalScrambleFail = await rpc(loyalClient, 'agent_scramble', {
+      game_id: daGameId,
+      runner_id: daHostPid,
+    });
+    expect(
+      Boolean(loyalScrambleFail.error),
+      'loyal hunter cannot call agent_scramble',
+      'loyal hunter unexpectedly called scramble',
+    );
+
+    // Double Agent calling agent_whisper succeeds and returns target quadrant
+    const agentWhisperRes = await rpc<{ quadrant?: string }>(agentClient, 'agent_whisper', { game_id: daGameId });
+    expect(
+      !agentWhisperRes.error && agentWhisperRes.data?.quadrant === 'North',
+      'double agent whisper returns target cardinal quadrant',
+      JSON.stringify(agentWhisperRes.data ?? agentWhisperRes.error),
+    );
+
+    // Repeat whisper is rejected (single use)
+    const repeatWhisperFail = await rpc(agentClient, 'agent_whisper', { game_id: daGameId });
+    expect(
+      Boolean(repeatWhisperFail.error),
+      'repeat agent_whisper call is rejected (single use)',
+      'repeat whisper unexpectedly succeeded',
+    );
+
+    // 3. Tribunal Secrecy & Access Restrictions:
+    // Runner attempting to start tribunal is rejected
+    const runnerTribunalFail = await rpc(host, 'start_tribunal', {
+      game_id: daGameId,
+      accused_hunter_id: agentPid,
+    });
+    expect(
+      Boolean(runnerTribunalFail.error),
+      'runner cannot start tribunal (hunters only)',
+      'runner unexpectedly started tribunal',
+    );
+
+    // Hunter accusing self is rejected
+    const selfAccuseFail = await rpc(loyalClient, 'start_tribunal', {
+      game_id: daGameId,
+      accused_hunter_id: loyalPid,
+    });
+    expect(
+      Boolean(selfAccuseFail.error),
+      'hunter cannot accuse self in tribunal',
+      'hunter unexpectedly accused self',
+    );
+
+    // Loyal hunter convenes tribunal against agent
+    const startTribRes = await rpc<{ status?: string }>(loyalClient, 'start_tribunal', {
+      game_id: daGameId,
+      accused_hunter_id: agentPid,
+    });
+    expect(!startTribRes.error, 'loyal hunter convenes tribunal against suspect', JSON.stringify(startTribRes.error));
+
+    // Runner CANNOT read tribunals table under RLS (team isolation)
+    const runnerTribunals = (await host.from('tribunals').select('*').eq('game_id', daGameId)).data ?? [];
+    expectEmpty(runnerTribunals, 'runner cannot read tribunals table (RLS policy)');
+
+    // Outsider CANNOT read tribunals table under RLS
+    const outsiderTribunals = (await outsider.from('tribunals').select('*').eq('game_id', daGameId)).data ?? [];
+    expectEmpty(outsiderTribunals, 'outsider cannot read tribunals table (RLS policy)');
+
+    // Loyal hunter CAN read tribunals table under RLS
+    const hunterTribunals = (await loyalClient.from('tribunals').select('*').eq('game_id', daGameId)).data ?? [];
+    expect(
+      hunterTribunals.length === 1,
+      'hunter can read active tribunal under RLS',
+      `count=${hunterTribunals.length}`,
+    );
+
+    // Runner attempting to vote in tribunal is rejected
+    const runnerVoteFail = await rpc(host, 'cast_vote', {
+      game_id: daGameId,
+      vote: true,
+    });
+    expect(
+      Boolean(runnerVoteFail.error),
+      'runner cannot cast vote in tribunal',
+      'runner unexpectedly voted in tribunal',
+    );
+
+    // Second tribunal in same match is rejected
+    const secondTribFail = await rpc(loyalClient, 'start_tribunal', {
+      game_id: daGameId,
+      accused_hunter_id: agentPid,
+    });
+    expect(
+      Boolean(secondTribFail.error),
+      'second tribunal in same game is rejected (once per game)',
+      'second tribunal unexpectedly permitted',
+    );
+
+    for (const client of [host, hunter, daHunter2]) {
+      await rpc(client, 'leave_game', { game_id: daGameId });
+    }
+  }
+
   // Consent records are append-only and reachable only through the RPCs.
   const policyAck = await rpc(host, 'set_consent', {
     consent_type: 'policy_ack',

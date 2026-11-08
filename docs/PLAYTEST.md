@@ -195,6 +195,11 @@ Immediately following each outdoor play session, ask each participant:
   - Voting banner allows instant guilty/innocent casting.
   - Majority guilty ejects the agent and awards hunters a bonus ping round.
   - Erroneous ejection of a loyal hunter imposes a 5-minute silence penalty.
+* **Physical Device & Environmental Verification:**
+  - [ ] **Daylight Readability:** Confirm cyan whisper banner (`#0284C7`) and red gavel tribunal banner (`#FCA5A5`) are clearly legible outdoors in direct sunlight.
+  - [ ] **Haptic Feedback Verification:** Verify distinct haptic pulses on physical device when Double Agent triggers Whisper (`150 ms`), arms Scramble (`[0, 100, 100, 100]`), or casts a Tribunal vote (`100 ms`).
+  - [ ] **Silence Overlay Usability:** Verify falsely convicted loyal hunter displays a clear countdown timer showing remaining silence duration without disabling map navigation.
+  - [ ] **Emergency SOS Interruption:** Verify that if any player triggers SOS, active tribunal voting is paused immediately.
 
 ### 3.9 VIP Escort Role Add-on (docs/MODES.md §5.2)
 * **Recommended Group:** 5–12 players (minimum 1 hunter, 2 runners; recommended 2+ hunters, 4+ runners).

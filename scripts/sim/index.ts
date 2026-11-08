@@ -824,6 +824,35 @@ async function doubleAgentScenario() {
     JSON.stringify(voteRes.data ?? voteRes.error?.message),
   );
 
+  // Negative restrictions check (VM2)
+  const runnerWhisperFail = await rpc(host, 'agent_whisper', { game_id: gameId });
+  expect(
+    Boolean(runnerWhisperFail.error),
+    'sim: runner cannot use agent_whisper',
+    'unexpectedly succeeded calling whisper as runner',
+  );
+
+  const runnerScrambleFail = await rpc(host, 'agent_scramble', { game_id: gameId, runner_id: runnerId });
+  expect(
+    Boolean(runnerScrambleFail.error),
+    'sim: runner cannot use agent_scramble',
+    'unexpectedly succeeded calling scramble as runner',
+  );
+
+  const runnerTribunalFail = await rpc(host, 'start_tribunal', { game_id: gameId, accused_hunter_id: agentId });
+  expect(
+    Boolean(runnerTribunalFail.error),
+    'sim: runner cannot start tribunal',
+    'unexpectedly succeeded starting tribunal as runner',
+  );
+
+  const selfAccuseFail = await rpc(loyalHunter, 'start_tribunal', { game_id: gameId, accused_hunter_id: await playerId(loyalHunter, gameId) });
+  expect(
+    Boolean(selfAccuseFail.error),
+    'sim: hunter cannot accuse self in tribunal',
+    'unexpectedly succeeded accusing self in tribunal',
+  );
+
   for (const client of [host, hunter1, hunter2]) {
     await rpc(client, 'leave_game', { game_id: gameId });
   }
