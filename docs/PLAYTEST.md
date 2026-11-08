@@ -89,6 +89,13 @@ Immediately following each outdoor play session, ask each participant:
   - [ ] If round duration expires while at least one runner is `active`, **Runners Win (`time_expired`)**.
   - [ ] Verify auto-release: an unrescued prisoner is freed automatically after 300 seconds.
   - [ ] Verify shrinking zone safety: if an active safe zone shrinks past the jail perimeter, all prisoners are evacuated automatically.
+* **Physical Device & Environmental Verification:**
+  - [ ] **Touchscreen Hold Usability:** Verify holding the onscreen rescue button for 10 continuous seconds functions reliably outdoors under direct sunlight and with moist/sweaty fingers.
+  - [ ] **GPS Jitter Tolerance:** Test rescue hold at the 9–10 m perimeter threshold; confirm minor satellite multipath jitter ($\pm 3\text{ m}$) does not prematurely abort the hold if the runner is stationary.
+  - [ ] **Audio & Haptic Feedback:** Confirm distinct, high-volume audio tones and haptic patterns fire upon being jailed and upon being freed.
+  - [ ] **Jailed Perimeter Warning:** Confirm a visual warning banner appears on a jailed player's device if they wander $>25\text{ m}$ away from the physical jail landmark.
+  - [ ] **Site Safety Check:** Confirm the physical jail is placed $\ge 50\text{ m}$ away from vehicle roads, bodies of water, construction, or steep drop-offs.
+  - [ ] **SOS Interruption:** Verify pressing the in-app SOS button while in jail or while performing a rescue immediately pauses the round and notifies all participants.
 
 ### 3.5 Assassin Ring Base Mode (docs/MODES.md §4.3)
 * **Recommended Group:** 6–16 players (minimum 3 players).

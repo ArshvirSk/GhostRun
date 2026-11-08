@@ -7,4 +7,5 @@
 | 2026-11-08 | R3 | Fix what the evidence shows is wrong (on branch recovery/r3, no push) | verified | approved |
 | 2026-11-08 | R4 | Release-candidate verification pack (generic smoke test checklist, field test sheet, limitations list) | verified | approved |
 | 2026-11-08 | VM0 | Mode inventory matrix (docs/MODE_STATUS.md), catalogue outputs, and baseline test suite | verified | approved |
-| 2026-11-08 | VM1 (jailbreak) | Spec check and discrepancy analysis for Jailbreak base mode (docs/specs/jailbreak.md) | claimed | pending |
+| 2026-11-08 | VM1 (jailbreak) | Spec check and discrepancy analysis for Jailbreak base mode (docs/specs/jailbreak.md) | verified | approved |
+| 2026-11-08 | VM2 (jailbreak) | Fix Jailbreak mode auto-release loop, update tests and PLAYTEST.md | fixed in code, needs device test | pending |

@@ -1619,6 +1619,19 @@ async function main() {
 
     const hunterStartRescue = await rpc(hunter, 'start_rescue', { game_id: jbGameId });
     expect(Boolean(hunterStartRescue.error), 'hunter cannot call start_rescue', 'call unexpectedly succeeded');
+
+    const hunterCompleteRescue = await rpc(hunter, 'complete_rescue', { game_id: jbGameId });
+    expect(Boolean(hunterCompleteRescue.error), 'hunter cannot call complete_rescue', 'call unexpectedly succeeded');
+
+    const hunterCancelRescue = await rpc(hunter, 'cancel_rescue', { game_id: jbGameId });
+    expect(Boolean(hunterCancelRescue.error), 'hunter cannot call cancel_rescue', 'call unexpectedly succeeded');
+
+    const hunterRescueEvents = await hunter
+      .from('events')
+      .select('*')
+      .eq('game_id', jbGameId)
+      .eq('type', 'rescue_started');
+    expectEmpty(hunterRescueEvents.data, 'hunter cannot read rescue_started event');
   }
 
   // --- Assassin Ring Access and Secrecy Checks (B2) ---
