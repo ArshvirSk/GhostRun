@@ -118,3 +118,11 @@ gh release create vX.Y.Z "android/app/build/outputs/apk/release/app-release.apk#
 1. Do not push `v2.5.0` tag until physical field test sign-off is complete.
 2. If distributing the current build for outdoor field testing, tag as `v2.5.0-rc1` locally.
 3. If publishing a GitHub Release for field testing, mark explicitly as **"Pre-release"** with title `GhostRun v2.5.0-rc1 (Release Candidate 1)`.
+
+---
+
+## 9. Verification Pack Reference
+
+For human physical testing protocols, smoke test checklists, and known operational limitations, see:  
+[`docs/VERIFICATION_PACK.md`](file:///c:/ASK_Main/ASK/Projects/GhostRun/docs/VERIFICATION_PACK.md)
+

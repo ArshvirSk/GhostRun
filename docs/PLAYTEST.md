@@ -413,4 +413,5 @@ Before testing with real players:
 - **Field Playtest Status:** ⏳ Pending User Physical Sign-Off. Requires physical outdoor test session with 6+ players and explicit sign-off by project owner. Automated simulation or built APKs constitute release candidates, not signed-off releases.
 - **External Cron Automation:** ✅ Completed. External keep-alive cron job configured and active, triggering the `cleanup_old_games()` retention sweep.
 - **Official Contact Email:** `arshvirsk26@gmail.com`
+- **Release-Candidate Verification Pack:** [`docs/VERIFICATION_PACK.md`](file:///c:/ASK_Main/ASK/Projects/GhostRun/docs/VERIFICATION_PACK.md) (contains Part 1 Physical Smoke Test Checklist, Part 2 6+ Player Log Sheet, and Part 3 Known Limitations).
 
