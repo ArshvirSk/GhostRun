@@ -43,7 +43,8 @@
 | 2026-11-10 | UI-M4 | Onboarding suite (welcome hero, 4-step signup over existing auth, permissions & 18+ gate, offline briefing tour, back-compat redirects, handles spec) | verified | approved |
 | 2026-11-10 | UI-M5 | Home, join and host wizard (Play tab, code boxes join modal, five-step host wizard, create_game payload snapshot test) | verified | approved |
 | 2026-11-10 | UI-M6 | Lobby, tabs and You (3-segment lobby, role briefing card, Modes library, You profile & stats, Settings & Privacy redesign) | verified | approved |
-| 2026-11-10 | UI-M7 | Result, replay and gallery completion (swipeable recap cards, ±15s replay skip, ghost echo, gallery completion, token coverage) | verified | pending |
+| 2026-11-10 | UI-M7 | Result, replay and gallery completion (swipeable recap cards, ±15s replay skip, ghost echo, gallery completion, token coverage) | verified | approved |
+| 2026-11-10 | UI-M8 | Hardening and release candidate (redirects and deep links test, a11y pass, docs/ADDING_A_MODE.md, README update, release checklist) | verified | pending |
 
 
 
