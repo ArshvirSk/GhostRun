@@ -57,15 +57,15 @@ export default function SplashScreen() {
         return;
       }
 
-      // If user hasn't seen onboarding, send them to onboarding
+      // If user hasn't seen onboarding, send them to welcome
       if (onboardedVal !== 'true') {
-        router.replace('/onboarding' as any);
+        router.replace('/welcome' as any);
         return;
       }
 
-      // If no active session, send to auth
+      // If no active session, send to sign-in
       if (!sessionRes.data.session) {
-        router.replace('/auth');
+        router.replace('/signin' as any);
         return;
       }
 
@@ -84,7 +84,7 @@ export default function SplashScreen() {
       }
 
       if (!profile) {
-        router.replace('/welcome');
+        router.replace('/signup/name' as any);
         return;
       }
 
@@ -100,7 +100,9 @@ export default function SplashScreen() {
       )?.policy_ack;
       const acknowledgedVersion = ack?.granted ? (ack.policy_version ?? 0) : 0;
       router.replace(
-        acknowledgedVersion < PRIVACY_VERSION ? ('/privacy?mode=gate' as any) : '/home',
+        acknowledgedVersion < PRIVACY_VERSION
+          ? ('/signup/before-you-play' as any)
+          : '/home',
       );
     } catch (err) {
       setHasError(true);

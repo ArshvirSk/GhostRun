@@ -30,6 +30,9 @@
 | 2026-11-09 | UI-M0 | UI Audit and baseline (docs/UI_AUDIT.md, docs/PHYSICAL_CHECKLIST.md, test baselines, U-D1 to U-D13 recommendations) | verified | approved |
 | 2026-11-09 | UI-M1 | Token architecture, ThemeProvider, Text primitive, mode registry & modules, RulesCard, ParamField, dev preview, drift test | verified | approved |
 | 2026-11-09 | UI-M2 | Game shell, role layouts, mode HUD widgets, timer isolation, profile:hud benchmark | verified | approved |
-| 2026-11-09 | UI-M3 | Design system tokens (Direction A), UI primitives, motion primitives, tour engine skeleton, HUD gallery, zero hardcoded hex | verified | pending |
+| 2026-11-09 | UI-M3 | Design system tokens (Direction A), UI primitives, motion primitives, tour engine skeleton, HUD gallery, zero hardcoded hex | verified | approved |
+| 2026-11-09 | UI-M4 | Onboarding & entry flow (welcome hero, 4-step signup over existing auth, permissions & 18+ gate, offline briefing tour, back-compat redirects, handles spec) | verified | pending |
+
+
 
 

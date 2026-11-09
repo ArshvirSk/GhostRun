@@ -81,5 +81,21 @@ This document tracks all physical device, multi-device, GPS, sensor, and human v
 | P-045 | UI-M3 | Interactive HUD Gallery Screen | Launch `/debug/hud-gallery` cold on physical test device | All design tokens, UI primitives (Button, Card, Chip, Sheet, Toast, CodeBoxes, SegmentBar, BriefingCard), motion components, and 5 role layouts render interactively | deferred |
 | P-046 | UI-M3 | Tour Player Beat Progression | Play Briefing tour player in `/debug/hud-gallery` through all 8 canonical beats | Offline scripted beats advance smoothly with story segments, mock radar markers render on radar frame, and tour exits cleanly | deferred |
 
+---
+
+## UI-M4: Onboarding & Entry Flow Device Checklist
+
+| ID | Milestone | Item to Check | How to Test | Expected Result | Status |
+|---|---|---|---|---|---|
+| P-047 | UI-M4 | First-Run Welcome Navigation | Clear app data / install fresh build, launch app | Cold launch routes directly to `/(onboarding)/welcome`; Night Radar ambient radar sweep renders smoothly | deferred |
+| P-048 | UI-M4 | Live Radar Chip Preview & Palette | On `/signup/name`, type codename and tap colors | Callout chip updates uppercase codename in real time; player entity pin renders with selected color ring | deferred |
+| P-049 | UI-M4 | Email Registration & Cooldown Timer | On `/signup/account`, register with email; observe `/signup/code` | Confirmation dispatch triggers 60s cooldown countdown; resend button disabled until timer hits 0s | deferred |
+| P-050 | UI-M4 | Email Link Deep-Link Verification | Tap confirmation email link on device | Deep link brings app to foreground, restores session, and advances player | deferred |
+| P-051 | UI-M4 | Mandatory Age Confirmation Gate | On `/signup/before-you-play`, attempt completion without checking age | Complete button strictly disabled; checking 18+ or guardian confirmation enables button | deferred |
+| P-052 | UI-M4 | Native OS Sensor Permissions | On `/signup/before-you-play`, tap Allow on Location, Background, and Notifications | Native Android OS dialogs appear; granting updates status to "Granted ✓" with haptic tap | deferred |
+| P-053 | UI-M4 | Offline Briefing Tour Playthrough | Complete setup or tap "Preview Briefing Tour" on `/welcome` | Offline scripted round plays through all 8 beats with story segment progress; Done routes to `/home` | deferred |
+| P-054 | UI-M4 | Legacy Route Redirect Shims | Navigate to `/auth` and `/onboarding` manually via deep link | `/auth` redirects cleanly to `/signin`; `/onboarding` redirects cleanly to `/welcome` | deferred |
+
+
 
 
