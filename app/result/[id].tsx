@@ -2,7 +2,15 @@ import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../../src/lib/
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import {
   circleRing,
@@ -13,6 +21,9 @@ import {
 } from '../../src/lib/geo';
 import { stopLocationSharing } from '../../src/lib/location';
 import { supabase } from '../../src/lib/supabase';
+import { colors, radii, spacing } from '../../src/theme/tokens';
+import { Button, Card, Chip, Text } from '../../src/ui';
+import { formatDistance, useUnits } from '../../src/utils/units';
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
@@ -184,17 +195,19 @@ function teamLabel(team: Team) {
   return team === 'runner' ? 'Runner' : team === 'hunter' ? 'Hunter' : 'No team';
 }
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_WIDTH = SCREEN_WIDTH - 32;
+
 export default function ResultScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { unitSystem } = useUnits();
   const gameId = Array.isArray(id) ? id[0] : id;
 
   const [state, setState] = useState<RoundResultState | null>(null);
   const [gameStats, setGameStats] = useState<GameStats | null>(null);
   const [trails, setTrails] = useState<TrailPoint[]>([]);
-  const [loadingTrails, setLoadingTrails] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const [trailError, setTrailError] = useState('');
   const [rematchBusy, setRematchBusy] = useState(false);
   const [rematchError, setRematchError] = useState('');
   const [ghostPreview, setGhostPreview] = useState<GhostPreview | null>(null);
@@ -203,6 +216,9 @@ export default function ResultScreen() {
   const [ghostDismissed, setGhostDismissed] = useState(false);
   const [ghostPermanentlyDeclined, setGhostPermanentlyDeclined] = useState(false);
   const [ghostScore, setGhostScore] = useState<GhostDuelScore | null>(null);
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const [shareRecapFeedback, setShareRecapFeedback] = useState(false);
+
   const mountedRef = useRef(true);
   const leavingRef = useRef(false);
 
@@ -213,8 +229,7 @@ export default function ResultScreen() {
     };
   }, []);
 
-  // A result is terminal. The background task would otherwise keep uploading
-  // the player's position after the round has already ended.
+  // Stop background location updates once result is reached
   useEffect(() => {
     void stopLocationSharing();
   }, []);
@@ -289,7 +304,6 @@ export default function ResultScreen() {
       if (!mountedRef.current) return;
       if (scoreRow) {
         setGhostScore(scoreRow as GhostDuelScore);
-        // Public local leaderboard fetch suppressed pending user reporting & blocking infrastructure (Phase D)
       }
     }
 
@@ -326,8 +340,7 @@ export default function ResultScreen() {
     return () => clearTimeout(initialLoad);
   }, [load]);
 
-  // A direct link can arrive before the round is over. The live screen owns
-  // those phases; the result screen only renders a finished game.
+  // Direct link routing guard
   useEffect(() => {
     if (!state || !gameId) return;
     const phase = state.game.status;
@@ -338,7 +351,7 @@ export default function ResultScreen() {
     } else if (phase === 'countdown' || phase === 'head_start' || phase === 'live') {
       router.replace({ pathname: '/game/[id]', params: { id: gameId } });
     } else if (phase === 'cancelled') {
-      router.replace('/home');
+      router.replace('/play' as any);
     }
   }, [gameId, router, state]);
 
@@ -363,8 +376,7 @@ export default function ResultScreen() {
     router.replace({ pathname: '/lobby/[id]', params: { id: created.game_id } });
   }
 
-  // A rematch is created for the whole crew at once, so players who stay on the
-  // result follow the finished game's pointer into the fresh lobby.
+  // Rematch follower polling
   useEffect(() => {
     if (!supabase || !gameId || state?.game.status !== 'ended') return;
     const rematchId = state.game.rematch_game_id;
@@ -447,17 +459,21 @@ export default function ResultScreen() {
     return winner?.player_id ?? null;
   }, [state]);
 
+  const handleCardScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(offsetX / CARD_WIDTH);
+    if (index !== activeCardIndex && index >= 0) {
+      setActiveCardIndex(index);
+    }
+  };
+
   if (!gameId) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.error}>Game not found.</Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.replace('/home')}
-          style={styles.linkButton}
-        >
-          <Text style={styles.linkText}>Back to home</Text>
-        </Pressable>
+        <Text variant="headline" color={colors.danger} style={{ marginBottom: spacing.md }}>
+          Operation not found.
+        </Text>
+        <Button title="Return to Base" variant="primary" size="md" onPress={() => router.replace('/play' as any)} />
       </View>
     );
   }
@@ -466,19 +482,20 @@ export default function ResultScreen() {
     return (
       <View style={styles.centered}>
         {errorMessage ? (
-          <Text accessibilityRole="alert" style={styles.error}>
-            {errorMessage}
-          </Text>
+          <>
+            <Text variant="body" color={colors.danger} style={{ marginBottom: spacing.md }}>
+              {errorMessage}
+            </Text>
+            <Button title="Return to Base" variant="secondary" size="md" onPress={() => router.replace('/play' as any)} />
+          </>
         ) : (
-          <ActivityIndicator color="#1D4ED8" size="large" />
+          <>
+            <ActivityIndicator color={colors.primary} size="large" />
+            <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+              Decrypting mission debrief…
+            </Text>
+          </>
         )}
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.replace('/home')}
-          style={styles.linkButton}
-        >
-          <Text style={styles.linkText}>Back to home</Text>
-        </Pressable>
       </View>
     );
   }
@@ -486,8 +503,10 @@ export default function ResultScreen() {
   if (state.game.status !== 'ended') {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#1D4ED8" size="large" />
-        <Text style={styles.loadingText}>Loading the result…</Text>
+        <ActivityIndicator color={colors.primary} size="large" />
+        <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+          Finalizing round telemetry…
+        </Text>
       </View>
     );
   }
@@ -513,98 +532,98 @@ export default function ResultScreen() {
   const isJailbreak =
     game.mode === 'jailbreak' ||
     (game as unknown as { mode_id?: string }).mode_id === 'jailbreak';
+
+  const isVictory =
+    (state.my_team === 'runner' && game.winner === 'runners') ||
+    (state.my_team === 'hunter' && game.winner === 'hunters') ||
+    (isGhostDuel && ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? ''));
+
   const winnerTitle = game.end_reason === 'curfew_reached'
     ? 'Curfew Reached'
     : isGhostDuel
     ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? '')
       ? game.end_reason === 'ghost_tagged'
-        ? 'Ghost Tagged!'
+        ? 'Ghost Intercepted'
         : game.end_reason === 'evaded'
-          ? 'Evaded Successfully!'
-          : 'Ghost Beaten!'
+          ? 'Evaded Successfully'
+          : 'Ghost Record Beaten'
       : game.end_reason === 'ghost_escaped'
         ? 'Ghost Escaped'
         : game.end_reason === 'haunted'
           ? 'Haunted by Ghost'
-          : 'Ghost Won'
+          : 'Ghost Victorious'
     : isAssassinRing
-      ? 'Assassin Victorious'
+      ? 'Contract Fulfilled'
       : isTerritoryPulse
         ? game.end_reason === 'territory_dominance'
           ? game.winner === 'runners'
-            ? 'Runners Claim Dominance!'
-            : 'Hunters Claim Dominance!'
+            ? 'Runners Dominance'
+            : 'Hunters Dominance'
           : game.end_reason === 'points_victory'
             ? game.winner === 'runners'
-              ? 'Runners Win by Points!'
-              : 'Hunters Win by Points!'
-            : 'Territory Draw'
+              ? 'Runners Victory by Points'
+              : 'Hunters Victory by Points'
+            : 'Territory Stalemate'
         : game.winner === 'runners'
-          ? 'Runners win'
+          ? 'Runners Victory'
           : game.winner === 'hunters'
-            ? 'Hunters win'
-            : 'Round over';
-  const accent = game.end_reason === 'curfew_reached'
-    ? '#F59E0B'
-    : isGhostDuel
-    ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? '')
-      ? '#059669'
-      : '#B91C1C'
-    : isAssassinRing
-      ? '#D97706'
-      : game.winner === 'runners'
-        ? '#059669'
-        : game.winner === 'hunters'
-          ? '#B91C1C'
-          : '#475569';
+            ? 'Hunters Victory'
+            : 'Mission Concluded';
+
+  const outcomeAccent = game.end_reason === 'curfew_reached'
+    ? colors.warning
+    : isVictory
+      ? colors.success
+      : game.winner
+        ? colors.danger
+        : colors.textMuted;
+
   const reasonCopy = game.end_reason === 'curfew_reached'
     ? 'The match concluded automatically for player safety because the curfew deadline was reached.'
     : isGhostDuel
     ? game.end_reason === 'ghost_beaten'
-      ? 'You reached the finish line faster than the ghost runner!'
+      ? 'You reached the finish line faster than the recorded ghost runner.'
       : game.end_reason === 'ghost_won'
-        ? 'The ghost runner beat you to the finish line.'
+        ? 'The ghost runner reached the extraction perimeter first.'
         : game.end_reason === 'evaded'
-          ? 'You reached the target without getting caught by the ghost hunter!'
+          ? 'You navigated to the target without getting caught by the ghost hunter.'
           : game.end_reason === 'haunted'
-            ? 'The ghost hunter caught you within 20m!'
+            ? 'The ghost hunter approached within critical tag proximity.'
             : game.end_reason === 'ghost_tagged'
-              ? 'You tagged the ghost runner before it completed the route!'
+              ? 'You neutralized the ghost runner before it completed the route.'
               : game.end_reason === 'ghost_escaped'
-                ? 'The ghost runner completed the route before you could tag it.'
-                : 'The ghost duel has finished.'
+                ? 'The ghost runner finished its route before tag engagement.'
+                : 'The solo ghost duel debrief is finalized.'
     : isTerritoryPulse
       ? game.end_reason === 'territory_dominance'
-        ? 'A squad achieved territory dominance by controlling >= 70% of sectors!'
+        ? 'A squad achieved territory dominance by holding at least 70% of sectors across pulse boundaries.'
         : game.end_reason === 'points_victory'
-          ? 'Victorious through superior sector control points accumulated across pulses.'
-          : 'Both squads finished with equal territory pulse points.'
+          ? 'Victorious through superior sector control points accumulated across periodic pulses.'
+          : 'Both squads finished with equal territory pulse scores.'
       : game.end_reason === 'vip_eliminated'
-      ? 'Hunters successfully eliminated the secret VIP!'
+      ? 'Hunters successfully identified and eliminated the clandestine VIP.'
       : game.end_reason === 'last_survivor'
-        ? 'The last assassin standing survived the elimination ring.'
+        ? 'The last operative standing survived the elimination ring.'
         : game.end_reason === 'all_jailed'
-          ? 'All runners were jailed at the same time.'
+          ? 'All runner operatives were incarcerated simultaneously.'
           : game.end_reason === 'extraction_complete'
-            ? 'The carrier reached the extraction point with the package!'
+            ? 'The active package carrier reached the extraction point safely.'
             : game.end_reason === 'package_secured'
-              ? 'Hunters captured and secured the dropped package!'
+              ? 'Hunters intercepted and secured the dropped package.'
               : game.end_reason === 'target_reached'
-                ? 'A runner reached the secret target.'
+                ? 'A runner infiltrated the secret target perimeter.'
                 : game.end_reason === 'all_tagged'
-                  ? 'Every runner was tagged.'
+                  ? 'All runners were tagged before target infiltration.'
                   : game.end_reason === 'all_hunters_left'
-                    ? 'Every hunter left the round.'
+                    ? 'All hunters disconnected from the operation.'
                     : game.end_reason === 'time_expired'
                       ? isAssassinRing
-                        ? 'Time ran out. The assassin with the most eliminations wins.'
+                        ? 'Operation duration elapsed. Most eliminations determines victory.'
                         : game.mode === 'classic_chase'
-                          ? 'Time ran out before the runners reached the target.'
-                          : 'Time ran out. The runners stayed hidden.'
-                      : 'This round has finished.';
+                          ? 'Time expired before runners could reach the extraction target.'
+                          : 'Time expired. Runners evaded hunters throughout the operational duration.'
+                      : 'The round has concluded.';
 
-  // Time expiry is stamped when a client next reads state, which can be later
-  // than the actual finish; the scheduled end is the honest round length.
   const finishAt = game.end_reason === 'time_expired' ? game.ends_at : game.ended_at;
   const roundSeconds =
     game.live_at && finishAt ? (Date.parse(finishAt) - Date.parse(game.live_at)) / 1000 : null;
@@ -627,6 +646,7 @@ export default function ResultScreen() {
       },
     };
   });
+
   const positionsData: PointCollection = {
     type: 'FeatureCollection',
     features: positionFeatures,
@@ -648,22 +668,11 @@ export default function ResultScreen() {
       }
     : null;
 
-  const recapCopy = loadingTrails
-    ? 'Loading the recorded routes…'
-    : trails.length === 0
-      ? 'No trail points were recorded for this round. The dots are the final positions.'
-      : trailFeatures.length === 0
-        ? `${trails.length} trail point${
-            trails.length === 1 ? '' : 's'
-          } recorded; a route needs at least two. The dots are still the final positions.`
-        : `${trailFeatures.length} route${trailFeatures.length === 1 ? '' : 's'} · ${
-            trails.length
-          } recorded point${
-            trails.length === 1 ? '' : 's'
-          }. Colored lines join each player’s recorded fixes; dots are their final positions.`;
+  const cardsCount = 7;
 
   return (
     <View style={styles.screen}>
+      {/* Tactical Map Layer */}
       <MapLibreMap attribution mapStyle={MAP_STYLE} style={StyleSheet.absoluteFill}>
         <Camera
           initialViewState={{
@@ -671,21 +680,34 @@ export default function ResultScreen() {
             zoom,
           }}
         />
+        {/* Play Area Perimeter */}
         <GeoJSONSource id="play-area" data={circleRing(game.area, game.area.radius_m)}>
           <Layer
             id="play-area-fill"
             type="fill"
-            paint={{ 'fill-color': '#1D4ED8', 'fill-opacity': 0.06 }}
+            paint={{ 'fill-color': colors.primary, 'fill-opacity': 0.05 }}
           />
           <Layer
             id="play-area-outline"
             type="line"
-            paint={{ 'line-color': '#1D4ED8', 'line-width': 2, 'line-dasharray': [2, 2] }}
+            paint={{ 'line-color': colors.primary, 'line-width': 2, 'line-dasharray': [2, 2] }}
           />
         </GeoJSONSource>
 
+        {/* Ghost Echo Trail Glow Underlay */}
         {trailFeatures.length > 0 && (
-          <GeoJSONSource id="trails" data={trailsData}>
+          <GeoJSONSource id="trails-glow" data={trailsData}>
+            <Layer
+              id="trail-echo-glow"
+              type="line"
+              layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+              paint={{
+                'line-color': ['get', 'color'],
+                'line-width': 8,
+                'line-opacity': 0.25,
+                'line-blur': 3,
+              }}
+            />
             <Layer
               id="trail-lines"
               type="line"
@@ -693,23 +715,24 @@ export default function ResultScreen() {
               paint={{
                 'line-color': ['get', 'color'],
                 'line-width': 3,
-                'line-opacity': 0.72,
+                'line-opacity': 0.85,
               }}
             />
           </GeoJSONSource>
         )}
 
+        {/* Secret Target Perimeter & Marker */}
         {target && (
           <GeoJSONSource id="target-radius" data={circleRing(target, game.target_radius_m)}>
             <Layer
               id="target-radius-fill"
               type="fill"
-              paint={{ 'fill-color': '#DB2777', 'fill-opacity': 0.1 }}
+              paint={{ 'fill-color': colors.danger, 'fill-opacity': 0.12 }}
             />
             <Layer
               id="target-radius-line"
               type="line"
-              paint={{ 'line-color': '#DB2777', 'line-width': 2, 'line-dasharray': [2, 2] }}
+              paint={{ 'line-color': colors.danger, 'line-width': 2, 'line-dasharray': [2, 2] }}
             />
           </GeoJSONSource>
         )}
@@ -721,14 +744,15 @@ export default function ResultScreen() {
               type="circle"
               paint={{
                 'circle-radius': 9,
-                'circle-color': '#DB2777',
+                'circle-color': colors.danger,
                 'circle-stroke-width': 3,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>
         )}
 
+        {/* Final Positions */}
         {positionFeatures.length > 0 && (
           <GeoJSONSource id="final-positions" data={positionsData}>
             <Layer
@@ -742,8 +766,8 @@ export default function ResultScreen() {
                 'circle-stroke-color': [
                   'case',
                   ['==', ['get', 'tagged'], true],
-                  '#0F172A',
-                  '#FFFFFF',
+                  colors.surface,
+                  colors.textLight,
                 ],
               }}
             />
@@ -751,858 +775,784 @@ export default function ResultScreen() {
         )}
       </MapLibreMap>
 
-      <View style={styles.hud}>
-        <Text style={[styles.eyebrow, { color: accent }]}>
-          {isTerritoryPulse
-            ? 'TERRITORY PULSE'
-            : isGhostDuel
-              ? 'SOLO GHOST DUEL'
-              : isAssassinRing
-                ? 'ASSASSIN RING'
-                : isRelayHeist
-                  ? 'RELAY HEIST'
-                  : isJailbreak
-                    ? 'JAILBREAK'
-                    : game.mode === 'classic_chase'
-                      ? 'CLASSIC CHASE'
-                      : 'TAG HUNT'}{' '}
-          · {game.code}
-        </Text>
-        <Text style={[styles.title, { color: accent }]}>{winnerTitle}</Text>
-        <Text style={styles.subtitle}>{reasonCopy}</Text>
-
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>ROUND TIME</Text>
-            <Text style={styles.statValue}>
-              {roundSeconds !== null && roundSeconds > 0 ? formatDuration(roundSeconds) : '—'}
-            </Text>
-          </View>
-          {isGhostDuel ? (
-            <>
-              <View style={styles.stat}>
-                <Text style={styles.statLabel}>SPLIT DELTA</Text>
-                <Text style={styles.statValue}>
-                  {ghostScore?.delta_s !== undefined
-                    ? `${ghostScore.delta_s > 0 ? '+' : ''}${ghostScore.delta_s.toFixed(1)}s`
-                    : '—'}
-                </Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statLabel}>SCORE</Text>
-                <Text style={styles.statValue}>{ghostScore?.score ?? '—'}</Text>
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.stat}>
-                <Text style={styles.statLabel}>TAGGED</Text>
-                <Text style={styles.statValue}>{taggedCount}</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statLabel}>PLAYERS</Text>
-                <Text style={styles.statValue}>{players.length}</Text>
-              </View>
-            </>
-          )}
+      {/* Top Mission HUD */}
+      <View style={styles.topHud}>
+        <View style={styles.topHudRow}>
+          <Chip
+            label={
+              isTerritoryPulse
+                ? 'TERRITORY PULSE'
+                : isGhostDuel
+                  ? 'SOLO GHOST DUEL'
+                  : isAssassinRing
+                    ? 'ASSASSIN RING'
+                    : isRelayHeist
+                      ? 'RELAY HEIST'
+                      : isJailbreak
+                        ? 'JAILBREAK'
+                        : game.mode === 'classic_chase'
+                          ? 'CLASSIC CHASE'
+                          : 'TAG HUNT'
+            }
+            variant="accent"
+            size="sm"
+          />
+          <Chip label={`#${game.code}`} variant="default" size="sm" />
         </View>
-
-        {errorMessage !== '' && (
-          <Text accessibilityRole="alert" style={styles.error}>
-            {errorMessage}
-          </Text>
-        )}
+        <Text variant="headline" color={outcomeAccent} style={{ marginTop: spacing.xs }}>
+          {winnerTitle}
+        </Text>
       </View>
 
-      <ScrollView style={styles.sheet} contentContainerStyle={styles.sheetContent}>
-        <Text style={styles.sectionLabel}>ROUND RECAP</Text>
-        <Text style={styles.recapText}>{recapCopy}</Text>
-
-        {target && (
-          <View style={styles.targetCard}>
-            <View style={styles.targetDot} />
-            <View style={styles.targetDetails}>
-              <Text style={styles.targetTitle}>Target revealed</Text>
-              <Text style={styles.targetBody}>
-                {game.end_reason === 'target_reached'
-                  ? 'The pink ring is the place the winning runner reached.'
-                  : 'The pink ring is where the runners had to finish.'}
-              </Text>
-            </View>
+      {/* Bottom Swipeable Cards Deck (Addendum C #4) */}
+      <View style={styles.bottomDeck}>
+        {/* Pagination & Indicator Header */}
+        <View style={styles.deckHeader}>
+          <View style={styles.deckCategoryRow}>
+            <Ionicons color={colors.primary} name="layers-outline" size={14} />
+            <Text variant="caption" color={colors.primary} weight="bold">
+              CARD {activeCardIndex + 1} OF {cardsCount} · {
+                activeCardIndex === 0
+                  ? 'OUTCOME DOSSIER'
+                  : activeCardIndex === 1
+                    ? 'MATCH HIGHLIGHTS'
+                    : activeCardIndex === 2
+                      ? 'TACTICAL DEBRIEF'
+                      : activeCardIndex === 3
+                        ? 'OPERATIVE ROSTER'
+                        : activeCardIndex === 4
+                          ? 'GHOST ARCHIVE'
+                          : activeCardIndex === 5
+                            ? 'MISSION RECAP'
+                            : 'COMMAND ACTIONS'
+              }
+            </Text>
           </View>
-        )}
-
-        {trailError !== '' && (
-          <Text accessibilityRole="alert" style={styles.error}>
-            Routes could not be loaded: {trailError}
-          </Text>
-        )}
-        {loadingTrails && (
-          <ActivityIndicator color="#1D4ED8" size="small" style={styles.trailSpinner} />
-        )}
-
-        <View style={styles.legendRow}>
-          <View style={[styles.legendLine, { backgroundColor: '#1D4ED8' }]} />
-          <Text style={styles.legendText}>Recorded route</Text>
-          <View style={[styles.legendDot, { backgroundColor: '#475569' }]} />
-          <Text style={styles.legendText}>Final position</Text>
-          {target && <View style={[styles.legendDot, { backgroundColor: '#DB2777' }]} />}
-          {target && <Text style={styles.legendText}>Target</Text>}
+          <View style={styles.indicatorDotsRow}>
+            {Array.from({ length: cardsCount }).map((_, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.dot,
+                  idx === activeCardIndex && styles.activeDot,
+                ]}
+              />
+            ))}
+          </View>
         </View>
 
-        {gameStats && (
-          <View style={styles.recapStatsContainer}>
-            <Text style={styles.sectionLabel}>MATCH HIGHLIGHTS</Text>
-            <View style={styles.statCardsGrid}>
-              {myPlayerStats && (
-                <View style={styles.statCardHighlight}>
-                  <Text style={styles.statCardCategory}>YOUR CLOSEST CALL</Text>
-                  <Text style={styles.statCardBigValue}>
-                    {myPlayerStats.closest_call_m !== null
-                      ? `${myPlayerStats.closest_call_m} m`
-                      : myPlayerStats.share_trail === false
-                        ? 'Private route'
-                        : '—'}
-                  </Text>
-                  <Text style={styles.statCardSub}>
-                    {myPlayerStats.share_trail === false
-                      ? 'Route kept private'
-                      : 'Closest opponent approach'}
-                  </Text>
-                </View>
-              )}
-
-              {myPlayerStats?.best_bluff && (
-                <View
-                  style={
-                    myPlayerStats.best_bluff.achieved
-                      ? styles.statCardHighlight
-                      : styles.statCard
-                  }
-                >
-                  <Text style={styles.statCardCategory}>BEST BLUFF</Text>
-                  <Text style={[styles.statCardBigValue, { fontSize: 16 }]}>
-                    {myPlayerStats.best_bluff.title}
-                  </Text>
-                  <Text style={styles.statCardSub}>{myPlayerStats.best_bluff.detail}</Text>
-                </View>
-              )}
-
-              {myPlayerStats && myPlayerStats.team === 'runner' && (
-                <View style={styles.statCard}>
-                  <Text style={styles.statCardCategory}>LONGEST UNSEEN</Text>
-                  <Text style={styles.statCardBigValue}>
-                    {formatDuration(myPlayerStats.longest_unseen_s)}
-                  </Text>
-                  <Text style={styles.statCardSub}>Undetected streak</Text>
-                </View>
-              )}
-
-              {myPlayerStats && (
-                <View style={styles.statCard}>
-                  <Text style={styles.statCardCategory}>LOUDEST MOMENT</Text>
-                  <Text style={styles.statCardBigValue}>
-                    {myPlayerStats.loudest_noise}
-                    <Text style={{ fontSize: 13, color: '#94A3B8' }}> / 100</Text>
-                  </Text>
-                  <Text style={styles.statCardSub}>Peak noise level</Text>
-                </View>
-              )}
-
-              {gameStats.heat_stats.total_presses > 0 && (
-                <View style={styles.statCard}>
-                  <Text style={styles.statCardCategory}>HEAT HIT RATE</Text>
-                  <Text style={styles.statCardBigValue}>{gameStats.heat_stats.hit_rate_pct}%</Text>
-                  <Text style={styles.statCardSub}>
-                    {gameStats.heat_stats.hot_hits} of {gameStats.heat_stats.total_presses} probes
-                    hot
-                  </Text>
-                </View>
-              )}
-
-              {gameStats.total_drops_claimed > 0 && (
-                <View style={styles.statCard}>
-                  <Text style={styles.statCardCategory}>DROPS CLAIMED</Text>
-                  <Text style={styles.statCardBigValue}>
-                    {myPlayerStats?.drops_claimed ?? 0}
-                    <Text style={{ fontSize: 13, color: '#94A3B8' }}>
-                      {' '}
-                      / {gameStats.total_drops_claimed} total
-                    </Text>
-                  </Text>
-                  <Text style={styles.statCardSub}>Tactical supply items</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {isGhostDuel && ghostScore && (
-          <View style={styles.recapStatsContainer}>
-            <Text style={styles.sectionLabel}>SOLO GHOST DUEL DEBRIEF</Text>
-            <View style={styles.statCardsGrid}>
-              <View style={styles.statCardHighlight}>
-                <Text style={styles.statCardCategory}>FINAL SCORE</Text>
-                <Text style={styles.statCardBigValue}>{ghostScore.score}</Text>
-                <Text style={styles.statCardSub}>
-                  {ghostScore.delta_s >= 0
-                    ? `Beat ghost by ${ghostScore.delta_s.toFixed(1)}s`
-                    : `Behind ghost by ${Math.abs(ghostScore.delta_s).toFixed(1)}s`}
+        {/* Horizontal Swipeable Card Scroller */}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleCardScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.cardsScrollerContent}
+        >
+          {/* CARD 1: MISSION OUTCOME DOSSIER */}
+          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <View style={styles.cardHeaderRow}>
+                <Text variant="label" color={outcomeAccent}>
+                  {isVictory ? 'MISSION ACCOMPLISHED' : 'MISSION CONCLUDED'}
                 </Text>
+                <Chip
+                  label={game.end_reason?.replace('_', ' ').toUpperCase() || 'ENDED'}
+                  variant="default"
+                  size="sm"
+                />
               </View>
 
-              <View style={styles.statCard}>
-                <Text style={styles.statCardCategory}>YOUR TIME</Text>
-                <Text style={styles.statCardBigValue}>{formatDuration(ghostScore.player_time_s)}</Text>
-                <Text style={styles.statCardSub}>Ghost: {formatDuration(ghostScore.ghost_time_s)}</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statCardCategory}>ROUTE EFFICIENCY</Text>
-                <Text style={styles.statCardBigValue}>
-                  {Math.round(ghostScore.efficiency * 100)}%
-                </Text>
-                <Text style={styles.statCardSub}>Direct vs actual path</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statCardCategory}>VARIANT</Text>
-                <Text style={[styles.statCardBigValue, { fontSize: 16, textTransform: 'uppercase' }]}>
-                  {ghostScore.variant.replace('_', ' ')}
-                </Text>
-                <Text style={styles.statCardSub}>Solo duel mode</Text>
-              </View>
-            </View>
-
-            {/* Public leaderboard hidden pending user reporting & blocking infrastructure (Phase D) */}
-          </View>
-        )}
-
-        {isTerritoryPulse && (
-          <View style={styles.recapStatsContainer}>
-            <Text style={styles.sectionLabel}>TERRITORY PULSE DEBRIEF</Text>
-            <View style={styles.statCardsGrid}>
-              <View style={styles.statCardHighlight}>
-                <Text style={styles.statCardCategory}>OUTCOME</Text>
-                <Text style={[styles.statCardBigValue, { fontSize: 18 }]}>
-                  {game.end_reason === 'territory_dominance' ? 'DOMINANCE' : 'POINTS'}
-                </Text>
-                <Text style={styles.statCardSub}>
-                  {game.winner === 'runners'
-                    ? 'Runners Victory'
-                    : game.winner === 'hunters'
-                      ? 'Hunters Victory'
-                      : 'Draw'}
-                </Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statCardCategory}>SECTORS</Text>
-                <Text style={styles.statCardBigValue}>7</Text>
-                <Text style={styles.statCardSub}>Radial map sectors</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statCardCategory}>WIN CONDITION</Text>
-                <Text style={[styles.statCardBigValue, { fontSize: 15 }]}>
-                  {game.end_reason === 'territory_dominance' ? '70% CONTROL' : 'FINAL SCORE'}
-                </Text>
-                <Text style={styles.statCardSub}>Synchronized pulses</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {isRelayHeist && gameStats?.mode_recap && (
-          <View style={styles.recapStatsContainer}>
-            <Text style={styles.sectionLabel}>RELAY HEIST DEBRIEF</Text>
-            <View style={styles.statCardsGrid}>
-              <View style={styles.statCardHighlight}>
-                <Text style={styles.statCardCategory}>PACKAGE STATUS</Text>
-                <Text style={[styles.statCardBigValue, { fontSize: 18 }]}>
-                  {gameStats.mode_recap.package_secured
-                    ? 'SECURED'
-                    : game.end_reason === 'extraction_complete'
-                      ? 'EXTRACTED'
-                      : 'INTERCEPTED'}
-                </Text>
-                <Text style={styles.statCardSub}>
-                  {game.winner === 'runners' ? 'Heist Successful' : 'Hunters Intercepted'}
-                </Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statCardCategory}>HANDOFFS</Text>
-                <Text style={styles.statCardBigValue}>
-                  {gameStats.mode_recap.total_handoffs ?? 0}
-                </Text>
-                <Text style={styles.statCardSub}>Team exchanges</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statCardCategory}>PACKAGE DROPS</Text>
-                <Text style={styles.statCardBigValue}>
-                  {gameStats.mode_recap.package_drops ?? 0}
-                </Text>
-                <Text style={styles.statCardSub}>Carrier tag fumbles</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {isJailbreak && gameStats?.mode_recap && (
-          <View style={styles.recapStatsContainer}>
-            <Text style={styles.sectionLabel}>JAILBREAK DEBRIEF</Text>
-            <View style={styles.statCardsGrid}>
-              <View style={styles.statCardHighlight}>
-                <Text style={styles.statCardCategory}>OUTCOME</Text>
-                <Text style={[styles.statCardBigValue, { fontSize: 18 }]}>
-                  {game.end_reason === 'all_jailed' ? 'ALL JAILED' : 'PRISONERS ESCAPED'}
-                </Text>
-                <Text style={styles.statCardSub}>
-                  {game.winner === 'runners' ? 'Runners Escaped' : 'Hunters Incarceration'}
-                </Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statCardCategory}>RESCUES</Text>
-                <Text style={styles.statCardBigValue}>
-                  {gameStats.mode_recap.total_rescues ?? 0}
-                </Text>
-                <Text style={styles.statCardSub}>Jail breaks triggered</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statCardCategory}>INCARCERATIONS</Text>
-                <Text style={styles.statCardBigValue}>
-                  {gameStats.mode_recap.total_jailed ?? 0}
-                </Text>
-                <Text style={styles.statCardSub}>Runners sent to jail</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {gameStats?.mode_recap?.ai_gm && (
-          <View style={styles.recapStatsContainer}>
-            <Text style={styles.sectionLabel}>AI GAME MASTER DEBRIEF</Text>
-            <View style={styles.statCardsGrid}>
-              <View style={styles.statCardHighlight}>
-                <Text style={styles.statCardCategory}>DISPATCHES</Text>
-                <Text style={styles.statCardBigValue}>
-                  {gameStats.mode_recap.ai_gm.total_events}
-                  <Text style={{ fontSize: 13, color: '#94A3B8' }}>
-                    {' '}/ {gameStats.mode_recap.ai_gm.max_events}
-                  </Text>
-                </Text>
-                <Text style={styles.statCardSub}>Dynamic interventions</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Text style={styles.statCardCategory}>LAST EVENT</Text>
-                <Text style={[styles.statCardBigValue, { fontSize: 15, textTransform: 'uppercase' }]}>
-                  {gameStats.mode_recap.ai_gm.last_event_type
-                    ? gameStats.mode_recap.ai_gm.last_event_type.replace('_', ' ')
-                    : 'None'}
-                </Text>
-                <Text style={styles.statCardSub}>Final intervention</Text>
-              </View>
-
-              {gameStats.mode_recap.ai_gm.last_narration && (
-                <View style={[styles.statCard, { width: '100%' }]}>
-                  <Text style={styles.statCardCategory}>LAST NARRATION</Text>
-                  <Text style={[styles.statCardSub, { color: '#0F172A', marginTop: 4 }]}>
-                    &quot;{gameStats.mode_recap.ai_gm.last_narration}&quot;
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {ghostPreview &&
-          ghostPreview.can_contribute &&
-          !ghostDismissed &&
-          !ghostPermanentlyDeclined && (
-            <View style={styles.ghostContributionCard}>
-              <View style={styles.ghostHeaderRow}>
-                <MaterialCommunityIcons color="#7C3AED" name="ghost" size={20} />
-                <Text style={styles.ghostCardTitle}>Contribute to Ghost Library</Text>
-              </View>
-              {ghostSuccess || ghostPreview.already_contributed ? (
-                <View style={styles.ghostSuccessBox}>
-                  <Ionicons color="#059669" name="checkmark-circle" size={18} />
-                  <Text style={styles.ghostSuccessText}>
-                    {ghostSuccess
-                      ? 'Thank you! Your route was trimmed by 150m and added to the ghost library.'
-                      : 'You have already contributed this route to the ghost library.'}
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.ghostCardBody}>
-                    Help solo players practice! Your route is anonymized and trimmed by 150m at the
-                    start and end to keep your exact locations private.
-                  </Text>
-                  <View style={styles.ghostStatsRow}>
-                    <View style={styles.ghostStatCol}>
-                      <Text style={styles.ghostStatLabel}>TRIMMED LENGTH</Text>
-                      <Text style={styles.ghostStatValue}>
-                        {ghostPreview.trimmed_length_m >= 1000
-                          ? `${(ghostPreview.trimmed_length_m / 1000).toFixed(1)} km`
-                          : `${ghostPreview.trimmed_length_m} m`}
-                      </Text>
-                    </View>
-                    <View style={styles.ghostStatCol}>
-                      <Text style={styles.ghostStatLabel}>DURATION</Text>
-                      <Text style={styles.ghostStatValue}>
-                        {formatDuration(ghostPreview.duration_s)}
-                      </Text>
-                    </View>
-                    <View style={styles.ghostStatCol}>
-                      <Text style={styles.ghostStatLabel}>DIFFICULTY</Text>
-                      <Text style={[styles.ghostStatValue, { textTransform: 'capitalize' }]}>
-                        {ghostPreview.difficulty}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.ghostButtonRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={ghostBusy}
-                      onPress={() => void handleContributeGhost()}
-                      style={styles.ghostContributeBtn}
-                    >
-                      {ghostBusy ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Text style={styles.ghostContributeBtnText}>Contribute Route</Text>
-                      )}
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => setGhostDismissed(true)}
-                      style={styles.ghostDismissBtn}
-                    >
-                      <Text style={styles.ghostDismissBtnText}>Not now</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => void handleNeverAskGhost()}
-                      style={styles.ghostDismissBtn}
-                    >
-                      <Text style={styles.ghostDismissBtnText}>Never ask again</Text>
-                    </Pressable>
-                  </View>
-                </>
-              )}
-            </View>
-          )}
-
-        <Text style={styles.sectionLabel}>FINAL POSITIONS · {positions.length}</Text>
-        {players.map((player) => {
-          const position = positions.find((entry) => entry.player_id === player.id);
-          const isWinner = player.id === winnerId;
-          const isAgent = player.secret_role === 'agent';
-          return (
-            <View key={player.id} style={styles.playerRow}>
-              <View style={[styles.playerDot, { backgroundColor: player.color }]} />
-              <View style={styles.playerText}>
-                <View style={styles.playerNameRow}>
-                  <Text style={styles.playerName}>{player.display_name}</Text>
-                  {player.user_id === game.host_id && (
-                    <MaterialCommunityIcons color="#EAB308" name="crown" size={13} />
-                  )}
-                  {isAgent && (
-                    <View style={styles.agentBadge}>
-                      <MaterialCommunityIcons color="#0284C7" name="incognito" size={12} />
-                      <Text style={styles.agentBadgeText}>AGENT</Text>
-                    </View>
-                  )}
-                  {player.secret_role === 'vip' && (
-                    <View style={styles.vipBadge}>
-                      <MaterialCommunityIcons color="#D97706" name="crown" size={12} />
-                      <Text style={styles.vipBadgeText}>VIP</Text>
-                    </View>
-                  )}
-                  {player.secret_role === 'bodyguard' && (
-                    <View style={styles.bodyguardBadge}>
-                      <MaterialCommunityIcons color="#2563EB" name="shield-account" size={12} />
-                      <Text style={styles.bodyguardBadgeText}>GUARD</Text>
-                    </View>
-                  )}
-                  {player.id === state.my_player_id && <Text style={styles.playerYou}>(you)</Text>}
-                </View>
-                <Text style={styles.playerSub}>
-                  {teamLabel(player.team)} ·{' '}
-                  {position ? 'Final position recorded' : 'No final position'}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.playerMeta,
-                  isWinner && styles.playerWinner,
-                  !isWinner && player.status === 'tagged' && styles.playerTagged,
-                ]}
-              >
-                {isWinner
-                  ? 'Reached target'
-                  : player.status === 'tagged'
-                    ? 'Tagged'
-                    : teamLabel(player.team)}
+              <Text variant="body" color={colors.text} style={{ marginTop: spacing.sm, lineHeight: 20 }}>
+                {reasonCopy}
               </Text>
-            </View>
-          );
-        })}
 
-        <Pressable
-          accessibilityRole="button"
-          disabled={rematchBusy}
-          onPress={() => void playAgain()}
-          style={styles.playAgainButton}
-        >
-          {rematchBusy ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.playAgainText}>Play again</Text>
-          )}
-        </Pressable>
-        <Text style={styles.playAgainHint}>
-          {game.mode === 'classic_chase'
-            ? 'Same crew, sides and settings. A runner picks a new target in the fresh lobby.'
-            : 'Same crew, sides and settings. The fresh lobby starts a new Tag Hunt.'}
-        </Text>
-        {rematchError !== '' && (
-          <Text accessibilityRole="alert" style={styles.error}>
-            {rematchError}
-          </Text>
-        )}
+              <View style={styles.statsGrid}>
+                <View style={styles.statBox}>
+                  <Text variant="caption" color={colors.textMuted}>OPERATIONAL DURATION</Text>
+                  <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                    {roundSeconds !== null && roundSeconds > 0 ? formatDuration(roundSeconds) : '—'}
+                  </Text>
+                </View>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push({ pathname: '/replay/[id]', params: { id: gameId } })}
-          style={styles.replayButton}
-        >
-          <Text style={styles.replayText}>Watch replay</Text>
-        </Pressable>
+                {isGhostDuel ? (
+                  <>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>SPLIT DELTA</Text>
+                      <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
+                        {ghostScore?.delta_s !== undefined
+                          ? `${ghostScore.delta_s > 0 ? '+' : ''}${ghostScore.delta_s.toFixed(1)}s`
+                          : '—'}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>PERFORMANCE SCORE</Text>
+                      <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
+                        {ghostScore?.score ?? '—'}
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>OPERATIVES TAGGED</Text>
+                      <Text variant="headline" color={colors.hunter} style={{ marginTop: 2 }}>
+                        {taggedCount}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>TOTAL IN SQUAD</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {players.length}
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </View>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.replace('/home')}
-          style={styles.homeLink}
-        >
-          <Text style={styles.homeLinkText}>Back to home</Text>
-        </Pressable>
+              <Text variant="caption" color={colors.textSubtle} style={{ marginTop: spacing.md }}>
+                Swipe left for match highlights and tactical telemetry →
+              </Text>
+            </Card>
+          </View>
 
-        <Text style={styles.footer}>
-          Routes are the trail recorded by the server, at most one point every ten seconds. Final
-          positions are the last fixes stored before the round ended.
-        </Text>
-      </ScrollView>
+          {/* CARD 2: MATCH HIGHLIGHTS & STRATEGIC STATS */}
+          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <Text variant="label" color={colors.primary} style={{ marginBottom: spacing.sm }}>
+                PERSONAL TELEMETRY & HIGHLIGHTS
+              </Text>
+
+              <View style={styles.statsGrid}>
+                {myPlayerStats && (
+                  <View style={styles.statBoxHighlight}>
+                    <Text variant="caption" color={colors.primary}>CLOSEST CALL</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {myPlayerStats.closest_call_m !== null
+                        ? formatDistance(myPlayerStats.closest_call_m, unitSystem)
+                        : myPlayerStats.share_trail === false
+                          ? 'Private Route'
+                          : '—'}
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      {myPlayerStats.share_trail === false ? 'Route kept confidential' : 'Opponent nearest vector'}
+                    </Text>
+                  </View>
+                )}
+
+                {myPlayerStats?.best_bluff && (
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.warning}>BEST BLUFF</Text>
+                    <Text variant="body" weight="bold" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {myPlayerStats.best_bluff.title}
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      {myPlayerStats.best_bluff.detail}
+                    </Text>
+                  </View>
+                )}
+
+                {myPlayerStats && myPlayerStats.team === 'runner' && (
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>LONGEST UNSEEN</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {formatDuration(myPlayerStats.longest_unseen_s)}
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      Undetected stealth streak
+                    </Text>
+                  </View>
+                )}
+
+                {myPlayerStats && (
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>PEAK NOISE LEVEL</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {myPlayerStats.loudest_noise}
+                      <Text variant="caption" color={colors.textMuted}> / 100</Text>
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      Acoustic telemetry max
+                    </Text>
+                  </View>
+                )}
+
+                {gameStats && gameStats.heat_stats.total_presses > 0 && (
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>HEAT HIT RATE</Text>
+                    <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
+                      {gameStats.heat_stats.hit_rate_pct}%
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      {gameStats.heat_stats.hot_hits} of {gameStats.heat_stats.total_presses} probes hot
+                    </Text>
+                  </View>
+                )}
+
+                {gameStats && gameStats.total_drops_claimed > 0 && (
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>DROPS CLAIMED</Text>
+                    <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
+                      {myPlayerStats?.drops_claimed ?? 0}
+                      <Text variant="caption" color={colors.textMuted}> / {gameStats.total_drops_claimed}</Text>
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      Tactical field caches
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Card>
+          </View>
+
+          {/* CARD 3: TACTICAL MODE DEBRIEF */}
+          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <Text variant="label" color={colors.primary} style={{ marginBottom: spacing.sm }}>
+                MODE DEBRIEF & PARAMETERS
+              </Text>
+
+              {isGhostDuel && ghostScore && (
+                <View style={styles.statsGrid}>
+                  <View style={styles.statBoxHighlight}>
+                    <Text variant="caption" color={colors.primary}>FINAL TIME TRIAL SCORE</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {ghostScore.score}
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      {ghostScore.delta_s >= 0
+                        ? `Beat ghost pace by ${ghostScore.delta_s.toFixed(1)}s`
+                        : `Behind ghost pace by ${Math.abs(ghostScore.delta_s).toFixed(1)}s`}
+                    </Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>YOUR ELAPSED TIME</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {formatDuration(ghostScore.player_time_s)}
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      Ghost: {formatDuration(ghostScore.ghost_time_s)}
+                    </Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>ROUTE EFFICIENCY</Text>
+                    <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
+                      {Math.round(ghostScore.efficiency * 100)}%
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      Direct vs traveled vector
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {isTerritoryPulse && (
+                <View style={styles.statsGrid}>
+                  <View style={styles.statBoxHighlight}>
+                    <Text variant="caption" color={colors.primary}>TERRITORY CONTROL OUTCOME</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {game.end_reason === 'territory_dominance' ? 'DOMINANCE' : 'POINTS'}
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      {game.winner === 'runners' ? 'Runners Victory' : game.winner === 'hunters' ? 'Hunters Victory' : 'Draw'}
+                    </Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>SECTORS</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>7</Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>Radial map grid</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>THRESHOLD</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>70%</Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>Dominance pulse</Text>
+                  </View>
+                </View>
+              )}
+
+              {isRelayHeist && gameStats?.mode_recap && (
+                <View style={styles.statsGrid}>
+                  <View style={styles.statBoxHighlight}>
+                    <Text variant="caption" color={colors.primary}>PACKAGE STATUS</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {gameStats.mode_recap.package_secured
+                        ? 'SECURED BY HUNTERS'
+                        : game.end_reason === 'extraction_complete'
+                          ? 'EXTRACTED BY RUNNERS'
+                          : 'INTERCEPTED'}
+                    </Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>SQUAD HANDOFFS</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {gameStats.mode_recap.total_handoffs ?? 0}
+                    </Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>PACKAGE DROPS</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {gameStats.mode_recap.package_drops ?? 0}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {isJailbreak && gameStats?.mode_recap && (
+                <View style={styles.statsGrid}>
+                  <View style={styles.statBoxHighlight}>
+                    <Text variant="caption" color={colors.primary}>JAILBREAK OUTCOME</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {game.end_reason === 'all_jailed' ? 'ALL JAILED' : 'PRISONERS ESCAPED'}
+                    </Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>RESCUES TRIGGERED</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {gameStats.mode_recap.total_rescues ?? 0}
+                    </Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>TOTAL JAILED</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {gameStats.mode_recap.total_jailed ?? 0}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {gameStats?.mode_recap?.ai_gm && (
+                <View style={styles.statsGrid}>
+                  <View style={styles.statBoxHighlight}>
+                    <Text variant="caption" color={colors.primary}>AI GAME MASTER INTERVENTIONS</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {gameStats.mode_recap.ai_gm.total_events} / {gameStats.mode_recap.ai_gm.max_events}
+                    </Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>LAST DISPATCH</Text>
+                    <Text variant="body" weight="bold" color={colors.textLight} style={{ marginTop: 2, textTransform: 'uppercase' }}>
+                      {gameStats.mode_recap.ai_gm.last_event_type?.replace('_', ' ') || 'None'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {!isGhostDuel && !isTerritoryPulse && !isRelayHeist && !isJailbreak && (
+                <View style={styles.statsGrid}>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>EXTRACTION TARGET</Text>
+                    <Text variant="body" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {target ? 'Placed & Infiltrated' : 'None Configured'}
+                    </Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text variant="caption" color={colors.textMuted}>RADAR PING INTERVAL</Text>
+                    <Text variant="body" color={colors.textLight} style={{ marginTop: 2 }}>
+                      Standard 10s Pings
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </Card>
+          </View>
+
+          {/* CARD 4: OPERATIVE ROSTER & SECRECY LIFT */}
+          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <View style={styles.cardHeaderRow}>
+                <Text variant="label" color={colors.primary}>
+                  SECRECY LIFTED // OPERATIVE ROSTER ({players.length})
+                </Text>
+                <Chip label="UNCLASSIFIED" variant="default" size="sm" />
+              </View>
+
+              <ScrollView style={{ maxHeight: 220, marginTop: spacing.sm }}>
+                {players.map((player) => {
+                  const position = positions.find((entry) => entry.player_id === player.id);
+                  const isWinner = player.id === winnerId;
+                  const isAgent = player.secret_role === 'agent';
+
+                  return (
+                    <View key={player.id} style={styles.playerRow}>
+                      <View style={[styles.playerDot, { backgroundColor: player.color }]} />
+                      <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text variant="body" weight="bold" color={colors.textLight}>
+                            {player.display_name}
+                          </Text>
+                          {player.user_id === game.host_id && (
+                            <MaterialCommunityIcons color={colors.warning} name="crown" size={13} />
+                          )}
+                          {isAgent && (
+                            <Chip label="DOUBLE AGENT" variant="accent" size="sm" />
+                          )}
+                          {player.secret_role === 'vip' && (
+                            <Chip label="VIP" variant="accent" size="sm" />
+                          )}
+                          {player.secret_role === 'bodyguard' && (
+                            <Chip label="GUARD" variant="default" size="sm" />
+                          )}
+                          {player.id === state.my_player_id && (
+                            <Text variant="caption" color={colors.primary}>(you)</Text>
+                          )}
+                        </View>
+                        <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                          {teamLabel(player.team)} · {position ? 'Position recorded' : 'No fix'}
+                        </Text>
+                      </View>
+                      <Text
+                        variant="caption"
+                        weight="bold"
+                        color={
+                          isWinner
+                            ? colors.success
+                            : player.status === 'tagged'
+                              ? colors.danger
+                              : colors.textMuted
+                        }
+                      >
+                        {isWinner ? 'Reached Target' : player.status === 'tagged' ? 'Tagged' : teamLabel(player.team)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </Card>
+          </View>
+
+          {/* CARD 5: GHOST LIBRARY CONTRIBUTION */}
+          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <View style={styles.cardHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <MaterialCommunityIcons color={colors.ghostTrail} name="ghost" size={18} />
+                  <Text variant="label" color={colors.ghostTrail}>
+                    GHOST LIBRARY CONTRIBUTION
+                  </Text>
+                </View>
+                <Chip label="PRIVACY BUFFER" variant="default" size="sm" />
+              </View>
+
+              {ghostPreview && ghostPreview.can_contribute && !ghostDismissed && !ghostPermanentlyDeclined ? (
+                <>
+                  {ghostSuccess || ghostPreview.already_contributed ? (
+                    <View style={styles.ghostStatusBox}>
+                      <Ionicons color={colors.success} name="checkmark-circle" size={20} />
+                      <Text variant="body" color={colors.text} style={{ marginLeft: spacing.sm, flex: 1 }}>
+                        {ghostSuccess
+                          ? 'Thank you! Route trimmed by 150m and contributed to the solo training archive.'
+                          : 'This route is already archived in the ghost library.'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      <Text variant="body" color={colors.text} style={{ marginTop: spacing.sm, lineHeight: 19 }}>
+                        Help solo operatives train against authentic pace. Your path is anonymized and trimmed by 150m at start and end.
+                      </Text>
+
+                      <View style={[styles.statsGrid, { marginVertical: spacing.md }]}>
+                        <View style={styles.statBox}>
+                          <Text variant="caption" color={colors.textMuted}>TRIMMED LENGTH</Text>
+                          <Text variant="body" weight="bold" color={colors.textLight}>
+                            {formatDistance(ghostPreview.trimmed_length_m, unitSystem)}
+                          </Text>
+                        </View>
+                        <View style={styles.statBox}>
+                          <Text variant="caption" color={colors.textMuted}>DURATION</Text>
+                          <Text variant="body" weight="bold" color={colors.textLight}>
+                            {formatDuration(ghostPreview.duration_s)}
+                          </Text>
+                        </View>
+                        <View style={styles.statBox}>
+                          <Text variant="caption" color={colors.textMuted}>DIFFICULTY</Text>
+                          <Text variant="body" weight="bold" color={colors.textLight} style={{ textTransform: 'capitalize' }}>
+                            {ghostPreview.difficulty}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                        <Button
+                          title={ghostBusy ? 'Archiving…' : 'Contribute Route'}
+                          variant="primary"
+                          size="sm"
+                          disabled={ghostBusy}
+                          onPress={() => void handleContributeGhost()}
+                        />
+                        <Button
+                          title="Not Now"
+                          variant="secondary"
+                          size="sm"
+                          onPress={() => setGhostDismissed(true)}
+                        />
+                        <Button
+                          title="Never"
+                          variant="secondary"
+                          size="sm"
+                          onPress={() => void handleNeverAskGhost()}
+                        />
+                      </View>
+                    </>
+                  )}
+                </>
+              ) : (
+                <View style={styles.ghostStatusBox}>
+                  <MaterialCommunityIcons color={colors.textMuted} name="shield-check" size={20} />
+                  <Text variant="body" color={colors.textMuted} style={{ marginLeft: spacing.sm, flex: 1 }}>
+                    Ghost contribution is {ghostPermanentlyDeclined ? 'permanently disabled in your privacy settings' : 'reserved for runner routes with sufficient length'}.
+                  </Text>
+                </View>
+              )}
+            </Card>
+          </View>
+
+          {/* CARD 6: SHAREABLE RECAP CARD PLACEHOLDER (Addendum C #4) */}
+          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <View style={styles.cardHeaderRow}>
+                <Text variant="label" color={colors.primary}>
+                  MISSION RECAP CARD // EXPORT
+                </Text>
+                <Chip label="PREVIEW" variant="accent" size="sm" />
+              </View>
+
+              {/* Shareable Card Visual Frame */}
+              <View style={styles.recapCardPreview}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="headline" color={colors.primary}>GHOSTRUN</Text>
+                  <Chip label={winnerTitle.toUpperCase()} variant="accent" size="sm" />
+                </View>
+
+                <View style={{ marginVertical: spacing.md }}>
+                  <Text variant="body" weight="bold" color={colors.textLight}>
+                    OPERATIVE: {playerById.get(state.my_player_id)?.display_name || 'CLASSIFIED'}
+                  </Text>
+                  <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                    MODE: {game.mode.toUpperCase()} · CODE: #{game.code}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View>
+                    <Text variant="caption" color={colors.textMuted}>TIME</Text>
+                    <Text variant="body" weight="bold" color={colors.textLight}>
+                      {roundSeconds ? formatDuration(roundSeconds) : '—'}
+                    </Text>
+                  </View>
+                  <View>
+                    <Text variant="caption" color={colors.textMuted}>SQUAD</Text>
+                    <Text variant="body" weight="bold" color={colors.textLight}>
+                      {players.length} PLAYERS
+                    </Text>
+                  </View>
+                  <View>
+                    <Text variant="caption" color={colors.textMuted}>STATUS</Text>
+                    <Text variant="body" weight="bold" color={outcomeAccent}>
+                      {isVictory ? 'VICTORIOUS' : 'COMPLETED'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={{ marginTop: spacing.md }}>
+                <Button
+                  title={shareRecapFeedback ? 'Recap Card Export Ready (Phase D)' : 'Share Mission Recap'}
+                  variant="primary"
+                  size="md"
+                  onPress={() => setShareRecapFeedback(true)}
+                />
+                <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', marginTop: spacing.xs }}>
+                  Card sharing slot (Addendum C #4) — Image generation enabled in Phase D.
+                </Text>
+              </View>
+            </Card>
+          </View>
+
+          {/* CARD 7: MISSION COMMAND ACTIONS & REMATCH */}
+          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <Text variant="label" color={colors.primary} style={{ marginBottom: spacing.sm }}>
+                MISSION ACTIONS & REMATCH
+              </Text>
+
+              {rematchError !== '' && (
+                <Text variant="body" color={colors.danger} style={{ marginBottom: spacing.sm }}>
+                  {rematchError}
+                </Text>
+              )}
+
+              <View style={{ gap: spacing.sm }}>
+                <Button
+                  title={rematchBusy ? 'Opening Rematch Lobby…' : 'Play Again (Rematch)'}
+                  variant="primary"
+                  size="lg"
+                  disabled={rematchBusy}
+                  onPress={() => void playAgain()}
+                />
+                <Button
+                  title="Watch Replay (±15s Controls)"
+                  variant="secondary"
+                  size="md"
+                  onPress={() => router.push({ pathname: '/replay/[id]', params: { id: gameId } })}
+                />
+                <Button
+                  title="Return to Base (Play)"
+                  variant="secondary"
+                  size="sm"
+                  onPress={() => router.replace('/play' as any)}
+                />
+              </View>
+
+              <Text variant="caption" color={colors.textSubtle} style={{ marginTop: spacing.md, lineHeight: 16 }}>
+                Routes are recorded by the server at 10-second intervals. Final positions reflect the last valid fixes stored before the round concluded.
+              </Text>
+            </Card>
+          </View>
+        </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#E2E8F0', flex: 1 },
+  screen: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
   centered: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     flex: 1,
     justifyContent: 'center',
-    padding: 28,
+    padding: spacing.xl,
   },
-  loadingText: { color: '#64748B', fontSize: 14, marginTop: 14 },
-  hud: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    elevation: 3,
-    left: 16,
-    padding: 16,
+  topHud: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    left: spacing.base,
+    padding: spacing.md,
     position: 'absolute',
-    right: 16,
-    top: 48,
+    right: spacing.base,
+    top: spacing.xl + spacing.base,
+    zIndex: 10,
   },
-  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.3 },
-  title: { fontSize: 30, fontWeight: '900', letterSpacing: 0.2, marginTop: 4 },
-  subtitle: { color: '#475569', fontSize: 13, lineHeight: 19, marginTop: 4 },
-  statsRow: { flexDirection: 'row', gap: 22, marginTop: 14 },
-  stat: { flexShrink: 1 },
-  statLabel: { color: '#64748B', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  statValue: { color: '#0F172A', fontSize: 22, fontWeight: '900', marginTop: 2 },
-  error: { color: '#B91C1C', fontSize: 13, lineHeight: 19, marginTop: 10 },
-  sheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+  topHudRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  bottomDeck: {
+    backgroundColor: colors.surfaceDark,
+    borderColor: colors.border,
+    borderTopLeftRadius: radii.card,
+    borderTopRightRadius: radii.card,
+    borderTopWidth: 1,
     bottom: 0,
     left: 0,
-    maxHeight: '46%',
+    maxHeight: '56%',
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.md,
     position: 'absolute',
     right: 0,
+    zIndex: 10,
   },
-  sheetContent: { padding: 20, paddingBottom: 30 },
-  sectionLabel: {
-    color: '#475569',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.1,
-    marginBottom: 6,
-    marginTop: 8,
-  },
-  recapText: { color: '#475569', fontSize: 13, lineHeight: 19, marginBottom: 12 },
-  targetCard: {
-    alignItems: 'flex-start',
-    backgroundColor: '#FDF2F8',
-    borderRadius: 14,
-    flexDirection: 'row',
-    marginBottom: 12,
-    padding: 12,
-  },
-  targetDot: { backgroundColor: '#DB2777', borderRadius: 5, height: 10, marginTop: 4, width: 10 },
-  targetDetails: { flex: 1, marginLeft: 10 },
-  targetTitle: { color: '#831843', fontSize: 14, fontWeight: '900' },
-  targetBody: { color: '#9D174D', fontSize: 12, lineHeight: 17, marginTop: 3 },
-  trailSpinner: { alignSelf: 'flex-start', marginBottom: 10 },
-  legendRow: {
+  deckHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 6,
-    marginTop: 2,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.base,
+    paddingBottom: spacing.sm,
   },
-  legendLine: { borderRadius: 2, height: 3, width: 16 },
-  legendDot: { borderRadius: 5, height: 9, width: 9 },
-  legendText: { color: '#64748B', fontSize: 11, fontWeight: '700', marginRight: 6 },
+  deckCategoryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  indicatorDotsRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+  },
+  dot: {
+    backgroundColor: colors.borderDark,
+    borderRadius: radii.full,
+    height: 6,
+    width: 6,
+  },
+  activeDot: {
+    backgroundColor: colors.primary,
+    width: 14,
+  },
+  cardsScrollerContent: {
+    paddingHorizontal: spacing.base,
+    gap: spacing.md,
+  },
+  cardSlide: {
+    flex: 1,
+  },
+  cardInner: {
+    padding: spacing.md,
+  },
+  cardHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  statBox: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flex: 1,
+    minWidth: '45%',
+    padding: spacing.sm,
+  },
+  statBoxHighlight: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.borderAccent,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    width: '100%',
+    padding: spacing.sm,
+  },
   playerRow: {
     alignItems: 'center',
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.borderLight,
     borderBottomWidth: 1,
     flexDirection: 'row',
-    minHeight: 52,
-    paddingVertical: 6,
+    paddingVertical: spacing.sm,
   },
-  playerDot: { borderRadius: 5, height: 10, width: 10 },
-  playerText: { flex: 1, marginLeft: 8 },
-  playerNameRow: { alignItems: 'center', flexDirection: 'row', gap: 5 },
-  playerName: { color: '#0F172A', fontSize: 13, fontWeight: '700' },
-  playerYou: { color: '#64748B', fontSize: 11, fontWeight: '600' },
-  playerSub: { color: '#94A3B8', fontSize: 11, fontWeight: '600', marginTop: 2 },
-  playerMeta: { color: '#475569', fontSize: 12, fontWeight: '800' },
-  playerWinner: { color: '#047857' },
-  playerTagged: { color: '#B91C1C' },
-  playAgainButton: {
+  playerDot: {
+    borderRadius: radii.full,
+    height: 10,
+    width: 10,
+  },
+  ghostStatusBox: {
     alignItems: 'center',
-    backgroundColor: '#1D4ED8',
-    borderRadius: 13,
-    justifyContent: 'center',
-    marginTop: 18,
-    minHeight: 50,
-  },
-  playAgainText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  playAgainHint: { color: '#64748B', fontSize: 11, lineHeight: 17, marginTop: 7 },
-  replayButton: {
-    alignItems: 'center',
-    borderColor: '#1D4ED8',
-    borderRadius: 13,
-    borderWidth: 1,
-    justifyContent: 'center',
-    marginTop: 10,
-    minHeight: 50,
-  },
-  replayText: { color: '#1D4ED8', fontSize: 15, fontWeight: '900' },
-  homeLink: { alignItems: 'center', justifyContent: 'center', marginTop: 4, minHeight: 44 },
-  homeLinkText: { color: '#475569', fontSize: 15, fontWeight: '700' },
-  footer: { color: '#94A3B8', fontSize: 11, lineHeight: 17, marginTop: 14 },
-  linkButton: { alignItems: 'center', justifyContent: 'center', marginTop: 16, minHeight: 44 },
-  linkText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
-  recapStatsContainer: {
-    marginBottom: 16,
-    marginTop: 8,
-  },
-  statCardsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6,
-  },
-  statCard: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    borderWidth: 1,
-    flexBasis: '48%',
-    flexGrow: 1,
-    padding: 12,
-  },
-  statCardHighlight: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
-    borderRadius: 12,
-    borderWidth: 1,
-    flexBasis: '100%',
-    padding: 12,
-  },
-  statCardCategory: {
-    color: '#64748B',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  statCardBigValue: {
-    color: '#0F172A',
-    fontSize: 20,
-    fontWeight: '900',
-    marginVertical: 4,
-  },
-  statCardSub: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  agentBadge: {
-    alignItems: 'center',
-    backgroundColor: '#E0F2FE',
-    borderColor: '#38BDF8',
-    borderRadius: 6,
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 3,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    marginTop: spacing.sm,
+    padding: spacing.md,
   },
-  agentBadgeText: {
-    color: '#0369A1',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  ghostContributionCard: {
-    backgroundColor: '#FAF5FF',
-    borderColor: '#E9D5FF',
-    borderRadius: 14,
+  recapCardPreview: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderAccent,
+    borderRadius: radii.md,
     borderWidth: 1,
-    marginBottom: 16,
-    padding: 14,
-  },
-  ghostHeaderRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 6,
-  },
-  ghostCardTitle: {
-    color: '#6B21A8',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  ghostCardBody: {
-    color: '#7E22CE',
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 10,
-  },
-  ghostStatsRow: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#F3E8FF',
-    borderRadius: 10,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 12,
-    paddingVertical: 10,
-  },
-  ghostStatCol: {
-    alignItems: 'center',
-  },
-  ghostStatLabel: {
-    color: '#9333EA',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  ghostStatValue: {
-    color: '#3B0764',
-    fontSize: 14,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  ghostButtonRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  ghostContributeBtn: {
-    alignItems: 'center',
-    backgroundColor: '#7C3AED',
-    borderRadius: 10,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 40,
-    paddingHorizontal: 12,
-  },
-  ghostContributeBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  ghostDismissBtn: {
-    alignItems: 'center',
-    borderColor: '#D8B4FE',
-    borderRadius: 10,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 40,
-    paddingHorizontal: 14,
-  },
-  ghostDismissBtnText: {
-    color: '#7E22CE',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  ghostSuccessBox: {
-    alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-    borderRadius: 10,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-    padding: 10,
-  },
-  ghostSuccessText: {
-    color: '#065F46',
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 17,
-  },
-  vipBadge: {
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 6,
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  vipBadgeText: {
-    color: '#D97706',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  bodyguardBadge: {
-    alignItems: 'center',
-    backgroundColor: '#DBEAFE',
-    borderRadius: 6,
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  bodyguardBadgeText: {
-    color: '#2563EB',
-    fontSize: 10,
-    fontWeight: '800',
+    marginTop: spacing.sm,
+    padding: spacing.base,
   },
 });

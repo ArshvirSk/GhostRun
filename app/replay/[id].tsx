@@ -1,4 +1,5 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../../src/lib/map';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -7,7 +8,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 
@@ -20,6 +20,8 @@ import {
 } from '../../src/lib/geo';
 import { stopLocationSharing } from '../../src/lib/location';
 import { supabase } from '../../src/lib/supabase';
+import { colors, radii, spacing } from '../../src/theme/tokens';
+import { Button, Card, Chip, Text } from '../../src/ui';
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
@@ -284,7 +286,6 @@ export default function ReplayScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [trailError, setTrailError] = useState('');
   const [replayError, setReplayError] = useState('');
-  const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(10);
@@ -307,7 +308,7 @@ export default function ReplayScreen() {
     };
   }, []);
 
-  // The replay is a terminal view; never leave the background tracker alive.
+  // Stop background tracker once replay mounts
   useEffect(() => {
     void stopLocationSharing();
   }, []);
@@ -372,7 +373,7 @@ export default function ReplayScreen() {
     } else if (phase === 'countdown' || phase === 'head_start' || phase === 'live') {
       router.replace({ pathname: '/game/[id]', params: { id: gameId } });
     } else if (phase === 'cancelled') {
-      router.replace('/home');
+      router.replace('/play' as any);
     }
   }, [gameId, router, state]);
 
@@ -394,6 +395,15 @@ export default function ReplayScreen() {
     },
     [durationS],
   );
+
+  // ±15s Skip Helpers (Addendum C #4)
+  const skipBackward15 = useCallback(() => {
+    seek(cursorRef.current - 15);
+  }, [seek]);
+
+  const skipForward15 = useCallback(() => {
+    seek(cursorRef.current + 15);
+  }, [seek]);
 
   useEffect(() => {
     if (!playing || durationS <= 0) return;
@@ -509,7 +519,7 @@ export default function ReplayScreen() {
       const pressedAt = Date.parse(mark.pressed_at);
       if (hasTimeline && pressedAt > cursorMs) continue;
       const color =
-        mark.result === 'hot' ? '#EF4444' : mark.result === 'cold' ? '#3B82F6' : '#64748B';
+        mark.result === 'hot' ? colors.heatHot : mark.result === 'cold' ? colors.heatCold : colors.textMuted;
       features.push({
         type: 'Feature',
         properties: { color, result: mark.result, hunter: mark.display_name },
@@ -524,10 +534,10 @@ export default function ReplayScreen() {
     return replay.zones.map((zone) => {
       const color =
         zone.controller === 'runner'
-          ? '#10B981'
+          ? colors.runner
           : zone.controller === 'hunter'
-            ? '#EF4444'
-            : '#94A3B8';
+            ? colors.hunter
+            : colors.textSubtle;
       const ring = circleRing(
         { longitude: zone.longitude, latitude: zone.latitude },
         zone.radius_m || 60,
@@ -557,14 +567,14 @@ export default function ReplayScreen() {
       if (coords.length >= 2) {
         lines.push({
           type: 'Feature',
-          properties: { color: '#8B5CF6', kind: npc.kind },
+          properties: { color: colors.ghostTrail, kind: npc.kind },
           geometry: { type: 'LineString', coordinates: coords },
         });
       }
       if (npc.longitude && npc.latitude) {
         points.push({
           type: 'Feature',
-          properties: { color: '#8B5CF6', kind: npc.kind },
+          properties: { color: colors.ghostTrail, kind: npc.kind },
           geometry: { type: 'Point', coordinates: [npc.longitude, npc.latitude] },
         });
       }
@@ -583,7 +593,7 @@ export default function ReplayScreen() {
         type: 'Feature',
         properties: {
           claimed: isClaimedAtTime,
-          color: isClaimedAtTime ? '#64748B' : '#F59E0B',
+          color: isClaimedAtTime ? colors.textMuted : colors.warning,
           type: drop.type,
         },
         geometry: { type: 'Point', coordinates: [drop.longitude, drop.latitude] },
@@ -621,7 +631,7 @@ export default function ReplayScreen() {
       result.push({
         key: `tag-${tag.id}`,
         position: offset(tag.tagged_at) / durationS,
-        color: '#DC2626',
+        color: colors.danger,
         height: 24,
         top: 2,
       });
@@ -630,7 +640,7 @@ export default function ReplayScreen() {
       result.push({
         key: `ping-${ping.id}`,
         position: offset(ping.released_at) / durationS,
-        color: ping.reason === 'boundary' ? '#F59E0B' : '#DB2777',
+        color: ping.reason === 'boundary' ? colors.warning : colors.radarScan,
         height: 10,
         top: 18,
       });
@@ -639,7 +649,7 @@ export default function ReplayScreen() {
       result.push({
         key: `heat-${mark.id}`,
         position: offset(mark.pressed_at) / durationS,
-        color: mark.result === 'hot' ? '#EF4444' : mark.result === 'cold' ? '#3B82F6' : '#64748B',
+        color: mark.result === 'hot' ? colors.heatHot : mark.result === 'cold' ? colors.heatCold : colors.textMuted,
         height: 8,
         top: 24,
       });
@@ -690,14 +700,10 @@ export default function ReplayScreen() {
   if (!gameId) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.error}>Game not found.</Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.replace('/home')}
-          style={styles.linkButton}
-        >
-          <Text style={styles.linkText}>Back to home</Text>
-        </Pressable>
+        <Text variant="headline" color={colors.danger} style={{ marginBottom: spacing.md }}>
+          Operation not found.
+        </Text>
+        <Button title="Return to Base" variant="primary" size="md" onPress={() => router.replace('/play' as any)} />
       </View>
     );
   }
@@ -706,19 +712,20 @@ export default function ReplayScreen() {
     return (
       <View style={styles.centered}>
         {errorMessage ? (
-          <Text accessibilityRole="alert" style={styles.error}>
-            {errorMessage}
-          </Text>
+          <>
+            <Text variant="body" color={colors.danger} style={{ marginBottom: spacing.md }}>
+              {errorMessage}
+            </Text>
+            <Button title="Return to Base" variant="secondary" size="md" onPress={() => router.replace('/play' as any)} />
+          </>
         ) : (
-          <ActivityIndicator color="#1D4ED8" size="large" />
+          <>
+            <ActivityIndicator color={colors.primary} size="large" />
+            <Text variant="caption" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+              Loading operational replay…
+            </Text>
+          </>
         )}
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.replace('/home')}
-          style={styles.linkButton}
-        >
-          <Text style={styles.linkText}>Back to home</Text>
-        </Pressable>
       </View>
     );
   }
@@ -726,15 +733,18 @@ export default function ReplayScreen() {
   if (state.game.status !== 'ended') {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#1D4ED8" size="large" />
-        <Text style={styles.loadingText}>Loading the replay…</Text>
+        <ActivityIndicator color={colors.primary} size="large" />
+        <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
+          Awaiting operation completion…
+        </Text>
       </View>
     );
   }
 
   const accent =
-    game?.winner === 'runners' ? '#059669' : game?.winner === 'hunters' ? '#B91C1C' : '#475569';
+    game?.winner === 'runners' ? colors.success : game?.winner === 'hunters' ? colors.danger : colors.textMuted;
   const zoom = Math.max(10, Math.min(16, 15 - Math.log2((game?.area.radius_m ?? 600) / 200)));
+
   const positionsData: PointCollection = {
     type: 'FeatureCollection',
     features: positionFeatures,
@@ -802,6 +812,7 @@ export default function ReplayScreen() {
   const pingsSoFar = replay?.pings.filter(
     (ping) => !hasTimeline || Date.parse(ping.released_at) <= cursorMs,
   ).length;
+
   const togglePlay = () => {
     if (playing) {
       setPlaying(false);
@@ -827,22 +838,23 @@ export default function ReplayScreen() {
             : activeEvent?.kind === 'jail'
               ? `Jail · ${activeEvent.event.type.replace('_', ' ')}`
               : 'No event at this moment';
+
   const eventDetail =
     activeEvent?.kind === 'tag'
-      ? `${formatClock(activeEvent.at)} · ${Math.round(activeEvent.tag.distance_m)} m apart`
+      ? `${formatClock(activeEvent.at)} · ${Math.round(activeEvent.tag.distance_m)}m vector apart`
       : activeEvent?.kind === 'ping'
-        ? `${formatClock(activeEvent.at)} · ${activeEvent.ping.position_age_s ?? 0}s-old fix${
-            activeEvent.ping.reason === 'boundary' ? ' · boundary penalty' : ''
+        ? `${formatClock(activeEvent.at)} · ${activeEvent.ping.position_age_s ?? 0}s fix age${
+            activeEvent.ping.reason === 'boundary' ? ' · boundary excursion' : ''
           }`
         : activeEvent?.kind === 'heat'
           ? `${formatClock(activeEvent.at)} · ${activeEvent.heat.result.toUpperCase()}${
               activeEvent.heat.nearest_runner_m !== null
-                ? ` · ${Math.round(activeEvent.heat.nearest_runner_m)}m away`
+                ? ` · ${Math.round(activeEvent.heat.nearest_runner_m)}m range`
                 : ''
             }`
           : activeEvent?.kind === 'handoff' || activeEvent?.kind === 'jail'
-            ? `${formatClock(activeEvent.at)} · recorded game event`
-            : 'Drag the timeline or press play to move through the round.';
+            ? `${formatClock(activeEvent.at)} · recorded tactical mission event`
+            : 'Drag the timeline scrubber or use ±15s controls to navigate playback.';
 
   return (
     <View style={styles.screen}>
@@ -863,12 +875,12 @@ export default function ReplayScreen() {
           <Layer
             id="play-area-fill"
             type="fill"
-            paint={{ 'fill-color': '#1D4ED8', 'fill-opacity': 0.06 }}
+            paint={{ 'fill-color': colors.primary, 'fill-opacity': 0.05 }}
           />
           <Layer
             id="play-area-outline"
             type="line"
-            paint={{ 'line-color': '#1D4ED8', 'line-width': 2, 'line-dasharray': [2, 2] }}
+            paint={{ 'line-color': colors.primary, 'line-width': 2, 'line-dasharray': [2, 2] }}
           />
         </GeoJSONSource>
 
@@ -901,7 +913,7 @@ export default function ReplayScreen() {
               type="line"
               layout={{ 'line-join': 'round', 'line-cap': 'round' }}
               paint={{
-                'line-color': '#8B5CF6',
+                'line-color': colors.ghostTrail,
                 'line-width': 3,
                 'line-dasharray': [3, 3],
                 'line-opacity': 0.85,
@@ -910,8 +922,20 @@ export default function ReplayScreen() {
           </GeoJSONSource>
         )}
 
+        {/* Ghost Echo on Replay Trails (Addendum C #4) */}
         {trailFeatures.length > 0 && (
           <GeoJSONSource id="replay-trails" data={trailsData}>
+            <Layer
+              id="replay-trail-echo"
+              type="line"
+              layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+              paint={{
+                'line-color': ['get', 'color'],
+                'line-width': 8,
+                'line-opacity': 0.25,
+                'line-blur': 3,
+              }}
+            />
             <Layer
               id="replay-trail-lines"
               type="line"
@@ -919,7 +943,7 @@ export default function ReplayScreen() {
               paint={{
                 'line-color': ['get', 'color'],
                 'line-width': 3,
-                'line-opacity': 0.72,
+                'line-opacity': 0.85,
               }}
             />
           </GeoJSONSource>
@@ -933,12 +957,12 @@ export default function ReplayScreen() {
             <Layer
               id="replay-target-fill"
               type="fill"
-              paint={{ 'fill-color': '#DB2777', 'fill-opacity': 0.1 }}
+              paint={{ 'fill-color': colors.danger, 'fill-opacity': 0.1 }}
             />
             <Layer
               id="replay-target-line"
               type="line"
-              paint={{ 'line-color': '#DB2777', 'line-width': 2, 'line-dasharray': [2, 2] }}
+              paint={{ 'line-color': colors.danger, 'line-width': 2, 'line-dasharray': [2, 2] }}
             />
           </GeoJSONSource>
         )}
@@ -950,9 +974,9 @@ export default function ReplayScreen() {
               type="circle"
               paint={{
                 'circle-radius': 9,
-                'circle-color': '#DB2777',
+                'circle-color': colors.danger,
                 'circle-stroke-width': 3,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>
@@ -968,12 +992,12 @@ export default function ReplayScreen() {
                 'circle-color': [
                   'case',
                   ['==', ['get', 'reason'], 'boundary'],
-                  '#F59E0B',
-                  '#DB2777',
+                  colors.warning,
+                  colors.radarScan,
                 ],
                 'circle-opacity': ['interpolate', ['linear'], ['get', 'age_s'], 0, 0.9, 600, 0.25],
                 'circle-stroke-width': 2,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>
@@ -985,19 +1009,19 @@ export default function ReplayScreen() {
               id="replay-tag-halo"
               type="circle"
               paint={{
-                'circle-radius': 15,
-                'circle-color': '#DC2626',
-                'circle-opacity': 0.22,
+                'circle-radius': 16,
+                'circle-color': colors.danger,
+                'circle-opacity': 0.25,
               }}
             />
             <Layer
               id="replay-tag-dot"
               type="circle"
               paint={{
-                'circle-radius': 5,
-                'circle-color': '#DC2626',
+                'circle-radius': 6,
+                'circle-color': colors.danger,
                 'circle-stroke-width': 2,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>
@@ -1016,8 +1040,8 @@ export default function ReplayScreen() {
                 'circle-stroke-color': [
                   'case',
                   ['==', ['get', 'tagged'], true],
-                  '#0F172A',
-                  '#FFFFFF',
+                  colors.surface,
+                  colors.textLight,
                 ],
               }}
             />
@@ -1031,9 +1055,9 @@ export default function ReplayScreen() {
               type="circle"
               paint={{
                 'circle-radius': 8,
-                'circle-color': '#8B5CF6',
+                'circle-color': colors.ghostTrail,
                 'circle-stroke-width': 2,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>
@@ -1048,7 +1072,7 @@ export default function ReplayScreen() {
                 'circle-radius': 8,
                 'circle-color': ['get', 'color'],
                 'circle-stroke-width': 2,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>
@@ -1063,422 +1087,404 @@ export default function ReplayScreen() {
                 'circle-radius': 9,
                 'circle-color': ['get', 'color'],
                 'circle-stroke-width': 2,
-                'circle-stroke-color': '#FFFFFF',
+                'circle-stroke-color': colors.textLight,
               }}
             />
           </GeoJSONSource>
         )}
       </MapLibreMap>
 
+      {/* Top HUD */}
       <View style={styles.hud}>
-        <Text style={[styles.eyebrow, { color: accent }]}>ROUND REPLAY · {game?.code ?? ''}</Text>
-        <Text style={styles.title}>
-          {game?.winner === 'runners'
-            ? 'Runners win'
-            : game?.winner === 'hunters'
-              ? 'Hunters win'
-              : 'Round replay'}
-        </Text>
-        <Text style={styles.subtitle}>
-          {formatClock(cursorS)} / {formatClock(durationS)} ·{' '}
-          {hasTimeline ? 'Recorded round' : 'No timeline recorded'}
-        </Text>
+        <View style={styles.topHudRow}>
+          <Chip label={`REPLAY // #${game?.code ?? ''}`} variant="accent" size="sm" />
+          <Chip
+            label={game?.winner === 'runners' ? 'RUNNERS WON' : game?.winner === 'hunters' ? 'HUNTERS WON' : 'ENDED'}
+            variant="default"
+            size="sm"
+          />
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: spacing.xs }}>
+          <Text variant="headline" color={colors.textLight}>
+            {formatClock(cursorS)}
+            <Text variant="caption" color={colors.textMuted}> / {formatClock(durationS)}</Text>
+          </Text>
+          <Text variant="caption" color={accent} weight="bold">
+            {hasTimeline ? 'TIMELINE ACTIVE' : 'STATIC SNAPSHOT'}
+          </Text>
+        </View>
 
         <View style={styles.statsRow}>
           <View style={styles.stat}>
-            <Text style={styles.statLabel}>TAGS</Text>
-            <Text style={styles.statValue}>
+            <Text variant="caption" color={colors.textMuted}>TAGS</Text>
+            <Text variant="body" weight="bold" color={colors.hunter}>
               {tagsSoFar ?? 0}/{tagCount}
             </Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statLabel}>PINGS</Text>
-            <Text style={styles.statValue}>
+            <Text variant="caption" color={colors.textMuted}>PINGS</Text>
+            <Text variant="body" weight="bold" color={colors.radarScan}>
               {pingsSoFar ?? 0}/{pingCount}
             </Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statLabel}>PLAYERS</Text>
-            <Text style={styles.statValue}>{state.players.length}</Text>
+            <Text variant="caption" color={colors.textMuted}>SQUAD</Text>
+            <Text variant="body" weight="bold" color={colors.textLight}>
+              {state.players.length} Operatives
+            </Text>
           </View>
         </View>
       </View>
 
-      <ScrollView style={styles.sheet} contentContainerStyle={styles.sheetContent}>
-        <Text style={styles.sectionLabel}>LAYERS</Text>
-        <View style={styles.layerRow}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setVisibleLayers((l) => ({ ...l, trails: !l.trails }))}
-            style={[styles.layerChip, visibleLayers.trails && styles.layerChipActive]}
-          >
-            <Text
-              style={[
-                styles.layerChipText,
-                visibleLayers.trails && styles.layerChipTextActive,
-              ]}
-            >
-              🏃 Trails
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setVisibleLayers((l) => ({ ...l, pings: !l.pings }))}
-            style={[styles.layerChip, visibleLayers.pings && styles.layerChipActive]}
-          >
-            <Text
-              style={[
-                styles.layerChipText,
-                visibleLayers.pings && styles.layerChipTextActive,
-              ]}
-            >
-              📡 Pings
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setVisibleLayers((l) => ({ ...l, heat: !l.heat }))}
-            style={[styles.layerChip, visibleLayers.heat && styles.layerChipActive]}
-          >
-            <Text
-              style={[
-                styles.layerChipText,
-                visibleLayers.heat && styles.layerChipTextActive,
-              ]}
-            >
-              🔥 Heat
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setVisibleLayers((l) => ({ ...l, zones: !l.zones }))}
-            style={[styles.layerChip, visibleLayers.zones && styles.layerChipActive]}
-          >
-            <Text
-              style={[
-                styles.layerChipText,
-                visibleLayers.zones && styles.layerChipTextActive,
-              ]}
-            >
-              🗺️ Sectors
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setVisibleLayers((l) => ({ ...l, npc: !l.npc }))}
-            style={[styles.layerChip, visibleLayers.npc && styles.layerChipActive]}
-          >
-            <Text
-              style={[
-                styles.layerChipText,
-                visibleLayers.npc && styles.layerChipTextActive,
-              ]}
-            >
-              👻 Ghost
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setVisibleLayers((l) => ({ ...l, drops: !l.drops }))}
-            style={[styles.layerChip, visibleLayers.drops && styles.layerChipActive]}
-          >
-            <Text
-              style={[
-                styles.layerChipText,
-                visibleLayers.drops && styles.layerChipTextActive,
-              ]}
-            >
-              📦 Drops
-            </Text>
-          </Pressable>
-        </View>
-
-        <Text style={styles.sectionLabel}>TIMELINE</Text>
-        <View style={styles.timeRow}>
-          <Text style={styles.timeValue}>{formatClock(cursorS)}</Text>
-          <Text style={styles.timeTotal}>of {formatClock(durationS)}</Text>
-        </View>
-
-        {hasTimeline ? (
-          <TimelineScrubber
-            duration={durationS}
-            markers={markers}
-            onChange={(seconds) => {
-              setPlaying(false);
-              seek(seconds);
-            }}
-            value={cursorS}
-          />
-        ) : (
-          <Text style={styles.emptyText}>This round did not record a replay timeline.</Text>
-        )}
-
-        <View style={styles.controlsRow}>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!hasTimeline}
-            onPress={togglePlay}
-            style={[styles.playButton, !hasTimeline && styles.disabled]}
-          >
-            <Text style={styles.playText}>{playing ? 'Pause' : 'Play'}</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!hasTimeline}
-            onPress={() => {
-              setPlaying(false);
-              seek(0);
-            }}
-            style={[styles.secondaryButton, !hasTimeline && styles.disabled]}
-          >
-            <Text style={styles.secondaryText}>Start</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!hasTimeline}
-            onPress={() => {
-              setPlaying(false);
-              seek(durationS);
-            }}
-            style={[styles.secondaryButton, !hasTimeline && styles.disabled]}
-          >
-            <Text style={styles.secondaryText}>End</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!hasTimeline}
-            onPress={() => setSpeed((value) => (value === 1 ? 10 : 1))}
-            style={[styles.secondaryButton, !hasTimeline && styles.disabled]}
-          >
-            <Text style={styles.secondaryText}>{speed}×</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.eventCard}>
-          <Text style={styles.eventLabel}>
-            {activeEvent
-              ? Math.abs(activeEvent.at - cursorS) <= 3
-                ? 'AT THE PLAYHEAD'
-                : 'LATEST EVENT'
-              : 'NO EVENTS YET'}
+      {/* Bottom Controls Sheet */}
+      <View style={styles.sheet}>
+        <ScrollView contentContainerStyle={styles.sheetContent}>
+          {/* Layer Filter Chips */}
+          <Text variant="label" color={colors.primary} style={{ marginBottom: spacing.xs }}>
+            TACTICAL LAYERS
           </Text>
-          <Text style={styles.eventTitle}>{eventTitle}</Text>
-          <Text style={styles.eventDetail}>{eventDetail}</Text>
-        </View>
+          <View style={styles.layerRow}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setVisibleLayers((l) => ({ ...l, trails: !l.trails }))}
+            >
+              <Chip
+                label="Trails"
+                variant={visibleLayers.trails ? 'accent' : 'default'}
+                size="sm"
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setVisibleLayers((l) => ({ ...l, pings: !l.pings }))}
+            >
+              <Chip
+                label="Pings"
+                variant={visibleLayers.pings ? 'accent' : 'default'}
+                size="sm"
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setVisibleLayers((l) => ({ ...l, heat: !l.heat }))}
+            >
+              <Chip
+                label="Heat"
+                variant={visibleLayers.heat ? 'accent' : 'default'}
+                size="sm"
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setVisibleLayers((l) => ({ ...l, zones: !l.zones }))}
+            >
+              <Chip
+                label="Sectors"
+                variant={visibleLayers.zones ? 'accent' : 'default'}
+                size="sm"
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setVisibleLayers((l) => ({ ...l, npc: !l.npc }))}
+            >
+              <Chip
+                label="Ghost"
+                variant={visibleLayers.npc ? 'accent' : 'default'}
+                size="sm"
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setVisibleLayers((l) => ({ ...l, drops: !l.drops }))}
+            >
+              <Chip
+                label="Drops"
+                variant={visibleLayers.drops ? 'accent' : 'default'}
+                size="sm"
+              />
+            </Pressable>
+          </View>
 
-        {trailError !== '' && (
-          <Text accessibilityRole="alert" style={styles.error}>
-            Routes could not be loaded: {trailError}
-          </Text>
-        )}
-        {replayError !== '' && (
-          <Text accessibilityRole="alert" style={styles.error}>
-            Events could not be loaded: {replayError}
-          </Text>
-        )}
-        {loading && <ActivityIndicator color="#1D4ED8" size="small" style={styles.spinner} />}
+          {/* Timeline Scrubber */}
+          <View style={{ marginTop: spacing.xs }}>
+            {hasTimeline ? (
+              <TimelineScrubber
+                duration={durationS}
+                markers={markers}
+                onChange={(seconds) => {
+                  setPlaying(false);
+                  seek(seconds);
+                }}
+                value={cursorS}
+              />
+            ) : (
+              <Text variant="caption" color={colors.textMuted} style={{ marginVertical: spacing.sm }}>
+                This operation concluded without recorded trajectory timestamps.
+              </Text>
+            )}
+          </View>
 
-        <View style={styles.legendRow}>
-          <View style={[styles.legendLine, { backgroundColor: '#1D4ED8' }]} />
-          <Text style={styles.legendText}>Route</Text>
-          <View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} />
-          <Text style={styles.legendText}>Tag</Text>
-          <View style={[styles.legendDot, { backgroundColor: '#DB2777' }]} />
-          <Text style={styles.legendText}>Ping</Text>
-          <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-          <Text style={styles.legendText}>Heat</Text>
-          <View style={[styles.legendDot, { backgroundColor: '#8B5CF6' }]} />
-          <Text style={styles.legendText}>Ghost</Text>
-          <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
-          <Text style={styles.legendText}>Drop</Text>
-          {state.target && <View style={[styles.legendDot, { backgroundColor: '#DB2777' }]} />}
-          {state.target && <Text style={styles.legendText}>Target</Text>}
-        </View>
+          {/* Playback Controls Row with ±15s Skip (Addendum C #4) */}
+          <View style={styles.controlsRow}>
+            {/* Start */}
+            <Pressable
+              accessibilityRole="button"
+              disabled={!hasTimeline}
+              onPress={() => {
+                setPlaying(false);
+                seek(0);
+              }}
+              style={[styles.controlPill, !hasTimeline && styles.disabled]}
+            >
+              <Ionicons color={colors.textLight} name="play-skip-back" size={14} />
+            </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace({ pathname: '/result/[id]', params: { id: gameId } });
-          }}
-          style={styles.primaryButton}
-        >
-          <Text style={styles.primaryText}>Back to result</Text>
-        </Pressable>
+            {/* -15s Skip */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Skip backward 15 seconds"
+              disabled={!hasTimeline}
+              onPress={skipBackward15}
+              style={[styles.controlPill, !hasTimeline && styles.disabled]}
+            >
+              <Text variant="caption" weight="bold" color={colors.textLight}>-15s</Text>
+            </Pressable>
 
-        <Text style={styles.footer}>
-          Tags and pings are placed with server timestamps. Routes are the recorded trail, at most
-          one point every ten seconds.
-        </Text>
-      </ScrollView>
+            {/* Play / Pause Primary */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={playing ? 'Pause replay' : 'Play replay'}
+              disabled={!hasTimeline}
+              onPress={togglePlay}
+              style={[styles.playButtonPrimary, !hasTimeline && styles.disabled]}
+            >
+              <Ionicons color={colors.backgroundDark} name={playing ? 'pause' : 'play'} size={18} />
+              <Text variant="body" weight="bold" color={colors.backgroundDark} style={{ marginLeft: 6 }}>
+                {playing ? 'Pause' : 'Play'}
+              </Text>
+            </Pressable>
+
+            {/* +15s Skip */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Skip forward 15 seconds"
+              disabled={!hasTimeline}
+              onPress={skipForward15}
+              style={[styles.controlPill, !hasTimeline && styles.disabled]}
+            >
+              <Text variant="caption" weight="bold" color={colors.textLight}>+15s</Text>
+            </Pressable>
+
+            {/* End */}
+            <Pressable
+              accessibilityRole="button"
+              disabled={!hasTimeline}
+              onPress={() => {
+                setPlaying(false);
+                seek(durationS);
+              }}
+              style={[styles.controlPill, !hasTimeline && styles.disabled]}
+            >
+              <Ionicons color={colors.textLight} name="play-skip-forward" size={14} />
+            </Pressable>
+
+            {/* Speed Toggle */}
+            <Pressable
+              accessibilityRole="button"
+              disabled={!hasTimeline}
+              onPress={() => setSpeed((val) => (val === 1 ? 10 : 1))}
+              style={[styles.controlPill, !hasTimeline && styles.disabled]}
+            >
+              <Text variant="caption" weight="bold" color={colors.primary}>{speed}×</Text>
+            </Pressable>
+          </View>
+
+          {/* Active Event Dossier Banner */}
+          <Card variant="default" style={styles.eventCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text variant="caption" color={colors.primary} weight="bold">
+                {activeEvent
+                  ? Math.abs(activeEvent.at - cursorS) <= 3
+                    ? 'CURRENT EVENT'
+                    : 'RECENT EVENT'
+                  : 'STATUS MONITOR'}
+              </Text>
+              <Chip label={formatClock(cursorS)} variant="default" size="sm" />
+            </View>
+            <Text variant="body" weight="bold" color={colors.textLight} style={{ marginTop: 4 }}>
+              {eventTitle}
+            </Text>
+            <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+              {eventDetail}
+            </Text>
+          </Card>
+
+          {trailError !== '' && (
+            <Text variant="caption" color={colors.danger} style={{ marginTop: spacing.xs }}>
+              Routes telemetry error: {trailError}
+            </Text>
+          )}
+          {replayError !== '' && (
+            <Text variant="caption" color={colors.danger} style={{ marginTop: spacing.xs }}>
+              Replay events error: {replayError}
+            </Text>
+          )}
+
+          {/* Return Action */}
+          <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+            <Button
+              title="Back to Mission Debrief"
+              variant="secondary"
+              size="md"
+              onPress={() => {
+                if (router.canGoBack()) router.back();
+                else router.replace({ pathname: '/result/[id]', params: { id: gameId } });
+              }}
+            />
+          </View>
+        </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#E2E8F0', flex: 1 },
+  screen: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
   centered: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     flex: 1,
     justifyContent: 'center',
-    padding: 28,
+    padding: spacing.xl,
   },
-  loadingText: { color: '#64748B', fontSize: 14, marginTop: 14 },
   hud: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    elevation: 3,
-    left: 16,
-    padding: 16,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    left: spacing.base,
+    padding: spacing.md,
     position: 'absolute',
-    right: 16,
-    top: 48,
+    right: spacing.base,
+    top: spacing.xl + spacing.base,
+    zIndex: 10,
   },
-  eyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.3 },
-  title: { color: '#0F172A', fontSize: 26, fontWeight: '900', marginTop: 4 },
-  subtitle: { color: '#475569', fontSize: 13, lineHeight: 19, marginTop: 4 },
-  statsRow: { flexDirection: 'row', gap: 22, marginTop: 12 },
-  stat: { flexShrink: 1 },
-  statLabel: { color: '#64748B', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  statValue: { color: '#0F172A', fontSize: 20, fontWeight: '900', marginTop: 2 },
-  error: { color: '#B91C1C', fontSize: 12, lineHeight: 18, marginTop: 8 },
+  topHudRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statsRow: {
+    borderTopColor: colors.borderLight,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.lg,
+    marginTop: spacing.sm,
+    paddingTop: spacing.xs,
+  },
+  stat: {
+    flexShrink: 1,
+  },
   sheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    backgroundColor: colors.surfaceDark,
+    borderColor: colors.border,
+    borderTopLeftRadius: radii.card,
+    borderTopRightRadius: radii.card,
+    borderTopWidth: 1,
     bottom: 0,
     left: 0,
-    maxHeight: '48%',
+    maxHeight: '52%',
     position: 'absolute',
     right: 0,
+    zIndex: 10,
   },
-  sheetContent: { padding: 20, paddingBottom: 28 },
+  sheetContent: {
+    padding: spacing.base,
+    paddingBottom: spacing.xl,
+  },
   layerRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
   },
-  layerChip: {
-    backgroundColor: '#F1F5F9',
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  track: {
+    height: 36,
+    justifyContent: 'center',
+    position: 'relative',
   },
-  layerChipActive: {
-    backgroundColor: '#1E293B',
-    borderColor: '#0F172A',
-  },
-  layerChipText: {
-    color: '#475569',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  layerChipTextActive: {
-    color: '#FFFFFF',
-  },
-  sectionLabel: {
-    color: '#475569',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.1,
-    marginBottom: 6,
-    marginTop: 2,
-  },
-  timeRow: { alignItems: 'baseline', flexDirection: 'row', gap: 8, marginBottom: 2 },
-  timeValue: { color: '#0F172A', fontSize: 28, fontWeight: '900', letterSpacing: 0.4 },
-  timeTotal: { color: '#64748B', fontSize: 13, fontWeight: '700' },
-  track: { height: 32, justifyContent: 'center', marginTop: 6 },
   rail: {
-    backgroundColor: '#E2E8F0',
-    borderRadius: 3,
-    height: 6,
+    backgroundColor: colors.borderDark,
+    borderRadius: radii.full,
+    height: 4,
     left: 0,
     position: 'absolute',
     right: 0,
-    top: 13,
   },
   railFill: {
-    backgroundColor: '#1D4ED8',
-    borderRadius: 3,
-    height: 6,
+    backgroundColor: colors.primary,
+    borderRadius: radii.full,
+    height: 4,
     left: 0,
     position: 'absolute',
-    top: 13,
   },
-  marker: { borderRadius: 2, marginLeft: -1.5, position: 'absolute', width: 3 },
-  thumb: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#1D4ED8',
-    borderRadius: 9,
-    borderWidth: 3,
-    height: 18,
-    marginLeft: -9,
+  marker: {
+    borderRadius: radii.xs,
+    marginLeft: -1.5,
     position: 'absolute',
-    top: 7,
-    width: 18,
+    width: 3,
+  },
+  thumb: {
+    backgroundColor: colors.primary,
+    borderColor: colors.surfaceDark,
+    borderRadius: radii.full,
+    borderWidth: 2,
+    height: 16,
+    marginLeft: -8,
+    position: 'absolute',
+    top: 10,
+    width: 16,
   },
   controlsRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
+    justifyContent: 'space-between',
+    marginVertical: spacing.sm,
   },
-  playButton: {
+  controlPill: {
     alignItems: 'center',
-    backgroundColor: '#1D4ED8',
-    borderRadius: 10,
-    justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: 20,
-  },
-  playText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
-  secondaryButton: {
-    alignItems: 'center',
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
     borderWidth: 1,
+    height: 38,
     justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: 12,
+    minWidth: 42,
+    paddingHorizontal: spacing.xs,
   },
-  secondaryText: { color: '#334155', fontSize: 13, fontWeight: '800' },
-  disabled: { opacity: 0.4 },
-  eventCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    marginTop: 12,
-    padding: 12,
-  },
-  eventLabel: { color: '#64748B', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  eventTitle: { color: '#0F172A', fontSize: 15, fontWeight: '900', marginTop: 4 },
-  eventDetail: { color: '#475569', fontSize: 12, lineHeight: 17, marginTop: 3 },
-  emptyText: { color: '#64748B', fontSize: 13, lineHeight: 19 },
-  spinner: { alignSelf: 'flex-start', marginTop: 10 },
-  legendRow: {
+  playButtonPrimary: {
     alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radii.pill,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 4,
-    marginTop: 12,
-  },
-  legendLine: { borderRadius: 2, height: 3, width: 16 },
-  legendDot: { borderRadius: 5, height: 9, width: 9 },
-  legendText: { color: '#64748B', fontSize: 11, fontWeight: '700', marginRight: 6 },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#0F172A',
-    borderRadius: 12,
+    height: 38,
     justifyContent: 'center',
-    marginTop: 16,
-    minHeight: 48,
+    paddingHorizontal: spacing.base,
   },
-  primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
-  footer: { color: '#94A3B8', fontSize: 11, lineHeight: 17, marginTop: 12 },
-  linkButton: { alignItems: 'center', justifyContent: 'center', marginTop: 16, minHeight: 44 },
-  linkText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
+  disabled: {
+    opacity: 0.35,
+  },
+  eventCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    marginTop: spacing.xs,
+    padding: spacing.md,
+  },
 });

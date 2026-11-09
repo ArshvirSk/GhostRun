@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radii, spacing } from '../../src/theme/tokens';
 import {
@@ -252,10 +253,11 @@ export default function HudGalleryScreen(): React.JSX.Element {
         {/* Gallery Navigation Segments */}
         <SegmentBar
           items={[
-            { id: 'components', label: 'UI PRIMITIVES' },
+            { id: 'components', label: 'PRIMITIVES' },
             { id: 'motion', label: 'MOTION' },
             { id: 'layouts', label: 'ROLE HUDS' },
-            { id: 'tour', label: 'TOUR PLAYER' },
+            { id: 'tour', label: 'TOUR' },
+            { id: 'recap', label: 'RECAP & REPLAY' },
           ]}
           activeId={activeSegment}
           onChange={setActiveSegment}
@@ -668,6 +670,142 @@ export default function HudGalleryScreen(): React.JSX.Element {
             </View>
           </View>
         )}
+
+        {/* ----------------- SECTION 5: RECAP & REPLAY ----------------- */}
+        {activeSegment === 'recap' && (
+          <View style={styles.sectionBlock}>
+            {/* Outcome Dossier Card Preview */}
+            <Card variant="elevated" style={styles.sectionCard}>
+              <Text variant="label" color={colors.primary} style={styles.sectionLabel}>
+                MISSION OUTCOME CARD
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Chip label="CLASSIC CHASE" variant="accent" size="sm" />
+                <Chip label="TARGET REACHED" variant="default" size="sm" />
+              </View>
+              <Text variant="headline" color={colors.success} style={{ marginTop: spacing.xs }}>
+                Runners Victory
+              </Text>
+              <Text variant="body" color={colors.text} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
+                A runner successfully infiltrated the secret extraction perimeter before tag engagement.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+                <View style={[styles.statBox, { flex: 1 }]}>
+                  <Text variant="caption" color={colors.textMuted}>DURATION</Text>
+                  <Text variant="headline" color={colors.textLight}>04m 12s</Text>
+                </View>
+                <View style={[styles.statBox, { flex: 1 }]}>
+                  <Text variant="caption" color={colors.textMuted}>TAGGED</Text>
+                  <Text variant="headline" color={colors.hunter}>1 of 4</Text>
+                </View>
+                <View style={[styles.statBox, { flex: 1 }]}>
+                  <Text variant="caption" color={colors.textMuted}>SQUAD</Text>
+                  <Text variant="headline" color={colors.textLight}>5</Text>
+                </View>
+              </View>
+            </Card>
+
+            {/* Match Highlights Card Preview */}
+            <Card variant="elevated" style={styles.sectionCard}>
+              <Text variant="label" color={colors.primary} style={styles.sectionLabel}>
+                MATCH HIGHLIGHTS & TELEMETRY
+              </Text>
+              <View style={[styles.statBox, { width: '100%', backgroundColor: colors.primaryLight, borderColor: colors.borderAccent }]}>
+                <Text variant="caption" color={colors.primary}>CLOSEST CALL</Text>
+                <Text variant="headline" color={colors.textLight}>14 m</Text>
+                <Text variant="caption" color={colors.textMuted}>Opponent nearest vector approach</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+                <View style={[styles.statBox, { flex: 1 }]}>
+                  <Text variant="caption" color={colors.textMuted}>LONGEST UNSEEN</Text>
+                  <Text variant="body" weight="bold" color={colors.textLight}>03m 45s</Text>
+                </View>
+                <View style={[styles.statBox, { flex: 1 }]}>
+                  <Text variant="caption" color={colors.textMuted}>PEAK NOISE</Text>
+                  <Text variant="body" weight="bold" color={colors.textLight}>78 / 100</Text>
+                </View>
+              </View>
+            </Card>
+
+            {/* Mode Debrief Card Preview */}
+            <Card variant="elevated" style={styles.sectionCard}>
+              <Text variant="label" color={colors.primary} style={styles.sectionLabel}>
+                TACTICAL MODE DEBRIEFS
+              </Text>
+              <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
+                <Chip label="GHOST DUEL: +1.8s SPLIT" variant="accent" size="sm" />
+                <Chip label="TERRITORY: 7 SECTORS" variant="default" size="sm" />
+                <Chip label="RELAY: EXTRACTED" variant="default" size="sm" />
+                <Chip label="AI GM: 4 EVENTS" variant="warning" size="sm" />
+              </View>
+            </Card>
+
+            {/* Shareable Mission Recap Card Preview (Addendum C #4) */}
+            <Card variant="elevated" style={styles.sectionCard}>
+              <Text variant="label" color={colors.primary} style={styles.sectionLabel}>
+                SHAREABLE RECAP CARD (ADDENDUM C #4)
+              </Text>
+              <View style={styles.recapCardPreview}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="headline" color={colors.primary}>GHOSTRUN</Text>
+                  <Chip label="VICTORIOUS" variant="accent" size="sm" />
+                </View>
+                <View style={{ marginVertical: spacing.md }}>
+                  <Text variant="body" weight="bold" color={colors.textLight}>OPERATIVE: CIPHER</Text>
+                  <Text variant="caption" color={colors.textMuted}>MODE: CLASSIC CHASE · CODE: #G7XK</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View>
+                    <Text variant="caption" color={colors.textMuted}>TIME</Text>
+                    <Text variant="body" weight="bold" color={colors.textLight}>04m 12s</Text>
+                  </View>
+                  <View>
+                    <Text variant="caption" color={colors.textMuted}>SQUAD</Text>
+                    <Text variant="body" weight="bold" color={colors.textLight}>5 OPERATIVES</Text>
+                  </View>
+                  <View>
+                    <Text variant="caption" color={colors.textMuted}>STATUS</Text>
+                    <Text variant="body" weight="bold" color={colors.success}>INFILTRATED</Text>
+                  </View>
+                </View>
+              </View>
+              <Button
+                title="EXPORT RECAP CARD"
+                variant="primary"
+                size="md"
+                onPress={() => setToastMessage('Recap Card Export ready (Phase D)')}
+              />
+            </Card>
+
+            {/* Replay Controls & ±15s Skip Preview (Addendum C #4) */}
+            <Card variant="elevated" style={styles.sectionCard}>
+              <Text variant="label" color={colors.primary} style={styles.sectionLabel}>
+                REPLAY CONTROLS & ±15S SKIP
+              </Text>
+              <View style={styles.controlsRow}>
+                <View style={styles.controlPill}>
+                  <Ionicons color={colors.textLight} name="play-skip-back" size={14} />
+                </View>
+                <TouchableOpacity style={styles.controlPill} onPress={() => setToastMessage('Skipped -15s')}>
+                  <Text variant="caption" weight="bold" color={colors.textLight}>-15s</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.playButtonPrimary} onPress={() => setToastMessage('Toggle Play/Pause')}>
+                  <Ionicons color={colors.backgroundDark} name="play" size={16} />
+                  <Text variant="caption" weight="bold" color={colors.backgroundDark} style={{ marginLeft: 4 }}>Play</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.controlPill} onPress={() => setToastMessage('Skipped +15s')}>
+                  <Text variant="caption" weight="bold" color={colors.textLight}>+15s</Text>
+                </TouchableOpacity>
+                <View style={styles.controlPill}>
+                  <Ionicons color={colors.textLight} name="play-skip-forward" size={14} />
+                </View>
+                <View style={styles.controlPill}>
+                  <Text variant="caption" weight="bold" color={colors.primary}>10×</Text>
+                </View>
+              </View>
+            </Card>
+          </View>
+        )}
       </ScrollView>
 
       {/* Modal Bottom Sheet */}
@@ -859,5 +997,45 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  statBox: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    padding: spacing.sm,
+  },
+  recapCardPreview: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderAccent,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    padding: spacing.base,
+  },
+  controlsRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: spacing.xs,
+  },
+  controlPill: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    minWidth: 42,
+    paddingHorizontal: spacing.xs,
+  },
+  playButtonPrimary: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radii.pill,
+    flexDirection: 'row',
+    height: 38,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.base,
   },
 });
