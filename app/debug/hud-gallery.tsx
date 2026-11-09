@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../src/theme/ThemeProvider';
 import { colors, radii, spacing } from '../../src/theme/tokens';
 import {
   BriefingCard,
@@ -143,6 +144,7 @@ const MOCK_ROUND_STATE: RoundState = {
 };
 
 export default function HudGalleryScreen(): React.JSX.Element {
+  const { colors, spacing, themeMode, setThemeMode, isDark } = useTheme();
   const reducedMotion = useReducedMotion();
   const [simulatedNow] = useState(1700000000000);
   const [hapticsOn, setHapticsOn] = useState(isHapticsEnabled());
@@ -172,7 +174,7 @@ export default function HudGalleryScreen(): React.JSX.Element {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -184,7 +186,7 @@ export default function HudGalleryScreen(): React.JSX.Element {
             HUD GALLERY
           </Text>
           <Text variant="body" color={colors.textMuted}>
-            Direction A &apos;Night Radar&apos; design system, motion language, role layouts, and tour preview.
+            Afterimage (System / Light / Dark) visual system, motion language, role layouts, and tour preview.
           </Text>
         </View>
 
@@ -194,7 +196,29 @@ export default function HudGalleryScreen(): React.JSX.Element {
             SYSTEM CONTROLS & ACCESSIBILITY
           </Text>
 
+          {/* Theme Appearance Mode Switcher */}
           <View style={styles.switchRow}>
+            <View>
+              <Text variant="body" weight="bold">
+                Theme Appearance
+              </Text>
+              <Text variant="caption" color={colors.textMuted}>
+                Afterimage System / Light / Dark modes (persists choice)
+              </Text>
+            </View>
+          </View>
+          <SegmentBar
+            items={[
+              { id: 'system', label: 'SYSTEM' },
+              { id: 'light', label: 'LIGHT' },
+              { id: 'dark', label: 'DARK' },
+            ]}
+            activeId={themeMode}
+            onChange={(id) => setThemeMode(id as any)}
+            style={{ marginTop: spacing.xs, marginBottom: spacing.md }}
+          />
+
+          <View style={[styles.switchRow, { borderTopWidth: 1, borderTopColor: colors.borderLight }]}>
             <View>
               <Text variant="body" weight="bold">
                 Reduced Motion
@@ -231,20 +255,26 @@ export default function HudGalleryScreen(): React.JSX.Element {
           {/* Sunlight Contrast Matrix */}
           <View style={styles.contrastMatrix}>
             <Text variant="label" color={colors.textMuted} style={{ marginBottom: 6 }}>
-              SUNLIGHT CONTRAST AUDIT (WCAG 2.1)
+              AFTERIMAGE CONTRAST RATIOS (WCAG 2.1)
             </Text>
             <View style={styles.contrastGrid}>
               <View style={styles.contrastItem}>
-                <Text variant="mono" color={colors.primary}>16.5:1</Text>
+                <Text variant="mono" color={colors.primary}>
+                  {isDark ? '16.4:1' : '14.1:1'}
+                </Text>
                 <Text variant="caption" color={colors.textMuted}>Text / Canvas (AAA)</Text>
               </View>
               <View style={styles.contrastItem}>
-                <Text variant="mono" color={colors.primary}>14.1:1</Text>
-                <Text variant="caption" color={colors.textMuted}>Runner Mint (AAA)</Text>
+                <Text variant="mono" color={colors.primary}>
+                  {isDark ? '14.9:1' : '5.0:1'}
+                </Text>
+                <Text variant="caption" color={colors.textMuted}>Action Lime (AAA/AA)</Text>
               </View>
               <View style={styles.contrastItem}>
-                <Text variant="mono" color={colors.hunter}>6.2:1</Text>
-                <Text variant="caption" color={colors.textMuted}>Hunter Amber (AA)</Text>
+                <Text variant="mono" color={colors.hunter}>
+                  {isDark ? '8.3:1' : '5.1:1'}
+                </Text>
+                <Text variant="caption" color={colors.textMuted}>Hunter Coral (AAA/AA)</Text>
               </View>
             </View>
           </View>
