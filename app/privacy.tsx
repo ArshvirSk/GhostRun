@@ -1,16 +1,18 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
   View,
 } from 'react-native';
-
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../src/theme/ThemeProvider';
+import { Text } from '../src/ui/Text';
+import { Card } from '../src/ui/Card';
+import { Button } from '../src/ui/Button';
 import {
   PRIVACY_CHANGELOG,
   PRIVACY_CONTACT_EMAIL,
@@ -41,6 +43,7 @@ type GhostRecord = {
 export default function PrivacyScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  const { colors, spacing } = useTheme();
   const isGate = mode === 'gate';
 
   const [consents, setConsents] = useState<Consents | null>(null);
@@ -91,7 +94,6 @@ export default function PrivacyScreen() {
   }
 
   useEffect(() => {
-    // Deferred so the fetch does not set state synchronously inside the effect.
     const timer = setTimeout(() => void load(), 0);
     return () => clearTimeout(timer);
   }, [load]);
@@ -129,220 +131,255 @@ export default function PrivacyScreen() {
       setActionError(error.message);
       return;
     }
-    router.replace('/home');
+    router.replace('/play' as any);
   }
 
   if (!consents && !loadError) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color="#1D4ED8" size="large" />
-        <Text style={styles.centeredText}>Loading your privacy choices…</Text>
+      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.primary} size="large" />
+        <Text variant="body" style={{ color: colors.textMuted, marginTop: spacing.md }}>
+          Loading your privacy choices…
+        </Text>
       </View>
     );
   }
 
   if (loadError) {
     return (
-      <View style={styles.centered}>
-        <Text accessibilityRole="alert" style={styles.error}>
+      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+        <Text variant="body" style={{ color: colors.danger, marginBottom: spacing.md }}>
           {loadError}
         </Text>
-        <Pressable
-          accessibilityRole="button"
+        <Button
+          title="Try again"
+          variant="secondary"
+          size="sm"
           onPress={() => void load()}
-          style={styles.primaryButton}
-        >
-          <Text style={styles.primaryButtonText}>Try again</Text>
-        </Pressable>
+        />
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.screen}>
-      {!isGate && (
-        <Pressable
-          accessibilityLabel="Back"
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          style={styles.backRow}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView contentContainerStyle={[styles.screen, { padding: spacing.lg }]}>
+        {!isGate && (
+          <Pressable
+            accessibilityLabel="Back"
+            accessibilityRole="button"
+            onPress={() => router.back()}
+            style={styles.backRow}
+          >
+            <Ionicons color={colors.primary} name="chevron-back" size={20} />
+            <Text variant="label" style={{ color: colors.primary, marginLeft: spacing.xs }}>
+              BACK
+            </Text>
+          </Pressable>
+        )}
+
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs }}>
+          PRIVACY PROTOCOL
+        </Text>
+        <Text variant="caption" style={{ color: colors.textMuted, marginTop: 4 }}>
+          Version {PRIVACY_VERSION}.0 · Updated 2026-11-08
+        </Text>
+
+        {needsAcknowledgement && (
+          <Card
+            variant="elevated"
+            style={[
+              styles.card,
+              { backgroundColor: colors.surfaceElevated, borderColor: colors.borderAccent, marginTop: spacing.md },
+            ]}
+          >
+            <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+              {acknowledgedVersion === 0 ? 'Before you play' : 'What changed'}
+            </Text>
+            {(PRIVACY_CHANGELOG[PRIVACY_VERSION] ?? []).map((line) => (
+              <Text key={line} variant="body" style={{ color: colors.textMuted, marginTop: 4, fontSize: 13, lineHeight: 18 }}>
+                • {line}
+              </Text>
+            ))}
+          </Card>
+        )}
+
+        <Card
+          variant="default"
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
         >
-          <Ionicons color="#1D4ED8" name="chevron-back" size={20} />
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-      )}
-
-      <Text style={styles.title}>Privacy</Text>
-      <Text style={styles.versionLine}>Version {PRIVACY_VERSION}.0 · Updated 2026-11-08</Text>
-
-      {needsAcknowledgement && (
-        <View style={styles.changedCard}>
-          <Text style={styles.changedTitle}>
-            {acknowledgedVersion === 0 ? 'Before you play' : 'What changed'}
+          <Text variant="label" style={{ color: colors.primary, marginBottom: spacing.xs }}>
+            THE SHORT VERSION
           </Text>
-          {(PRIVACY_CHANGELOG[PRIVACY_VERSION] ?? []).map((line) => (
-            <Text key={line} style={styles.changedLine}>
+          {PRIVACY_SHORT_VERSION.map((line) => (
+            <Text key={line} variant="body" style={{ color: colors.text, marginTop: 4, fontSize: 13, lineHeight: 18 }}>
               • {line}
             </Text>
           ))}
-        </View>
-      )}
+        </Card>
 
-      <View style={styles.card}>
-        <Text style={styles.cardEyebrow}>THE SHORT VERSION</Text>
-        {PRIVACY_SHORT_VERSION.map((line) => (
-          <Text key={line} style={styles.shortLine}>
-            • {line}
-          </Text>
-        ))}
-      </View>
+        {!isGate && (
+          <Card
+            variant="default"
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
+          >
+            <Text variant="label" style={{ color: colors.primary, marginBottom: spacing.sm }}>
+              YOUR CHOICES
+            </Text>
 
-      {!isGate && (
-        <View style={styles.card}>
-          <Text style={styles.cardEyebrow}>YOUR CHOICES</Text>
+            <ChoiceRow
+              busy={busy === 'ghost'}
+              label="Contribute routes to Ghost Library"
+              onValueChange={(value) => void setConsent('ghost', value)}
+              value={consents?.ghost?.granted ?? true}
+              colors={colors}
+            />
+            <ChoiceRow
+              busy={busy === 'leaderboard_name'}
+              label="Public leaderboard name"
+              onValueChange={(value) => void setConsent('leaderboard_name', value)}
+              value={consents?.leaderboard_name?.granted ?? false}
+              colors={colors}
+            />
+            <ChoiceRow
+              busy={busy === 'diagnostics'}
+              label="Diagnostics (no location telemetry)"
+              onValueChange={(value) => void setConsent('diagnostics', value)}
+              value={consents?.diagnostics?.granted ?? false}
+              colors={colors}
+            />
 
-          <ChoiceRow
-            busy={busy === 'ghost'}
-            label="Contribute routes to Ghost Library"
-            onValueChange={(value) => void setConsent('ghost', value)}
-            value={consents?.ghost?.granted ?? true}
-          />
-          <ChoiceRow
-            busy={busy === 'leaderboard_name'}
-            label="Public leaderboard name"
-            onValueChange={(value) => void setConsent('leaderboard_name', value)}
-            value={consents?.leaderboard_name?.granted ?? false}
-          />
-          <ChoiceRow
-            busy={busy === 'diagnostics'}
-            label="Diagnostics (no location)"
-            onValueChange={(value) => void setConsent('diagnostics', value)}
-            value={consents?.diagnostics?.granted ?? false}
-          />
-
-          <View style={styles.staticRow}>
-            <Text style={styles.choiceLabel}>Share my route in replays</Text>
-            <Text style={styles.staticValue}>Asked in every lobby</Text>
-          </View>
-          <Text style={styles.helper}>
-            You pick per game when you join a lobby. You can change it there until the round ends,
-            and hide your route later from the result screen.
-          </Text>
-          <View style={styles.ghostSection}>
-            <View style={styles.staticRow}>
-              <Text style={styles.choiceLabel}>Ghost Library Contributions</Text>
-              <Text style={styles.staticValue}>
-                {ghosts.length === 0 ? 'None active' : `${ghosts.length} active`}
+            <View style={[styles.staticRow, { borderTopWidth: 1, borderTopColor: colors.borderDark, paddingTop: spacing.sm, marginTop: spacing.sm }]}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 14 }}>
+                Share route in replays
+              </Text>
+              <Text variant="caption" style={{ color: colors.primary }}>
+                Asked in every lobby
               </Text>
             </View>
-            <Text style={styles.helper}>
-              Contributed routes are completely anonymous, have 150m automatically trimmed from the
-              start and end to protect your origin and destination privacy, and are automatically
-              deleted after 90 days.
+            <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2, lineHeight: 16 }}>
+              You pick per game when joining a lobby. Positions are visible only to players the rules allow, routes are shared only if you choose to share them, and data is deleted after the retention period.
             </Text>
-            {ghosts.length > 0 && (
-              <Pressable
-                accessibilityRole="button"
-                disabled={deletingGhosts}
-                onPress={() => void handleDeleteGhosts()}
-                style={styles.deleteGhostsButton}
-              >
-                {deletingGhosts ? (
-                  <ActivityIndicator color="#DC2626" size="small" />
-                ) : (
-                  <Text style={styles.deleteGhostsText}>
-                    Delete all my ghost routes ({ghosts.length})
+
+            <View style={[styles.ghostSection, { borderTopWidth: 1, borderTopColor: colors.borderDark, paddingTop: spacing.sm, marginTop: spacing.sm }]}>
+              <View style={styles.staticRow}>
+                <Text variant="title" style={{ color: colors.text, fontSize: 14 }}>
+                  Ghost Library Contributions
+                </Text>
+                <Text variant="caption" style={{ color: colors.radarScan }}>
+                  {ghosts.length === 0 ? 'None active' : `${ghosts.length} active`}
+                </Text>
+              </View>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2, lineHeight: 16 }}>
+                Contributed routes are anonymous, have 150m automatically trimmed from the start and end to protect your origin and destination privacy, and are automatically deleted after 90 days.
+              </Text>
+              {ghosts.length > 0 && (
+                <Button
+                  title={deletingGhosts ? 'Deleting...' : `Delete all ghost routes (${ghosts.length})`}
+                  variant="danger"
+                  size="sm"
+                  style={{ marginTop: spacing.sm }}
+                  disabled={deletingGhosts}
+                  onPress={() => void handleDeleteGhosts()}
+                />
+              )}
+            </View>
+          </Card>
+        )}
+
+        <Card
+          variant="default"
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
+        >
+          <Text variant="label" style={{ color: colors.primary, marginBottom: spacing.xs }}>
+            TACTICAL DETAILS
+          </Text>
+          {PRIVACY_SECTIONS.map((section) => {
+            const open = expanded === section.title;
+            return (
+              <View key={section.title} style={[styles.section, { borderTopColor: colors.borderDark }]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: open }}
+                  onPress={() => setExpanded(open ? null : section.title)}
+                  style={styles.sectionHeader}
+                >
+                  <Text variant="title" style={{ color: colors.text, fontSize: 14, flex: 1 }}>
+                    {section.title}
+                  </Text>
+                  <Ionicons color={colors.textMuted} name={open ? 'chevron-up' : 'chevron-down'} size={16} />
+                </Pressable>
+                {open && (
+                  <Text variant="body" style={{ color: colors.textMuted, marginTop: 6, fontSize: 13, lineHeight: 18 }}>
+                    {section.body}
                   </Text>
                 )}
-              </Pressable>
-            )}
-          </View>
+              </View>
+            );
+          })}
+        </Card>
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/settings' as any)}
-            style={styles.linkRow}
+        {PRIVACY_POLICY_URL ? (
+          <Text variant="caption" style={{ color: colors.primary, marginTop: spacing.md, textAlign: 'center' }}>
+            {PRIVACY_POLICY_URL}
+          </Text>
+        ) : (
+          <Text variant="caption" style={{ color: colors.textSubtle, marginTop: spacing.md, textAlign: 'center' }}>
+            For privacy inquiries, account data questions, or the full policy text, contact {PRIVACY_CONTACT_EMAIL}.
+          </Text>
+        )}
+
+        {isGate && (
+          <Card
+            variant="elevated"
+            style={[
+              styles.gateCard,
+              { backgroundColor: colors.surfaceElevated, borderColor: colors.borderAccent, marginTop: spacing.lg },
+            ]}
           >
-            <Text style={styles.linkText}>Export or delete my data</Text>
-            <Ionicons color="#1D4ED8" name="chevron-forward" size={16} />
-          </Pressable>
-        </View>
-      )}
-
-      <View style={styles.card}>
-        <Text style={styles.cardEyebrow}>DETAILS</Text>
-        {PRIVACY_SECTIONS.map((section) => {
-          const open = expanded === section.title;
-          return (
-            <View key={section.title} style={styles.section}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ expanded: open }}
-                onPress={() => setExpanded(open ? null : section.title)}
-                style={styles.sectionHeader}
-              >
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-                <Ionicons color="#64748B" name={open ? 'chevron-up' : 'chevron-down'} size={16} />
-              </Pressable>
-              {open && <Text style={styles.sectionBody}>{section.body}</Text>}
-            </View>
-          );
-        })}
-      </View>
-
-      {PRIVACY_POLICY_URL ? (
-        <Text style={styles.policyLink}>{PRIVACY_POLICY_URL}</Text>
-      ) : (
-        <Text style={styles.placeholder}>
-          For privacy inquiries, account data questions, or the full policy text, contact{' '}
-          {PRIVACY_CONTACT_EMAIL}.
-        </Text>
-      )}
-
-      {isGate && (
-        <View style={styles.gateCard}>
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: ageConfirmed }}
-            onPress={() => setAgeConfirmed((value) => !value)}
-            style={styles.checkboxRow}
-          >
-            <Ionicons
-              color={ageConfirmed ? '#1D4ED8' : '#94A3B8'}
-              name={ageConfirmed ? 'checkbox' : 'square-outline'}
-              size={24}
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: ageConfirmed }}
+              onPress={() => setAgeConfirmed((value) => !value)}
+              style={styles.checkboxRow}
+            >
+              <Ionicons
+                color={ageConfirmed ? colors.primary : colors.textSubtle}
+                name={ageConfirmed ? 'checkbox' : 'square-outline'}
+                size={24}
+              />
+              <Text variant="body" style={{ color: colors.text, marginLeft: spacing.xs, flex: 1, fontSize: 13, lineHeight: 18 }}>
+                I have read this and I am 18 or older, or playing under a guardian&apos;s supervision.
+              </Text>
+            </Pressable>
+            <Button
+              title={busy === 'ack' ? 'Confirming...' : 'Continue'}
+              variant="primary"
+              size="lg"
+              style={{ marginTop: spacing.md }}
+              disabled={!ageConfirmed || busy === 'ack'}
+              onPress={() => void acknowledge()}
             />
-            <Text style={styles.checkboxLabel}>
-              I have read this and I am 18 or older, or supervised by a guardian.
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!ageConfirmed || busy === 'ack'}
-            onPress={() => void acknowledge()}
-            style={[styles.primaryButton, !ageConfirmed && styles.primaryButtonDisabled]}
-          >
-            {busy === 'ack' ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Continue</Text>
+            {actionError !== '' && (
+              <Text variant="caption" style={{ color: colors.danger, marginTop: spacing.xs, textAlign: 'center' }}>
+                {actionError}
+              </Text>
             )}
-          </Pressable>
-          {actionError !== '' && (
-            <Text accessibilityRole="alert" style={styles.error}>
-              {actionError}
-            </Text>
-          )}
-        </View>
-      )}
+          </Card>
+        )}
 
-      {toast !== '' && <Text style={styles.toast}>{toast}</Text>}
-      {!isGate && actionError !== '' && (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {actionError}
-        </Text>
-      )}
-    </ScrollView>
+        {toast !== '' && (
+          <Text variant="body" style={{ color: colors.primary, marginTop: spacing.md, textAlign: 'center' }}>
+            {toast}
+          </Text>
+        )}
+        {!isGate && actionError !== '' && (
+          <Text variant="body" style={{ color: colors.danger, marginTop: spacing.md, textAlign: 'center' }}>
+            {actionError}
+          </Text>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -351,23 +388,27 @@ function ChoiceRow({
   label,
   onValueChange,
   value,
+  colors,
 }: {
   busy: boolean;
   label: string;
   onValueChange: (value: boolean) => void;
   value: boolean;
+  colors: any;
 }) {
   return (
     <View style={styles.choiceRow}>
-      <Text style={styles.choiceLabel}>{label}</Text>
+      <Text variant="body" style={{ color: colors.text, flex: 1, fontSize: 14 }}>
+        {label}
+      </Text>
       {busy ? (
-        <ActivityIndicator color="#1D4ED8" size="small" />
+        <ActivityIndicator color={colors.primary} size="small" />
       ) : (
         <Switch
           accessibilityLabel={label}
           onValueChange={onValueChange}
-          thumbColor="#FFFFFF"
-          trackColor={{ false: '#CBD5E1', true: '#1D4ED8' }}
+          thumbColor={colors.textLight}
+          trackColor={{ false: colors.borderDark, true: colors.primary }}
           value={value}
         />
       )}
@@ -376,134 +417,56 @@ function ChoiceRow({
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#E2E8F0', padding: 18, paddingBottom: 48 },
+  container: {
+    flex: 1,
+  },
+  screen: {
+    paddingBottom: 48,
+  },
   centered: {
-    alignItems: 'center',
-    backgroundColor: '#E2E8F0',
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 24,
   },
-  centeredText: { color: '#475569', fontSize: 15, marginTop: 12 },
-  backRow: { alignItems: 'center', flexDirection: 'row', marginTop: 8 },
-  backText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
-  title: { color: '#0F172A', fontSize: 28, fontWeight: '900', marginTop: 12 },
-  versionLine: { color: '#64748B', fontSize: 13, marginBottom: 14, marginTop: 4 },
+  backRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingVertical: 8,
+  },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    elevation: 2,
-    marginBottom: 14,
     padding: 16,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    borderWidth: 1,
   },
-  cardEyebrow: {
-    color: '#1D4ED8',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginBottom: 10,
-  },
-  shortLine: { color: '#0F172A', fontSize: 15, lineHeight: 23 },
   choiceRow: {
     alignItems: 'center',
-    borderBottomColor: '#E2E8F0',
-    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    minHeight: 52,
+    paddingVertical: 10,
   },
-  choiceLabel: { color: '#0F172A', flex: 1, fontSize: 15, fontWeight: '600', paddingRight: 12 },
   staticRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    minHeight: 48,
   },
-  staticValue: { color: '#64748B', fontSize: 13, fontWeight: '600' },
-  helper: { color: '#64748B', fontSize: 13, lineHeight: 19, marginBottom: 8 },
   ghostSection: {
-    borderBottomColor: '#E2E8F0',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 4,
+    marginTop: 8,
   },
-  deleteGhostsButton: {
-    alignItems: 'center',
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FECACA',
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: 'center',
-    marginBottom: 8,
-    marginTop: 4,
+  section: {
+    borderTopWidth: 1,
     paddingVertical: 10,
   },
-  deleteGhostsText: {
-    color: '#DC2626',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  linkRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    minHeight: 44,
-  },
-  linkText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
-  section: { borderBottomColor: '#E2E8F0', borderBottomWidth: StyleSheet.hairlineWidth },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    minHeight: 48,
   },
-  sectionTitle: { color: '#0F172A', fontSize: 15, fontWeight: '600' },
-  sectionBody: { color: '#475569', fontSize: 14, lineHeight: 21, paddingBottom: 12 },
-  changedCard: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 14,
-    padding: 16,
-  },
-  changedTitle: { color: '#1E3A8A', fontSize: 16, fontWeight: '800', marginBottom: 6 },
-  changedLine: { color: '#1E3A8A', fontSize: 14, lineHeight: 21 },
   gateCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginTop: 4,
     padding: 16,
+    borderWidth: 1,
   },
-  checkboxRow: { alignItems: 'flex-start', flexDirection: 'row', minHeight: 48 },
-  checkboxLabel: { color: '#0F172A', flex: 1, fontSize: 15, lineHeight: 22, marginLeft: 10 },
-  primaryButton: {
+  checkboxRow: {
     alignItems: 'center',
-    backgroundColor: '#1D4ED8',
-    borderRadius: 12,
-    justifyContent: 'center',
-    marginTop: 14,
-    minHeight: 52,
-  },
-  primaryButtonDisabled: { backgroundColor: '#94A3B8' },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
-  error: { color: '#991B1B', fontSize: 14, marginTop: 10, textAlign: 'center' },
-  toast: {
-    color: '#065F46',
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  policyLink: { color: '#1D4ED8', fontSize: 13, marginVertical: 6, textAlign: 'center' },
-  placeholder: {
-    color: '#64748B',
-    fontSize: 12,
-    lineHeight: 18,
-    marginVertical: 8,
-    textAlign: 'center',
+    flexDirection: 'row',
   },
 });

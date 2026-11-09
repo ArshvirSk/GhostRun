@@ -111,6 +111,22 @@ This document tracks all physical device, multi-device, GPS, sensor, and human v
 | P-061 | UI-M5 | Map Boundary & Placements Gesture Conflict | On `/host/area`, pan and pinch-zoom the map across boundaries | Map moves smoothly with zero pan gesture conflict (no sheet overlay); tapping map sets placement pin | deferred |
 | P-062 | UI-M5 | Legacy Route Redirect Shims | Navigate to `/home`, `/create`, `/target/:id` | `/home` routes to `/play`; `/create` routes to `/host/mode`; `/target/:id` routes to `/lobby/:id` | deferred |
 
+---
+
+## UI-M6: Lobby, Tabs & You Device Checklist
+
+| ID | Milestone | Item to Check | How to Test | Expected Result | Status |
+|---|---|---|---|---|---|
+| P-063 | UI-M6 | Segmented Lobby Tab Switching | In active lobby, tap Roster, Rules & Intel, and Tactical Map | Seamless instant switching between segments without state resets or flickering | deferred |
+| P-064 | UI-M6 | Private Role Briefing Card | Open Rules & Intel in lobby with assigned role | Shows personal directives and objectives; never exposes opponent secrets; high-complexity role requires acknowledgement | deferred |
+| P-065 | UI-M6 | C3 Replay Sharing Modal Choice | Join lobby as fresh player | Prominent modal/card prompts for route sharing choice; ready button stays locked until choice selected | deferred |
+| P-066 | UI-M6 | Modes Library Filter Chips | On `/modes`, toggle Squad Size (Solo, Squad, Massive) and Complexity (Casual, Tactical, Hardcore) | Mode cards filter dynamically with smooth transitions; empty state provides reset button | deferred |
+| P-067 | UI-M6 | Mode Detail Screen & Host Routing | On `/modes/[id]`, review full rules dossier and tap "Host this Mode" | Navigates to `/host/rules` with target mode and compatible rules pre-selected | deferred |
+| P-068 | UI-M6 | You Tab Operative Profile Editor | On `/you`, tap Edit, change codename and radar color, tap Save Profile | Updates profile locally and remotely; header immediately reflects new callout chip | deferred |
+| P-069 | UI-M6 | Stats Grid & Match History | Play or load games in `/you` | Operational stats (rounds, won, win rate, best escape, farthest) render accurately in case file style | deferred |
+| P-070 | UI-M6 | Unit Calibration System Toggle | In `/settings`, switch between Metric (km/m) and Imperial (mi/ft) | Distances across lobby, boundary area, stats grid, and speed alerts convert instantaneously | deferred |
+| P-071 | UI-M6 | Audio, Haptics & Map Style Preferences | Toggle Night Radar style, audio cues, and haptic feedback in `/settings` | Preferences persist across app cold starts via AsyncStorage | deferred |
+
 
 
 

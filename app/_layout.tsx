@@ -8,7 +8,7 @@ import '../src/lib/location';
 export default function RootLayout() {
   return (
     <>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(onboarding)" />
@@ -18,6 +18,10 @@ export default function RootLayout() {
         <Stack.Screen name="auth" />
         <Stack.Screen name="privacy" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="how-to-play" />
+        <Stack.Screen name="safety" />
+        <Stack.Screen name="modes/[id]" />
+        <Stack.Screen name="debug/hud-gallery" />
         <Stack.Screen name="home" />
         <Stack.Screen name="create" />
         <Stack.Screen name="join" />

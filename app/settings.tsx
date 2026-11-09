@@ -1,31 +1,102 @@
-import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system/legacy';
-import { useRouter } from 'expo-router';
-import * as Sharing from 'expo-sharing';
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
   View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Switch,
+  TextInput,
+  ActivityIndicator,
+  Linking,
 } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { useTheme } from '../src/theme/ThemeProvider';
+import { Text } from '../src/ui/Text';
+import { Card } from '../src/ui/Card';
+import { Chip } from '../src/ui/Chip';
+import { Button } from '../src/ui/Button';
 import { PRIVACY_CONTACT_EMAIL } from '../src/lib/privacy';
 import { supabase } from '../src/lib/supabase';
+import { useUnits } from '../src/utils/units';
 
 const DELETE_WORD = 'DELETE';
 
 export default function SettingsScreen() {
+  const { colors, spacing, radii } = useTheme();
   const router = useRouter();
+  const { unitSystem, setUnitSystem } = useUnits();
+
+  // Settings State
+  const [mapStyle, setMapStyle] = useState<'night' | 'standard'>('night');
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // Busy/Error states
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteWord, setDeleteWord] = useState('');
+
+  useEffect(() => {
+    async function loadPreferences() {
+      try {
+        const [storedMap, storedAudio, storedHaptics] = await Promise.all([
+          AsyncStorage.getItem('@ghostrun:map_style'),
+          AsyncStorage.getItem('@ghostrun:audio_enabled'),
+          AsyncStorage.getItem('@ghostrun:haptics_enabled'),
+        ]);
+
+        if (storedMap === 'standard' || storedMap === 'night') {
+          setMapStyle(storedMap);
+        }
+        if (storedAudio !== null) setAudioEnabled(storedAudio !== 'false');
+        if (storedHaptics !== null) setHapticsEnabled(storedHaptics !== 'false');
+
+        if (supabase) {
+          const { data } = await supabase.auth.getUser();
+          if (data.user?.email) setUserEmail(data.user.email);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    void loadPreferences();
+  }, []);
+
+  const toggleMapStyle = async (val: boolean) => {
+    const next = val ? 'night' : 'standard';
+    setMapStyle(next);
+    await AsyncStorage.setItem('@ghostrun:map_style', next);
+  };
+
+  const toggleAudio = async (val: boolean) => {
+    setAudioEnabled(val);
+    await AsyncStorage.setItem('@ghostrun:audio_enabled', String(val));
+  };
+
+  const toggleHaptics = async (val: boolean) => {
+    setHapticsEnabled(val);
+    await AsyncStorage.setItem('@ghostrun:haptics_enabled', String(val));
+  };
+
+  const handleSignOut = async () => {
+    if (!supabase) return;
+    setBusy('signout');
+    try {
+      await supabase.auth.signOut();
+      router.replace('/auth');
+    } catch {
+      // ignore
+    } finally {
+      setBusy('');
+    }
+  };
 
   async function exportData() {
     if (!supabase) return;
@@ -47,7 +118,7 @@ export default function SettingsScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(path, {
           mimeType: 'application/json',
-          dialogTitle: 'GhostRun data export',
+          dialogTitle: 'GhostRun tactical data export',
         });
       } else {
         setNotice(`Export saved to ${path}`);
@@ -73,8 +144,6 @@ export default function SettingsScreen() {
         data && typeof data === 'object' && (data as { account_removed?: boolean }).account_removed,
       );
 
-      // Clear local data but keep the onboarding flag so a returning install
-      // does not replay the tutorial.
       const keys = await AsyncStorage.getAllKeys();
       const removable = keys.filter((key) => key !== '@ghostrun:onboarded');
       if (removable.length > 0) await AsyncStorage.multiRemove(removable);
@@ -92,203 +161,342 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.screen}>
-      <Pressable
-        accessibilityLabel="Back"
-        accessibilityRole="button"
-        onPress={() => router.back()}
-        style={styles.backRow}
-      >
-        <Ionicons color="#1D4ED8" name="chevron-back" size={20} />
-        <Text style={styles.backText}>Back</Text>
-      </Pressable>
-
-      <Text style={styles.title}>Settings</Text>
-
-      <View style={styles.card}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push('/privacy' as any)}
-          style={styles.row}
+          accessibilityLabel="Back"
+          onPress={() => router.back()}
+          style={styles.backRow}
         >
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Privacy</Text>
-            <Text style={styles.rowSub}>Your choices, what we store, and why</Text>
-          </View>
-          <Ionicons color="#94A3B8" name="chevron-forward" size={18} />
+          <Ionicons name="arrow-back" size={22} color={colors.primary} />
+          <Text variant="label" style={{ color: colors.primary, marginLeft: spacing.xs }}>
+            BACK
+          </Text>
         </Pressable>
-      </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardEyebrow}>YOUR DATA</Text>
-        <Pressable
-          accessibilityRole="button"
-          disabled={busy !== ''}
-          onPress={() => void exportData()}
-          style={styles.row}
-        >
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Export my data</Text>
-            <Text style={styles.rowSub}>Profile, choices, games and your own routes as JSON</Text>
-          </View>
-          {busy === 'export' ? (
-            <ActivityIndicator color="#1D4ED8" size="small" />
-          ) : (
-            <Ionicons color="#94A3B8" name="download-outline" size={18} />
-          )}
-        </Pressable>
-        <Text style={styles.contact}>Questions: {PRIVACY_CONTACT_EMAIL}</Text>
-      </View>
-
-      <View style={styles.dangerCard}>
-        <Text style={styles.dangerTitle}>Delete account and data</Text>
-        <Text style={styles.dangerBody}>
-          This removes your profile, your route history and your choices, and signs you out. Shared
-          recaps other players already saved (for example screenshots) cannot be recalled.
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.md }}>
+          SETTINGS
         </Text>
-        {!confirmingDelete ? (
+        <Text variant="body" style={{ color: colors.textMuted, marginTop: 4, marginBottom: spacing.lg }}>
+          Tactical display, unit calibration, audio telemetry, and operative data management.
+        </Text>
+
+        {/* Display & Map Style */}
+        <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
+          TACTICAL DISPLAY
+        </Text>
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
+          <View style={styles.settingRow}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Night Radar Map Style
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Dark canvas is easier on the eyes and harder to spot in low-light operations.
+              </Text>
+            </View>
+            <Switch
+              value={mapStyle === 'night'}
+              onValueChange={toggleMapStyle}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+        </Card>
+
+        {/* Units System */}
+        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
+          MEASUREMENT UNITS
+        </Text>
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
+          <View style={styles.settingRow}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Distance Calibration
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Applied to boundary radius, tag distance, and radar sweep telemetry.
+              </Text>
+            </View>
+            <View style={styles.chipToggle}>
+              <Chip
+                label="METRIC (m/km)"
+                variant={unitSystem === 'metric' ? 'accent' : 'muted'}
+                size="sm"
+                onPress={() => void setUnitSystem('metric')}
+              />
+              <Chip
+                label="IMPERIAL (ft/mi)"
+                variant={unitSystem === 'imperial' ? 'accent' : 'muted'}
+                size="sm"
+                onPress={() => void setUnitSystem('imperial')}
+              />
+            </View>
+          </View>
+        </Card>
+
+        {/* Audio & Haptics */}
+        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
+          TACTICAL TELEMETRY
+        </Text>
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, padding: 0 }]}>
+          <View style={[styles.settingRow, { padding: spacing.md }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Audio Cues
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Pings, countdown ticks, and warning alarms.
+              </Text>
+            </View>
+            <Switch
+              value={audioEnabled}
+              onValueChange={toggleAudio}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Haptic Feedback
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Vibration pulses on proximity heat and radar arrivals.
+              </Text>
+            </View>
+            <Switch
+              value={hapticsEnabled}
+              onValueChange={toggleHaptics}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+        </Card>
+
+        {/* Battery & Background Location Advice */}
+        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
+          HARDWARE & BATTERY
+        </Text>
+        <Card variant="elevated" style={[styles.card, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}>
+          <View style={styles.alertHeader}>
+            <MaterialCommunityIcons name="battery-charging-high" size={20} color={colors.radarScan} />
+            <Text variant="label" style={{ color: colors.radarScan, marginLeft: spacing.xs }}>
+              BATTERY OPTIMIZATION NOTICE
+            </Text>
+          </View>
+          <Text variant="body" style={{ color: colors.textMuted, marginTop: spacing.xs, fontSize: 13, lineHeight: 18 }}>
+            GhostRun uploads GPS updates while running in the background. If your phone enters deep sleep, fixes may stall. For best results, exclude GhostRun from aggressive OS battery savers.
+          </Text>
+        </Card>
+
+        {/* Privacy & Account */}
+        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
+          PRIVACY & ACCOUNT
+        </Text>
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, padding: 0 }]}>
           <Pressable
             accessibilityRole="button"
-            onPress={() => {
-              setConfirmingDelete(true);
-              setError('');
-            }}
-            style={styles.dangerButton}
+            onPress={() => router.push('/privacy' as any)}
+            style={[styles.settingRow, { padding: spacing.md }]}
           >
-            <Text style={styles.dangerButtonText}>Delete account</Text>
-          </Pressable>
-        ) : (
-          <>
-            <Text style={styles.confirmLabel}>Type {DELETE_WORD} to confirm</Text>
-            <TextInput
-              autoCapitalize="characters"
-              autoCorrect={false}
-              onChangeText={setDeleteWord}
-              placeholder={DELETE_WORD}
-              placeholderTextColor="#94A3B8"
-              style={styles.confirmInput}
-              value={deleteWord}
-            />
-            <View style={styles.confirmRow}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={busy === 'delete'}
-                onPress={() => {
-                  setConfirmingDelete(false);
-                  setDeleteWord('');
-                }}
-                style={styles.cancelButton}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                disabled={deleteWord.trim().toUpperCase() !== DELETE_WORD || busy === 'delete'}
-                onPress={() => void deleteAccount()}
-                style={[
-                  styles.dangerButton,
-                  styles.confirmDelete,
-                  deleteWord.trim().toUpperCase() !== DELETE_WORD && styles.dangerButtonDisabled,
-                ]}
-              >
-                {busy === 'delete' ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.dangerButtonText}>Delete forever</Text>
-                )}
-              </Pressable>
+            <View style={{ flex: 1 }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Privacy & Data Management
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Your choices, location retention, and ghost contributions.
+              </Text>
             </View>
-          </>
-        )}
-      </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
 
-      {notice !== '' && <Text style={styles.notice}>{notice}</Text>}
-      {error !== '' && (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {error}
-        </Text>
-      )}
-    </ScrollView>
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy !== ''}
+            onPress={() => void exportData()}
+            style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Export My Data
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Export profile, route logs, and consent history as JSON.
+              </Text>
+            </View>
+            {busy === 'export' ? (
+              <ActivityIndicator color={colors.primary} size="small" />
+            ) : (
+              <MaterialCommunityIcons name="download-outline" size={20} color={colors.textMuted} />
+            )}
+          </Pressable>
+        </Card>
+
+        {/* Sign Out & Session */}
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}>
+          <View style={styles.settingRow}>
+            <View style={{ flex: 1 }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 15 }}>
+                Signed in as
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                {userEmail || 'Authenticated Operative'}
+              </Text>
+            </View>
+            <Button
+              title={busy === 'signout' ? 'Signing out...' : 'Sign Out'}
+              variant="secondary"
+              size="sm"
+              onPress={() => void handleSignOut()}
+            />
+          </View>
+        </Card>
+
+        {/* Danger Zone */}
+        <Card
+          variant="elevated"
+          style={[
+            styles.card,
+            { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder, marginTop: spacing.xl },
+          ]}
+        >
+          <Text variant="title" style={{ color: colors.dangerText, fontSize: 16 }}>
+            Delete Account and Data
+          </Text>
+          <Text variant="caption" style={{ color: colors.dangerText, marginTop: 4, lineHeight: 18 }}>
+            Permanently purges your operative profile, personal trail points, and anonymous ghost paths. This action cannot be undone.
+          </Text>
+
+          {!confirmingDelete ? (
+            <Button
+              title="Delete Account"
+              variant="danger"
+              size="sm"
+              style={{ marginTop: spacing.md }}
+              onPress={() => setConfirmingDelete(true)}
+            />
+          ) : (
+            <View style={{ marginTop: spacing.md }}>
+              <Text variant="label" style={{ color: colors.dangerText }}>
+                Type {DELETE_WORD} to confirm permanent deletion:
+              </Text>
+              <TextInput
+                value={deleteWord}
+                onChangeText={setDeleteWord}
+                autoCapitalize="characters"
+                placeholder={DELETE_WORD}
+                placeholderTextColor={colors.dangerBorder}
+                style={[
+                  styles.confirmInput,
+                  {
+                    backgroundColor: colors.surface,
+                    color: colors.text,
+                    borderColor: colors.dangerBorder,
+                    borderRadius: radii.sm,
+                  },
+                ]}
+              />
+              <View style={styles.confirmRow}>
+                <Button
+                  title="Cancel"
+                  variant="secondary"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  onPress={() => {
+                    setConfirmingDelete(false);
+                    setDeleteWord('');
+                  }}
+                />
+                <Button
+                  title={busy === 'delete' ? 'Deleting...' : 'Delete Forever'}
+                  variant="danger"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  disabled={deleteWord.trim().toUpperCase() !== DELETE_WORD || busy === 'delete'}
+                  onPress={() => void deleteAccount()}
+                />
+              </View>
+            </View>
+          )}
+        </Card>
+
+        {notice !== '' && (
+          <Text variant="body" style={{ color: colors.primary, marginTop: spacing.md, textAlign: 'center' }}>
+            {notice}
+          </Text>
+        )}
+        {error !== '' && (
+          <Text variant="body" style={{ color: colors.danger, marginTop: spacing.md, textAlign: 'center' }}>
+            {error}
+          </Text>
+        )}
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Pressable
+            onPress={() => void Linking.openURL(`mailto:${PRIVACY_CONTACT_EMAIL}`)}
+            style={{ marginBottom: 4 }}
+          >
+            <Text variant="caption" style={{ color: colors.textMuted }}>
+              Questions & Security: {PRIVACY_CONTACT_EMAIL}
+            </Text>
+          </Pressable>
+          <Text variant="mono" style={{ color: colors.textSubtle, fontSize: 11 }}>
+            GhostRun v2.5.0 · Operative Release
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#E2E8F0', padding: 18, paddingBottom: 48 },
-  backRow: { alignItems: 'center', flexDirection: 'row', marginTop: 8 },
-  backText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
-  title: { color: '#0F172A', fontSize: 28, fontWeight: '900', marginBottom: 16, marginTop: 12 },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    elevation: 2,
-    marginBottom: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-  },
-  cardEyebrow: {
-    color: '#1D4ED8',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginTop: 8,
-  },
-  row: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    minHeight: 64,
-  },
-  rowText: { flex: 1, paddingRight: 12 },
-  rowTitle: { color: '#0F172A', fontSize: 16, fontWeight: '700' },
-  rowSub: { color: '#64748B', fontSize: 13, lineHeight: 18, marginTop: 2 },
-  contact: { color: '#64748B', fontSize: 12, paddingBottom: 10 },
-  dangerCard: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-  },
-  dangerTitle: { color: '#991B1B', fontSize: 16, fontWeight: '800' },
-  dangerBody: { color: '#7F1D1D', fontSize: 13, lineHeight: 19, marginTop: 6 },
-  dangerButton: {
-    alignItems: 'center',
-    backgroundColor: '#DC2626',
-    borderRadius: 12,
-    justifyContent: 'center',
-    marginTop: 14,
-    minHeight: 48,
-    paddingHorizontal: 18,
-  },
-  dangerButtonDisabled: { backgroundColor: '#FCA5A5' },
-  dangerButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-  confirmLabel: { color: '#991B1B', fontSize: 13, fontWeight: '700', marginTop: 14 },
-  confirmInput: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FCA5A5',
-    borderRadius: 10,
-    borderWidth: 1,
-    color: '#0F172A',
-    fontSize: 16,
-    marginTop: 8,
-    minHeight: 48,
-    paddingHorizontal: 14,
-  },
-  confirmRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  cancelButton: {
-    alignItems: 'center',
-    borderColor: '#FCA5A5',
-    borderRadius: 12,
-    borderWidth: 1,
+  container: {
     flex: 1,
-    justifyContent: 'center',
-    minHeight: 48,
   },
-  cancelButtonText: { color: '#991B1B', fontSize: 15, fontWeight: '700' },
-  confirmDelete: { flex: 2, marginTop: 0 },
-  notice: { color: '#065F46', fontSize: 14, marginTop: 14, textAlign: 'center' },
-  error: { color: '#991B1B', fontSize: 14, marginTop: 14, textAlign: 'center' },
+  content: {
+    paddingBottom: 48,
+  },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  card: {
+    padding: 16,
+    borderWidth: 1,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  chipToggle: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  alertHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  confirmInput: {
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    fontSize: 15,
+  },
+  confirmRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: 32,
+    paddingVertical: 12,
+  },
 });
