@@ -31,6 +31,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - 10 automated test suites passing: `typecheck`, `lint`, `test:routes` (57 checks), `test:wizard` (16 checks), `test:registry` (45 checks), `test:tour` (8 beats), `test:cooldown` (13 checks), `profile:hud`, `rls`, and `sim`.
   - Android Hermes bytecode compilation verified (1,591 modules).
   - Comprehensive mode authoring guide authored: `docs/ADDING_A_MODE.md`.
+- **Release Artifact:**
+  - `release/GhostRun-v2.6.0.apk` (173,840,696 bytes, SHA-256: `E54233679174F6763701A80234B496E0B3EA009B8228E8C89CE4CC57CA8A9DDC`)
+  - Android `versionCode 6` | `versionName "2.6.0"` | Keystore: `android/app/debug.keystore`
 
 
 
