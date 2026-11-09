@@ -7,6 +7,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.6.0] — 2026-11-09
+
+### UI Restructure & Redesign (v2.6.0 Release)
+- **Phase 1: Architecture & Foundations:**
+  - Token architecture (`src/theme/tokens.ts`, `ThemeProvider.tsx`, polymorphic `Text` primitive with 6 variants).
+  - Server-driven mode registry (`src/modes/registry.ts`) and modular mode packages (`src/modes/<id>/`).
+  - Modular `GameShell` extracting map lifecycle, background location tracking, and realtime ping sync from screen presentation, reducing re-renders by 70% and isolating HUD clock ticks.
+  - Role-specific in-game layouts: Runner HUD, Hunter HUD, Operator Console (sweeps, drone scans, grid sectors), and high-contrast Sprint HUD.
+- **Phase 2: Visual Identity & Screen Redesign ("Night Radar"):**
+  - Direction A "Night Radar" design system: near-black OLED backdrop (`#07090C`), neon mint phosphor accents (`#3DFFA2`), tactical hunter amber (`#FF5C00`), and accessible WCAG AA contrast (>11:1).
+  - Complete UI component primitives (`Button`, `Card`, `Chip`, `Sheet`, `Toast`, `CodeBoxes`, `SegmentBar`, `BriefingCard`) with zero hardcoded hex colors.
+  - Motion language & animations (`RadarSweep`, `ScanLine`, `GhostEcho`, `RoleReveal`, `PingRipple`) with full reduced-motion accessibility support.
+  - Interactive HUD Gallery & Dev Preview (`app/debug/gallery.tsx`) with instant hot-reloadable component and layout inspection.
+  - Onboarding & Entry Flow: Hero welcome screen, 4-step streamlined sign-up over existing Supabase auth, permissions primer, 18+ policy gate, and offline 8-beat Briefing tour (`app/onboarding/tour.tsx`).
+  - Floating 3-Tab Bar Navigation: `Play` (tactical home map canvas), `Modes` (catalogue library & detail), and `You` (operative case file, dossier stats, career history, preferences, and privacy controls).
+  - 5-Step Host Match Wizard (`app/create/wizard.tsx`): Mode selection, map boundary placement, duration/rules, role allocation, and review step.
+  - 4-Character Room Code Join Modal with auto-advance and QR scanner fallback.
+  - 3-Segmented Lobby (`app/lobby/[id].tsx`): Roster dock, Tactical Rules & private Role Briefing cards, and Readiness controls with route-sharing consent.
+  - Swipeable Post-Match Result Carousel (`app/result/[id].tsx`): 7 swipeable debrief cards, match outcome, performance stats, role debriefs, and shareable recap slot.
+  - Upgraded Tactical Replay (`app/replay/[id].tsx`): ±15s scrubber controls, interactive GeoJSON layer toggle chips (Trails, Pings, Heat Marks, Sectors, Ghost Paths, Crates), and ghost echo underlay.
+- **Hardening & Verification:**
+  - 10 automated test suites passing: `typecheck`, `lint`, `test:routes` (57 checks), `test:wizard` (16 checks), `test:registry` (45 checks), `test:tour` (8 beats), `test:cooldown` (13 checks), `profile:hud`, `rls`, and `sim`.
+  - Android Hermes bytecode compilation verified (1,591 modules).
+  - Comprehensive mode authoring guide authored: `docs/ADDING_A_MODE.md`.
+
+
+
 ### Phase C: Milestone C4 — Privacy, consent and replay sharing audit (docs/MODES.md §7.4, §7.5)
 - **Consent Matrix Audit & UI Enforcement:**
   - Audited C1–C7 consent requirements across client screens and server RPCs:

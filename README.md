@@ -4,8 +4,8 @@
 
 ![GhostRun](banner.png)
 
-[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.5.0)
-[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.5.0)
+[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.6.0)
+[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.6.0)
 [![Expo SDK](https://img.shields.io/badge/Expo-v58.0-000000.svg)](https://expo.dev)
 [![React Native](https://img.shields.io/badge/React%20Native-0.88-61DAFB.svg)](https://reactnative.dev)
 [![Supabase](https://img.shields.io/badge/Backend-Supabase%20PostGIS-3ECF8E.svg)](https://supabase.com)
@@ -24,7 +24,7 @@
 ---
 
 ## 📑 Table of Contents
-- [📱 Navigation & Screen Restructure (v2.5.0)](#-navigation--screen-restructure-v250)
+- [📱 Navigation & Screen Restructure (v2.6.0)](#-navigation--screen-restructure-v260)
 - [🎨 Design System: "Night Radar"](#-design-system-night-radar)
 - [🎮 Game Modes](#-game-modes)
 - [🎛️ Modifiers (Stackable Match Dynamics)](#️-modifiers-stackable-match-dynamics)
@@ -46,9 +46,9 @@
 
 ---
 
-## 📱 Navigation & Screen Restructure (v2.5.0)
+## 📱 Navigation & Screen Restructure (v2.6.0)
 
-GhostRun v2.5.0 introduces an overhaul of the entire application architecture according to `docs/UI_RESTRUCTURE.md`:
+GhostRun v2.6.0 introduces an overhaul of the entire application architecture according to `docs/UI_RESTRUCTURE.md`:
 
 ```mermaid
 graph TD
@@ -72,7 +72,7 @@ graph TD
     Result --> Replay["Tactical Replay (/replay/:id - +-15s Controls)"]
 ```
 
-### Highlights of the v2.5.0 Architecture:
+### Highlights of the v2.6.0 Architecture:
 1. **Floating 3-Tab Bar (`app/(tabs)/`):**
    - **Play (`/play`):** Live map canvas, current match card, host game shortcut, and room code entry modal.
    - **Modes (`/modes`):** Interactive tactical modes library detailing base modes, modifiers, and roles.

@@ -1,6 +1,6 @@
 # Developer Guide: Adding a Mode, Modifier, or Role to GhostRun
 
-This document specifies the standard end-to-end procedure for engineering and integrating new game modes, stackable modifiers, and specialized roles in **GhostRun** (v2.5.0+).
+This document specifies the standard end-to-end procedure for engineering and integrating new game modes, stackable modifiers, and specialized roles in **GhostRun** (v2.6.0+).
 
 ---
 
