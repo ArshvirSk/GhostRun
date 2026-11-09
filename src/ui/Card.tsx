@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, View, ViewProps, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, View, ViewProps, ViewStyle } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { triggerHaptic } from '../motion/haptics';
 
@@ -10,7 +10,7 @@ export interface CardProps extends ViewProps {
   variant?: CardVariant;
   padding?: CardPadding;
   onPress?: () => void;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }
 

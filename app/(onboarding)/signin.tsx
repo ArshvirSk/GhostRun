@@ -71,7 +71,7 @@ export default function SigninScreen() {
     if (acknowledgedVersion < PRIVACY_VERSION) {
       router.replace('/signup/before-you-play' as any);
     } else {
-      router.replace('/home');
+      router.replace('/play' as any);
     }
   };
 

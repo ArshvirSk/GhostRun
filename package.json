@@ -12,6 +12,7 @@
     "test:cooldown": "node --env-file=.env --import tsx scripts/test-resend-cooldown.ts",
     "test:registry": "node --env-file=.env --import tsx scripts/registry-drift.ts",
     "test:tour": "node --import tsx scripts/test-tour-engine.ts",
+    "test:wizard": "node --import tsx scripts/test-wizard-payload.ts",
     "profile:hud": "node --env-file=.env --import tsx scripts/profile-hud-renders.ts",
     "sim": "node --env-file=.env --import tsx scripts/sim/index.ts",
     "rls": "node --env-file=.env --import tsx scripts/rls-check.ts"

@@ -102,7 +102,7 @@ export default function SplashScreen() {
       router.replace(
         acknowledgedVersion < PRIVACY_VERSION
           ? ('/signup/before-you-play' as any)
-          : '/home',
+          : ('/play' as any),
       );
     } catch (err) {
       setHasError(true);

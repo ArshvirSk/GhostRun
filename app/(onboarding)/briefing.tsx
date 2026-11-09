@@ -11,11 +11,11 @@ export default function BriefingScreen() {
   const router = useRouter();
 
   const handleFinish = () => {
-    router.replace('/home' as any);
+    router.replace('/play' as any);
   };
 
   const handleSkip = () => {
-    router.replace('/home' as any);
+    router.replace('/play' as any);
   };
 
   return (

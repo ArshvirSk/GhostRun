@@ -96,6 +96,22 @@ This document tracks all physical device, multi-device, GPS, sensor, and human v
 | P-053 | UI-M4 | Offline Briefing Tour Playthrough | Complete setup or tap "Preview Briefing Tour" on `/welcome` | Offline scripted round plays through all 8 beats with story segment progress; Done routes to `/home` | deferred |
 | P-054 | UI-M4 | Legacy Route Redirect Shims | Navigate to `/auth` and `/onboarding` manually via deep link | `/auth` redirects cleanly to `/signin`; `/onboarding` redirects cleanly to `/welcome` | deferred |
 
+---
+
+## UI-M5: Home, Join & Host Wizard Device Checklist
+
+| ID | Milestone | Item to Check | How to Test | Expected Result | Status |
+|---|---|---|---|---|---|
+| P-055 | UI-M5 | Play Tab Ambient Sweep & Codename Greeting | Launch `/play` on device | Radar sweep renders at 60fps in background; codename header and quick actions display cleanly | deferred |
+| P-056 | UI-M5 | Active Game Resume Pill | Join a game, press back to Home, view `/play` | Pulsing accent resume card appears with room code and status; tapping returns to match | deferred |
+| P-057 | UI-M5 | Join Code Boxes Touch Interaction | On `/join`, type 4-character room code on mobile keyboard | Inputs auto-advance, backspace retreats, paste fills 4 boxes, button activates when 4 chars filled | deferred |
+| P-058 | UI-M5 | Join Error Shake & Haptic Feedback | On `/join`, submit an invalid or non-existent 4-character code | Code boxes shake horizontally, error haptic triggers, red alert card displays error message | deferred |
+| P-059 | UI-M5 | Deep Link Join Code Prefill | Open deep link `ghost-run://join?code=TEST` in mobile browser | App opens `/join` with code boxes pre-populated with "TEST" | deferred |
+| P-060 | UI-M5 | Host Wizard Draft Preservation | Navigate through `/host/mode` -> `rules` -> `extras` -> `area`, press back arrow | All selections (mode, preset, params, roles, modifiers, radius) are preserved without data loss | deferred |
+| P-061 | UI-M5 | Map Boundary & Placements Gesture Conflict | On `/host/area`, pan and pinch-zoom the map across boundaries | Map moves smoothly with zero pan gesture conflict (no sheet overlay); tapping map sets placement pin | deferred |
+| P-062 | UI-M5 | Legacy Route Redirect Shims | Navigate to `/home`, `/create`, `/target/:id` | `/home` routes to `/play`; `/create` routes to `/host/mode`; `/target/:id` routes to `/lobby/:id` | deferred |
+
+
 
 
 
