@@ -37,16 +37,20 @@ export const colors = {
   accent: '#3DFFA2',
   runner: '#3DFFA2',
   hunter: '#FF5C00',
+  hunterHover: '#E05200',
+  hunterText: '#1F0B00',
   warning: '#FFB020',
 
   // Feedback & Tactical
   success: '#3DFFA2',
   successText: '#052917',
   danger: '#FF4D3D',
+  dangerHover: '#E03D2E',
   dangerText: '#FFE5E3',
   dangerSurface: '#240C0B',
   dangerBorder: '#5C1D1A',
   dangerDisabled: '#3D1513',
+  shadow: '#000000',
 
   // Tactical Overlays (Hot & Cold, Radar, Echo)
   heatHot: '#FF4D3D',

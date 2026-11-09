@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
-import { motion } from '../theme/tokens';
+import { colors, motion } from '../theme/tokens';
 import { Text } from './Text';
 
 export type ToastType = 'info' | 'warning' | 'danger' | 'success';
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginHorizontal: 16,
     marginVertical: 4,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,

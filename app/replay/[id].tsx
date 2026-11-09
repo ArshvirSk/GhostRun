@@ -317,7 +317,6 @@ export default function ReplayScreen() {
     if (!gameId) return;
     if (!supabase) {
       setErrorMessage('Supabase is not configured in this build.');
-      setLoading(false);
       return;
     }
 
@@ -325,7 +324,6 @@ export default function ReplayScreen() {
     if (!mountedRef.current) return;
     if (stateResult.error) {
       setErrorMessage(stateResult.error.message);
-      setLoading(false);
       return;
     }
 
@@ -334,7 +332,6 @@ export default function ReplayScreen() {
     setErrorMessage('');
 
     if (snapshot.game.status !== 'ended') {
-      setLoading(false);
       return;
     }
 
@@ -355,7 +352,6 @@ export default function ReplayScreen() {
       setReplay(replayResult.data as ReplayData);
       setReplayError('');
     }
-    setLoading(false);
   }, [gameId]);
 
   useEffect(() => {

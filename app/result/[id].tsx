@@ -253,7 +253,6 @@ export default function ResultScreen() {
     setErrorMessage('');
 
     if (snapshot.game.status !== 'ended') {
-      setLoadingTrails(false);
       return;
     }
 
@@ -261,7 +260,6 @@ export default function ResultScreen() {
       snapshot.game.mode === 'ghost_duel' ||
       (snapshot.game as unknown as { mode_id?: string }).mode_id === 'ghost_duel';
 
-    setLoadingTrails(true);
     const [trailRes, statsRes, ghostRes, consentsRes] = await Promise.all([
       supabase.rpc('get_game_trails', { game_id: gameId }),
       supabase.rpc('get_game_stats', { game_id: gameId }),
@@ -280,11 +278,8 @@ export default function ResultScreen() {
       }
     }
 
-    if (trailRes.error) {
-      setTrailError(trailRes.error.message);
-    } else {
+    if (!trailRes.error && trailRes.data) {
       setTrails((trailRes.data as TrailPoint[] | null) ?? []);
-      setTrailError('');
     }
 
     if (!statsRes.error && statsRes.data) {
@@ -306,8 +301,6 @@ export default function ResultScreen() {
         setGhostScore(scoreRow as GhostDuelScore);
       }
     }
-
-    setLoadingTrails(false);
   }, [gameId]);
 
   async function handleContributeGhost() {

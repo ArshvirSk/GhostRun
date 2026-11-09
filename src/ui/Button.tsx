@@ -56,14 +56,14 @@ export function Button({
         bg = pressed ? colors.primaryHover : colors.primary;
         break;
       case 'hunter':
-        bg = pressed ? '#E05200' : colors.hunter;
+        bg = pressed ? colors.hunterHover : colors.hunter;
         break;
       case 'secondary':
         bg = pressed ? colors.surfaceMuted : colors.surfaceElevated;
         border = colors.borderDark;
         break;
       case 'danger':
-        bg = pressed ? '#E03D2E' : colors.danger;
+        bg = pressed ? colors.dangerHover : colors.danger;
         break;
       case 'ghost':
         bg = pressed ? colors.primaryLight : 'transparent';
@@ -107,7 +107,7 @@ export function Button({
       case 'primary':
         return colors.successText; // Dark tactical text on neon mint
       case 'hunter':
-        return '#1F0B00'; // Dark text on amber
+        return colors.hunterText; // Dark text on amber
       case 'danger':
         return colors.dangerText;
       case 'ghost':

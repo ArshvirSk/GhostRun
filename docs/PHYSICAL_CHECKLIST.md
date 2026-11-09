@@ -127,6 +127,32 @@ This document tracks all physical device, multi-device, GPS, sensor, and human v
 | P-070 | UI-M6 | Unit Calibration System Toggle | In `/settings`, switch between Metric (km/m) and Imperial (mi/ft) | Distances across lobby, boundary area, stats grid, and speed alerts convert instantaneously | deferred |
 | P-071 | UI-M6 | Audio, Haptics & Map Style Preferences | Toggle Night Radar style, audio cues, and haptic feedback in `/settings` | Preferences persist across app cold starts via AsyncStorage | deferred |
 
+---
+
+## UI-M7: Result, Replay & Gallery Device Checklist
+
+| ID | Milestone | Item to Check | How to Test | Expected Result | Status |
+|---|---|---|---|---|---|
+| P-072 | UI-M7 | Result Swipeable Cards Carousel | Finish match, swipe horizontally across dossier cards | Smooth 60fps card transitions; pagination dots track active card 1 through 7 | deferred |
+| P-073 | UI-M7 | Ghost Echo Glow Layer on Result Map | Inspect runner trails on post-game map | Glowing purple underlay line renders beneath runner trail; closest call marker visible | deferred |
+| P-074 | UI-M7 | Replay ±15s Skip Controls | In `/replay/[id]`, tap -15s and +15s buttons | Scrubber jumps exactly 15 seconds backward/forward; map entities and playhead update synchronously | deferred |
+| P-075 | UI-M7 | Tactical Layer Toggles | In replay, toggle Trails, Pings, Heat, Sectors, Drops chips | Map layers toggle visibility dynamically without re-querying Supabase | deferred |
+| P-076 | UI-M7 | Shareable Recap Card Slot | On Result Card 6, tap "Share Mission Recap" | Displays branded recap card preview with Phase D image generation slot notice | deferred |
+| P-077 | UI-M7 | Rematch Flow | On Result Card 7, tap "Play Again" | Calls `rematch_game`, creates rematch lobby, preserves crew and sides, and redirects all players | deferred |
+
+---
+
+## UI-M8: Release-Candidate Verification & Field-Test Sheet
+
+| ID | Milestone | Item to Check | How to Test | Expected Result | Status |
+|---|---|---|---|---|---|
+| P-078 | UI-M8 | Production Cold Launch & Deep Linking | Install release APK, open `ghost-run://join?code=TEST` | App cold launches in <2s, directly opens `/join` with "TEST" pre-filled | deferred |
+| P-079 | UI-M8 | Direct Sunlight High-Contrast Legibility | Test Night Radar visual system outdoors under bright sunlight | Display, HUD metrics, timer, and action buttons clearly legible (WCAG AA compliant) | deferred |
+| P-080 | UI-M8 | Rapid Navigation Stress & Memory Stability | Rapidly cycle between Play, Modes, You, Wizard, and Replay | UI thread maintains 60fps; no memory leaks, unmounted component warnings, or crashes | deferred |
+| P-081 | UI-M8 | Full Live Field Match (Runners vs Hunters) | 2+ physical Android devices outdoors in public park | Scheduled radar pings release every interval; GPS fixes record; 15m tag registers cleanly | deferred |
+| P-082 | UI-M8 | Emergency SOS Physical Activation | During live match, tap SOS in top HUD | Location immediately broadcasts to all players; emergency dial triggers; game auto-pauses | deferred |
+| P-083 | UI-M8 | Vehicle Speed Warning Guard | Travel at >28.8 km/h (8 m/s) in car/transit for 10 seconds | Vehicle advisory warning banner appears; speed logged honestly without false unfair verdicts | deferred |
+
 
 
 
