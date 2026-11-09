@@ -25,7 +25,7 @@ export default function TabsLayout() {
           right: 20,
           borderRadius: radii.card,
           elevation: 12,
-          shadowColor: '#000000',
+          shadowColor: colors.backgroundDark,
           shadowOffset: { width: 0, height: 6 },
           shadowOpacity: 0.4,
           shadowRadius: 12,
