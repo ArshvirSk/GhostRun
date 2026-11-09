@@ -36,7 +36,8 @@
 | 2026-11-09 | UI-M6 | Lobby, tabs and You (3-segment lobby, role briefing card, Modes library, You profile & stats, Settings & Privacy redesign) | verified | approved |
 | 2026-11-09 | UI-M7 | Result, replay and gallery completion (swipeable recap cards, ±15s replay skip, ghost echo, gallery completion, token coverage) | verified | approved |
 | 2026-11-09 | UI-M8 | Hardening and release candidate (redirects & deep links test, a11y pass, docs/ADDING_A_MODE.md, README update, release checklist) | verified | approved |
-| 2026-11-10 | UI-M0 | UI Audit and baseline refresh (Afterimage direction, light/dark constraints, updated baseline captures, U-D1 to U-D13) | verified | pending |
+| 2026-11-10 | UI-M0 | UI Audit and baseline refresh (Afterimage direction, light/dark constraints, updated baseline captures, U-D1 to U-D13) | verified | approved |
+| 2026-11-10 | UI-M1 | Token architecture, ThemeProvider, Text primitive, mode registry & modules, RulesCard, ParamField, dev preview, drift test | verified | pending |
 
 
 
