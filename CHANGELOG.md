@@ -7,6 +7,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.7.0] — 2026-11-10
+
+### Major UI Restructure & "Afterimage" Design System Release
+- **Afterimage Design System (Light / Dark / System):**
+  - Full implementation of the Afterimage visual system across all app chrome, HUD, controls, and bottom sheets.
+  - Complete light/dark semantic color tokens in `src/theme/tokens.ts` with strict WCAG AA/AAA contrast ratios.
+  - Dynamic `ThemeProvider` with OS color scheme tracking and persistent user preference in `@ghostrun:theme_preference`.
+  - Zero hardcoded hex colors across `src/ui`, `src/motion`, and `src/game-shell`.
+- **Onboarding & Entry Suite:**
+  - Modernized `app/(onboarding)/welcome.tsx` hero screen with radar sweep animation.
+  - 4-step sign-up flow (`/signup/name`, `/signup/account`, `/signup/code`, `/signup/before-you-play`) built over existing Supabase auth methods with 60s resend cooldown.
+  - Offline-first 8-beat tactical Briefing tour (`app/(onboarding)/briefing.tsx` & `src/tour/`) with 0 network calls and 0 location queries.
+  - Mandatory age confirmation gate adhering to 18+ policy.
+- **Home, Play & Host Wizard:**
+  - Redesigned Play tab with map canvas preview, room code entry launcher, and active match recovery.
+  - 4-character CodeBoxes join modal (`app/join.tsx`) with auto-advance, backspace navigation, error shake animation, and QR scanner.
+  - 5-step Host Wizard (`app/host/` — Mode, Rules, Extras, Area, Review) with zero pan gesture conflicts and verified snapshot RPC parity against `create_game`.
+- **Lobby, Navigation & Operative Dossier:**
+  - 3-segment Lobby (`ROSTER`, `RULES & INTEL`, `TACTICAL AREA`) with kicking management, remote operator toggles, and ready-up synchronization.
+  - Private `RoleBriefingCard` with mandatory briefing acknowledgement for high-complexity roles (VIP, Operator, Double Agent) while preserving secrecy.
+  - Modes Library (`app/(tabs)/modes.tsx`) with squad size and difficulty filters, enforcing the client deny list.
+  - Operative tab (`app/(tabs)/you.tsx`) with codename/palette customizer, case file stats, and match history.
+  - Settings and Privacy split with Metric/Imperial units calibration.
+- **Post-Game & Replay Polish:**
+  - Result screen transformed into a 7-card horizontal swipeable carousel (`app/result/[id].tsx`) including shareable recap card slot and rematch integration.
+  - Replay screen (`app/replay/[id].tsx`) enhanced with dedicated **±15s** skip buttons and Ghost Echo trail visualization layer.
+- **Backward-Compatible Route Shims:**
+  - Preserved redirects for legacy routes: `/home` -> `/play`, `/create` -> `/host/mode`, `/target/[id]` -> `/lobby/[id]`, `/auth` -> `/signin`, `/onboarding` -> `/welcome`.
+
+
 ## [2.6.1] — 2026-11-09
 
 ### Patch Fixes & Routing Stabilization
