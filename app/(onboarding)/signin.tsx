@@ -69,7 +69,7 @@ export default function SigninScreen() {
     setBusy(false);
     triggerHaptic('roleReveal');
     if (acknowledgedVersion < PRIVACY_VERSION) {
-      router.replace('/signup/before-you-play' as any);
+      router.replace('/privacy?mode=gate' as any);
     } else {
       router.replace('/play' as any);
     }

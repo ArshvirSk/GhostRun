@@ -57,15 +57,9 @@ export default function SplashScreen() {
         return;
       }
 
-      // If user hasn't seen onboarding, send them to welcome
-      if (onboardedVal !== 'true') {
+      // If user hasn't completed onboarding or has no active session, send them to welcome hero
+      if (onboardedVal !== 'true' || !sessionRes.data.session) {
         router.replace('/welcome' as any);
-        return;
-      }
-
-      // If no active session, send to sign-in
-      if (!sessionRes.data.session) {
-        router.replace('/signin' as any);
         return;
       }
 
@@ -88,7 +82,7 @@ export default function SplashScreen() {
         return;
       }
 
-      // Existing v1 players upgrade into the privacy gate: the policy must be
+      // Existing players upgrade into the privacy gate: the policy must be
       // acknowledged for the current version before Home is reachable.
       setStatusMessage('Checking permissions…');
       const { data: consents } = await supabase.rpc('get_my_consents');
@@ -101,7 +95,7 @@ export default function SplashScreen() {
       const acknowledgedVersion = ack?.granted ? (ack.policy_version ?? 0) : 0;
       router.replace(
         acknowledgedVersion < PRIVACY_VERSION
-          ? ('/signup/before-you-play' as any)
+          ? ('/privacy?mode=gate' as any)
           : ('/play' as any),
       );
     } catch (err) {

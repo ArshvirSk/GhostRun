@@ -4,8 +4,8 @@
 
 ![GhostRun](banner.png)
 
-[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.6.0)
-[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.6.0)
+[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.6.1)
+[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.6.1)
 [![Expo SDK](https://img.shields.io/badge/Expo-v58.0-000000.svg)](https://expo.dev)
 [![React Native](https://img.shields.io/badge/React%20Native-0.88-61DAFB.svg)](https://reactnative.dev)
 [![Supabase](https://img.shields.io/badge/Backend-Supabase%20PostGIS-3ECF8E.svg)](https://supabase.com)

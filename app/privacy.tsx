@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   Pressable,
@@ -131,6 +132,7 @@ export default function PrivacyScreen() {
       setActionError(error.message);
       return;
     }
+    await AsyncStorage.setItem('@ghostrun:onboarded', 'true');
     router.replace('/play' as any);
   }
 

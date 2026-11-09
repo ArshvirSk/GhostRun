@@ -103,25 +103,45 @@ export default function SignupBeforeYouPlayScreen() {
         return;
       }
 
-      // Upsert user profile
-      const effectiveName = name.trim() || 'Operative';
-      const effectiveColor = color || colors.palette[0];
-      const { error: profileError } = await client.rpc('upsert_profile', {
-        name: effectiveName,
-        color: effectiveColor,
-      });
+      // Upsert user profile if name is provided, or ensure profile exists
+      if (name.trim()) {
+        const effectiveName = name.trim();
+        const effectiveColor = color || colors.palette[0];
+        const { error: profileError } = await client.rpc('upsert_profile', {
+          name: effectiveName,
+          color: effectiveColor,
+        });
 
-      if (profileError) {
-        setErrorMessage(`Profile setup failed: ${profileError.message}`);
-        setSubmitting(false);
-        return;
+        if (profileError) {
+          setErrorMessage(`Profile setup failed: ${profileError.message}`);
+          setSubmitting(false);
+          return;
+        }
+      } else {
+        const { data: existingProfile } = await client
+          .from('profiles')
+          .select('id')
+          .eq('id', sessionData.session.user.id)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          const { error: profileError } = await client.rpc('upsert_profile', {
+            name: 'Operative',
+            color: color || colors.palette[0],
+          });
+          if (profileError) {
+            setErrorMessage(`Profile setup failed: ${profileError.message}`);
+            setSubmitting(false);
+            return;
+          }
+        }
       }
 
       // Record mandatory policy acknowledgement consent
       const { error: consentError } = await client.rpc('set_consent', {
         consent_type: 'policy_ack',
-        p_granted: true,
-        p_policy_version: PRIVACY_VERSION,
+        granted: true,
+        policy_version: PRIVACY_VERSION,
       });
 
       if (consentError) {

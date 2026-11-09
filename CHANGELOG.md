@@ -7,6 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.6.1] — 2026-11-09
+
+### Patch Fixes & Routing Stabilization
+- **Fixed Boot Routing & Policy Gate Redirection:**
+  - Resolved an issue in `app/index.tsx` and `app/(onboarding)/signin.tsx` where authenticated users with unacknowledged privacy policies were mistakenly redirected directly to step 4 of the new user sign-up flow (`/signup/before-you-play`).
+  - Corrected destination to the dedicated First-Run Privacy Gate (`/privacy?mode=gate`), preserving existing operative profiles.
+  - Ensured unauthenticated or fresh boot scenarios cleanly land on the Hero Welcome screen (`/welcome`).
+- **Fixed `set_consent` RPC Schema Cache Error:**
+  - Resolved `could not find function public.set_consent in the schema cache` in `app/(onboarding)/signup/before-you-play.tsx`.
+  - Realigned parameter names from `p_granted` and `p_policy_version` to canonical Postgres parameters `granted` and `policy_version`.
+  - Safeguarded `upsert_profile` during sign-up completion to prevent overwriting existing player codenames.
+- **Release Artifact:**
+  - `release/GhostRun-v2.6.1.apk` (173,841,508 bytes, SHA-256: `A2BECD174153A9C3FD93C8DA04C047C5E8AD15A442B5B7CD4178B18820A213BD`)
+  - Android `versionCode 7` | `versionName "2.6.1"` | Keystore: `android/app/debug.keystore`
+
+
+
 ## [2.6.0] — 2026-11-09
 
 ### UI Restructure & Redesign (v2.6.0 Release)
