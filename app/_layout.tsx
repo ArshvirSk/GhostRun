@@ -2,6 +2,7 @@ import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
 
 // Registers the background location task at startup, including a cold start
@@ -9,6 +10,20 @@ import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
 import '../src/lib/location';
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    'Archivo-Black': require('../assets/fonts/Archivo-Black.ttf'),
+    'Archivo-Bold': require('../assets/fonts/Archivo-Bold.ttf'),
+    'Archivo-SemiBold': require('../assets/fonts/Archivo-SemiBold.ttf'),
+    'Archivo-Regular': require('../assets/fonts/Archivo-Regular.ttf'),
+    'SegoeUI-Regular': require('../assets/fonts/SegoeUI-Regular.ttf'),
+    'SegoeUI-SemiBold': require('../assets/fonts/SegoeUI-SemiBold.ttf'),
+    'SegoeUI-Bold': require('../assets/fonts/SegoeUI-Bold.ttf'),
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>

@@ -2,7 +2,7 @@
   "expo": {
     "name": "GhostRun",
     "slug": "ghostrun",
-    "version": "2.7.2",
+    "version": "2.7.3",
     "orientation": "portrait",
     "scheme": "ghost-run",
     "icon": "./assets/icon.png",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.ghostrun.app",
-      "versionCode": 10,
+      "versionCode": 11,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
@@ -50,7 +50,8 @@
         {
           "cameraPermission": "GhostRun needs camera access to scan runner QR codes for QR Tagging."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

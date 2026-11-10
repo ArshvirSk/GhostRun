@@ -194,6 +194,16 @@ export const motion = {
 } as const;
 
 export const typography = {
+  fontFamilies: {
+    display: 'Archivo-Bold',
+    displayBlack: 'Archivo-Black',
+    displaySemi: 'Archivo-SemiBold',
+    displayRegular: 'Archivo-Regular',
+    body: 'SegoeUI-Regular',
+    bodySemi: 'SegoeUI-SemiBold',
+    bodyBold: 'SegoeUI-Bold',
+    mono: 'monospace',
+  },
   fontSizes: {
     caption: 11,
     sub: 13,

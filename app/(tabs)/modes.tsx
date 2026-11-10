@@ -55,10 +55,10 @@ export default function ModesTab() {
         ]}
       >
         <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs }}>
-          MODES LIBRARY
+          GAME MODES
         </Text>
         <Text variant="body" style={{ color: colors.textMuted, marginTop: 4, marginBottom: spacing.md }}>
-          Tactical GPS game types built for physical outdoor evasion and intelligence.
+          Outdoor GPS game modes for running, chasing, and evasion.
         </Text>
 
         {/* Filters */}
@@ -151,7 +151,7 @@ export default function ModesTab() {
                 {mode.briefing?.intel && mode.briefing.intel.length > 0 && (
                   <View style={[styles.intelPreview, { backgroundColor: colors.surfaceElevated, borderRadius: radii.sm }]}>
                     <Text variant="mono" style={{ color: colors.radarScan, fontSize: 11, marginBottom: 4 }}>
-                      MISSION BRIEF:
+                      HOW TO PLAY:
                     </Text>
                     <Text variant="body" numberOfLines={2} style={{ color: colors.text, fontSize: 12, lineHeight: 16 }}>
                       {mode.briefing.intel[0]}
@@ -161,7 +161,7 @@ export default function ModesTab() {
 
                 <View style={styles.cardActions}>
                   <Button
-                    title="Intel Dossier"
+                    title="Mode Info"
                     variant="secondary"
                     size="sm"
                     style={{ flex: 1 }}
@@ -184,7 +184,7 @@ export default function ModesTab() {
             <View style={[styles.emptyBox, { borderColor: colors.borderDark }]}>
               <MaterialCommunityIcons name="filter-remove-outline" size={32} color={colors.textMuted} />
               <Text variant="body" style={{ color: colors.textMuted, marginTop: spacing.xs }}>
-                No mission modes match the selected criteria.
+                No modes match the selected filters.
               </Text>
               <Button
                 title="Reset Filters"

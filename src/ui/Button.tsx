@@ -144,9 +144,10 @@ export function Button({
           {title ? (
             <Text
               variant="label"
+              weight="bold"
               style={{
+                fontFamily: 'Archivo-Bold',
                 color: getTextColor(),
-                fontWeight: '800',
                 letterSpacing: 0.8,
               }}
             >

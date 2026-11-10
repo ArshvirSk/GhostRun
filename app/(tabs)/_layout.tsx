@@ -43,6 +43,7 @@ function YouTabIcon({ focused }: { color: string; focused: boolean }) {
     >
       <Text
         style={{
+          fontFamily: 'Archivo-Black',
           fontSize: 11,
           fontWeight: '900',
           color: focused ? colors.primaryText : isDark ? colors.textMuted : '#FFFFFF',
@@ -107,8 +108,10 @@ export default function TabsLayout() {
           paddingHorizontal: 16,
           position: 'absolute',
           bottom: Math.max(insets.bottom, 16) + 10,
-          left: 28,
-          right: 28,
+          left: 24,
+          right: 24,
+          start: 24,
+          end: 24,
           borderRadius: 36,
           elevation: 24,
           shadowColor: '#000000',
@@ -121,6 +124,7 @@ export default function TabsLayout() {
           justifyContent: 'center',
         },
         tabBarLabelStyle: {
+          fontFamily: 'Archivo-Bold',
           fontSize: 10,
           fontWeight: '800',
           letterSpacing: 0.5,

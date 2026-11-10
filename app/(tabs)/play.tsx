@@ -135,7 +135,7 @@ export default function PlayScreen() {
           />
         }
       >
-        {/* Top Header Row with GhostRun Brand Mark and Operational Pill */}
+        {/* Top Header Row with GhostRun Brand Mark */}
         <View style={styles.headerRow}>
           <View style={styles.brandContainer}>
             <Image
@@ -146,21 +146,6 @@ export default function PlayScreen() {
             />
             <Text style={[styles.brandTitle, { color: colors.text }]}>
               GHOST<Text style={{ color: colors.primary }}>RUN</Text>
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.statusPill,
-              {
-                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
-            <Text style={[styles.statusPillText, { color: colors.textMuted }]}>
-              GRID LIVE
             </Text>
           </View>
         </View>
@@ -218,10 +203,10 @@ export default function PlayScreen() {
           </Pressable>
         )}
 
-        {/* Middle Tactical Promo Card */}
+        {/* Middle Featured Mode Card */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Tactical Arena Details"
+          accessibilityLabel="Featured Game Mode"
           onPress={() => {
             triggerHaptic('buttonTap');
             router.push('/host/mode' as any);
@@ -235,7 +220,7 @@ export default function PlayScreen() {
           ]}
         >
           <Text style={[styles.promoHeader, { color: colors.accent }]}>
-            TACTICAL GRID · OPERATIONAL
+            FEATURED · CLASSIC CHASE
           </Text>
           <View style={styles.promoContent}>
             <View
@@ -250,7 +235,7 @@ export default function PlayScreen() {
               <Text style={[styles.ogBadgeText, { color: colors.accent }]}>OG</Text>
             </View>
             <Text style={[styles.promoText, { color: colors.text }]} numberOfLines={2}>
-              Deploy outdoor chase arena.{'\n'}Live radar tracking & ghost telemetry.
+              Outrun hunter radar pings and reach the secret extraction target.
             </Text>
             <Ionicons
               name="chevron-forward"
@@ -365,6 +350,7 @@ const styles = StyleSheet.create({
     height: 24,
   },
   brandTitle: {
+    fontFamily: 'Archivo-Black',
     fontSize: 19,
     fontWeight: '900',
     letterSpacing: 2,
@@ -384,6 +370,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statusPillText: {
+    fontFamily: 'Archivo-SemiBold',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1,
@@ -392,12 +379,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   greetingHi: {
+    fontFamily: 'Archivo-Black',
     fontSize: 56,
     fontWeight: '900',
     lineHeight: 58,
     letterSpacing: -1.5,
   },
   greetingName: {
+    fontFamily: 'Archivo-Black',
     fontSize: 56,
     fontWeight: '900',
     lineHeight: 60,
@@ -405,6 +394,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   subtitle: {
+    fontFamily: 'SegoeUI-Regular',
     fontSize: 17,
     fontWeight: '500',
     lineHeight: 23,
@@ -442,6 +432,7 @@ const styles = StyleSheet.create({
     marginBottom: 26,
   },
   promoHeader: {
+    fontFamily: 'Archivo-SemiBold',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -461,11 +452,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ogBadgeText: {
+    fontFamily: 'Archivo-Black',
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
   promoText: {
+    fontFamily: 'SegoeUI-Regular',
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '600',
@@ -488,6 +481,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   hostButtonText: {
+    fontFamily: 'Archivo-Bold',
     fontSize: 17,
     fontWeight: '800',
     letterSpacing: 0.2,
@@ -501,6 +495,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   joinButtonText: {
+    fontFamily: 'Archivo-Bold',
     fontSize: 17,
     fontWeight: '800',
     letterSpacing: 0.2,
@@ -513,6 +508,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   linkText: {
+    fontFamily: 'SegoeUI-SemiBold',
     fontSize: 14,
     fontWeight: '600',
   },

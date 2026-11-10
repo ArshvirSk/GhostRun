@@ -39,10 +39,63 @@ export function Text({
 }: TextProps) {
   const { colors, typography } = useTheme();
 
+  const getFontFamily = React.useCallback((): string => {
+    if (variant === 'mono') {
+      return Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+    }
+
+    const isDisplay = [
+      'hero',
+      'display',
+      'headline',
+      'title',
+      'label',
+      'numeric',
+    ].includes(variant);
+
+    if (weight) {
+      if (isDisplay) {
+        if (weight === 'black' || weight === 'heavy') return 'Archivo-Black';
+        if (weight === 'bold') return 'Archivo-Bold';
+        if (weight === 'semibold' || weight === 'medium') return 'Archivo-SemiBold';
+        return 'Archivo-Regular';
+      }
+      if (weight === 'black' || weight === 'heavy' || weight === 'bold') {
+        return 'SegoeUI-Bold';
+      }
+      if (weight === 'semibold' || weight === 'medium') {
+        return 'SegoeUI-SemiBold';
+      }
+      return 'SegoeUI-Regular';
+    }
+
+    switch (variant) {
+      case 'hero':
+      case 'display':
+      case 'numeric':
+        return 'Archivo-Black';
+      case 'headline':
+      case 'title':
+        return 'Archivo-Bold';
+      case 'label':
+        return 'Archivo-SemiBold';
+      case 'subtitle':
+      case 'caption':
+        return 'SegoeUI-SemiBold';
+      case 'sub':
+      case 'body':
+      default:
+        return 'SegoeUI-Regular';
+    }
+  }, [variant, weight]);
+
   const variantStyle: TextStyle = React.useMemo(() => {
+    const fontFamily = getFontFamily();
+
     switch (variant) {
       case 'hero':
         return {
+          fontFamily,
           fontSize: typography.fontSizes.hero,
           fontWeight: typography.fontWeights.black as TextStyle['fontWeight'],
           lineHeight: typography.lineHeights.hero,
@@ -51,6 +104,7 @@ export function Text({
         };
       case 'display':
         return {
+          fontFamily,
           fontSize: typography.fontSizes.display,
           fontWeight: typography.fontWeights.black as TextStyle['fontWeight'],
           lineHeight: typography.lineHeights.display,
@@ -59,6 +113,7 @@ export function Text({
         };
       case 'headline':
         return {
+          fontFamily,
           fontSize: typography.fontSizes.headline,
           fontWeight: typography.fontWeights.heavy as TextStyle['fontWeight'],
           lineHeight: typography.lineHeights.display,
@@ -66,6 +121,7 @@ export function Text({
         };
       case 'title':
         return {
+          fontFamily,
           fontSize: typography.fontSizes.title,
           fontWeight: typography.fontWeights.bold as TextStyle['fontWeight'],
           lineHeight: typography.lineHeights.heading,
@@ -73,6 +129,7 @@ export function Text({
         };
       case 'subtitle':
         return {
+          fontFamily,
           fontSize: typography.fontSizes.subtitle,
           fontWeight: typography.fontWeights.semibold as TextStyle['fontWeight'],
           lineHeight: typography.lineHeights.body,
@@ -80,6 +137,7 @@ export function Text({
         };
       case 'caption':
         return {
+          fontFamily,
           fontSize: typography.fontSizes.caption,
           fontWeight: typography.fontWeights.medium as TextStyle['fontWeight'],
           lineHeight: typography.lineHeights.tight,
@@ -87,6 +145,7 @@ export function Text({
         };
       case 'sub':
         return {
+          fontFamily,
           fontSize: typography.fontSizes.sub,
           fontWeight: typography.fontWeights.normal as TextStyle['fontWeight'],
           lineHeight: typography.lineHeights.sub,
@@ -94,6 +153,7 @@ export function Text({
         };
       case 'label':
         return {
+          fontFamily,
           fontSize: typography.fontSizes.caption,
           fontWeight: typography.fontWeights.heavy as TextStyle['fontWeight'],
           letterSpacing: 1.2,
@@ -102,30 +162,31 @@ export function Text({
         };
       case 'mono':
         return {
+          fontFamily,
           fontSize: typography.fontSizes.sub,
           fontWeight: typography.fontWeights.medium as TextStyle['fontWeight'],
-          fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
           letterSpacing: 0.5,
           color: colors.text,
         };
       case 'numeric':
         return {
+          fontFamily,
           fontSize: typography.fontSizes.headline,
           fontWeight: typography.fontWeights.black as TextStyle['fontWeight'],
-          fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
           letterSpacing: 1.5,
           color: colors.text,
         };
       case 'body':
       default:
         return {
+          fontFamily,
           fontSize: typography.fontSizes.body,
           fontWeight: typography.fontWeights.normal as TextStyle['fontWeight'],
           lineHeight: typography.lineHeights.body,
           color: colors.text,
         };
     }
-  }, [variant, colors, typography]);
+  }, [variant, colors, typography, getFontFamily]);
 
   const customStyle: TextStyle = {
     ...(color ? { color } : {}),

@@ -30,6 +30,22 @@ export default function BriefingScreen() {
     router.push('/signin' as any);
   };
 
+  const handleHostGame = () => {
+    if (isAuthenticated) {
+      router.push('/host/mode' as any);
+    } else {
+      router.push('/signup/name' as any);
+    }
+  };
+
+  const handleJoinCode = () => {
+    router.push('/join' as any);
+  };
+
+  const handleDemoRound = () => {
+    router.push('/play' as any);
+  };
+
   const handleFinish = () => {
     if (isAuthenticated) {
       router.replace('/play' as any);
@@ -47,6 +63,9 @@ export default function BriefingScreen() {
           onFinish={handleFinish}
           onSignIn={handleSignIn}
           onSignUp={handleSignUp}
+          onHostGame={handleHostGame}
+          onJoinCode={handleJoinCode}
+          onDemoRound={handleDemoRound}
           script={CORE_TOUR_SCRIPT}
         />
       </View>

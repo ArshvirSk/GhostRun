@@ -173,17 +173,9 @@ export default function YouTab() {
       >
         {/* Top Header Row */}
         <View style={styles.topRow}>
-          <View>
-            <Text style={[styles.pageTitle, { color: colors.text }]}>
-              CASE FILE
-            </Text>
-            <View style={styles.statusPill}>
-              <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
-              <Text style={[styles.statusPillText, { color: colors.textMuted }]}>
-                CLEARANCE LEVEL 1 · OPERATIONAL
-              </Text>
-            </View>
-          </View>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>
+            PROFILE
+          </Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Settings"
@@ -247,17 +239,17 @@ export default function YouTab() {
                   ]}
                 >
                   <Text style={[styles.tagBadgeText, { color: colors.primary }]}>
-                    TAG ID #{shortId}
+                    #{shortId}
                   </Text>
                 </View>
               </View>
 
               <Text style={[styles.codenameText, { color: colors.text }]} numberOfLines={1}>
-                {displayName}
+                @{displayName.toUpperCase()}
               </Text>
 
               <Text style={[styles.rankText, { color: colors.textMuted }]}>
-                TACTICAL RADAR · ACTIVE AGENT
+                ACTIVE PLAYER
               </Text>
             </View>
           </View>
@@ -265,7 +257,7 @@ export default function YouTab() {
           {/* Edit Callsign & Signature Trigger */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Edit Codename and Radar Color"
+            accessibilityLabel="Edit Profile and Radar Color"
             onPress={() => {
               triggerHaptic('buttonTap');
               setIsEditing(!isEditing);
@@ -284,7 +276,7 @@ export default function YouTab() {
               color={colors.text}
             />
             <Text style={[styles.editTriggerText, { color: colors.text }]}>
-              {isEditing ? 'Close Editor' : 'Edit Callsign & Color'}
+              {isEditing ? 'Close Editor' : 'Edit Profile & Color'}
             </Text>
           </Pressable>
 
@@ -292,12 +284,12 @@ export default function YouTab() {
           {isEditing && (
             <View style={[styles.editDrawer, { borderTopColor: colors.border }]}>
               <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
-                AGENT CODENAME
+                CODENAME
               </Text>
               <TextInput
                 value={draftName}
                 onChangeText={setDraftName}
-                placeholder="Agent Codename"
+                placeholder="Your Codename"
                 placeholderTextColor={colors.textSubtle}
                 maxLength={20}
                 autoCapitalize="words"
@@ -317,7 +309,7 @@ export default function YouTab() {
                   { color: colors.textMuted, marginTop: 14, marginBottom: 8 },
                 ]}
               >
-                RADAR SIGNATURE COLOR
+                PLAYER COLOR
               </Text>
               <View style={styles.paletteRow}>
                 {colors.palette.map((c) => {
@@ -344,7 +336,7 @@ export default function YouTab() {
               </View>
 
               <Button
-                title={savingProfile ? 'Updating Credentials…' : 'Save Callsign'}
+                title={savingProfile ? 'Updating Profile…' : 'Save Profile'}
                 variant="primary"
                 size="md"
                 disabled={savingProfile || !draftName.trim()}
@@ -355,9 +347,9 @@ export default function YouTab() {
           )}
         </Card>
 
-        {/* Section: Operational Performance Matrix */}
+        {/* Section: Performance Stats */}
         <Text style={[styles.sectionHeading, { color: colors.textMuted }]}>
-          OPERATIONAL TELEMETRY
+          CAREER STATS
         </Text>
 
         {/* Hero Win Rate Showcase Card */}
@@ -377,7 +369,7 @@ export default function YouTab() {
                 {stats.rounds > 0 ? `${stats.winRate}%` : '--'}
               </Text>
               <Text style={[styles.winRateLabel, { color: colors.textMuted }]}>
-                MISSION WIN RATE
+                WIN RATE
               </Text>
             </View>
 
@@ -470,7 +462,7 @@ export default function YouTab() {
           >
             <View style={styles.metricHeader}>
               <Ionicons name="timer-outline" size={18} color={colors.warning} />
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>BEST EVADE</Text>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>BEST ESCAPE</Text>
             </View>
             <Text style={[styles.metricValue, { color: colors.text }]}>
               {stats.bestEscape}
@@ -490,7 +482,7 @@ export default function YouTab() {
           >
             <View style={styles.metricHeader}>
               <Ionicons name="navigate-outline" size={18} color={colors.hunter} />
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>FARTHEST</Text>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>DISTANCE</Text>
             </View>
             <Text style={[styles.metricValue, { color: colors.text }]}>
               {formatDistance(stats.farthestMeters)}
@@ -501,7 +493,7 @@ export default function YouTab() {
         {/* Section: Mission Log */}
         <View style={styles.sectionHeaderRow}>
           <Text style={[styles.sectionHeading, { color: colors.textMuted, marginBottom: 0 }]}>
-            MISSION LOG
+            MATCH HISTORY
           </Text>
           {history.length > 0 && (
             <Chip label={`${history.length} ROUNDS`} variant="muted" size="sm" />
@@ -527,10 +519,10 @@ export default function YouTab() {
               color={colors.textSubtle}
             />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              Empty Case File
+              No Matches Yet
             </Text>
             <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-              No outdoor rounds on record yet. Deploy onto the radar to record telemetry.
+              No matches played yet. Host a game or join with a code to start playing.
             </Text>
             <Button
               title="Host a Game"
@@ -578,7 +570,7 @@ export default function YouTab() {
 
         {/* Section: Tactical Guides & Tools */}
         <Text style={[styles.sectionHeading, { color: colors.textMuted, marginTop: 28 }]}>
-          TACTICAL DOSSIERS & TOOLS
+          GUIDES & RESOURCES
         </Text>
 
         <Card
@@ -601,7 +593,7 @@ export default function YouTab() {
           >
             <MaterialCommunityIcons name="book-open-outline" size={20} color={colors.primary} />
             <Text style={[styles.menuRowText, { color: colors.text }]}>
-              Field Manual & Rules
+              Game Rules & Guide
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
@@ -631,7 +623,7 @@ export default function YouTab() {
           >
             <MaterialCommunityIcons name="movie-play-outline" size={20} color={colors.radarScan} />
             <Text style={[styles.menuRowText, { color: colors.text }]}>
-              Replay Briefing Tour
+              Replay Onboarding Tour
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
@@ -670,6 +662,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   pageTitle: {
+    fontFamily: 'Archivo-Black',
     fontSize: 26,
     fontWeight: '900',
     letterSpacing: -0.5,
@@ -686,6 +679,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statusPillText: {
+    fontFamily: 'Archivo-SemiBold',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -722,6 +716,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   avatarInitial: {
+    fontFamily: 'Archivo-Black',
     fontSize: 30,
     fontWeight: '900',
     color: '#FFFFFF',
@@ -750,17 +745,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   tagBadgeText: {
+    fontFamily: 'Archivo-SemiBold',
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 0.8,
   },
   codenameText: {
+    fontFamily: 'Archivo-Black',
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: -0.5,
+    textTransform: 'uppercase',
     marginTop: 2,
   },
   rankText: {
+    fontFamily: 'SegoeUI-SemiBold',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -777,6 +776,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   editTriggerText: {
+    fontFamily: 'Archivo-Bold',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -786,12 +786,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   inputLabel: {
+    fontFamily: 'Archivo-SemiBold',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
     marginBottom: 6,
   },
   textInput: {
+    fontFamily: 'SegoeUI-SemiBold',
     height: 46,
     borderRadius: 12,
     borderWidth: 1,
@@ -801,6 +803,7 @@ const styles = StyleSheet.create({
   },
   paletteRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     paddingVertical: 6,
   },
@@ -810,6 +813,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   sectionHeading: {
+    fontFamily: 'Archivo-SemiBold',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -834,12 +838,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   winRateValue: {
+    fontFamily: 'Archivo-Black',
     fontSize: 40,
     fontWeight: '900',
     letterSpacing: -1,
     lineHeight: 44,
   },
   winRateLabel: {
+    fontFamily: 'SegoeUI-SemiBold',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -854,10 +860,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   victoriesText: {
+    fontFamily: 'Archivo-Bold',
     fontSize: 14,
     fontWeight: '800',
   },
   winRateSubtext: {
+    fontFamily: 'SegoeUI-Regular',
     fontSize: 11,
     fontWeight: '600',
     marginTop: 4,
@@ -891,11 +899,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   metricLabel: {
+    fontFamily: 'SegoeUI-SemiBold',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   metricValue: {
+    fontFamily: 'Archivo-Black',
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: -0.5,
@@ -908,11 +918,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyTitle: {
+    fontFamily: 'Archivo-Black',
     fontSize: 16,
     fontWeight: '800',
     marginTop: 8,
   },
   emptySubtitle: {
+    fontFamily: 'SegoeUI-Regular',
     fontSize: 13,
     textAlign: 'center',
     marginTop: 4,
@@ -928,11 +940,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   historyMode: {
+    fontFamily: 'Archivo-Bold',
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.2,
   },
   historyMeta: {
+    fontFamily: 'SegoeUI-Regular',
     fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
@@ -950,6 +964,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   menuRowText: {
+    fontFamily: 'SegoeUI-SemiBold',
     fontSize: 14,
     fontWeight: '700',
     flex: 1,
