@@ -26,7 +26,7 @@ import { useUnits } from '../src/utils/units';
 const DELETE_WORD = 'DELETE';
 
 export default function SettingsScreen() {
-  const { colors, spacing, radii } = useTheme();
+  const { colors, spacing, radii, themeMode, setThemeMode } = useTheme();
   const router = useRouter();
   const { unitSystem, setUnitSystem } = useUnits();
 
@@ -186,6 +186,42 @@ export default function SettingsScreen() {
         <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
           TACTICAL DISPLAY
         </Text>
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginBottom: spacing.md }]}>
+          <View style={styles.settingRow}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Interface Theme
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Calibrated for sunlight evasion (Light) and stealth night operations (Dark).
+              </Text>
+            </View>
+            <View style={styles.chipToggle}>
+              <Chip
+                label="SYSTEM"
+                variant={themeMode === 'system' ? 'accent' : 'muted'}
+                size="sm"
+                selected={themeMode === 'system'}
+                onPress={() => void setThemeMode('system')}
+              />
+              <Chip
+                label="LIGHT"
+                variant={themeMode === 'light' ? 'accent' : 'muted'}
+                size="sm"
+                selected={themeMode === 'light'}
+                onPress={() => void setThemeMode('light')}
+              />
+              <Chip
+                label="DARK"
+                variant={themeMode === 'dark' ? 'accent' : 'muted'}
+                size="sm"
+                selected={themeMode === 'dark'}
+                onPress={() => void setThemeMode('dark')}
+              />
+            </View>
+          </View>
+        </Card>
+
         <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
           <View style={styles.settingRow}>
             <View style={{ flex: 1, paddingRight: spacing.sm }}>
