@@ -132,10 +132,10 @@ export default function SignupNameScreen() {
             ) : null}
           </View>
 
-          {/* 8-Color Tactical Palette */}
+          {/* 16-Color Tactical Palette */}
           <View style={styles.paletteGroup}>
             <Text style={styles.inputLabel} variant="label">
-              PLAYER COLOR ACCENT
+              TACTICAL COLOR ACCENT
             </Text>
             <Text style={styles.paletteSubtitle} variant="caption">
               Marks your blips and trail points on the tactical map.
@@ -302,15 +302,16 @@ const styles = StyleSheet.create({
   paletteGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    gap: 12,
     justifyContent: 'space-between',
   },
   colorSwatch: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
+    marginVertical: 2,
   },
   colorSwatchSelected: {
     borderWidth: 3,

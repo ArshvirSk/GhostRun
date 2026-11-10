@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -24,6 +24,7 @@ import { Text } from '../../../src/ui/Text';
 
 export default function SignupBeforeYouPlayScreen() {
   const router = useRouter();
+  const { next } = useLocalSearchParams<{ next?: string }>();
 
   const name = useSignupStore((s) => s.name);
   const color = useSignupStore((s) => s.color);
@@ -39,6 +40,29 @@ export default function SignupBeforeYouPlayScreen() {
   const [batteryExpanded, setBatteryExpanded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Check current OS permissions on mount so UI reflects already-granted states
+  useEffect(() => {
+    let active = true;
+    async function checkCurrentPermissions() {
+      try {
+        const fg = await Location.getForegroundPermissionsAsync();
+        if (active && fg.granted) setForegroundGranted(true);
+
+        const bg = await Location.getBackgroundPermissionsAsync();
+        if (active && bg.granted) setBackgroundGranted(true);
+
+        const notif = await Notifications.getPermissionsAsync();
+        if (active && notif.granted) setNotificationsGranted(true);
+      } catch {
+        // Non-blocking
+      }
+    }
+    void checkCurrentPermissions();
+    return () => {
+      active = false;
+    };
+  }, [setForegroundGranted, setBackgroundGranted, setNotificationsGranted]);
 
   const handleRequestForeground = async () => {
     try {
@@ -84,70 +108,58 @@ export default function SignupBeforeYouPlayScreen() {
       return;
     }
 
-    if (!isSupabaseConfigured || !supabase) {
-      setErrorMessage('Supabase is not configured.');
-      triggerHaptic('error');
-      return;
-    }
-
     setSubmitting(true);
     setErrorMessage('');
 
     try {
-      const client = supabase;
-      const { data: sessionData, error: sessionError } = await client.auth.getSession();
-      if (sessionError || !sessionData.session) {
-        setErrorMessage('Active session not found. Please sign in again.');
-        setSubmitting(false);
-        router.replace('/signin' as any);
-        return;
-      }
+      if (isSupabaseConfigured && supabase) {
+        const client = supabase;
+        const { data: sessionData } = await client.auth.getSession();
+        let currentSession = sessionData?.session;
 
-      // Upsert user profile if name is provided, or ensure profile exists
-      if (name.trim()) {
-        const effectiveName = name.trim();
-        const effectiveColor = color || colors.palette[0];
-        const { error: profileError } = await client.rpc('upsert_profile', {
-          name: effectiveName,
-          color: effectiveColor,
-        });
-
-        if (profileError) {
-          setErrorMessage(`Profile setup failed: ${profileError.message}`);
-          setSubmitting(false);
-          return;
-        }
-      } else {
-        const { data: existingProfile } = await client
-          .from('profiles')
-          .select('id')
-          .eq('id', sessionData.session.user.id)
-          .maybeSingle();
-
-        if (!existingProfile) {
-          const { error: profileError } = await client.rpc('upsert_profile', {
-            name: 'Operative',
-            color: color || colors.palette[0],
-          });
-          if (profileError) {
-            setErrorMessage(`Profile setup failed: ${profileError.message}`);
-            setSubmitting(false);
-            return;
+        // If no active session, sign in anonymously so user can play immediately as a guest
+        if (!currentSession) {
+          try {
+            const { data: anonData } = await client.auth.signInAnonymously();
+            if (anonData?.session) {
+              currentSession = anonData.session;
+            }
+          } catch {
+            // Anonymous auth disabled or offline; proceed with local onboarding flag
           }
         }
-      }
 
-      // Record mandatory policy acknowledgement consent
-      const { error: consentError } = await client.rpc('set_consent', {
-        consent_type: 'policy_ack',
-        granted: true,
-        policy_version: PRIVACY_VERSION,
-      });
+        if (currentSession) {
+          // Upsert user profile if name is provided, or ensure default Operative profile exists
+          if (name.trim()) {
+            const effectiveName = name.trim();
+            const effectiveColor = color || colors.palette[0];
+            await client.rpc('upsert_profile', {
+              name: effectiveName,
+              color: effectiveColor,
+            });
+          } else {
+            const { data: existingProfile } = await client
+              .from('profiles')
+              .select('id')
+              .eq('id', currentSession.user.id)
+              .maybeSingle();
 
-      if (consentError) {
-        setErrorMessage(`Consent recording failed: ${consentError.message}`);
-        setSubmitting(false);
-        return;
+            if (!existingProfile) {
+              await client.rpc('upsert_profile', {
+                name: 'Operative',
+                color: color || colors.palette[0],
+              });
+            }
+          }
+
+          // Record mandatory policy acknowledgement consent
+          await client.rpc('set_consent', {
+            consent_type: 'policy_ack',
+            granted: true,
+            policy_version: PRIVACY_VERSION,
+          });
+        }
       }
 
       // Mark onboarding completed in AsyncStorage
@@ -156,8 +168,9 @@ export default function SignupBeforeYouPlayScreen() {
       triggerHaptic('roleReveal');
       setSubmitting(false);
 
-      // Navigate to the tactical grid
-      router.replace('/play' as any);
+      // Navigate to destination (or /play)
+      const targetRoute = next ? (next as any) : ('/play' as any);
+      router.replace(targetRoute);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Setup completion failed.');
       triggerHaptic('error');
@@ -173,7 +186,7 @@ export default function SignupBeforeYouPlayScreen() {
         {/* Step Header */}
         <View style={styles.header}>
           <Text style={styles.stepIndicator} variant="label">
-            STEP 4 OF 4 • SAFETY & PERMISSIONS
+            {name.trim() ? 'STEP 4 OF 4 • SAFETY & PERMISSIONS' : 'ONBOARDING • SAFETY & PERMISSIONS'}
           </Text>
           <Text style={styles.title} variant="headline">
             Before you play

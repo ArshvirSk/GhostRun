@@ -62,7 +62,17 @@ export default function HostRulesScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.lg,
+            paddingBottom: Math.max(insets.bottom, 16) + 120,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <Text variant="display" style={{ color: colors.text, marginTop: spacing.sm }}>
           Configure Rules
         </Text>
@@ -135,7 +145,7 @@ export default function HostRulesScreen() {
           }}
           style={[styles.accordionHeader, { backgroundColor: colors.surface, borderRadius: radii.md, padding: spacing.md }]}
         >
-          <View style={styles.accordionTitleRow}>
+          <View style={[styles.accordionTitleRow, { flex: 1, marginRight: spacing.sm }]}>
             <Ionicons name="options-outline" size={18} color={colors.accent} />
             <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
               Advanced Timing & Boundaries
@@ -154,7 +164,7 @@ export default function HostRulesScreen() {
             {/* Head Start */}
             {!isGhostDuel && (
               <View style={styles.paramRow}>
-                <View style={{ flex: 1 }}>
+                <View style={styles.paramTextCol}>
                   <Text variant="title" style={{ color: colors.text, fontSize: 14 }}>
                     Head Start (seconds)
                   </Text>
@@ -184,7 +194,7 @@ export default function HostRulesScreen() {
 
             {/* Round Duration */}
             <View style={styles.paramRow}>
-              <View style={{ flex: 1 }}>
+              <View style={styles.paramTextCol}>
                 <Text variant="title" style={{ color: colors.text, fontSize: 14 }}>
                   Round Length
                 </Text>
@@ -213,7 +223,7 @@ export default function HostRulesScreen() {
 
             {/* Ping Interval */}
             <View style={styles.paramRow}>
-              <View style={{ flex: 1 }}>
+              <View style={styles.paramTextCol}>
                 <Text variant="title" style={{ color: colors.text, fontSize: 14 }}>
                   Radar Ping Cadence
                 </Text>
@@ -242,7 +252,7 @@ export default function HostRulesScreen() {
 
             {/* Tag Radius */}
             <View style={styles.paramRow}>
-              <View style={{ flex: 1 }}>
+              <View style={styles.paramTextCol}>
                 <Text variant="title" style={{ color: colors.text, fontSize: 14 }}>
                   Physical Tag Radius
                 </Text>
@@ -271,7 +281,7 @@ export default function HostRulesScreen() {
 
             {/* Boundary Penalty Toggle */}
             <View style={styles.paramRow}>
-              <View style={{ flex: 1 }}>
+              <View style={styles.paramTextCol}>
                 <Text variant="title" style={{ color: colors.text, fontSize: 14 }}>
                   Excursion Penalty
                 </Text>
@@ -360,13 +370,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  paramTextCol: {
+    flex: 1,
+    paddingRight: 12,
   },
   stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   stepBtn: {
     width: 32,
@@ -381,5 +396,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     borderTopWidth: 1,
+    zIndex: 10,
+    elevation: 8,
   },
 });

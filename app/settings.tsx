@@ -16,12 +16,14 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../src/theme/ThemeProvider';
+import { radii, spacing } from '../src/theme/tokens';
 import { Text } from '../src/ui/Text';
 import { Card } from '../src/ui/Card';
 import { Chip } from '../src/ui/Chip';
 import { Button } from '../src/ui/Button';
 import { PRIVACY_CONTACT_EMAIL } from '../src/lib/privacy';
 import { supabase } from '../src/lib/supabase';
+import { triggerHaptic } from '../src/motion/haptics';
 import { useUnits } from '../src/utils/units';
 
 const DELETE_WORD = 'DELETE';
@@ -257,28 +259,96 @@ export default function SettingsScreen() {
           MEASUREMENT UNITS
         </Text>
         <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
-          <View style={styles.settingRow}>
-            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+          <View style={styles.unitsSection}>
+            <View style={{ marginBottom: spacing.md }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Distance Calibration
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Applied to boundary radius, tag distance, and radar sweep telemetry.
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 4, lineHeight: 18 }}>
+                Applied across boundary radius, tag distance, radar sweep telemetry, and game HUDs.
               </Text>
             </View>
-            <View style={styles.chipToggle}>
-              <Chip
-                label="METRIC (m/km)"
-                variant={unitSystem === 'metric' ? 'accent' : 'muted'}
-                size="sm"
-                onPress={() => void setUnitSystem('metric')}
-              />
-              <Chip
-                label="IMPERIAL (ft/mi)"
-                variant={unitSystem === 'imperial' ? 'accent' : 'muted'}
-                size="sm"
-                onPress={() => void setUnitSystem('imperial')}
-              />
+
+            <View style={styles.unitToggleRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Set measurement units to Metric (meters and kilometers)"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  void setUnitSystem('metric');
+                }}
+                style={[
+                  styles.unitSegmentBtn,
+                  unitSystem === 'metric' ? styles.unitSegmentBtnActive : styles.unitSegmentBtnInactive,
+                  {
+                    borderColor: unitSystem === 'metric' ? colors.primary : colors.borderDark,
+                    backgroundColor: unitSystem === 'metric' ? colors.surfaceElevated : colors.surface,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={unitSystem === 'metric' ? 'radio-button-on' : 'radio-button-off'}
+                  size={18}
+                  color={unitSystem === 'metric' ? colors.primary : colors.textMuted}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    variant="label"
+                    style={[
+                      styles.unitSegmentTitle,
+                      { color: unitSystem === 'metric' ? colors.text : colors.textMuted },
+                    ]}
+                  >
+                    METRIC
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: unitSystem === 'metric' ? colors.primary : colors.textSubtle, fontSize: 11 }}
+                  >
+                    Meters (m / km)
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Set measurement units to Imperial (feet and miles)"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  void setUnitSystem('imperial');
+                }}
+                style={[
+                  styles.unitSegmentBtn,
+                  unitSystem === 'imperial' ? styles.unitSegmentBtnActive : styles.unitSegmentBtnInactive,
+                  {
+                    borderColor: unitSystem === 'imperial' ? colors.primary : colors.borderDark,
+                    backgroundColor: unitSystem === 'imperial' ? colors.surfaceElevated : colors.surface,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={unitSystem === 'imperial' ? 'radio-button-on' : 'radio-button-off'}
+                  size={18}
+                  color={unitSystem === 'imperial' ? colors.primary : colors.textMuted}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    variant="label"
+                    style={[
+                      styles.unitSegmentTitle,
+                      { color: unitSystem === 'imperial' ? colors.text : colors.textMuted },
+                    ]}
+                  >
+                    IMPERIAL
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: unitSystem === 'imperial' ? colors.primary : colors.textSubtle, fontSize: 11 }}
+                  >
+                    Feet (ft / mi)
+                  </Text>
+                </View>
+              </Pressable>
             </View>
           </View>
         </Card>
@@ -492,7 +562,7 @@ export default function SettingsScreen() {
             </Text>
           </Pressable>
           <Text variant="mono" style={{ color: colors.textSubtle, fontSize: 11 }}>
-            GhostRun v2.7.2 · Operative Release
+            GhostRun v2.7.4 · Operative Release
           </Text>
         </View>
       </ScrollView>
@@ -524,6 +594,31 @@ const styles = StyleSheet.create({
   chipToggle: {
     flexDirection: 'row',
     gap: 6,
+  },
+  unitsSection: {
+    width: '100%',
+  },
+  unitToggleRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  unitSegmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+  },
+  unitSegmentBtnActive: {},
+  unitSegmentBtnInactive: {},
+  unitSegmentTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   alertHeader: {
     flexDirection: 'row',

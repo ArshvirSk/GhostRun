@@ -69,16 +69,24 @@ export const darkColors = {
   ripple: 'rgba(184, 163, 255, 0.25)',
   fogHaze: 'rgba(255, 255, 255, 0.08)',
 
-  // 8-Color Player Palette (Welcome screen & player pins)
+  // 16-Color Tactical Palette (Welcome screen, codename selection & player pins)
   palette: [
     '#B8A3FF', // Spectral Violet
     '#C7F36B', // Acid Lime
     '#FF8A75', // Hunter Coral
     '#38BDF8', // Radar Cyan
-    '#FBBF24', // Amber
-    '#EC4899', // Pink
-    '#06B6D4', // Sky
+    '#FBBF24', // Amber Gold
+    '#EC4899', // Neon Pink
+    '#10B981', // Emerald
     '#A855F7', // Deep Violet
+    '#F97316', // Blaze Orange
+    '#06B6D4', // Electric Teal
+    '#E11D48', // Crimson Flare
+    '#84CC16', // Cyber Lime
+    '#6366F1', // Indigo
+    '#14B8A6', // Mint Pulse
+    '#D946EF', // Magenta
+    '#94A3B8', // Tactical Slate
   ],
 } as const;
 
@@ -144,16 +152,24 @@ export const lightColors = {
   ripple: 'rgba(102, 80, 164, 0.25)',
   fogHaze: 'rgba(0, 0, 0, 0.08)',
 
-  // 8-Color Player Palette
+  // 16-Color Tactical Palette
   palette: [
     '#6650A4', // Spectral Violet
     '#557A22', // Acid Lime
     '#B94B3A', // Hunter Coral
     '#0284C7', // Sky
-    '#D97706', // Amber
+    '#D97706', // Amber Gold
     '#DB2777', // Pink
-    '#0891B2', // Cyan
+    '#059669', // Emerald
     '#7E22CE', // Deep Violet
+    '#EA580C', // Blaze Orange
+    '#0891B2', // Cyan
+    '#BE123C', // Crimson
+    '#65A30D', // Cyber Lime
+    '#4F46E5', // Indigo
+    '#0D9488', // Teal
+    '#C026D3', // Magenta
+    '#475569', // Tactical Slate
   ],
 } as const;
 

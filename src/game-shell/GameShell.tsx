@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from '../ui/Text';
@@ -130,10 +131,36 @@ export function GameShell({ gameId }: GameShellProps) {
     };
   }, [gameId, loadState]);
 
-  // Visual clock tick
+  // Visual clock tick (pauses when screen is off / app is in background to conserve CPU & battery)
   useEffect(() => {
-    const tick = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(tick);
+    let tick: ReturnType<typeof setInterval> | null = null;
+    const startTick = () => {
+      if (!tick) tick = setInterval(() => setNow(Date.now()), 500);
+    };
+    const stopTick = () => {
+      if (tick) {
+        clearInterval(tick);
+        tick = null;
+      }
+    };
+
+    if (AppState.currentState === 'active') {
+      startTick();
+    }
+
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        setNow(Date.now());
+        startTick();
+      } else {
+        stopTick();
+      }
+    });
+
+    return () => {
+      stopTick();
+      sub.remove();
+    };
   }, []);
 
   // AppState resync
@@ -162,6 +189,11 @@ export function GameShell({ gameId }: GameShellProps) {
 
     let res: StartLocationResult;
     try {
+      // Ensure match notifications are permitted for radar alerts and phase shifts
+      const notifPerm = await Notifications.getPermissionsAsync();
+      if (!notifPerm.granted && notifPerm.canAskAgain) {
+        await Notifications.requestPermissionsAsync();
+      }
       res = await startLocationSharing(gameId);
     } catch {
       res = { ok: false, reason: 'error', message: 'Location sharing error' };
@@ -198,10 +230,12 @@ export function GameShell({ gameId }: GameShellProps) {
     };
   }, [sharing, startSharing, state, state?.game?.status, state?.my_player_id, state?.players]);
 
-  // Local location watcher
+  // Local location watcher: when phone is locked/backgrounded with background sharing enabled,
+  // skip local React state marker updates to conserve CPU & battery.
   useEffect(() => {
     if (sharing !== 'on') return;
     return watchLocation((nextFix) => {
+      if (AppState.currentState !== 'active' && backgroundSharing) return;
       setFix(nextFix);
       if (!backgroundSharing) void uploadLocation(nextFix);
     });

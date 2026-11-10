@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -78,6 +79,13 @@ export default function SplashScreen() {
 
       if (!profile) {
         router.replace('/signup/name' as any);
+        return;
+      }
+
+      // If user hasn't completed safety & permissions onboarding, guide them there
+      const onboardedVal = await AsyncStorage.getItem('@ghostrun:onboarded');
+      if (onboardedVal !== 'true') {
+        router.replace('/signup/before-you-play' as any);
         return;
       }
 

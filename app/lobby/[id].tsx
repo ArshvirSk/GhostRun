@@ -10,6 +10,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text } from '../../src/ui/Text';
 import { Card } from '../../src/ui/Card';
@@ -233,6 +235,27 @@ export default function LobbyScreen() {
 
   const activeModule = getModeModule(state?.game.mode_id || 'classic_chase');
 
+  // Ensure push notifications and location permissions are ready before match begins
+  const ensureGamePermissions = useCallback(async () => {
+    try {
+      const notifStatus = await Notifications.getPermissionsAsync();
+      if (!notifStatus.granted && notifStatus.canAskAgain) {
+        await Notifications.requestPermissionsAsync();
+      }
+      const locStatus = await Location.getForegroundPermissionsAsync();
+      if (!locStatus.granted && locStatus.canAskAgain) {
+        await Location.requestForegroundPermissionsAsync();
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+  }, []);
+
+  // Request notifications & GPS on lobby entry
+  useEffect(() => {
+    void ensureGamePermissions();
+  }, [ensureGamePermissions]);
+
   // RPC wrappers
   async function runAction(action: string, call: () => PromiseLike<RpcResult>) {
     setBusyAction(action);
@@ -280,6 +303,7 @@ export default function LobbyScreen() {
 
   async function startRound() {
     if (!supabase || !gameId) return;
+    await ensureGamePermissions();
     const started = await runAction('start', () =>
       supabase!.rpc('start_game', { game_id: gameId }),
     );
@@ -289,6 +313,11 @@ export default function LobbyScreen() {
   async function toggleReady() {
     if (!supabase || !gameId) return;
     const ownPlayer = state?.players.find((p) => p.id === state.my_player_id);
+
+    // If becoming ready, ensure match notifications & location permissions are active
+    if (!ownPlayer?.is_ready) {
+      await ensureGamePermissions();
+    }
 
     // If role has high complexity and unacknowledged, switch to rules tab and warn
     const effectiveRole = mySecretRole || ownPlayer?.team;

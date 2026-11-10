@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -30,27 +31,39 @@ export default function BriefingScreen() {
     router.push('/signin' as any);
   };
 
-  const handleHostGame = () => {
+  const handleHostGame = async () => {
+    await AsyncStorage.setItem('@ghostrun:onboarded', 'true');
     if (isAuthenticated) {
       router.push('/host/mode' as any);
     } else {
-      router.push('/signup/name' as any);
+      router.push('/signin' as any);
     }
   };
 
-  const handleJoinCode = () => {
-    router.push('/join' as any);
+  const handleJoinCode = async () => {
+    await AsyncStorage.setItem('@ghostrun:onboarded', 'true');
+    if (isAuthenticated) {
+      router.push('/join' as any);
+    } else {
+      router.push('/signin' as any);
+    }
   };
 
-  const handleDemoRound = () => {
-    router.push('/play' as any);
+  const handleDemoRound = async () => {
+    await AsyncStorage.setItem('@ghostrun:onboarded', 'true');
+    if (isAuthenticated) {
+      router.push('/play' as any);
+    } else {
+      router.push('/signin' as any);
+    }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
+    await AsyncStorage.setItem('@ghostrun:onboarded', 'true');
     if (isAuthenticated) {
       router.replace('/play' as any);
     } else {
-      router.push('/signup/name' as any);
+      router.push('/signin' as any);
     }
   };
 

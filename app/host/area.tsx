@@ -57,7 +57,12 @@ export default function HostAreaScreen() {
           setCenter(parsed, 'my_location');
         }
 
-        const perm = await Location.getForegroundPermissionsAsync();
+        // Check foreground location permission; if not granted, request automatically so map centers to user's real GPS
+        let perm = await Location.getForegroundPermissionsAsync();
+        if (!perm.granted && perm.canAskAgain) {
+          perm = await Location.requestForegroundPermissionsAsync();
+        }
+
         if (perm.granted && active) {
           setLocating(true);
           const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -124,12 +129,23 @@ export default function HostAreaScreen() {
     setLocating(true);
     setPlacementError('');
     try {
+      let perm = await Location.getForegroundPermissionsAsync();
+      if (!perm.granted) {
+        perm = await Location.requestForegroundPermissionsAsync();
+      }
+      if (!perm.granted) {
+        setPlacementError('Location permission is required to center on your current GPS.');
+        triggerHaptic('error');
+        return;
+      }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
       setCenter(coords, 'my_location');
+      void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
       triggerHaptic('buttonTap');
     } catch (err: unknown) {
       setPlacementError(err instanceof Error ? err.message : 'Could not get current location.');
+      triggerHaptic('error');
     } finally {
       setLocating(false);
     }
