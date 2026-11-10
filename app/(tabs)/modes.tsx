@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text } from '../../src/ui/Text';
 import { Card } from '../../src/ui/Card';
@@ -16,6 +17,7 @@ type DifficultyFilter = 'all' | '1' | '2' | '3';
 export default function ModesTab() {
   const { colors, spacing, radii } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [playerFilter, setPlayerFilter] = useState<PlayerFilter>('all');
   const [diffFilter, setDiffFilter] = useState<DifficultyFilter>('all');
 
@@ -42,8 +44,17 @@ export default function ModesTab() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
-        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xl }}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: 18,
+            paddingTop: Math.max(insets.top, 20) + spacing.md,
+            paddingBottom: Math.max(insets.bottom, 20) + 100,
+          },
+        ]}
+      >
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs }}>
           MODES LIBRARY
         </Text>
         <Text variant="body" style={{ color: colors.textMuted, marginTop: 4, marginBottom: spacing.md }}>
@@ -55,7 +66,12 @@ export default function ModesTab() {
           <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
             SQUAD SIZE
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterScrollView}
+            contentContainerStyle={styles.filterRow}
+          >
             {(
               [
                 { id: 'all', label: 'ALL SIZES' },
@@ -77,7 +93,12 @@ export default function ModesTab() {
           <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.sm, marginBottom: spacing.xs }}>
             COMPLEXITY
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterScrollView}
+            contentContainerStyle={styles.filterRow}
+          >
             {(
               [
                 { id: 'all', label: 'ALL TIERS' },
@@ -150,7 +171,7 @@ export default function ModesTab() {
                     title="Host Mode"
                     variant="primary"
                     size="sm"
-                    icon="play"
+                    icon={<Ionicons name="play" size={13} color={colors.primaryText} />}
                     style={{ flex: 1 }}
                     onPress={() => handleHost(mode.id)}
                   />
@@ -193,11 +214,14 @@ const styles = StyleSheet.create({
   filterSection: {
     marginVertical: 4,
   },
+  filterScrollView: {
+    marginHorizontal: -18,
+  },
   filterRow: {
     flexDirection: 'row',
     gap: 8,
+    paddingHorizontal: 18,
     paddingVertical: 4,
-    paddingRight: 24,
   },
   modeCard: {
     padding: 16,

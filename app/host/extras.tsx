@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text } from '../../src/ui/Text';
@@ -14,6 +15,7 @@ import { triggerHaptic } from '../../src/motion/haptics';
 export default function HostExtrasScreen() {
   const { colors, spacing } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const selectedMode = useHostStore((s) => s.mode);
   const selectedModifiers = useHostStore((s) => s.selectedModifiers);
@@ -28,7 +30,15 @@ export default function HostExtrasScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Top Header Bar */}
-      <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingTop: spacing.xl }]}>
+      <View
+        style={[
+          styles.topBar,
+          {
+            paddingHorizontal: spacing.lg,
+            paddingTop: Math.max(insets.top, 16) + 8,
+          },
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back to Rules"
@@ -48,7 +58,7 @@ export default function HostExtrasScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: Math.max(insets.bottom, 16) + 90 }]}>
         <Text variant="display" style={{ color: colors.text, marginTop: spacing.sm }}>
           Roles & Modifiers
         </Text>
@@ -190,7 +200,9 @@ export default function HostExtrasScreen() {
           {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            padding: spacing.lg,
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.md,
+            paddingBottom: Math.max(insets.bottom, 16) + 8,
           },
         ]}
       >

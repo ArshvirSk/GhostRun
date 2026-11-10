@@ -6,6 +6,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import { triggerHaptic } from '../motion/haptics';
@@ -118,6 +119,14 @@ export function Button({
     }
   };
 
+  const renderIcon = () => {
+    if (!icon) return null;
+    if (typeof icon === 'string') {
+      return <Ionicons name={icon as any} size={size === 'sm' ? 14 : 18} color={getTextColor()} />;
+    }
+    return icon;
+  };
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -131,7 +140,7 @@ export function Button({
         <ActivityIndicator color={getTextColor()} size="small" />
       ) : (
         <>
-          {icon && iconPosition === 'left' && <View>{icon}</View>}
+          {icon && iconPosition === 'left' && <View>{renderIcon()}</View>}
           {title ? (
             <Text
               variant="label"
@@ -146,7 +155,7 @@ export function Button({
           ) : (
             children
           )}
-          {icon && iconPosition === 'right' && <View>{icon}</View>}
+          {icon && iconPosition === 'right' && <View>{renderIcon()}</View>}
         </>
       )}
     </Pressable>

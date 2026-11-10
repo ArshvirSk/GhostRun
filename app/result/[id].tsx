@@ -1,6 +1,7 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../../src/lib/map';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -201,6 +202,7 @@ const CARD_WIDTH = SCREEN_WIDTH - 32;
 export default function ResultScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { unitSystem } = useUnits();
   const gameId = Array.isArray(id) ? id[0] : id;
 
@@ -462,7 +464,15 @@ export default function ResultScreen() {
 
   if (!gameId) {
     return (
-      <View style={styles.centered}>
+      <View
+        style={[
+          styles.centered,
+          {
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
+          },
+        ]}
+      >
         <Text variant="headline" color={colors.danger} style={{ marginBottom: spacing.md }}>
           Operation not found.
         </Text>
@@ -473,7 +483,15 @@ export default function ResultScreen() {
 
   if (!state) {
     return (
-      <View style={styles.centered}>
+      <View
+        style={[
+          styles.centered,
+          {
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
+          },
+        ]}
+      >
         {errorMessage ? (
           <>
             <Text variant="body" color={colors.danger} style={{ marginBottom: spacing.md }}>
@@ -495,7 +513,15 @@ export default function ResultScreen() {
 
   if (state.game.status !== 'ended') {
     return (
-      <View style={styles.centered}>
+      <View
+        style={[
+          styles.centered,
+          {
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
+          },
+        ]}
+      >
         <ActivityIndicator color={colors.primary} size="large" />
         <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
           Finalizing round telemetry…
@@ -769,7 +795,7 @@ export default function ResultScreen() {
       </MapLibreMap>
 
       {/* Top Mission HUD */}
-      <View style={styles.topHud}>
+      <View style={[styles.topHud, { top: Math.max(insets.top, 16) + 8 }]}>
         <View style={styles.topHudRow}>
           <Chip
             label={
@@ -798,7 +824,7 @@ export default function ResultScreen() {
       </View>
 
       {/* Bottom Swipeable Cards Deck (Addendum C #4) */}
-      <View style={styles.bottomDeck}>
+      <View style={[styles.bottomDeck, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
         {/* Pagination & Indicator Header */}
         <View style={styles.deckHeader}>
           <View style={styles.deckCategoryRow}>

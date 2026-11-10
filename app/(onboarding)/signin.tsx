@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 import { authErrorMessage } from '../../src/lib/authErrors';
 import { PRIVACY_VERSION } from '../../src/lib/privacy';
@@ -156,6 +157,19 @@ export default function SigninScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Back to Briefing */}
+          <Pressable
+            accessibilityLabel="Back to Briefing Tour"
+            accessibilityRole="button"
+            onPress={() => router.replace('/briefing' as any)}
+            style={styles.backRow}
+          >
+            <Ionicons name="arrow-back" size={20} color={colors.primary} />
+            <Text variant="label" style={{ color: colors.primary, marginLeft: 6 }}>
+              BRIEFING TOUR
+            </Text>
+          </Pressable>
+
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.eyebrow} variant="label">
@@ -286,8 +300,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xl,
+  },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    paddingVertical: 4,
   },
   header: {
     marginBottom: spacing.xl,

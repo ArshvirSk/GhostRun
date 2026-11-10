@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { Text } from '../src/ui/Text';
@@ -15,6 +16,7 @@ const CODE_LENGTH = 4;
 export default function JoinGameScreen() {
   const { colors, spacing, radii } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ code?: string }>();
 
   const initialCode = typeof params.code === 'string'
@@ -78,7 +80,17 @@ export default function JoinGameScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.content, { padding: spacing.xl }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: spacing.xl,
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 24,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Navigation Header */}
         <View style={styles.topBar}>
           <Pressable
@@ -190,7 +202,7 @@ export default function JoinGameScreen() {
             </Text>
           </Card>
         )}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -200,7 +212,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
   },
   topBar: {

@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text } from '../../src/ui/Text';
@@ -80,6 +81,7 @@ type RpcResult = { error: { message: string } | null; data?: unknown };
 export default function LobbyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colors, spacing, radii } = useTheme();
   const { formatDistance } = useUnits();
   const gameId = Array.isArray(id) ? id[0] : id;
@@ -436,7 +438,16 @@ export default function LobbyScreen() {
 
   if (!state) {
     return (
-      <View style={[styles.loading, { backgroundColor: colors.background }]}>
+      <View
+        style={[
+          styles.loading,
+          {
+            backgroundColor: colors.background,
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
+          },
+        ]}
+      >
         {errorMessage ? (
           <Text variant="body" style={{ color: colors.danger }}>
             {errorMessage}
@@ -462,7 +473,16 @@ export default function LobbyScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 80 }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: spacing.lg,
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 40,
+          },
+        ]}
+      >
         {/* Top Header Card */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1, marginRight: spacing.sm }}>

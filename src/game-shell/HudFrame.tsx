@@ -5,6 +5,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../ui/Text';
 import { useTheme } from '../theme/ThemeProvider';
@@ -48,6 +49,7 @@ export const HudFrame = memo(function HudFrame({
   extraChips,
 }: HudFrameProps) {
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const timerValue = selectTimerValue(state, serverNow);
   const timerLabel = selectTimerLabel(state);
   const nextPingIn = selectNextPingIn(state, serverNow);
@@ -76,6 +78,7 @@ export const HudFrame = memo(function HudFrame({
       style={[
         styles.hud,
         {
+          top: Math.max(insets.top, 16) + 8,
           backgroundColor: tokens.colors.surface,
           borderColor: tokens.colors.border,
           borderRadius: tokens.radii.card,

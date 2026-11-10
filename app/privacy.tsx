@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { Text } from '../src/ui/Text';
@@ -44,6 +45,7 @@ type GhostRecord = {
 export default function PrivacyScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colors, spacing } = useTheme();
   const isGate = mode === 'gate';
 
@@ -149,7 +151,16 @@ export default function PrivacyScreen() {
 
   if (loadError) {
     return (
-      <View style={[styles.centered, { backgroundColor: colors.background }]}>
+      <View
+        style={[
+          styles.centered,
+          {
+            backgroundColor: colors.background,
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
+          },
+        ]}
+      >
         <Text variant="body" style={{ color: colors.danger, marginBottom: spacing.md }}>
           {loadError}
         </Text>
@@ -165,7 +176,16 @@ export default function PrivacyScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.screen, { padding: spacing.lg }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.screen,
+          {
+            paddingHorizontal: spacing.lg,
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 32,
+          },
+        ]}
+      >
         {!isGate && (
           <Pressable
             accessibilityLabel="Back"

@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeProvider';
 import type { HudWidgetProps } from '../types';
 
@@ -19,6 +20,7 @@ export const RunnerLayout = memo(function RunnerLayout({
   sheetWidgets,
 }: RunnerLayoutProps) {
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
 
   // The shell enforces max 3 action buttons
   const visibleActions = actionWidgets.slice(0, 3);
@@ -38,7 +40,10 @@ export const RunnerLayout = memo(function RunnerLayout({
 
       {/* Floating Action Bar (Enforcing Max 3 Buttons) */}
       {visibleActions.length > 0 && (
-        <View pointerEvents="box-none" style={styles.actionBar}>
+        <View
+          pointerEvents="box-none"
+          style={[styles.actionBar, { bottom: Math.max(insets.bottom, 16) + 70 }]}
+        >
           <View
             style={[
               styles.actionsPill,

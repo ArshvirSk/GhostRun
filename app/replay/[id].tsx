@@ -1,6 +1,7 @@
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../../src/lib/map';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -278,6 +279,7 @@ function TimelineScrubber({
 export default function ReplayScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const gameId = Array.isArray(id) ? id[0] : id;
 
   const [state, setState] = useState<ReplayState | null>(null);
@@ -695,7 +697,15 @@ export default function ReplayScreen() {
 
   if (!gameId) {
     return (
-      <View style={styles.centered}>
+      <View
+        style={[
+          styles.centered,
+          {
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
+          },
+        ]}
+      >
         <Text variant="headline" color={colors.danger} style={{ marginBottom: spacing.md }}>
           Operation not found.
         </Text>
@@ -706,7 +716,15 @@ export default function ReplayScreen() {
 
   if (!state) {
     return (
-      <View style={styles.centered}>
+      <View
+        style={[
+          styles.centered,
+          {
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
+          },
+        ]}
+      >
         {errorMessage ? (
           <>
             <Text variant="body" color={colors.danger} style={{ marginBottom: spacing.md }}>
@@ -728,7 +746,15 @@ export default function ReplayScreen() {
 
   if (state.game.status !== 'ended') {
     return (
-      <View style={styles.centered}>
+      <View
+        style={[
+          styles.centered,
+          {
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
+          },
+        ]}
+      >
         <ActivityIndicator color={colors.primary} size="large" />
         <Text variant="body" color={colors.textMuted} style={{ marginTop: spacing.md }}>
           Awaiting operation completion…
@@ -1091,7 +1117,7 @@ export default function ReplayScreen() {
       </MapLibreMap>
 
       {/* Top HUD */}
-      <View style={styles.hud}>
+      <View style={[styles.hud, { top: Math.max(insets.top, 16) + 8 }]}>
         <View style={styles.topHudRow}>
           <Chip label={`REPLAY // #${game?.code ?? ''}`} variant="accent" size="sm" />
           <Chip
@@ -1135,7 +1161,7 @@ export default function ReplayScreen() {
 
       {/* Bottom Controls Sheet */}
       <View style={styles.sheet}>
-        <ScrollView contentContainerStyle={styles.sheetContent}>
+        <ScrollView contentContainerStyle={[styles.sheetContent, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           {/* Layer Filter Chips */}
           <Text variant="label" color={colors.primary} style={{ marginBottom: spacing.xs }}>
             TACTICAL LAYERS

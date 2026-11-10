@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -19,6 +19,7 @@ const GHOSTRUN_LOGO = require('../assets/splash-mark.png');
 
 export default function SplashScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [statusMessage, setStatusMessage] = useState('Starting…');
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -42,12 +43,10 @@ export default function SplashScreen() {
 
     try {
       const minDisplayPromise = new Promise((resolve) => setTimeout(resolve, 350));
-      const onboardedPromise = AsyncStorage.getItem('@ghostrun:onboarded');
       const sessionPromise = supabase.auth.getSession();
 
-      const [, onboardedVal, sessionRes] = await Promise.all([
+      const [, sessionRes] = await Promise.all([
         minDisplayPromise,
-        onboardedPromise,
         sessionPromise,
       ]);
 
@@ -57,9 +56,9 @@ export default function SplashScreen() {
         return;
       }
 
-      // If user hasn't completed onboarding or has no active session, send them to welcome hero
-      if (onboardedVal !== 'true' || !sessionRes.data.session) {
-        router.replace('/welcome' as any);
+      // If user has no active session, route directly to the onboarding briefing tour
+      if (!sessionRes.data.session) {
+        router.replace('/briefing' as any);
         return;
       }
 
@@ -121,7 +120,7 @@ export default function SplashScreen() {
         <Text style={styles.brandTagline}>Real-World GPS Chase</Text>
       </Animated.View>
 
-      <View style={styles.bottomSection}>
+      <View style={[styles.bottomSection, { bottom: Math.max(insets.bottom, 16) + 32 }]}>
         {hasError ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>Configuration Notice</Text>

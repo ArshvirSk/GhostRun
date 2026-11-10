@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { Text } from '../src/ui/Text';
@@ -10,6 +11,7 @@ import { Button } from '../src/ui/Button';
 export default function HowToPlayScreen() {
   const { colors, spacing, radii } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const sections = [
     {
@@ -46,7 +48,16 @@ export default function HowToPlayScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: spacing.lg,
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 32,
+          },
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"

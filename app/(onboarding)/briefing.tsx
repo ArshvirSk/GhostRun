@@ -1,34 +1,56 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { supabase } from '../../src/lib/supabase';
+import { colors } from '../../src/theme/tokens';
 import { CORE_TOUR_SCRIPT } from '../../src/tour/scripts/core';
 import { TourPlayer } from '../../src/tour/TourPlayer';
-import { colors } from '../../src/theme/tokens';
 
 export default function BriefingScreen() {
   const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const handleFinish = () => {
-    router.replace('/play' as any);
+  useEffect(() => {
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data?.session) {
+          setIsAuthenticated(true);
+        }
+      });
+    }
+  }, []);
+
+  const handleSignUp = () => {
+    router.push('/signup/name' as any);
   };
 
-  const handleSkip = () => {
-    router.replace('/play' as any);
+  const handleSignIn = () => {
+    router.push('/signin' as any);
+  };
+
+  const handleFinish = () => {
+    if (isAuthenticated) {
+      router.replace('/play' as any);
+    } else {
+      router.push('/signup/name' as any);
+    }
   };
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={styles.container}>
+    <View style={styles.container}>
       <StatusBar style="light" />
       <View style={styles.playerContainer}>
         <TourPlayer
+          isAuthenticated={isAuthenticated}
           onFinish={handleFinish}
-          onSkip={handleSkip}
+          onSignIn={handleSignIn}
+          onSignUp={handleSignUp}
           script={CORE_TOUR_SCRIPT}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

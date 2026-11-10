@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text } from '../../src/ui/Text';
@@ -15,6 +16,7 @@ import { triggerHaptic } from '../../src/motion/haptics';
 export default function HostRulesScreen() {
   const { colors, spacing, radii } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const modeId = useHostStore((s) => s.mode);
   const preset = useHostStore((s) => s.preset);
@@ -32,7 +34,15 @@ export default function HostRulesScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Top Header Bar */}
-      <View style={[styles.topBar, { paddingHorizontal: spacing.lg, paddingTop: spacing.xl }]}>
+      <View
+        style={[
+          styles.topBar,
+          {
+            paddingHorizontal: spacing.lg,
+            paddingTop: Math.max(insets.top, 16) + 8,
+          },
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back to Mode Selection"
@@ -289,7 +299,9 @@ export default function HostRulesScreen() {
           {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            padding: spacing.lg,
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.md,
+            paddingBottom: Math.max(insets.bottom, 16) + 8,
           },
         ]}
       >

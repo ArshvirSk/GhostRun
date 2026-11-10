@@ -177,7 +177,7 @@ export default function ResetPasswordScreen() {
         .maybeSingle();
 
       setBusy(false);
-      router.replace(profile ? '/home' : ('/welcome' as any));
+      router.replace(profile ? '/play' : ('/briefing' as any));
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Password update failed.');
       triggerHaptic('error');

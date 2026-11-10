@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getShippingRegistry } from '../src/modes/registry';
 import { ModeModule } from '../src/modes/types';
@@ -19,6 +20,7 @@ export default function DevPreviewScreen() {
 
 function DevPreviewContent() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colors, spacing, radii } = useTheme();
   const registry = getShippingRegistry();
 
@@ -42,7 +44,12 @@ function DevPreviewContent() {
     <ScrollView
       contentContainerStyle={[
         styles.screen,
-        { backgroundColor: colors.background, padding: spacing.base },
+        {
+          backgroundColor: colors.background,
+          paddingHorizontal: spacing.base,
+          paddingTop: Math.max(insets.top, 16) + 8,
+          paddingBottom: Math.max(insets.bottom, 16) + 32,
+        },
       ]}
     >
       {/* Top Navigation */}

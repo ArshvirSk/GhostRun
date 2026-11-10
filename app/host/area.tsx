@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,6 +26,7 @@ const RADII = [300, 600, 1000, 1500];
 export default function HostAreaScreen() {
   const { colors, spacing, radii, isDark } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraRef>(null);
 
   const mode = useHostStore((s) => s.mode);
@@ -245,7 +247,7 @@ export default function HostAreaScreen() {
       </MapLibreMap>
 
       {/* Top Floating Control Dock */}
-      <View style={[styles.topControls, { top: spacing.xl, left: spacing.md, right: spacing.md }]}>
+      <View style={[styles.topControls, { top: Math.max(insets.top, 16) + 8, left: spacing.md, right: spacing.md }]}>
         <Card variant="default" style={{ padding: spacing.md, borderRadius: radii.card, elevation: 8 }}>
           <View style={styles.topBarRow}>
             <Pressable
@@ -322,7 +324,9 @@ export default function HostAreaScreen() {
           {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            padding: spacing.lg,
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.md,
+            paddingBottom: Math.max(insets.bottom, 16) + 8,
           },
         ]}
       >

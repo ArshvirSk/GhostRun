@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -22,6 +23,7 @@ export const SprintLayout = memo(function SprintLayout({
   primaryAction,
 }: SprintLayoutProps) {
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const timerValue = selectTimerValue(state, serverNow);
   const timerLabel = selectTimerLabel(state);
 
@@ -29,7 +31,16 @@ export const SprintLayout = memo(function SprintLayout({
   const roleColor = isRunner ? tokens.colors.accent : tokens.colors.hunter;
 
   return (
-    <View style={[styles.container, { backgroundColor: tokens.colors.background }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: tokens.colors.background,
+          paddingTop: Math.max(insets.top, 16) + 12,
+          paddingBottom: Math.max(insets.bottom, 16) + 16,
+        },
+      ]}
+    >
       {/* Top Header Bar */}
       <View style={styles.header}>
         <View style={[styles.badge, { backgroundColor: tokens.colors.accent }]}>

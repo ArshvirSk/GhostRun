@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -21,6 +22,7 @@ export const OperatorLayout = memo(function OperatorLayout({
   sheetWidgets,
 }: OperatorLayoutProps) {
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const visibleActions = actionWidgets.slice(0, 3);
 
   return (
@@ -60,7 +62,10 @@ export const OperatorLayout = memo(function OperatorLayout({
 
       {/* Operator Action Bar */}
       {visibleActions.length > 0 && (
-        <View pointerEvents="box-none" style={styles.actionBar}>
+        <View
+          pointerEvents="box-none"
+          style={[styles.actionBar, { bottom: Math.max(insets.bottom, 16) + 70 }]}
+        >
           <View
             style={[
               styles.actionsPill,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, TouchableOpacity, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from '../ui/Text';
 import { Button } from '../ui/Button';
@@ -16,6 +17,9 @@ export interface TourPlayerProps {
   script: TourScript;
   onFinish?: () => void;
   onSkip?: () => void;
+  onSignUp?: () => void;
+  onSignIn?: () => void;
+  isAuthenticated?: boolean;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -24,8 +28,12 @@ export function TourPlayer({
   script,
   onFinish,
   onSkip,
+  onSignUp,
+  onSignIn,
+  isAuthenticated = false,
 }: TourPlayerProps): React.JSX.Element {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const [currentBeatIndex, setCurrentBeatIndex] = useState(0);
 
@@ -46,7 +54,11 @@ export function TourPlayer({
 
   const handleNext = () => {
     if (isLastBeat) {
-      onFinish?.();
+      if (!isAuthenticated && onSignUp) {
+        onSignUp();
+      } else {
+        onFinish?.();
+      }
     } else {
       setCurrentBeatIndex((prev) => prev + 1);
     }
@@ -58,13 +70,31 @@ export function TourPlayer({
     }
   };
 
+  const handleSkip = () => {
+    if (onSkip) {
+      onSkip();
+    } else {
+      // Advance immediately to the last beat (account options slide)
+      setCurrentBeatIndex(totalBeats - 1);
+    }
+  };
+
   const isHunterView = beat.viewMode === 'hunters';
   const roleColor = isHunterView ? colors.hunter : colors.runner;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Top Controls & Story Segments */}
-      <View style={[styles.topBar, { backgroundColor: colors.backgroundDark, borderBottomColor: colors.borderLight }]}>
+      <View
+        style={[
+          styles.topBar,
+          {
+            backgroundColor: colors.backgroundDark,
+            borderBottomColor: colors.borderLight,
+            paddingTop: Math.max(insets.top, 20) + 8,
+          },
+        ]}
+      >
         <View style={styles.segmentsRow}>
           {script.beats.map((_, idx) => (
             <View
@@ -85,21 +115,25 @@ export function TourPlayer({
         </View>
 
         <View style={styles.navRow}>
-          <TouchableOpacity
-            onPress={onSkip}
-            accessibilityRole="button"
-            accessibilityLabel="Skip tour"
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Text variant="label" color={colors.textMuted}>
-              SKIP
-            </Text>
-          </TouchableOpacity>
+          {!isLastBeat ? (
+            <TouchableOpacity
+              onPress={handleSkip}
+              accessibilityRole="button"
+              accessibilityLabel="Skip tour to account setup"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Text variant="label" color={colors.textMuted}>
+                SKIP
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.navPlaceholder} />
+          )}
 
           <View style={styles.hudBadgeRow}>
             <Chip
-              label={isHunterView ? "HUNTERS' VIEW" : "RUNNERS' VIEW"}
-              variant={isHunterView ? 'hunter' : 'accent'}
+              label={isLastBeat ? 'GRID READY' : isHunterView ? "HUNTERS' VIEW" : "RUNNERS' VIEW"}
+              variant={isLastBeat ? 'accent' : isHunterView ? 'hunter' : 'accent'}
               size="sm"
             />
             {beat.timeLeftSeconds !== undefined && beat.timeLeftSeconds > 0 && (
@@ -119,11 +153,12 @@ export function TourPlayer({
 
       {/* Interactive Map Visualizer Canvas */}
       <TouchableOpacity
-        activeOpacity={0.95}
+        activeOpacity={isLastBeat ? 1 : 0.95}
+        disabled={isLastBeat}
         onPress={handleNext}
         style={[styles.canvasContainer, { backgroundColor: colors.surfaceDark }]}
-        accessibilityRole="button"
-        accessibilityLabel="Advance tour step"
+        accessibilityRole={isLastBeat ? 'none' : 'button'}
+        accessibilityLabel={isLastBeat ? undefined : 'Advance tour step'}
       >
         {/* Background Grid Pattern */}
         <View style={styles.gridOverlay}>
@@ -249,7 +284,17 @@ export function TourPlayer({
       </TouchableOpacity>
 
       {/* Bottom Sheet Beat Card */}
-      <Card variant="elevated" style={[styles.bottomCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Card
+        variant="elevated"
+        style={[
+          styles.bottomCard,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            marginBottom: Math.max(insets.bottom, 16),
+          },
+        ]}
+      >
         <View style={styles.cardHeader}>
           <Text variant="mono" color={roleColor} style={styles.beatLabel}>
             BEAT {beat.beatNumber.toString().padStart(2, '0')} / {totalBeats.toString().padStart(2, '0')} • {beat.label}
@@ -262,24 +307,60 @@ export function TourPlayer({
           </Text>
         </View>
 
-        <View style={styles.cardFooter}>
-          {currentBeatIndex > 0 && (
+        {isLastBeat && !isAuthenticated && (onSignUp || onSignIn) ? (
+          <View style={styles.accountOptionsColumn}>
+            {onSignUp && (
+              <Button
+                title="Enter the Grid"
+                variant="primary"
+                size="lg"
+                onPress={onSignUp}
+                accessibilityHint="Starts player registration and takes you to codename selection"
+                style={styles.fullWidthButton}
+              />
+            )}
+            {onSignIn && (
+              <Button
+                title="I already have an account"
+                variant="secondary"
+                size="md"
+                onPress={onSignIn}
+                accessibilityHint="Sign in with existing credentials"
+                style={styles.fullWidthButton}
+              />
+            )}
+            {currentBeatIndex > 0 && (
+              <View style={styles.reviewBriefingRow}>
+                <Button
+                  title="← Review Briefing"
+                  variant="ghost"
+                  size="sm"
+                  onPress={handlePrev}
+                  accessibilityHint="Review previous briefing slide"
+                />
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.cardFooter}>
+            {currentBeatIndex > 0 && (
+              <Button
+                title="BACK"
+                variant="secondary"
+                size="md"
+                onPress={handlePrev}
+                style={styles.backButton}
+              />
+            )}
             <Button
-              title="BACK"
-              variant="secondary"
+              title={isLastBeat ? (isAuthenticated ? 'RETURN TO GRID' : 'ENTER THE GRID') : 'CONTINUE'}
+              variant={isHunterView ? 'hunter' : 'primary'}
               size="md"
-              onPress={handlePrev}
-              style={styles.backButton}
+              onPress={handleNext}
+              style={styles.continueButton}
             />
-          )}
-          <Button
-            title={isLastBeat ? 'ENTER THE GRID' : 'CONTINUE'}
-            variant={isHunterView ? 'hunter' : 'primary'}
-            size="md"
-            onPress={handleNext}
-            style={styles.continueButton}
-          />
-        </View>
+          </View>
+        )}
       </Card>
     </View>
   );
@@ -290,8 +371,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
   },
+  navPlaceholder: {
+    width: 48,
+    height: 20,
+  },
   topBar: {
-    paddingTop: 48,
     paddingHorizontal: 16,
     paddingBottom: 8,
     borderBottomWidth: 1,
@@ -426,5 +510,16 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     flex: 2,
+  },
+  accountOptionsColumn: {
+    gap: 10,
+    width: '100%',
+  },
+  fullWidthButton: {
+    width: '100%',
+  },
+  reviewBriefingRow: {
+    alignItems: 'center',
+    marginTop: 2,
   },
 });

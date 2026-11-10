@@ -7,6 +7,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.7.2] — 2026-11-10
+
+### Tactical Navigation Polish & Full-Bleed Filter Release
+- **Floating Capsule Navbar Ergonomics & Physics:**
+  - Increased horizontal inset margins to `left: 28, right: 28` and added `paddingHorizontal: 16` for clear visual distinction from screen bezels.
+  - Raised bottom elevation to `bottom: Math.max(insets.bottom, 16) + 10` for natural floating suspension above system gesture bars.
+  - Implemented high-depth Android Material `elevation: 24`, deep `shadowRadius: 20` drop shadow, and a 1.5px luminous border (`rgba(255, 255, 255, 0.16)`).
+  - Fixed active tab clipping: replaced blocky container highlight with smooth 50×28 `TabIconWrapper` pill badge (`borderRadius: 14`).
+  - Hardened `<Button>` against raw string icons, resolving runtime unhandled exceptions when navigating to Modes.
+- **Modes Library Edge-to-Edge Chip Scroll:**
+  - Removed container-level clipping wall on `app/(tabs)/modes.tsx`.
+  - Added negative horizontal margins (`marginHorizontal: -18`) with `paddingHorizontal: 18` so Squad Size and Complexity filter chips scroll edge-to-edge across the physical screen without being truncated by container margins.
+- **Unboxed Top Logo & High-Impact Play Screen:**
+  - Replaced raster squircle-boxed logo with clean transparent ghost silhouette vector marks (`assets/ghostrun-mark-mint.png` and `assets/ghostrun-mark-olive.png`).
+  - Restructured hero greeting hierarchy with 56px high-contrast typography and operational grid indicator.
+- **Operative Case File / Profile Overhaul:**
+  - Redesigned `app/(tabs)/you.tsx` with a 72×72 circular avatar displaying live radar status and agent initial in their chosen signature color.
+  - Added `#GR-XXXX` operative callsign badge and expandable drawer with 6 radar signature color swatches.
+  - Implemented Operational Telemetry dashboard with a 40px Win Rate showcase card, visual progress gauge, and a 2×2 metrics grid (Rounds, Evaded, Best Evade, Max Distance).
+- **Onboarding Sequence Fix:**
+  - Enforced strict sequence on cold boot: Onboarding Briefing Tour (`/briefing`) ➔ Account Options (Beat 8) ➔ Sign In/Up ➔ Home (`/play`).
+
 ## [2.7.1] — 2026-11-10
 
 ### Afterimage Redesign & Visual Polish Release

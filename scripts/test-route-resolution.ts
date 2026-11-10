@@ -83,7 +83,7 @@ const REDIRECT_SHIMS = [
   { file: 'app/create.tsx', target: '/host/mode' },
   { file: 'app/target/[id].tsx', target: '/lobby/[id]' },
   { file: 'app/auth.tsx', target: '/signin' },
-  { file: 'app/onboarding.tsx', target: '/welcome' },
+  { file: 'app/onboarding.tsx', target: '/briefing' },
 ];
 
 for (const shim of REDIRECT_SHIMS) {

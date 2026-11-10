@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -15,6 +16,7 @@ import { Text } from '../../src/ui/Text';
 import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
 import { Button } from '../../src/ui/Button';
+import { triggerHaptic } from '../../src/motion/haptics';
 import { supabase } from '../../src/lib/supabase';
 import { useUnits } from '../../src/utils/units';
 
@@ -29,8 +31,9 @@ interface MatchHistoryItem {
 }
 
 export default function YouTab() {
-  const { colors, spacing, radii } = useTheme();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { formatDistance } = useUnits();
 
   const [profile, setProfile] = useState<{ display_name: string; color: string } | null>(null);
@@ -42,7 +45,7 @@ export default function YouTab() {
   const [history, setHistory] = useState<MatchHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
-  // Stats
+  // Performance stats
   const [stats, setStats] = useState({
     rounds: 0,
     won: 0,
@@ -54,7 +57,7 @@ export default function YouTab() {
 
   const loadProfileAndHistory = useCallback(async () => {
     try {
-      // 1. Load local profile first for speed
+      // 1. Local cached profile for instant boot
       const localProfileRaw = await AsyncStorage.getItem('@ghostrun:profile');
       if (localProfileRaw) {
         try {
@@ -107,7 +110,6 @@ export default function YouTab() {
         }));
         setHistory(items);
 
-        // Derive stats
         const total = items.length;
         const won = items.filter((m) => m.team === m.winner).length;
         const neverCaughtCount = items.filter(
@@ -138,6 +140,7 @@ export default function YouTab() {
   const saveProfile = async () => {
     if (!draftName.trim() || !userId || !supabase) return;
     setSavingProfile(true);
+    triggerHaptic('buttonTap');
     try {
       const updated = { display_name: draftName.trim(), color: draftColor };
       await supabase.from('profiles').update(updated).eq('id', userId);
@@ -151,56 +154,145 @@ export default function YouTab() {
     }
   };
 
+  const displayName = profile?.display_name || 'Operative';
+  const initial = displayName.trim().charAt(0).toUpperCase() || 'A';
+  const signatureColor = profile?.color || colors.primary;
+  const shortId = userId ? userId.slice(0, 6).toUpperCase() : '8492';
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
-        {/* Top Header */}
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: Math.max(insets.top, 20) + 12,
+            paddingBottom: Math.max(insets.bottom, 20) + 100,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Top Header Row */}
         <View style={styles.topRow}>
-          <Text variant="display" style={{ color: colors.text, marginTop: spacing.xl }}>
-            CASE FILE
-          </Text>
+          <View>
+            <Text style={[styles.pageTitle, { color: colors.text }]}>
+              CASE FILE
+            </Text>
+            <View style={styles.statusPill}>
+              <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.statusPillText, { color: colors.textMuted }]}>
+                CLEARANCE LEVEL 1 · OPERATIONAL
+              </Text>
+            </View>
+          </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Settings"
-            onPress={() => router.push('/settings' as any)}
-            style={[styles.settingsButton, { backgroundColor: colors.surfaceElevated, marginTop: spacing.xl }]}
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              router.push('/settings' as any);
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={[
+              styles.settingsButton,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
           >
             <Ionicons name="settings-sharp" size={20} color={colors.text} />
           </Pressable>
         </View>
 
-        {/* Profile Dossier Card */}
+        {/* Hero Operative Dossier Card */}
         <Card
-          variant="default"
-          style={[styles.profileCard, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
+          variant="elevated"
+          style={[
+            styles.heroCard,
+            {
+              backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
         >
-          <View style={styles.profileRow}>
-            <View
-              style={[
-                styles.colorDot,
-                { backgroundColor: profile?.color || colors.primary, borderRadius: radii.pill },
-              ]}
-            />
-            <View style={{ flex: 1 }}>
-              <Text variant="title" style={{ color: colors.text }}>
-                {profile?.display_name || 'Operative'}
+          <View style={styles.heroRow}>
+            {/* Avatar Circle with Radar Signature & Initial */}
+            <View style={styles.avatarWrapper}>
+              <View
+                style={[
+                  styles.avatarCircle,
+                  {
+                    backgroundColor: signatureColor,
+                    borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
+                  },
+                ]}
+              >
+                <Text style={styles.avatarInitial}>{initial}</Text>
+              </View>
+              <View style={[styles.avatarLiveBadge, { backgroundColor: colors.primary }]} />
+            </View>
+
+            {/* Operative Callsign & Credentials */}
+            <View style={styles.heroMeta}>
+              <View style={styles.badgeRow}>
+                <View
+                  style={[
+                    styles.tagBadge,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(199, 243, 107, 0.12)'
+                        : 'rgba(85, 122, 34, 0.10)',
+                      borderColor: colors.primary,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tagBadgeText, { color: colors.primary }]}>
+                    TAG ID #{shortId}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={[styles.codenameText, { color: colors.text }]} numberOfLines={1}>
+                {displayName}
               </Text>
-              <Text variant="label" style={{ color: colors.textMuted, marginTop: 2 }}>
-                STATUS: ACTIVE OPERATIVE
+
+              <Text style={[styles.rankText, { color: colors.textMuted }]}>
+                TACTICAL RADAR · ACTIVE AGENT
               </Text>
             </View>
-            <Button
-              title={isEditing ? 'Cancel' : 'Edit'}
-              variant="secondary"
-              size="sm"
-              onPress={() => setIsEditing(!isEditing)}
-            />
           </View>
 
+          {/* Edit Callsign & Signature Trigger */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit Codename and Radar Color"
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              setIsEditing(!isEditing);
+            }}
+            style={[
+              styles.editTriggerBtn,
+              {
+                backgroundColor: isDark ? colors.surfaceMuted : colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Ionicons
+              name={isEditing ? 'close' : 'create-outline'}
+              size={16}
+              color={colors.text}
+            />
+            <Text style={[styles.editTriggerText, { color: colors.text }]}>
+              {isEditing ? 'Close Editor' : 'Edit Callsign & Color'}
+            </Text>
+          </Pressable>
+
+          {/* Edit Panel Drawer */}
           {isEditing && (
-            <View style={[styles.editBox, { borderTopColor: colors.borderDark, marginTop: spacing.md }]}>
-              <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
-                CHANGE CODENAME
+            <View style={[styles.editDrawer, { borderTopColor: colors.border }]}>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
+                AGENT CODENAME
               </Text>
               <TextInput
                 value={draftName}
@@ -208,133 +300,269 @@ export default function YouTab() {
                 placeholder="Agent Codename"
                 placeholderTextColor={colors.textSubtle}
                 maxLength={20}
+                autoCapitalize="words"
                 style={[
-                  styles.input,
+                  styles.textInput,
                   {
-                    backgroundColor: colors.surfaceElevated,
+                    backgroundColor: isDark ? colors.surface : colors.surfaceElevated,
                     color: colors.text,
-                    borderColor: colors.borderDark,
-                    borderRadius: radii.sm,
+                    borderColor: colors.border,
                   },
                 ]}
               />
 
-              <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.sm, marginBottom: spacing.xs }}>
-                RADAR COLOR SIGNATURE
+              <Text
+                style={[
+                  styles.inputLabel,
+                  { color: colors.textMuted, marginTop: 14, marginBottom: 8 },
+                ]}
+              >
+                RADAR SIGNATURE COLOR
               </Text>
               <View style={styles.paletteRow}>
-                {colors.palette.map((c) => (
-                  <Pressable
-                    key={c}
-                    onPress={() => setDraftColor(c)}
-                    style={[
-                      styles.paletteDot,
-                      { backgroundColor: c },
-                      draftColor === c && { borderColor: colors.text, borderWidth: 2 },
-                    ]}
-                  />
-                ))}
+                {colors.palette.map((c) => {
+                  const isSelected = draftColor.toLowerCase() === c.toLowerCase();
+                  return (
+                    <Pressable
+                      key={c}
+                      onPress={() => {
+                        triggerHaptic('buttonTap');
+                        setDraftColor(c);
+                      }}
+                      style={[
+                        styles.paletteSwatch,
+                        { backgroundColor: c },
+                        isSelected && {
+                          borderWidth: 3,
+                          borderColor: colors.text,
+                          transform: [{ scale: 1.15 }],
+                        },
+                      ]}
+                    />
+                  );
+                })}
               </View>
 
               <Button
-                title={savingProfile ? 'Updating...' : 'Save Profile'}
+                title={savingProfile ? 'Updating Credentials…' : 'Save Callsign'}
                 variant="primary"
-                size="sm"
-                style={{ marginTop: spacing.md }}
+                size="md"
                 disabled={savingProfile || !draftName.trim()}
+                style={{ marginTop: 16 }}
                 onPress={() => void saveProfile()}
               />
             </View>
           )}
         </Card>
 
-        {/* Stats Grid */}
-        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
-          OPERATIONAL PERFORMANCE
+        {/* Section: Operational Performance Matrix */}
+        <Text style={[styles.sectionHeading, { color: colors.textMuted }]}>
+          OPERATIONAL TELEMETRY
         </Text>
-        <View style={styles.statsGrid}>
-          <Card variant="elevated" style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
-            <Text variant="display" style={{ color: colors.primary }}>
+
+        {/* Hero Win Rate Showcase Card */}
+        <Card
+          variant="default"
+          style={[
+            styles.winRateCard,
+            {
+              backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <View style={styles.winRateRow}>
+            <View>
+              <Text style={[styles.winRateValue, { color: colors.primary }]}>
+                {stats.rounds > 0 ? `${stats.winRate}%` : '--'}
+              </Text>
+              <Text style={[styles.winRateLabel, { color: colors.textMuted }]}>
+                MISSION WIN RATE
+              </Text>
+            </View>
+
+            <View style={styles.winRateRight}>
+              <View style={styles.victoriesChip}>
+                <Ionicons name="trophy" size={14} color={colors.primary} />
+                <Text style={[styles.victoriesText, { color: colors.text }]}>
+                  {stats.won} / {stats.rounds} WON
+                </Text>
+              </View>
+              <Text style={[styles.winRateSubtext, { color: colors.textMuted }]}>
+                {stats.rounds === 0
+                  ? 'No rounds logged yet'
+                  : `${stats.rounds - stats.won} defeats recorded`}
+              </Text>
+            </View>
+          </View>
+
+          {/* Visual Progress Gauge */}
+          <View
+            style={[
+              styles.gaugeTrack,
+              { backgroundColor: isDark ? colors.surfaceMuted : colors.border },
+            ]}
+          >
+            <View
+              style={[
+                styles.gaugeFill,
+                {
+                  width: `${Math.max(stats.winRate, 4)}%`,
+                  backgroundColor: colors.primary,
+                },
+              ]}
+            />
+          </View>
+        </Card>
+
+        {/* 4 Core Performance Stat Cards (2x2 Grid) */}
+        <View style={styles.metricsGrid}>
+          {/* Rounds */}
+          <Card
+            variant="default"
+            style={[
+              styles.metricCard,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.metricHeader}>
+              <Ionicons name="flag-outline" size={18} color={colors.primary} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>ROUNDS</Text>
+            </View>
+            <Text style={[styles.metricValue, { color: colors.text }]}>
               {stats.rounds}
             </Text>
-            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
-              ROUNDS
-            </Text>
           </Card>
-          <Card variant="elevated" style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
-            <Text variant="display" style={{ color: colors.text }}>
-              {stats.won}
-            </Text>
-            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
-              WON
-            </Text>
-          </Card>
-          <Card variant="elevated" style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
-            <Text variant="display" style={{ color: colors.radarScan }}>
-              {stats.winRate}%
-            </Text>
-            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
-              WIN RATE
-            </Text>
-          </Card>
-          <Card variant="elevated" style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
-            <Text variant="display" style={{ color: colors.ghostTrail }}>
+
+          {/* Never Caught */}
+          <Card
+            variant="default"
+            style={[
+              styles.metricCard,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.metricHeader}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={colors.accent} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>EVADED</Text>
+            </View>
+            <Text style={[styles.metricValue, { color: colors.text }]}>
               {stats.neverCaught}
             </Text>
-            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
-              NEVER CAUGHT
-            </Text>
           </Card>
-          <Card variant="elevated" style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
-            <Text variant="display" style={{ color: colors.warning }}>
+
+          {/* Best Escape */}
+          <Card
+            variant="default"
+            style={[
+              styles.metricCard,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.metricHeader}>
+              <Ionicons name="timer-outline" size={18} color={colors.warning} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>BEST EVADE</Text>
+            </View>
+            <Text style={[styles.metricValue, { color: colors.text }]}>
               {stats.bestEscape}
             </Text>
-            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
-              BEST ESCAPE
-            </Text>
           </Card>
-          <Card variant="elevated" style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
-            <Text variant="display" style={{ color: colors.hunter }}>
+
+          {/* Farthest Run */}
+          <Card
+            variant="default"
+            style={[
+              styles.metricCard,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.metricHeader}>
+              <Ionicons name="navigate-outline" size={18} color={colors.hunter} />
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>FARTHEST</Text>
+            </View>
+            <Text style={[styles.metricValue, { color: colors.text }]}>
               {formatDistance(stats.farthestMeters)}
-            </Text>
-            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
-              FARTHEST
             </Text>
           </Card>
         </View>
 
-        {/* Match History */}
-        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.xl, marginBottom: spacing.xs }}>
-          MISSION LOG
-        </Text>
+        {/* Section: Mission Log */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionHeading, { color: colors.textMuted, marginBottom: 0 }]}>
+            MISSION LOG
+          </Text>
+          {history.length > 0 && (
+            <Chip label={`${history.length} ROUNDS`} variant="muted" size="sm" />
+          )}
+        </View>
+
         {loadingHistory ? (
-          <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.md }} />
+          <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
         ) : history.length === 0 ? (
-          <Card variant="default" style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
-            <MaterialCommunityIcons name="file-document-outline" size={36} color={colors.textSubtle} />
-            <Text variant="title" style={{ color: colors.text, marginTop: spacing.xs }}>
+          <Card
+            variant="default"
+            style={[
+              styles.emptyCard,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="file-document-outline"
+              size={40}
+              color={colors.textSubtle}
+            />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
               Empty Case File
             </Text>
-            <Text variant="body" style={{ color: colors.textMuted, marginTop: 4, textAlign: 'center', fontSize: 13 }}>
-              No rounds on file. Play one and this fills in.
+            <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
+              No outdoor rounds on record yet. Deploy onto the radar to record telemetry.
             </Text>
+            <Button
+              title="Host a Game"
+              variant="secondary"
+              size="sm"
+              style={{ marginTop: 14 }}
+              onPress={() => router.push('/host/mode' as any)}
+            />
           </Card>
         ) : (
-          <View style={{ gap: 8 }}>
+          <View style={{ gap: 10 }}>
             {history.map((item) => {
               const isWon = item.team === item.winner;
               return (
                 <Card
                   key={item.id}
                   variant="default"
-                  style={[styles.historyCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
+                  style={[
+                    styles.historyCard,
+                    {
+                      backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text variant="title" style={{ color: colors.text, fontSize: 15 }}>
+                    <Text style={[styles.historyMode, { color: colors.text }]}>
                       {item.mode_id.replace(/_/g, ' ').toUpperCase()}
                     </Text>
-                    <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                      ROLE: {item.team.toUpperCase()} · {new Date(item.created_at).toLocaleDateString()}
+                    <Text style={[styles.historyMeta, { color: colors.textMuted }]}>
+                      ROLE: {item.team.toUpperCase()} ·{' '}
+                      {new Date(item.created_at).toLocaleDateString()}
                     </Text>
                   </View>
                   <Chip
@@ -348,18 +576,31 @@ export default function YouTab() {
           </View>
         )}
 
-        {/* Tactical Actions & Field Guides */}
-        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.xl, marginBottom: spacing.xs }}>
+        {/* Section: Tactical Guides & Tools */}
+        <Text style={[styles.sectionHeading, { color: colors.textMuted, marginTop: 28 }]}>
           TACTICAL DOSSIERS & TOOLS
         </Text>
-        <Card variant="default" style={{ backgroundColor: colors.surface, borderColor: colors.borderDark, padding: 4 }}>
+
+        <Card
+          variant="default"
+          style={[
+            styles.menuCard,
+            {
+              backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/how-to-play' as any)}
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              router.push('/how-to-play' as any);
+            }}
             style={styles.menuRow}
           >
             <MaterialCommunityIcons name="book-open-outline" size={20} color={colors.primary} />
-            <Text variant="body" style={{ color: colors.text, flex: 1, marginLeft: spacing.sm }}>
+            <Text style={[styles.menuRowText, { color: colors.text }]}>
               Field Manual & Rules
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -367,11 +608,14 @@ export default function YouTab() {
 
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/safety' as any)}
-            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.borderDark }]}
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              router.push('/safety' as any);
+            }}
+            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
           >
             <MaterialCommunityIcons name="shield-check-outline" size={20} color={colors.warning} />
-            <Text variant="body" style={{ color: colors.text, flex: 1, marginLeft: spacing.sm }}>
+            <Text style={[styles.menuRowText, { color: colors.text }]}>
               Safety Protocol
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -379,11 +623,14 @@ export default function YouTab() {
 
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/briefing' as any)}
-            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.borderDark }]}
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              router.push('/briefing' as any);
+            }}
+            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
           >
             <MaterialCommunityIcons name="movie-play-outline" size={20} color={colors.radarScan} />
-            <Text variant="body" style={{ color: colors.text, flex: 1, marginLeft: spacing.sm }}>
+            <Text style={[styles.menuRowText, { color: colors.text }]}>
               Replay Briefing Tour
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -391,24 +638,15 @@ export default function YouTab() {
 
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/debug/hud-gallery' as any)}
-            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.borderDark }]}
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              router.push('/settings' as any);
+            }}
+            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
           >
-            <MaterialCommunityIcons name="view-dashboard-outline" size={20} color={colors.ghostTrail} />
-            <Text variant="body" style={{ color: colors.text, flex: 1, marginLeft: spacing.sm }}>
-              Tactical HUD Gallery
-            </Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/privacy' as any)}
-            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.borderDark }]}
-          >
-            <MaterialCommunityIcons name="lock-outline" size={20} color={colors.textMuted} />
-            <Text variant="body" style={{ color: colors.text, flex: 1, marginLeft: spacing.sm }}>
-              Privacy & Data Management
+            <Ionicons name="settings-outline" size={19} color={colors.textMuted} />
+            <Text style={[styles.menuRowText, { color: colors.text }]}>
+              Account Settings & Preferences
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
@@ -423,89 +661,297 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingBottom: 110,
+    paddingHorizontal: 20,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 20,
+  },
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   settingsButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  profileCard: {
-    padding: 16,
+  heroCard: {
+    padding: 18,
+    borderRadius: 20,
     borderWidth: 1,
+    marginBottom: 24,
   },
-  profileRow: {
+  heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
-  colorDot: {
-    width: 28,
-    height: 28,
+  avatarWrapper: {
+    position: 'relative',
   },
-  editBox: {
-    paddingTop: 12,
+  avatarCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+  },
+  avatarInitial: {
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  avatarLiveBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  heroMeta: {
+    flex: 1,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  tagBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  tagBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  codenameText: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    marginTop: 2,
+  },
+  rankText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  editTriggerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: 16,
+  },
+  editTriggerText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  editDrawer: {
+    marginTop: 16,
+    paddingTop: 16,
     borderTopWidth: 1,
   },
-  input: {
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  textInput: {
+    height: 46,
+    borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
     fontSize: 15,
+    fontWeight: '700',
   },
   paletteRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     paddingVertical: 6,
   },
-  paletteDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  paletteSwatch: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
-  statsGrid: {
+  sectionHeading: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 10,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 10,
+  },
+  winRateCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  winRateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  winRateValue: {
+    fontSize: 40,
+    fontWeight: '900',
+    letterSpacing: -1,
+    lineHeight: 44,
+  },
+  winRateLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginTop: 2,
+  },
+  winRateRight: {
+    alignItems: 'flex-end',
+  },
+  victoriesChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  victoriesText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  winRateSubtext: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  gaugeTrack: {
+    height: 6,
+    borderRadius: 3,
+    marginTop: 14,
+    overflow: 'hidden',
+  },
+  gaugeFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
-  statCard: {
-    width: '31%',
+  metricCard: {
+    width: '48%',
     flexGrow: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
   },
-  statLabel: {
-    fontSize: 9.5,
+  metricHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  metricLabel: {
+    fontSize: 10,
+    fontWeight: '800',
     letterSpacing: 0.5,
-    textAlign: 'center',
-    marginTop: 2,
+  },
+  metricValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.5,
   },
   emptyCard: {
     padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 8,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 18,
+    maxWidth: 260,
   },
   historyCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
+  },
+  historyMode: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  historyMeta: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  menuCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
+    gap: 12,
+  },
+  menuRowText: {
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
   },
 });

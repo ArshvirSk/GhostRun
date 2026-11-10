@@ -138,7 +138,7 @@ export const CORE_TOUR_SCRIPT: TourScript = {
       nextPingSeconds: 0,
       camera: { zoom: 14, center: [50, 50] },
       markers: [],
-      overlays: [],
+      overlays: [{ type: 'radarSweep' }],
       callToAction: 'finish',
     },
   ],

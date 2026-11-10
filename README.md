@@ -4,8 +4,8 @@
 
 ![GhostRun](banner.png)
 
-[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.7.1)
-[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.7.1)
+[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.7.2)
+[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.7.2)
 [![Expo SDK](https://img.shields.io/badge/Expo-v58.0-000000.svg)](https://expo.dev)
 [![React Native](https://img.shields.io/badge/React%20Native-0.88-61DAFB.svg)](https://reactnative.dev)
 [![Supabase](https://img.shields.io/badge/Backend-Supabase%20PostGIS-3ECF8E.svg)](https://supabase.com)
@@ -67,9 +67,8 @@ GhostRun v2.6.0 introduces an overhaul of the entire application architecture ac
 
 ```mermaid
 graph TD
-    Entry["/"] --> Welcome["/(onboarding)/welcome"]
-    Welcome --> Tour["/(onboarding)/briefing (8-Beat Tour)"]
-    Welcome --> AuthFlow["4-Step Sign-Up / Sign-In"]
+    Entry["/"] --> Tour["/(onboarding)/briefing (8-Beat Tour & Account Options)"]
+    Tour --> AuthFlow["4-Step Sign-Up / Sign-In"]
     AuthFlow --> MainTabs["Floating 3-Tab Pill Navigation"]
 
     subgraph Tabs ["Main Operations"]

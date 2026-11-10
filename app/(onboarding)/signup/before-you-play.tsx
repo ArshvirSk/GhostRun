@@ -156,8 +156,8 @@ export default function SignupBeforeYouPlayScreen() {
       triggerHaptic('roleReveal');
       setSubmitting(false);
 
-      // Navigate to the Briefing tour
-      router.replace('/briefing' as any);
+      // Navigate to the tactical grid
+      router.replace('/play' as any);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Setup completion failed.');
       triggerHaptic('error');
@@ -328,11 +328,11 @@ export default function SignupBeforeYouPlayScreen() {
           <ActivityIndicator color={colors.primary} size="small" style={styles.loader} />
         ) : (
           <Button
-            accessibilityHint="Completes profile creation and unlocks the briefing tour"
+            accessibilityHint="Completes profile creation and enters the tactical grid"
             disabled={!ageConfirmed}
             onPress={handleCompleteSetup}
             size="lg"
-            title="Complete Setup & Enter Briefing"
+            title="Complete Setup & Enter Grid"
             variant="primary"
           />
         )}

@@ -10,6 +10,7 @@ import {
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -28,6 +29,7 @@ const DELETE_WORD = 'DELETE';
 export default function SettingsScreen() {
   const { colors, spacing, radii, themeMode, setThemeMode } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { unitSystem, setUnitSystem } = useUnits();
 
   // Settings State
@@ -162,7 +164,16 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: spacing.lg,
+            paddingTop: Math.max(insets.top, 16) + 8,
+            paddingBottom: Math.max(insets.bottom, 16) + 32,
+          },
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
@@ -481,7 +492,7 @@ export default function SettingsScreen() {
             </Text>
           </Pressable>
           <Text variant="mono" style={{ color: colors.textSubtle, fontSize: 11 }}>
-            GhostRun v2.7.1 · Operative Release
+            GhostRun v2.7.2 · Operative Release
           </Text>
         </View>
       </ScrollView>
