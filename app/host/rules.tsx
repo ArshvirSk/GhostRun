@@ -52,7 +52,7 @@ export default function HostRulesScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
         <Text variant="display" style={{ color: colors.text, marginTop: spacing.sm }}>
           Configure Rules
         </Text>
@@ -72,6 +72,7 @@ export default function HostRulesScreen() {
                 <Chip
                   key={pKey}
                   label={pKey.toUpperCase()}
+                  size="sm"
                   selected={isSelected}
                   variant={isSelected ? 'accent' : 'default'}
                   onPress={() => {

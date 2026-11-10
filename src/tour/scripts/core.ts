@@ -87,8 +87,8 @@ export const CORE_TOUR_SCRIPT: TourScript = {
       nextPingSeconds: 6,
       camera: { zoom: 16, center: [40, 30] },
       markers: [
-        { id: 'r1_now', role: 'runner', x: 22, y: 18, label: 'YOU (CURRENT)' },
-        { id: 'r1_echo', role: 'runner', x: 30, y: 25, label: 'LAST PING', isEcho: true },
+        { id: 'r1_now', role: 'runner', x: 22, y: 18, label: 'YOU (CURRENT)', labelPosition: 'top' },
+        { id: 'r1_echo', role: 'runner', x: 30, y: 25, label: 'LAST PING', isEcho: true, labelPosition: 'bottom' },
       ],
       overlays: [],
     },
@@ -121,8 +121,8 @@ export const CORE_TOUR_SCRIPT: TourScript = {
       nextPingSeconds: 2,
       camera: { zoom: 17, center: [46, 46] },
       markers: [
-        { id: 'h1', role: 'hunter', x: 46, y: 46, label: 'YOU' },
-        { id: 'r1', role: 'runner', x: 48, y: 45, label: 'TARGET', isTagged: true },
+        { id: 'h1', role: 'hunter', x: 46, y: 46, label: 'YOU', labelPosition: 'top' },
+        { id: 'r1', role: 'runner', x: 48, y: 45, label: 'TARGET', isTagged: true, labelPosition: 'bottom' },
       ],
       overlays: [{ type: 'heatWashHot' }],
     },

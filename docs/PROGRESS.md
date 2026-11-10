@@ -45,6 +45,7 @@
 | 2026-11-10 | UI-M6 | Lobby, tabs and You (3-segment lobby, role briefing card, Modes library, You profile & stats, Settings & Privacy redesign) | verified | approved |
 | 2026-11-10 | UI-M7 | Result, replay and gallery completion (swipeable recap cards, ±15s replay skip, ghost echo, gallery completion, token coverage) | verified | approved |
 | 2026-11-10 | UI-M8 | Hardening and release candidate (redirects and deep links test, a11y pass, docs/ADDING_A_MODE.md, README update, release checklist) | verified | approved |
+| 2026-11-10 | UI-R1 | Afterimage Light/Dark redesign implementation against reference screenshots (label collision & mid-word wrap, review metric grid, chip padding, floating tab scroll offsets, dark map theme, theme switcher in settings, persistence suite, before/after captures) | verified | approved |
 
 
 

@@ -153,7 +153,7 @@ export default function YouTab() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
         {/* Top Header */}
         <View style={styles.topRow}>
           <Text variant="display" style={{ color: colors.text, marginTop: spacing.xl }}>
@@ -257,7 +257,7 @@ export default function YouTab() {
             <Text variant="display" style={{ color: colors.primary }}>
               {stats.rounds}
             </Text>
-            <Text variant="label" style={{ color: colors.textMuted }}>
+            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
               ROUNDS
             </Text>
           </Card>
@@ -265,7 +265,7 @@ export default function YouTab() {
             <Text variant="display" style={{ color: colors.text }}>
               {stats.won}
             </Text>
-            <Text variant="label" style={{ color: colors.textMuted }}>
+            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
               WON
             </Text>
           </Card>
@@ -273,7 +273,7 @@ export default function YouTab() {
             <Text variant="display" style={{ color: colors.radarScan }}>
               {stats.winRate}%
             </Text>
-            <Text variant="label" style={{ color: colors.textMuted }}>
+            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
               WIN RATE
             </Text>
           </Card>
@@ -281,7 +281,7 @@ export default function YouTab() {
             <Text variant="display" style={{ color: colors.ghostTrail }}>
               {stats.neverCaught}
             </Text>
-            <Text variant="label" style={{ color: colors.textMuted }}>
+            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
               NEVER CAUGHT
             </Text>
           </Card>
@@ -289,7 +289,7 @@ export default function YouTab() {
             <Text variant="display" style={{ color: colors.warning }}>
               {stats.bestEscape}
             </Text>
-            <Text variant="label" style={{ color: colors.textMuted }}>
+            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
               BEST ESCAPE
             </Text>
           </Card>
@@ -297,7 +297,7 @@ export default function YouTab() {
             <Text variant="display" style={{ color: colors.hunter }}>
               {formatDistance(stats.farthestMeters)}
             </Text>
-            <Text variant="label" style={{ color: colors.textMuted }}>
+            <Text variant="label" numberOfLines={1} style={[styles.statLabel, { color: colors.textMuted }]}>
               FARTHEST
             </Text>
           </Card>
@@ -478,8 +478,16 @@ const styles = StyleSheet.create({
   statCard: {
     width: '31%',
     flexGrow: 1,
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statLabel: {
+    fontSize: 9.5,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    marginTop: 2,
   },
   emptyCard: {
     padding: 24,

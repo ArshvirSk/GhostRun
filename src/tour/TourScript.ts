@@ -11,6 +11,7 @@ export interface TourMarker {
   x: number; // percentage coordinates (0-100) on simulated map canvas
   y: number;
   label?: string;
+  labelPosition?: 'top' | 'bottom';
   isEcho?: boolean;
   isTagged?: boolean;
   isOutsideZone?: boolean;

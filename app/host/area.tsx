@@ -14,14 +14,16 @@ import { Chip } from '../../src/ui/Chip';
 import { useHostStore } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
 
-const MAP_STYLE =
+const DAY_MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
+const DARK_MAP_STYLE =
+  process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
 const LAST_LOCATION_KEY = '@ghostrun:last_location_coords';
 
 const RADII = [300, 600, 1000, 1500];
 
 export default function HostAreaScreen() {
-  const { colors, spacing, radii } = useTheme();
+  const { colors, spacing, radii, isDark } = useTheme();
   const router = useRouter();
   const cameraRef = useRef<CameraRef>(null);
 
@@ -136,7 +138,7 @@ export default function HostAreaScreen() {
       {/* MapLibre Canvas */}
       <MapLibreMap
         attribution
-        mapStyle={MAP_STYLE}
+        mapStyle={isDark ? DARK_MAP_STYLE : DAY_MAP_STYLE}
         onPress={handleMapPress}
         style={StyleSheet.absoluteFill}
       >

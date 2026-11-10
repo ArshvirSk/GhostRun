@@ -114,7 +114,7 @@ export default function HostReviewScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
         <Text variant="display" style={{ color: colors.text, marginTop: spacing.sm }}>
           Session Review
         </Text>
@@ -141,20 +141,20 @@ export default function HostReviewScreen() {
 
           <View style={[styles.metricGrid, { marginTop: spacing.md, paddingTop: spacing.md, borderTopColor: colors.border, borderTopWidth: 1 }]}>
             <View style={styles.metricItem}>
-              <Text variant="label" style={{ color: colors.textMuted }}>DURATION</Text>
-              <Text variant="title" style={{ color: colors.text }}>{Math.round(rules.durationS / 60)}m</Text>
+              <Text variant="label" numberOfLines={1} style={[styles.metricLabel, { color: colors.textMuted }]}>DURATION</Text>
+              <Text variant="title" numberOfLines={1} style={{ color: colors.text }}>{Math.round(rules.durationS / 60)}m</Text>
             </View>
             <View style={styles.metricItem}>
-              <Text variant="label" style={{ color: colors.textMuted }}>RADAR PING</Text>
-              <Text variant="title" style={{ color: colors.radarScan }}>{rules.pingIntervalS}s</Text>
+              <Text variant="label" numberOfLines={1} style={[styles.metricLabel, { color: colors.textMuted }]}>RADAR PING</Text>
+              <Text variant="title" numberOfLines={1} style={{ color: colors.radarScan }}>{rules.pingIntervalS}s</Text>
             </View>
             <View style={styles.metricItem}>
-              <Text variant="label" style={{ color: colors.textMuted }}>TAG RADIUS</Text>
-              <Text variant="title" style={{ color: colors.warning }}>{rules.tagRadiusM}m</Text>
+              <Text variant="label" numberOfLines={1} style={[styles.metricLabel, { color: colors.textMuted }]}>TAG RADIUS</Text>
+              <Text variant="title" numberOfLines={1} style={{ color: colors.warning }}>{rules.tagRadiusM}m</Text>
             </View>
             <View style={styles.metricItem}>
-              <Text variant="label" style={{ color: colors.textMuted }}>BOUNDARY</Text>
-              <Text variant="title" style={{ color: colors.text }}>{radius}m</Text>
+              <Text variant="label" numberOfLines={1} style={[styles.metricLabel, { color: colors.textMuted }]}>BOUNDARY</Text>
+              <Text variant="title" numberOfLines={1} style={{ color: colors.text }}>{radius}m</Text>
             </View>
           </View>
         </Card>
@@ -268,9 +268,19 @@ const styles = StyleSheet.create({
   metricGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 6,
   },
   metricItem: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  metricLabel: {
+    fontSize: 9.5,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    marginBottom: 2,
   },
   chipsWrap: {
     flexDirection: 'row',
