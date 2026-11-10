@@ -48,7 +48,7 @@ export default function HostExtrasScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
         <Text variant="display" style={{ color: colors.text, marginTop: spacing.sm }}>
           Roles & Modifiers
         </Text>

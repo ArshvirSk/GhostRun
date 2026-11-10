@@ -42,7 +42,7 @@ export default function ModesTab() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
         <Text variant="display" style={{ color: colors.text, marginTop: spacing.xl }}>
           MODES LIBRARY
         </Text>
@@ -197,6 +197,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     paddingVertical: 4,
+    paddingRight: 24,
   },
   modeCard: {
     padding: 16,

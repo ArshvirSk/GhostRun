@@ -462,11 +462,11 @@ export default function LobbyScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 80 }]}>
         {/* Top Header Card */}
         <View style={styles.headerRow}>
-          <View>
-            <Text variant="label" style={{ color: colors.primary }}>
+          <View style={{ flex: 1, marginRight: spacing.sm }}>
+            <Text variant="label" numberOfLines={1} style={{ color: colors.primary }}>
               MISSION LOBBY · {activeModule?.name.toUpperCase() || 'OPERATIONAL GRID'}
             </Text>
             <View style={styles.codeWrap}>
@@ -490,6 +490,7 @@ export default function LobbyScreen() {
             label={everyoneReady ? 'READY TO DEPLOY' : 'PREPARING'}
             variant={everyoneReady ? 'accent' : 'muted'}
             size="sm"
+            style={{ flexShrink: 0 }}
           />
         </View>
 

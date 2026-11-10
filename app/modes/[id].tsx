@@ -48,7 +48,7 @@ export default function ModeDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 80 }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"

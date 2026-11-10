@@ -48,7 +48,7 @@ export default function HostModeScreen() {
       </View>
 
       {/* Main Mode Selection Scroll */}
-      <ScrollView contentContainerStyle={[styles.content, { padding: spacing.lg }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
         <Text variant="display" style={{ color: colors.text, marginTop: spacing.sm }}>
           Choose Game Mode
         </Text>
@@ -74,11 +74,11 @@ export default function HostModeScreen() {
               }}
             >
               <View style={styles.cardHeader}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, marginRight: spacing.sm }}>
                   <Text variant="title" style={{ color: colors.text }}>
                     {m.name}
                   </Text>
-                  <Text variant="label" style={{ color: colors.accent, marginTop: 2 }}>
+                  <Text variant="label" numberOfLines={1} style={{ color: colors.accent, marginTop: 2 }}>
                     {m.idealPlayers} • {m.complexity === 'high' ? 'COMPLEX' : 'STANDARD'}
                   </Text>
                 </View>

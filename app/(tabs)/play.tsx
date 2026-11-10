@@ -95,7 +95,7 @@ export default function PlayScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { padding: spacing.lg }]}
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
       >
         {/* Top Header */}

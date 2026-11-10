@@ -2,11 +2,13 @@ import React, { memo, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../lib/map';
 import { circleRing, type LngLat, type PointCollection } from '../lib/geo';
-import { colors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeProvider';
 import type { GameArea, RoundPing, RoundPosition } from './types';
 
-const MAP_STYLE =
+const DAY_MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
+const DARK_MAP_STYLE =
+  process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
 
 interface MapViewProps {
   area: GameArea;
@@ -31,6 +33,7 @@ export const MapView = memo(function MapView({
   modeLayers,
   onPressMap,
 }: MapViewProps) {
+  const { colors, isDark } = useTheme();
   // Memoized GeoJSON features
   const areaRing = useMemo(() => {
     return circleRing({ longitude: area.longitude, latitude: area.latitude }, area.radius_m);
@@ -79,7 +82,7 @@ export const MapView = memo(function MapView({
         },
       })),
     };
-  }, [teammates]);
+  }, [teammates, colors.heatCold]);
 
   const pingsData = useMemo<PointCollection>(() => {
     return {
@@ -121,7 +124,7 @@ export const MapView = memo(function MapView({
     <View style={StyleSheet.absoluteFill}>
       <MapLibreMap
         attribution
-        mapStyle={MAP_STYLE}
+        mapStyle={isDark ? DARK_MAP_STYLE : DAY_MAP_STYLE}
         onPress={onPressMap}
         style={StyleSheet.absoluteFill}
       >

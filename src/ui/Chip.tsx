@@ -28,7 +28,7 @@ export function Chip({
   onPress,
   style,
 }: ChipProps) {
-  const { colors, radii, spacing } = useTheme();
+  const { colors, radii } = useTheme();
 
   const handlePress = () => {
     if (disabled || !onPress) return;
@@ -135,8 +135,9 @@ export function Chip({
         {
           flexDirection: 'row',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: 6,
-          paddingHorizontal: size === 'sm' ? spacing.sm : spacing.md,
+          paddingHorizontal: size === 'sm' ? 8 : 10,
           paddingVertical: size === 'sm' ? 3 : 6,
           borderRadius: radii.pill,
           backgroundColor: chipColors.bg,
@@ -151,11 +152,13 @@ export function Chip({
       {icon && <View>{icon}</View>}
       <Text
         variant="label"
+        numberOfLines={1}
         style={{
           color: chipColors.text,
           fontWeight: selected ? '800' : '600',
-          letterSpacing: 0.6,
+          letterSpacing: 0.5,
           fontSize: 10,
+          textAlign: 'center',
         }}
       >
         {label}
