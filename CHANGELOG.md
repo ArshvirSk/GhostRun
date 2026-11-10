@@ -7,6 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [2.7.1] — 2026-11-10
+
+### Afterimage Redesign & Visual Polish Release
+- **Theme Switcher & Persistent Preference:**
+  - Added 3-way theme selector (`SYSTEM`, `LIGHT`, `DARK`) in `app/settings.tsx`.
+  - Persisted user preference under `@ghostrun:theme_preference` across application restarts.
+  - Added automated persistence test suite `scripts/test-theme-persistence.ts` (`npm run test:theme`).
+- **Visual Defect Resolutions (14 Screenshot Cases):**
+  - Host Wizard Step 5 Review screen refactored into a balanced 4-column metrics layout (`app/host/review.tsx`).
+  - Text wrapping and flex containment fixed across mode chips, difficulty tags, and briefing step markers.
+  - Map tile contrast calibrated for both Light and Dark tactical palettes.
+  - Floating navigation tab offsets adjusted with safe area inset padding.
+- **Branch Cleanup & Verification:**
+  - Consolidated and cleanly merged all UI milestone branches (`ui/ui-m0` .. `ui/ui-m8`, `ui/ui-r1`) into `main`.
+  - Deleted all local and remote UI development branches after full test suite verification.
+  - Release APK built and validated (`release/GhostRun-v2.7.1.apk`, versionCode 9).
+
 ## [2.7.0] — 2026-11-10
 
 ### Major UI Restructure & "Afterimage" Design System Release

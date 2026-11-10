@@ -481,7 +481,7 @@ export default function SettingsScreen() {
             </Text>
           </Pressable>
           <Text variant="mono" style={{ color: colors.textSubtle, fontSize: 11 }}>
-            GhostRun v2.7.0 · Operative Release
+            GhostRun v2.7.1 · Operative Release
           </Text>
         </View>
       </ScrollView>
