@@ -3,10 +3,12 @@ import {
   ActivityIndicator,
   AppState,
   LayoutAnimation,
+  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme/ThemeProvider';
@@ -31,6 +33,7 @@ import {
   selectActiveRoles,
   selectIsOutOfBounds,
   selectModeId,
+  selectMyPlayer,
   selectMyRole,
   selectPings,
   selectTarget,
@@ -41,6 +44,7 @@ import { HudFrame } from './HudFrame';
 import { PhaseBanner } from './PhaseBanner';
 import { SosSheet } from './SosSheet';
 import { SafetyCheckinModal } from '../components/SafetyCheckinModal';
+import { TeamRadioSheet } from '../components/TeamRadioSheet';
 import { useSafetyCheckin } from './useSafetyCheckin';
 import { EventFeed } from './EventFeed';
 import { TrackingStatus, type SharingState } from './TrackingStatus';
@@ -57,7 +61,7 @@ interface GameShellProps {
 
 export function GameShell({ gameId }: GameShellProps) {
   const router = useRouter();
-  const { tokens } = useTheme();
+  const { tokens, colors } = useTheme();
 
   const [state, setState] = useState<RoundState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +74,8 @@ export function GameShell({ gameId }: GameShellProps) {
   const [muted, setMuted] = useState(false);
   const [sfxMuted, setSfxMuted] = useState(false);
   const [sosVisible, setSosVisible] = useState(false);
+  const [radioVisible, setRadioVisible] = useState(false);
+  const [unreadRadioCount, setUnreadRadioCount] = useState(0);
   const [sprintMode, setSprintMode] = useState(false);
 
   // Location state
@@ -525,6 +531,48 @@ export function GameShell({ gameId }: GameShellProps) {
         onTriggerSos={handleCheckinSos}
         visible={checkinVisible}
       />
+
+      {/* Team Radio Floating Trigger (NF-07) */}
+      {myRole !== 'spectator' && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open Team Radio"
+          onPress={() => {
+            setRadioVisible(true);
+            setUnreadRadioCount(0);
+          }}
+          style={[
+            styles.radioFab,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: myRole === 'hunter' ? colors.danger : colors.primary,
+            },
+          ]}
+        >
+          <Ionicons
+            name="radio-outline"
+            size={22}
+            color={myRole === 'hunter' ? colors.danger : colors.primary}
+          />
+          {unreadRadioCount > 0 && (
+            <View style={[styles.unreadBadge, { backgroundColor: colors.accent }]}>
+              <Text variant="caption" style={{ color: '#000', fontSize: 10, fontWeight: '700' }}>
+                {unreadRadioCount}
+              </Text>
+            </View>
+          )}
+        </Pressable>
+      )}
+
+      {/* Team Radio Sheet (NF-07 & NF-08) */}
+      <TeamRadioSheet
+        visible={radioVisible}
+        gameId={gameId}
+        myTeam={myRole === 'hunter' ? 'hunter' : 'runner'}
+        myUserId={selectMyPlayer(state)?.user_id}
+        onClose={() => setRadioVisible(false)}
+        onUnreadChange={(delta) => setUnreadRadioCount((c) => c + delta)}
+      />
     </View>
   );
 }
@@ -538,5 +586,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
+  },
+  radioFab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 96,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    zIndex: 50,
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
 });
