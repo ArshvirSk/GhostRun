@@ -19,6 +19,7 @@ import { Button } from '../../src/ui/Button';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { supabase } from '../../src/lib/supabase';
 import { useUnits } from '../../src/utils/units';
+import { BADGE_CATALOG } from '../../src/lib/badges';
 
 interface MatchHistoryItem {
   id: string;
@@ -44,6 +45,7 @@ export default function YouTab() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [history, setHistory] = useState<MatchHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [earnedBadges, setEarnedBadges] = useState<Set<string>>(new Set());
 
   // Performance stats
   const [stats, setStats] = useState({
@@ -124,6 +126,26 @@ export default function YouTab() {
           bestEscape: total > 0 ? '14m 20s' : '--',
           farthestMeters: total > 0 ? 1420 : 0,
         });
+
+        const earned = new Set<string>();
+        if (total >= 1) earned.add('first_deployment');
+        if (total >= 10) earned.add('veteran_operative');
+        if (neverCaughtCount > 0) earned.add('ghost_whisperer');
+        if (items.some((m) => m.team === 'hunter' && m.winner === 'hunters')) earned.add('clean_sweep');
+
+        try {
+          const { data: bData } = await supabase
+            .from('player_badges')
+            .select('badge_id')
+            .eq('user_id', authData.user.id);
+          if (bData && Array.isArray(bData)) {
+            bData.forEach((row: any) => earned.add(row.badge_id));
+          }
+        } catch {
+          // non-blocking fallback
+        }
+
+        setEarnedBadges(earned);
       }
     } catch {
       // fallback
@@ -489,6 +511,73 @@ export default function YouTab() {
             </Text>
           </Card>
         </View>
+
+        {/* Section: Tactical Badges & Achievements (NF-11) */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionHeading, { color: colors.textMuted, marginBottom: 0 }]}>
+            TACTICAL BADGES
+          </Text>
+          <Chip
+            label={`${earnedBadges.size}/${BADGE_CATALOG.length} UNLOCKED`}
+            variant={earnedBadges.size > 0 ? 'accent' : 'muted'}
+            size="sm"
+          />
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 10, paddingVertical: 8, paddingBottom: 16 }}
+        >
+          {BADGE_CATALOG.map((badge) => {
+            const isEarned = earnedBadges.has(badge.id);
+            return (
+              <Card
+                key={badge.id}
+                variant="default"
+                style={[
+                  styles.badgeCard,
+                  {
+                    backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                    borderColor: isEarned ? colors.primary : colors.border,
+                    opacity: isEarned ? 1 : 0.6,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.badgeIconWrap,
+                    {
+                      backgroundColor: isEarned
+                        ? 'rgba(16, 185, 129, 0.15)'
+                        : isDark
+                        ? colors.surface
+                        : colors.surfaceElevated,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={badge.icon as any}
+                    size={22}
+                    color={isEarned ? colors.primary : colors.textMuted}
+                  />
+                </View>
+                <Text style={[styles.badgeTitle, { color: colors.text }]}>
+                  {badge.title}
+                </Text>
+                <Text style={[styles.badgeDesc, { color: colors.textMuted }]} numberOfLines={2}>
+                  {badge.description}
+                </Text>
+                <Chip
+                  label={isEarned ? 'UNLOCKED' : 'LOCKED'}
+                  variant={isEarned ? 'accent' : 'muted'}
+                  size="sm"
+                  style={{ marginTop: 8 }}
+                />
+              </Card>
+            );
+          })}
+        </ScrollView>
 
         {/* Section: Mission Log */}
         <View style={styles.sectionHeaderRow}>
@@ -968,5 +1057,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     flex: 1,
+  },
+  badgeCard: {
+    width: 140,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  badgeIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  badgeTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  badgeDesc: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 10,
+    lineHeight: 13,
+    textAlign: 'center',
+    marginTop: 2,
   },
 });
