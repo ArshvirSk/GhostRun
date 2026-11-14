@@ -21,6 +21,7 @@ import { supabase } from '../../src/lib/supabase';
 import { useUnits } from '../../src/utils/units';
 import { BADGE_CATALOG } from '../../src/lib/badges';
 import { SeasonRecapModal } from '../../src/components/SeasonRecapModal';
+import { FriendsSheet } from '../../src/components/FriendsSheet';
 import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
 
 interface MatchHistoryItem {
@@ -62,6 +63,7 @@ export default function YouTab() {
   const [recapVisible, setRecapVisible] = useState(false);
   const [recapData, setRecapData] = useState<SeasonRecapData | null>(null);
   const [loadingRecap, setLoadingRecap] = useState(false);
+  const [friendsVisible, setFriendsVisible] = useState(false);
 
   const handleOpenRecap = async () => {
     triggerHaptic('buttonTap');
@@ -762,6 +764,21 @@ export default function YouTab() {
             accessibilityRole="button"
             onPress={() => {
               triggerHaptic('buttonTap');
+              setFriendsVisible(true);
+            }}
+            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
+          >
+            <Ionicons name="people-outline" size={19} color={colors.primary} />
+            <Text style={[styles.menuRowText, { color: colors.text }]}>
+              Operative Network (Friends)
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              triggerHaptic('buttonTap');
               router.push('/settings' as any);
             }}
             style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
@@ -779,6 +796,11 @@ export default function YouTab() {
         visible={recapVisible}
         recap={recapData}
         onClose={() => setRecapVisible(false)}
+      />
+
+      <FriendsSheet
+        visible={friendsVisible}
+        onClose={() => setFriendsVisible(false)}
       />
     </View>
   );

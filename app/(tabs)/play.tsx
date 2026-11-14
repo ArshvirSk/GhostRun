@@ -19,6 +19,8 @@ import { supabase } from '../../src/lib/supabase';
 import { ScheduleGameModal } from '../../src/components/ScheduleGameModal';
 import { CrewManagementModal } from '../../src/components/CrewManagementModal';
 import { fetchActiveSeasonAndBanners, ActiveSeasonData } from '../../src/lib/seasons';
+import { getFriendsHosting } from '../../src/lib/friends';
+import { HostPresence } from '../../src/lib/friendsCore';
 
 const GHOSTRUN_MARK_MINT = require('../../assets/ghostrun-mark-mint.png');
 const GHOSTRUN_MARK_OLIVE = require('../../assets/ghostrun-mark-olive.png');
@@ -41,6 +43,7 @@ export default function PlayScreen() {
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
   const [crewModalVisible, setCrewModalVisible] = useState(false);
   const [seasonData, setSeasonData] = useState<ActiveSeasonData | null>(null);
+  const [friendsHosting, setFriendsHosting] = useState<HostPresence[]>([]);
 
   const loadProfileAndActiveGame = useCallback(async () => {
     // 1. Try local cached profile first for instant rendering
@@ -106,6 +109,10 @@ export default function PlayScreen() {
       if (seasonRes.success) {
         setSeasonData(seasonRes.data);
       }
+
+      // Fetch friends presence (FL-P1)
+      const hosts = await getFriendsHosting();
+      setFriendsHosting(hosts);
     } catch {
       // Offline fallback
     }
@@ -241,6 +248,49 @@ export default function PlayScreen() {
                 </Text>
               </View>
               <Ionicons name="sparkles-outline" size={18} color={colors.accent} />
+            </View>
+          </View>
+        )}
+
+        {/* Friends Hosting Now Presence Banner (FL-P1) */}
+        {friendsHosting.length > 0 && (
+          <View
+            style={[
+              styles.seasonBanner,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.borderDark || colors.border,
+              },
+            ]}
+          >
+            <View style={styles.seasonBannerRow}>
+              <View style={[styles.pulsingDot, { backgroundColor: colors.success }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.seasonBannerTitle, { color: colors.text }]}>
+                  {friendsHosting[0].hostName} is Hosting
+                </Text>
+                <Text style={[styles.seasonBannerSubtitle, { color: colors.textMuted }]}>
+                  {friendsHosting[0].modeId.replace(/_/g, ' ')} • {friendsHosting[0].playerCount} player(s) in lobby
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  router.push({
+                    pathname: '/lobby/[id]',
+                    params: { id: friendsHosting[0].gameId },
+                  } as any);
+                }}
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 4,
+                }}
+              >
+                <Text style={{ color: '#000', fontWeight: '700', fontSize: 12 }}>JOIN</Text>
+              </Pressable>
             </View>
           </View>
         )}
