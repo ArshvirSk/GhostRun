@@ -41,6 +41,7 @@
     "test:rules": "node --import tsx scripts/test-rule-packs.ts",
     "test:routes": "node --import tsx scripts/test-route-resolution.ts",
     "test:theme": "node --import tsx scripts/test-theme-persistence.ts",
+    "test:handles": "node --import tsx scripts/test-handles-moderation.ts",
     "profile:hud": "node --env-file=.env --import tsx scripts/profile-hud-renders.ts",
     "sim": "node --env-file=.env --import tsx scripts/sim/index.ts",
     "rls": "node --env-file=.env --import tsx scripts/rls-check.ts"

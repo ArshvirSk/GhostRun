@@ -87,6 +87,7 @@
 | 2026-11-15 | NF-36 | Community rule packs (strictly data-only, physical safety bounds validator, no code execution) | verified | pending |
 | 2026-11-15 | WAVE-5 | Wave 5: Scale & Extras — All 5 features implemented, tested and verified | verified | pending |
 | 2026-11-15 | FL0 | Friends & Echo audit (docs/FL_AUDIT.md, system inventory, scoring gaps, baseline tests, FL-D1 to FL-D8) | verified | pending |
+| 2026-11-15 | FL1 | Phase P0: Foundations (docs/specs/FL-P0.md, docs/MODERATION.md, migration 410, handlesCore, moderationCore, test:handles) | verified | pending |
 
 
 
