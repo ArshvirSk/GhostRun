@@ -40,6 +40,8 @@ import { MapView } from './MapView';
 import { HudFrame } from './HudFrame';
 import { PhaseBanner } from './PhaseBanner';
 import { SosSheet } from './SosSheet';
+import { SafetyCheckinModal } from '../components/SafetyCheckinModal';
+import { useSafetyCheckin } from './useSafetyCheckin';
 import { EventFeed } from './EventFeed';
 import { TrackingStatus, type SharingState } from './TrackingStatus';
 import { RunnerLayout } from './layouts/RunnerLayout';
@@ -80,6 +82,23 @@ export function GameShell({ gameId }: GameShellProps) {
   // Out of bounds grace tracking
   const [outOfBoundsSince, setOutOfBoundsSince] = useState<number | null>(null);
   const serverNow = now + serverOffset;
+
+  // Periodic Safety Check-in (NF-06)
+  const checkinInterval =
+    Number((state?.game?.mode_params?.safety as any)?.checkin_interval_m) ||
+    ((state as any)?.safety?.is_night ? 10 : 15);
+
+  const {
+    modalVisible: checkinVisible,
+    countdown: checkinCountdown,
+    handleConfirmOk: handleCheckinOk,
+    handleTriggerSos: handleCheckinSos,
+  } = useSafetyCheckin({
+    gameId,
+    isLive: state?.game?.status === 'live',
+    intervalMinutes: checkinInterval,
+    onSos: () => setSosVisible(true),
+  });
 
   const loadState = useCallback(async () => {
     if (!supabase || !gameId) return;
@@ -497,6 +516,14 @@ export function GameShell({ gameId }: GameShellProps) {
         actions={actions}
         onClose={() => setSosVisible(false)}
         visible={sosVisible}
+      />
+
+      {/* Periodic Safety Check-in Modal (NF-06) */}
+      <SafetyCheckinModal
+        countdownSeconds={checkinCountdown}
+        onConfirmOk={handleCheckinOk}
+        onTriggerSos={handleCheckinSos}
+        visible={checkinVisible}
       />
     </View>
   );
