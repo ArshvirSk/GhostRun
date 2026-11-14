@@ -25,6 +25,7 @@
     "test:diagnostics": "node --import tsx scripts/test-diagnostics.ts",
     "test:push": "node --import tsx scripts/test-push-notifications.ts",
     "test:schedule": "node --import tsx scripts/test-scheduled-games.ts",
+    "test:recap": "node --import tsx scripts/test-season-recap.ts",
     "test:routes": "node --import tsx scripts/test-route-resolution.ts",
     "test:theme": "node --import tsx scripts/test-theme-persistence.ts",
     "profile:hud": "node --env-file=.env --import tsx scripts/profile-hud-renders.ts",

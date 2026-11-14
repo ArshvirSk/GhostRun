@@ -20,6 +20,8 @@ import { triggerHaptic } from '../../src/motion/haptics';
 import { supabase } from '../../src/lib/supabase';
 import { useUnits } from '../../src/utils/units';
 import { BADGE_CATALOG } from '../../src/lib/badges';
+import { SeasonRecapModal } from '../../src/components/SeasonRecapModal';
+import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
 
 interface MatchHistoryItem {
   id: string;
@@ -56,6 +58,21 @@ export default function YouTab() {
     bestEscape: '--',
     farthestMeters: 0,
   });
+
+  const [recapVisible, setRecapVisible] = useState(false);
+  const [recapData, setRecapData] = useState<SeasonRecapData | null>(null);
+  const [loadingRecap, setLoadingRecap] = useState(false);
+
+  const handleOpenRecap = async () => {
+    triggerHaptic('buttonTap');
+    setLoadingRecap(true);
+    const res = await fetchSeasonRecap('Current Season');
+    setLoadingRecap(false);
+    if (res.success && res.recap) {
+      setRecapData(res.recap);
+      setRecapVisible(true);
+    }
+  };
 
   const loadProfileAndHistory = useCallback(async () => {
     try {
@@ -370,9 +387,33 @@ export default function YouTab() {
         </Card>
 
         {/* Section: Performance Stats */}
-        <Text style={[styles.sectionHeading, { color: colors.textMuted }]}>
-          CAREER STATS
-        </Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionHeading, { color: colors.textMuted, marginBottom: 0 }]}>
+            CAREER STATS
+          </Text>
+          <Pressable
+            onPress={() => void handleOpenRecap()}
+            disabled={loadingRecap}
+            style={[
+              styles.recapBtn,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            {loadingRecap ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <Ionicons name="sparkles" size={14} color={colors.primary} />
+                <Text style={[styles.recapBtnText, { color: colors.primary }]}>
+                  Season Recap
+                </Text>
+              </>
+            )}
+          </Pressable>
+        </View>
 
         {/* Hero Win Rate Showcase Card */}
         <Card
@@ -733,6 +774,12 @@ export default function YouTab() {
           </Pressable>
         </Card>
       </ScrollView>
+
+      <SeasonRecapModal
+        visible={recapVisible}
+        recap={recapData}
+        onClose={() => setRecapVisible(false)}
+      />
     </View>
   );
 }
@@ -914,6 +961,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 24,
     marginBottom: 10,
+  },
+  recapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+  },
+  recapBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: 'Archivo-SemiBold',
   },
   winRateCard: {
     padding: 16,
