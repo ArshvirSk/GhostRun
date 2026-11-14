@@ -706,6 +706,7 @@ async function doubleAgentScenario() {
 
   for (const client of [host, hunter1, hunter2]) {
     await rpc(client, 'set_share_trail', { game_id: gameId, share: true });
+    await rpc(client, 'submit_tracking_health', { game_id: gameId, health: 'healthy' });
     await rpc(client, 'set_ready', { game_id: gameId, ready: true });
   }
 

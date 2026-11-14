@@ -386,6 +386,16 @@ async function main() {
     'call unexpectedly succeeded',
   );
 
+  // NF-04 Pre-game Ready Check verification
+  const hostHealth = await rpc(host, 'submit_tracking_health', { game_id: gameId, health: 'healthy' });
+  const hunterHealth = await rpc(hunter, 'submit_tracking_health', { game_id: gameId, health: 'warning' });
+  const invalidHealth = await rpc(host, 'submit_tracking_health', { game_id: gameId, health: 'broken' });
+  const outsiderHealth = await rpc(outsider, 'submit_tracking_health', { game_id: gameId, health: 'healthy' });
+
+  expect(!hostHealth.error && !hunterHealth.error, 'members can submit valid tracking health in lobby', hostHealth.error?.message ?? '');
+  expect(Boolean(invalidHealth.error), 'invalid tracking health value is rejected', 'unexpected success');
+  expect(Boolean(outsiderHealth.error), 'outsider cannot submit tracking health', 'unexpected success');
+
   await rpc(host, 'set_share_trail', { game_id: gameId, share: true });
   await rpc(hunter, 'set_share_trail', { game_id: gameId, share: false });
   const hostReady = await rpc(host, 'set_ready', { game_id: gameId, ready: true });
@@ -411,6 +421,9 @@ async function main() {
     'start sets ordered countdown, head-start and end timestamps',
     JSON.stringify(started.data),
   );
+
+  const postStartHealth = await rpc(host, 'submit_tracking_health', { game_id: gameId, health: 'healthy' });
+  expect(Boolean(postStartHealth.error), 'tracking health cannot be updated once game has started', 'unexpected success');
 
   const lockedTarget = await rpc(host, 'set_target', {
     game_id: gameId,

@@ -157,3 +157,23 @@ This document tracks all physical device, multi-device, GPS, sensor, and human v
 
 
 
+
+## F0: Feature Readiness Audit — Deferred Items
+
+| ID | Milestone | Item to Check | How to Test | Expected Result | Status |
+|---|---|---|---|---|---|
+| F0-001 | G1 | All shipping modes work on physical device | Run each mode (classic_chase, tag_hunt, jailbreak, assassin_ring, relay_heist, territory_pulse, ghost_duel) on a real device outdoors | Game starts, phases advance, tags land, results display correctly | deferred |
+| F0-002 | G5 | Two successful field tests | Two separate outdoor play sessions with ≥2 players | Games complete without crashes, positions track, pings arrive, SOS works | deferred |
+| F0-003 | G6 | Privacy policy matches code | Review privacy policy text against actual data handling in code | All data types, retention periods, and consent flows match | deferred |
+| F0-004 | F0 | RLS check against live DB | Run `npm run rls` with valid Supabase credentials | All RLS assertions pass | deferred |
+| F0-005 | F0 | Simulator against live DB | Run `npm run sim` with valid Supabase credentials | All simulation scenarios pass | deferred |
+| F0-006 | NF-34 | Offline tracking resilience | Play a game while toggling airplane mode periodically | Positions resume cleanly after reconnect, no phantom locations | deferred |
+| F0-007 | NF-35 | Sound and haptic completeness | Play through all modes, verify every gameplay event has audio/haptic feedback | All cues fire at the right moment, mute toggle works | deferred |
+
+## NF-04: Pre-Game Ready Check & Tracking Health — Deferred Items
+
+| ID | Milestone | Item to Check | How to Test | Expected Result | Status |
+|---|---|---|---|---|---|
+| NF-04-001 | NF-04 | System settings deep link navigation | Tap 'SETTINGS' on diagnostic sheet on physical device | System navigates directly to GhostRun application settings | deferred |
+| NF-04-002 | NF-04 | Outdoor live GPS probe accuracy | Tap 'RE-TEST SENSORS' under open sky | Probes and displays high-accuracy GPS fix in meters within 5 seconds | deferred |
+| NF-04-003 | NF-04 | Roster readiness dot synchronization | Player A runs check on Device 1 while Host observes Device 2 | Host roster dot updates from gray to green/amber in realtime | deferred |

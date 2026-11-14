@@ -13,6 +13,7 @@
     "test:registry": "node --env-file=.env --import tsx scripts/registry-drift.ts",
     "test:tour": "node --import tsx scripts/test-tour-engine.ts",
     "test:wizard": "node --import tsx scripts/test-wizard-payload.ts",
+    "test:ready-check": "node --import tsx scripts/test-ready-check.ts",
     "test:routes": "node --import tsx scripts/test-route-resolution.ts",
     "test:theme": "node --import tsx scripts/test-theme-persistence.ts",
     "profile:hud": "node --env-file=.env --import tsx scripts/profile-hud-renders.ts",

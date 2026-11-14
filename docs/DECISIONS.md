@@ -478,3 +478,27 @@ Upgraded `export_my_data()` to export all personal and tactical gameplay records
 
 
 
+
+## 2026-11-15 — F0 Readiness Audit Decisions
+
+### Decision F0-D1: Keep Ghost Duel leaderboard hidden
+**Decision:** Ghost Duel leaderboard remains hidden in UI until NF-08 (report/block) is built and the following gaps are addressed: 6-hour update delay, eligibility gates, mock-location filtering, daily caps, name uniqueness, profanity filter.
+**Reason:** The leaderboard is functional but does not meet the design rules in NF-14 or the addendum. Exposing it prematurely risks abusive names and location inference.
+**Trade-off:** Solo Ghost Duel scores are still recorded server-side for future use.
+
+### Decision F0-D2: NF-01 (Demo round) deferred
+**Decision:** NF-01 is deferred because bots reuse the NPC/ghost movement engine, which is hidden per Addendum B standing decision.
+**Reason:** The NPC patrol engine (used by haunted_map) has not been field-tested or approved. Building a demo round on it would expose unapproved infrastructure.
+**Trade-off:** First-time users cannot try a solo demo round. The Briefing tour (offline, no server) serves as the introduction.
+
+### Decision F0-D3: NF-34 (Offline action queue) deferred
+**Decision:** The current "latest fix wins" approach is kept. NF-34 is deferred pending field test evidence that the current approach causes unacceptable data loss.
+**Reason:** The DECISIONS.md entry from 2026-10-30 explicitly chose "no 50-point offline queue" as a design decision. Overriding it without field evidence is premature.
+
+### Decision F0-D4: NF-35 (Sound/haptic completion) deferred
+**Decision:** The sound engine (9 SFX) and haptic engine (9 events) are functional. Missing cues (zone entry/exit, rescue hold countdown, tag cooldown tick) are deferred as polish items.
+**Reason:** The existing coverage handles all core gameplay events. Missing cues do not block gameplay.
+
+### Decision F0-D5: Client deny list for features
+**Decision:** The following modes are excluded from all mode-dependent features (recaps, seasons, leaderboards, share cards, banners): `haunted_map`, `horde`, and any mode depending on server-simulated NPCs with a client-side deny list in `src/modes/registry.ts`.
+**Reason:** Per Addendum B standing decision. The deny list already exists (Decision UI-D2) and covers haunted_map, horde, manhunt, qr_tagging.

@@ -48,6 +48,11 @@
 | 2026-11-10 | UI-R1 | Afterimage Light/Dark redesign implementation against reference screenshots (label collision & mid-word wrap, review metric grid, chip padding, floating tab scroll offsets, dark map theme, theme switcher in settings, persistence suite, before/after captures) | verified | approved |
 | 2026-11-10 | RELEASE-v2.7.1 | Release v2.7.1 (versionCode 9) Afterimage UI Redesign Release APK, release notes, changelog, and clean branch deletion | verified | approved |
 | 2026-11-10 | RELEASE-v2.7.2 | Release v2.7.2 (versionCode 10) Floating navbar padding & drop shadow, unboxed top logo, full-bleed filter chips, Operative profile redesign, and verified APK build | verified | approved |
+| 2026-11-10 | RELEASE-v2.7.3 | Release v2.7.3 (versionCode 11) Typography (Space Grotesk + Rajdhani), tactical onboarding (briefing, role-reveal, 16-color picker, Host a game CTA), modes two-tab library with global & player modifier tiles, ModeSimulationView animation crash fix | verified | approved |
+| 2026-11-10 | RELEASE-v2.7.4 | Release v2.7.4 (versionCode 12) arm64-v8a only build, resource shrinking (APK 53 MB), battery/CPU safeguards in GameShell, mode detail accordian modifiers & pause/play fix | verified | approved |
+| 2026-11-15 | F0 | Readiness audit: docs/FEATURES_READINESS.md, gates G1-G6, overlapping features, foundation status, leaderboard audit, baseline tests, decisions F-D1 to F-D14 and NF-33 to NF-36 | verified | approved |
+| 2026-11-15 | NF-04.1 | Spec: Pre-game Ready Check and tracking health diagnostic (docs/specs/NF-04.md) | verified | approved |
+| 2026-11-15 | NF-04.2 | Implementation: migration 160, submit_tracking_health RPC, diagnostic evaluator & ReadyCheckModal UI | verified | pending |
 
 
 

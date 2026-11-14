@@ -23,6 +23,11 @@ import { RoleBriefingCard } from '../../src/ui/RoleBriefingCard';
 import { getModeModule } from '../../src/modes/registry';
 import { useUnits } from '../../src/utils/units';
 import { supabase } from '../../src/lib/supabase';
+import { ReadyCheckModal } from '../../src/components/ReadyCheckModal';
+import {
+  runTrackingHealthDiagnostic,
+  type TrackingHealthReport,
+} from '../../src/lib/trackingHealth';
 
 type Team = 'runner' | 'hunter' | 'unassigned';
 
@@ -35,6 +40,7 @@ interface LobbyPlayer {
   status: 'active' | 'tagged' | 'left' | 'jailed';
   is_ready: boolean;
   is_remote?: boolean;
+  tracking_health?: 'healthy' | 'warning' | 'degraded' | 'unknown';
 }
 
 interface LobbyGame {
@@ -99,6 +105,35 @@ export default function LobbyScreen() {
   const [savingShare, setSavingShare] = useState(false);
   const [mySecretRole, setMySecretRole] = useState<string | null>(null);
   const [roleAcknowledged, setRoleAcknowledged] = useState(false);
+
+  // Ready check tracking health (NF-04)
+  const [readyCheckVisible, setReadyCheckVisible] = useState(false);
+  const [healthReport, setHealthReport] = useState<TrackingHealthReport | null>(null);
+  const [isProbingHealth, setIsProbingHealth] = useState(false);
+
+  const submitHealth = useCallback(
+    async (health: string) => {
+      if (!supabase || !gameId) return;
+      try {
+        await (supabase.rpc as any)('submit_tracking_health', { game_id: gameId, health });
+      } catch {
+        // Non-blocking fallback if RPC is unmigrated
+      }
+    },
+    [gameId],
+  );
+
+  const handleRunDiagnostic = useCallback(async () => {
+    setIsProbingHealth(true);
+    try {
+      const rep = await runTrackingHealthDiagnostic();
+      setHealthReport(rep);
+      void submitHealth(rep.overall);
+      return rep;
+    } finally {
+      setIsProbingHealth(false);
+    }
+  }, [submitHealth]);
 
   // Host draft modifiers/roles
   const [draftModifiers, setDraftModifiers] = useState<string[]>([]);
@@ -310,26 +345,52 @@ export default function LobbyScreen() {
     if (started) router.replace({ pathname: '/game/[id]', params: { id: gameId } });
   }
 
+  async function confirmReadyFromCheck() {
+    setReadyCheckVisible(false);
+    if (!supabase || !gameId) return;
+    if (healthReport) {
+      void submitHealth(healthReport.overall);
+    }
+    await runAction('ready', () =>
+      supabase!.rpc('set_ready', { game_id: gameId, ready: true }),
+    );
+  }
+
   async function toggleReady() {
     if (!supabase || !gameId) return;
     const ownPlayer = state?.players.find((p) => p.id === state.my_player_id);
 
-    // If becoming ready, ensure match notifications & location permissions are active
-    if (!ownPlayer?.is_ready) {
-      await ensureGamePermissions();
+    // If standing down, unready immediately
+    if (ownPlayer?.is_ready) {
+      await runAction('ready', () =>
+        supabase!.rpc('set_ready', { game_id: gameId, ready: false }),
+      );
+      return;
     }
+
+    // If becoming ready, ensure match notifications & location permissions are active
+    await ensureGamePermissions();
 
     // If role has high complexity and unacknowledged, switch to rules tab and warn
     const effectiveRole = mySecretRole || ownPlayer?.team;
     const isHighComplexity = ['double_agent', 'operator', 'vip'].includes(effectiveRole || '');
-    if (!ownPlayer?.is_ready && isHighComplexity && !roleAcknowledged) {
+    if (isHighComplexity && !roleAcknowledged) {
       setActiveSegment('rules');
       setBannerMessage('Please review and acknowledge your tactical role directives in Rules & Intel.');
       return;
     }
 
+    // NF-04: If health report not yet run or has warnings/degraded, show ready check modal
+    if (!healthReport || healthReport.overall === 'degraded' || healthReport.overall === 'warning') {
+      setReadyCheckVisible(true);
+      void handleRunDiagnostic();
+      return;
+    }
+
+    void submitHealth(healthReport.overall);
+
     await runAction('ready', () =>
-      supabase!.rpc('set_ready', { game_id: gameId, ready: !ownPlayer?.is_ready }),
+      supabase!.rpc('set_ready', { game_id: gameId, ready: true }),
     );
   }
 
@@ -738,6 +799,23 @@ export default function LobbyScreen() {
 
             {/* Ready & Host Action Controls */}
             <View style={[styles.actionSection, { marginTop: spacing.xl }]}>
+              {!ownPlayer?.is_ready && (
+                <Button
+                  title={
+                    healthReport
+                      ? `SENSORS: ${healthReport.summary}`
+                      : 'CHECK SENSORS & GPS'
+                  }
+                  variant="ghost"
+                  size="sm"
+                  style={{ marginBottom: spacing.sm }}
+                  onPress={() => {
+                    setReadyCheckVisible(true);
+                    void handleRunDiagnostic();
+                  }}
+                />
+              )}
+
               <Button
                 title={ownPlayer?.is_ready ? 'STAND DOWN' : 'READY UP'}
                 variant={ownPlayer?.is_ready ? 'secondary' : 'primary'}
@@ -976,6 +1054,15 @@ export default function LobbyScreen() {
           </View>
         )}
       </ScrollView>
+
+      <ReadyCheckModal
+        visible={readyCheckVisible}
+        report={healthReport}
+        isProbing={isProbingHealth}
+        onRetest={() => void handleRunDiagnostic()}
+        onConfirmReady={() => void confirmReadyFromCheck()}
+        onClose={() => setReadyCheckVisible(false)}
+      />
     </View>
   );
 }
@@ -1035,11 +1122,29 @@ function PlayerRow({
             </Text>
           )}
         </View>
-        <Chip
-          label={player.is_ready ? 'READY' : 'PREPARING'}
-          variant={player.is_ready ? 'accent' : 'muted'}
-          size="sm"
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {player.tracking_health && player.tracking_health !== 'unknown' && (
+            <View
+              accessibilityLabel={`Tracking health: ${player.tracking_health}`}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor:
+                  player.tracking_health === 'healthy'
+                    ? colors.primary
+                    : player.tracking_health === 'warning'
+                      ? '#FFB800'
+                      : '#FF3B30',
+              }}
+            />
+          )}
+          <Chip
+            label={player.is_ready ? 'READY' : 'PREPARING'}
+            variant={player.is_ready ? 'accent' : 'muted'}
+            size="sm"
+          />
+        </View>
       </View>
 
       {isHost && !isSelf && (
