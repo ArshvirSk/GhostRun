@@ -16,6 +16,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { supabase } from '../../src/lib/supabase';
+import { ScheduleGameModal } from '../../src/components/ScheduleGameModal';
+import { CrewManagementModal } from '../../src/components/CrewManagementModal';
+import { fetchActiveSeasonAndBanners, ActiveSeasonData } from '../../src/lib/seasons';
 
 const GHOSTRUN_MARK_MINT = require('../../assets/ghostrun-mark-mint.png');
 const GHOSTRUN_MARK_OLIVE = require('../../assets/ghostrun-mark-olive.png');
@@ -35,6 +38,9 @@ export default function PlayScreen() {
   const [displayName, setDisplayName] = useState<string>('Alphaop');
   const [activeGame, setActiveGame] = useState<ActiveGamePill | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
+  const [crewModalVisible, setCrewModalVisible] = useState(false);
+  const [seasonData, setSeasonData] = useState<ActiveSeasonData | null>(null);
 
   const loadProfileAndActiveGame = useCallback(async () => {
     // 1. Try local cached profile first for instant rendering
@@ -93,6 +99,12 @@ export default function PlayScreen() {
         }
       } else {
         setActiveGame(null);
+      }
+
+      // Fetch active season & banners (NF-31)
+      const seasonRes = await fetchActiveSeasonAndBanners();
+      if (seasonRes.success) {
+        setSeasonData(seasonRes.data);
       }
     } catch {
       // Offline fallback
@@ -203,6 +215,36 @@ export default function PlayScreen() {
           </Pressable>
         )}
 
+        {/* Season Countdown / Announcement Banner (NF-31) */}
+        {seasonData && (seasonData.countdown || seasonData.banners.length > 0) && (
+          <View
+            style={[
+              styles.seasonBanner,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.borderDark || colors.border,
+              },
+            ]}
+          >
+            <View style={styles.seasonBannerRow}>
+              <View style={[styles.pulsingDot, { backgroundColor: colors.accent }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.seasonBannerTitle, { color: colors.text }]}>
+                  {seasonData.banners.length > 0
+                    ? seasonData.banners[0].title
+                    : seasonData.season?.name || 'Tactical Operations'}
+                </Text>
+                <Text style={[styles.seasonBannerSubtitle, { color: colors.textMuted }]}>
+                  {seasonData.banners.length > 0
+                    ? seasonData.banners[0].subtitle || ''
+                    : seasonData.countdown?.label || ''}
+                </Text>
+              </View>
+              <Ionicons name="sparkles-outline" size={18} color={colors.accent} />
+            </View>
+          </View>
+        )}
+
         {/* Middle Featured Mode Card */}
         <Pressable
           accessibilityRole="button"
@@ -289,6 +331,53 @@ export default function PlayScreen() {
               Join with a code
             </Text>
           </Pressable>
+
+          {/* Secondary Tactical Actions: Squads (NF-16) & Schedule (NF-13) */}
+          <View style={styles.secondaryActionsRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Squads"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                setCrewModalVisible(true);
+              }}
+              style={({ pressed }) => [
+                styles.secondaryActionBtn,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                  borderColor: colors.border,
+                },
+                pressed && { opacity: 0.85, transform: [{ scale: 0.985 }] },
+              ]}
+            >
+              <Ionicons name="people-outline" size={16} color={colors.primary} />
+              <Text style={[styles.secondaryActionText, { color: colors.text }]}>
+                Squads
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Schedule Match"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                setScheduleModalVisible(true);
+              }}
+              style={({ pressed }) => [
+                styles.secondaryActionBtn,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                  borderColor: colors.border,
+                },
+                pressed && { opacity: 0.85, transform: [{ scale: 0.985 }] },
+              ]}
+            >
+              <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+              <Text style={[styles.secondaryActionText, { color: colors.text }]}>
+                Schedule
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Tactical Guidance Link Row */}
@@ -322,6 +411,16 @@ export default function PlayScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <CrewManagementModal
+        visible={crewModalVisible}
+        onClose={() => setCrewModalVisible(false)}
+      />
+
+      <ScheduleGameModal
+        visible={scheduleModalVisible}
+        onClose={() => setScheduleModalVisible(false)}
+      />
     </View>
   );
 }
@@ -514,6 +613,47 @@ const styles = StyleSheet.create({
   },
   linkSeparator: {
     fontSize: 14,
+    fontWeight: '700',
+  },
+  seasonBanner: {
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  seasonBannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  seasonBannerTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  seasonBannerSubtitle: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  secondaryActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  secondaryActionBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  secondaryActionText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 13,
     fontWeight: '700',
   },
 });
