@@ -1,15 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
+import { initTacticalNotificationChannels } from '../src/lib/notifications';
 
 // Registers the background location task at startup, including a cold start
 // performed by the OS while a round is live.
 import '../src/lib/location';
 
 export default function RootLayout() {
+  useEffect(() => {
+    void initTacticalNotificationChannels();
+  }, []);
   const [fontsLoaded] = useFonts({
     'Archivo-Black': require('../assets/fonts/Archivo-Black.ttf'),
     'Archivo-Bold': require('../assets/fonts/Archivo-Bold.ttf'),

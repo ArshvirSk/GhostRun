@@ -25,6 +25,10 @@ import { PRIVACY_CONTACT_EMAIL } from '../src/lib/privacy';
 import { supabase } from '../src/lib/supabase';
 import { triggerHaptic } from '../src/motion/haptics';
 import { useUnits } from '../src/utils/units';
+import {
+  initTacticalNotificationChannels,
+  STORAGE_KEY_SILENT_ALERTS,
+} from '../src/lib/notifications';
 
 const DELETE_WORD = 'DELETE';
 
@@ -38,6 +42,7 @@ export default function SettingsScreen() {
   const [mapStyle, setMapStyle] = useState<'night' | 'standard'>('night');
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [silentAlertsEnabled, setSilentAlertsEnabled] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Busy/Error states
@@ -50,10 +55,11 @@ export default function SettingsScreen() {
   useEffect(() => {
     async function loadPreferences() {
       try {
-        const [storedMap, storedAudio, storedHaptics] = await Promise.all([
+        const [storedMap, storedAudio, storedHaptics, storedSilentAlerts] = await Promise.all([
           AsyncStorage.getItem('@ghostrun:map_style'),
           AsyncStorage.getItem('@ghostrun:audio_enabled'),
           AsyncStorage.getItem('@ghostrun:haptics_enabled'),
+          AsyncStorage.getItem(STORAGE_KEY_SILENT_ALERTS),
         ]);
 
         if (storedMap === 'standard' || storedMap === 'night') {
@@ -61,6 +67,11 @@ export default function SettingsScreen() {
         }
         if (storedAudio !== null) setAudioEnabled(storedAudio !== 'false');
         if (storedHaptics !== null) setHapticsEnabled(storedHaptics !== 'false');
+        if (storedSilentAlerts !== null) {
+          setSilentAlertsEnabled(storedSilentAlerts !== 'false');
+        } else {
+          setSilentAlertsEnabled(true);
+        }
 
         if (supabase) {
           const { data } = await supabase.auth.getUser();
@@ -87,6 +98,12 @@ export default function SettingsScreen() {
   const toggleHaptics = async (val: boolean) => {
     setHapticsEnabled(val);
     await AsyncStorage.setItem('@ghostrun:haptics_enabled', String(val));
+  };
+
+  const toggleSilentAlerts = async (val: boolean) => {
+    setSilentAlertsEnabled(val);
+    await AsyncStorage.setItem(STORAGE_KEY_SILENT_ALERTS, String(val));
+    void initTacticalNotificationChannels(!val);
   };
 
   const handleSignOut = async () => {
@@ -387,6 +404,23 @@ export default function SettingsScreen() {
             <Switch
               value={hapticsEnabled}
               onValueChange={toggleHaptics}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Tactical Silent Alerts
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                In-game notifications vibrate silently without playing audio that reveals your location.
+              </Text>
+            </View>
+            <Switch
+              value={silentAlertsEnabled}
+              onValueChange={toggleSilentAlerts}
               trackColor={{ false: colors.borderDark, true: colors.primary }}
               thumbColor={colors.textLight}
             />

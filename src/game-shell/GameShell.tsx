@@ -22,6 +22,7 @@ import {
   type StartLocationResult,
 } from '../lib/location';
 import { initAudio, toggleAudioMuted } from '../lib/audio';
+import { initTacticalNotificationChannels } from '../lib/notifications';
 
 import type { RoundState, ShellActions } from './types';
 import { createShellActions } from './actions';
@@ -194,6 +195,7 @@ export function GameShell({ gameId }: GameShellProps) {
       if (!notifPerm.granted && notifPerm.canAskAgain) {
         await Notifications.requestPermissionsAsync();
       }
+      void initTacticalNotificationChannels();
       res = await startLocationSharing(gameId);
     } catch {
       res = { ok: false, reason: 'error', message: 'Location sharing error' };
