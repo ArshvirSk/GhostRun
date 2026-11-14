@@ -72,6 +72,14 @@
 | 2026-11-15 | NF-16 | Persistent Crews & squad lists (create/join crew, crew invites, CrewManagementModal) | verified | pending |
 | 2026-11-15 | NF-31 | Season framework & remote promo announcement banners on Play tab | verified | pending |
 | 2026-11-15 | WAVE-3 | Wave 3: Operations & Group Retention — All 5 features implemented, tested and verified | verified | pending |
+| 2026-11-15 | NF-19 | Official website & join gateway (public landing, safety, privacy, support, Universal Links) | verified | pending |
+| 2026-11-15 | NF-20 | Localisation engine (i18n dictionary, 5 locales: en, es, de, fr, ja, full key parity) | verified | pending |
+| 2026-11-15 | NF-21 | iOS configuration & Universal Links (app.json, permissions, background modes, apple-app-site-association) | verified | pending |
+| 2026-11-15 | NF-22 | Discord integration (rich embed match mobilization & recap webhooks with location privacy) | verified | pending |
+| 2026-11-15 | NF-25 | Accessibility extras (Protanopia, Deuteranopia, Tritanopia palettes, HUD scale, TalkBack cues) | verified | pending |
+| 2026-11-15 | NF-26 | Admin console & remote config (admin role, RLS kill-switches, disabled_modes, system health metrics) | verified | pending |
+| 2026-11-15 | NF-33 | Spoken TTS narration for AI Game Master (priority speech queue, screen-off tactical audio cues) | verified | pending |
+| 2026-11-15 | WAVE-4 | Wave 4: Reach, Platform & Accessibility — All 7 features implemented, tested and verified | verified | pending |
 
 
 

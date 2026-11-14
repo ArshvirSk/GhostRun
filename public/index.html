@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GhostRun — Real-World Tactical Pursuit</title>
+  <meta name="description" content="Physical, outdoor pursuit powered by real-time GPS radar. Run, evade, intercept.">
+  <meta property="og:title" content="GhostRun — Real-World Tactical Pursuit">
+  <meta property="og:description" content="Physical outdoor pursuit with real-time GPS radar. Available on Android & iOS.">
+  <meta property="og:image" content="https://ghostrun.app/assets/ghostrun-mark-mint.png">
+  <style>
+    :root {
+      --bg: #101014;
+      --surface: #1B1A22;
+      --surface-elevated: #24232D;
+      --primary: #C7F36B;
+      --accent: #B8A3FF;
+      --hunter: #FF8A75;
+      --text: #F1EEE8;
+      --text-muted: #B7B2BF;
+      --border: #393743;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    header {
+      padding: 20px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      font-weight: 900;
+      font-size: 20px;
+      letter-spacing: 2px;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .logo span { color: var(--primary); }
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-left: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--primary); }
+    main {
+      flex: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 24px;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: 48px;
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -1px;
+      margin-bottom: 20px;
+    }
+    p.lead {
+      font-size: 18px;
+      color: var(--text-muted);
+      max-width: 640px;
+      margin: 0 auto 36px auto;
+    }
+    .cta-group {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 56px;
+    }
+    .btn {
+      padding: 14px 28px;
+      border-radius: 28px;
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #101014;
+    }
+    .btn-secondary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn:hover {
+      opacity: 0.9;
+      transform: translateY(-2px);
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      text-align: left;
+      margin-top: 40px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .card h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      color: var(--primary);
+    }
+    .card p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-left: 16px;
+    }
+    footer a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="logo">GHOST<span>RUN</span></a>
+    <nav>
+      <a href="/join">Join Match</a>
+      <a href="/safety">Safety</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/support">Support</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero-badge">PHYSICAL TACTICAL PURSUIT</div>
+    <h1>The city is your arena.<br>Real players. Real radar.</h1>
+    <p class="lead">
+      GhostRun turns parks and urban areas into thrilling games of stealth and chase.
+      Evade detection as a runner or coordinate live intercepts as a hunter squad.
+    </p>
+
+    <div class="cta-group">
+      <a href="/join" class="btn btn-primary">Join with Match Code</a>
+      <a href="https://play.google.com/store/apps/details?id=com.ghostrun.app" class="btn btn-secondary">Get on Google Play</a>
+    </div>
+
+    <div class="features-grid">
+      <div class="card">
+        <h3>⚡ Real-Time Radar</h3>
+        <p>Hunters receive periodic directional ping sweeps. Runners leave decaying stealth echoes. Silence and speed determine survival.</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ Privacy First</h3>
+        <p>No stranger discovery. Ephemeral locations are wiped after each round. Home addresses and route endpoints are automatically trimmed.</p>
+      </div>
+      <div class="card">
+        <h3>🏃 Multiple Game Modes</h3>
+        <p>Deploy in Classic Chase, Tag Hunt, Jailbreak, Relay Heist, or Solo Ghost Duel against autonomous tactical simulations.</p>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div>© 2026 GhostRun Operations. Designed for 18+ or guardian-supervised play.</div>
+    <div>
+      <a href="/safety">Safety Protocol</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/support">Support & Help</a>
+    </div>
+  </footer>
+</body>
+</html>

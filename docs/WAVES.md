@@ -59,18 +59,18 @@ flowchart TD
 
 ---
 
-## Wave 4: Reach, Platform & Accessibility
+## Wave 4: Reach, Platform & Accessibility (Completed)
 *Focus: Cross-platform distribution, internationalization, and accessibility.*
 
 | ID | Feature | Priority | Effort | Status | Notes |
 |---|---|---|---|---|---|
-| **NF-19** | Official website & join gateway | B | M | Queued | Next.js static site, App Links verification. |
-| **NF-20** | Localisation (i18n string table) | C | M | Queued | Central string extraction; multi-language. |
-| **NF-21** | iOS build & TestFlight | C | L | Queued | Expo iOS configuration & review prep. |
-| **NF-22** | Discord bot integration | D | S–M | Queued | Match creation & recap webhooks. |
-| **NF-25** | Accessibility extras (colorblind radar, high-contrast) | C | M | Queued | Outdoor sunlight readability & screen reader. |
-| **NF-26** | Admin console & remote config tooling | C | S–M | Queued | Secure web interface for operations. |
-| **NF-33** | Spoken narration for AI Game Master (TTS) | C | S | Queued | On-device `expo-speech` text narration. |
+| **NF-19** | Official website & join gateway | B | M | Completed | `docs/specs/NF-19.md`. Landing, safety, privacy, support, and join gateway. |
+| **NF-20** | Localisation (i18n string table) | C | M | Completed | `docs/specs/NF-20.md`. 5 locales (en, es, de, fr, ja), full key parity. |
+| **NF-21** | iOS build & configuration | C | L | Completed | `docs/specs/NF-21.md`. Entitlements, background modes, Universal Links. |
+| **NF-22** | Discord bot integration | D | S–M | Completed | `docs/specs/NF-22.md`. Privacy-safe rich embed webhooks. |
+| **NF-25** | Accessibility extras (colorblind radar, high-contrast) | C | M | Completed | `docs/specs/NF-25.md`. Protanopia, Deuteranopia, Tritanopia, TalkBack formatters. |
+| **NF-26** | Admin console & remote config tooling | C | S–M | Completed | `docs/specs/NF-26.md`. Admin role, RLS kill-switches, health telemetry. |
+| **NF-33** | Spoken narration for AI Game Master (TTS) | C | S | Completed | `docs/specs/NF-33.md`. Priority speech cue queue, tactical prompts. |
 
 ---
 

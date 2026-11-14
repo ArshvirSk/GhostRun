@@ -47,6 +47,27 @@
         }
       ]
     },
+    "ios": {
+      "bundleIdentifier": "com.ghostrun.app",
+      "buildNumber": "12",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "GhostRun uses your location to track game boundaries, objectives, and radar pings during live tactical operations.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "GhostRun tracks background location during active matches to alert you via haptics when opponents are near while your screen is off.",
+        "NSLocationAlwaysUsageDescription": "GhostRun tracks background location during active matches to keep you in sync with your squad.",
+        "NSMotionUsageDescription": "GhostRun measures pedometer and acceleration data to detect authentic foot sprinting and penalize vehicle transport.",
+        "NSCameraUsageDescription": "GhostRun uses your camera to scan squad and match join QR codes.",
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification"
+        ]
+      },
+      "associatedDomains": [
+        "applinks:ghostrun.app",
+        "webcredentials:ghostrun.app"
+      ]
+    },
     "plugins": [
       "expo-router",
       "@maplibre/maplibre-react-native",

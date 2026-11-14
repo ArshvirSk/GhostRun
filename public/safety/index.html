@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GhostRun — Safety Protocol</title>
+  <style>
+    :root {
+      --bg: #101014;
+      --surface: #1B1A22;
+      --primary: #C7F36B;
+      --hunter: #FF8A75;
+      --warning: #FBBF24;
+      --text: #F1EEE8;
+      --text-muted: #B7B2BF;
+      --border: #393743;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      padding: 32px 20px;
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    a.back {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      display: inline-block;
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: 36px;
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+    .rule-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .rule-box h2 {
+      font-size: 20px;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+    .rule-box p {
+      color: var(--text-muted);
+      font-size: 15px;
+    }
+    .danger h2 { color: var(--hunter); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="back">← Return to GhostRun Home</a>
+    <h1>Operational Safety Protocol</h1>
+    <p style="color: var(--text-muted); margin-bottom: 24px;">GhostRun is an intense outdoor pursuit game. Safety is non-negotiable.</p>
+
+    <div class="rule-box danger">
+      <h2>1. Road & Traffic Awareness</h2>
+      <p>Never run into traffic, cross against pedestrian signals, or trespass on private property. The game will never incentivize crossing dangerous terrain or motorways.</p>
+    </div>
+
+    <div class="rule-box">
+      <h2>2. 18+ or Guardian Supervised</h2>
+      <p>GhostRun is strictly rated for adults aged 18 and older, or minors participating under active, direct guardian supervision.</p>
+    </div>
+
+    <div class="rule-box">
+      <h2>3. Night Curfews & Check-ins</h2>
+      <p>When playing after sunset, hosts can enable mandatory safety check-ins and curfews. Players must tap their check-in button every 10–15 minutes.</p>
+    </div>
+
+    <div class="rule-box">
+      <h2>4. Emergency SOS</h2>
+      <p>An emergency SOS button is always visible on your game screen. Activating SOS instantly reveals your status to all players and provides direct links to local emergency dispatch.</p>
+    </div>
+  </div>
+</body>
+</html>

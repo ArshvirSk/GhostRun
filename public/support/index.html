@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GhostRun — Support & Contact</title>
+  <style>
+    :root {
+      --bg: #101014;
+      --surface: #1B1A22;
+      --primary: #C7F36B;
+      --accent: #B8A3FF;
+      --text: #F1EEE8;
+      --text-muted: #B7B2BF;
+      --border: #393743;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      padding: 32px 20px;
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    a.back {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      display: inline-block;
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: 36px;
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 20px;
+    }
+    .card h2 {
+      font-size: 20px;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+    .card p {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 16px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      background: var(--primary);
+      color: #101014;
+      font-weight: 700;
+      border-radius: 20px;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="back">← Return to GhostRun Home</a>
+    <h1>Field Intelligence & Support</h1>
+    <p style="color: var(--text-muted); margin-bottom: 24px;">Need assistance with game setup, GPS calibration, or reporting an issue?</p>
+
+    <div class="card">
+      <h2>Contact Operations</h2>
+      <p>Our engineering team monitors tactical reports and bug submissions. Reach us directly via email:</p>
+      <a href="mailto:support@ghostrun.app?subject=GhostRun%20Support%20Request" class="btn">Email support@ghostrun.app</a>
+    </div>
+
+    <div class="card">
+      <h2>In-App Bug & Telemetry Dispatch</h2>
+      <p>For live connection or GPS sensor diagnosis, open the app, head to <strong>Settings → Send Feedback & Bug Report</strong>. This allows you to attach an anonymous device diagnostics bundle with zero GPS coordinates.</p>
+    </div>
+
+    <div class="card">
+      <h2>Account Deletion & Data Privacy</h2>
+      <p>To erase your profile and records, visit <strong>Settings → Purge All My Data</strong> within the application or send an email to <strong>privacy@ghostrun.app</strong>.</p>
+    </div>
+  </div>
+</body>
+</html>

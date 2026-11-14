@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID1234.com.ghostrun.app",
+        "paths": [
+          "/join",
+          "/join/*"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "TEAMID1234.com.ghostrun.app"
+    ]
+  }
+}
