@@ -24,6 +24,8 @@ import { getModeModule } from '../../src/modes/registry';
 import { useUnits } from '../../src/utils/units';
 import { supabase } from '../../src/lib/supabase';
 import { ReadyCheckModal } from '../../src/components/ReadyCheckModal';
+import { LobbyInviteModal } from '../../src/components/LobbyInviteModal';
+import { buildInvitePayload } from '../../src/lib/invite';
 import {
   runTrackingHealthDiagnostic,
   type TrackingHealthReport,
@@ -108,6 +110,7 @@ export default function LobbyScreen() {
 
   // Ready check tracking health (NF-04)
   const [readyCheckVisible, setReadyCheckVisible] = useState(false);
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [healthReport, setHealthReport] = useState<TrackingHealthReport | null>(null);
   const [isProbingHealth, setIsProbingHealth] = useState(false);
 
@@ -429,7 +432,21 @@ export default function LobbyScreen() {
 
   async function shareCode() {
     if (!state) return;
-    await Share.share({ message: `Join my GhostRun match with code: ${state.game.code}` });
+    const payload = buildInvitePayload({
+      code: state.game.code,
+      modeId: state.game.mode_id,
+      modeName: activeModule?.name,
+      playerCount: state.players.length,
+    });
+    try {
+      await Share.share({
+        title: payload.title,
+        message: payload.message,
+        url: payload.webLink,
+      });
+    } catch {
+      // User cancelled share or dismissed
+    }
   }
 
   async function chooseShare(share: boolean) {
@@ -592,12 +609,24 @@ export default function LobbyScreen() {
               </Text>
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="Share invite code"
                 onPress={() => void shareCode()}
                 style={[styles.sharePill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
               >
                 <Ionicons name="share-outline" size={16} color={colors.primary} />
                 <Text variant="label" style={{ color: colors.primary, marginLeft: 4 }}>
                   SHARE
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Show QR code and invite link"
+                onPress={() => setInviteModalVisible(true)}
+                style={[styles.sharePill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark, marginLeft: 6 }]}
+              >
+                <Ionicons name="qr-code-outline" size={16} color={colors.accent} />
+                <Text variant="label" style={{ color: colors.accent, marginLeft: 4 }}>
+                  QR
                 </Text>
               </Pressable>
             </View>
@@ -1080,6 +1109,15 @@ export default function LobbyScreen() {
         onRetest={() => void handleRunDiagnostic()}
         onConfirmReady={() => void confirmReadyFromCheck()}
         onClose={() => setReadyCheckVisible(false)}
+      />
+
+      <LobbyInviteModal
+        visible={inviteModalVisible}
+        code={state?.game.code || ''}
+        modeName={activeModule?.name}
+        modeId={state?.game.mode_id}
+        playerCount={state?.players.length}
+        onClose={() => setInviteModalVisible(false)}
       />
     </View>
   );

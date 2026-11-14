@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ghostrun.app",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7F:C2:52:92:2E:39:69:89:12:F1:C7:E9:88:FE:84:48:FA:7E:6D:23:6C:C1:C6:1C:89:6E:FF:45:90"
+      ]
+    }
+  }
+]

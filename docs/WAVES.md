@@ -18,16 +18,16 @@ flowchart TD
 
 ---
 
-## Wave 1: Easy to Start, Hard to Fail (Current)
+## Wave 1: Easy to Start, Hard to Fail (Completed)
 *Focus: Eliminating friction and physical GPS/tracking failures before match start.*
 
 | ID | Feature | Priority | Effort | Status | Companion / Spec |
 |---|---|---|---|---|---|
-| **NF-04** | Pre-game Ready Check (tracking health & sensors) | A | S–M | In Progress (Spec) | `docs/specs/NF-04.md` |
-| **NF-05** | Silent-by-default alerts (tactical vibration channels) | A | S | Pending | `docs/specs/NF-05.md` |
-| **NF-06** | Safety check-in & curfew (host toggles & alert) | A | S–M | Pending | `docs/specs/NF-06.md` |
-| **NF-03** | Rematch & role rotation (fairness & ratio balance) | A | S | Pending | `docs/specs/NF-03.md` |
-| **NF-02** | Invite links & share sheet (code prefill & join link) | A | S–M | Pending | `docs/specs/NF-02.md` |
+| **NF-04** | Pre-game Ready Check (tracking health & sensors) | A | S–M | Completed | `docs/specs/NF-04.md` |
+| **NF-05** | Silent-by-default alerts (tactical vibration channels) | A | S | Completed | `docs/specs/NF-05.md` |
+| **NF-06** | Safety check-in & curfew (host toggles & alert) | A | S–M | Completed | `docs/specs/NF-06.md` |
+| **NF-03** | Rematch & role rotation (fairness & ratio balance) | A | S | Completed | `docs/specs/NF-03.md` |
+| **NF-02** | Invite links & share sheet (code prefill & join link) | A | S–M | Completed | `docs/specs/NF-02.md` |
 
 ---
 

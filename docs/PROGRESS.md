@@ -51,8 +51,12 @@
 | 2026-11-10 | RELEASE-v2.7.3 | Release v2.7.3 (versionCode 11) Typography (Space Grotesk + Rajdhani), tactical onboarding (briefing, role-reveal, 16-color picker, Host a game CTA), modes two-tab library with global & player modifier tiles, ModeSimulationView animation crash fix | verified | approved |
 | 2026-11-10 | RELEASE-v2.7.4 | Release v2.7.4 (versionCode 12) arm64-v8a only build, resource shrinking (APK 53 MB), battery/CPU safeguards in GameShell, mode detail accordian modifiers & pause/play fix | verified | approved |
 | 2026-11-15 | F0 | Readiness audit: docs/FEATURES_READINESS.md, gates G1-G6, overlapping features, foundation status, leaderboard audit, baseline tests, decisions F-D1 to F-D14 and NF-33 to NF-36 | verified | approved |
-| 2026-11-15 | NF-04.1 | Spec: Pre-game Ready Check and tracking health diagnostic (docs/specs/NF-04.md) | verified | approved |
-| 2026-11-15 | NF-04.2 | Implementation: migration 160, submit_tracking_health RPC, diagnostic evaluator & ReadyCheckModal UI | verified | pending |
+| 2026-11-15 | NF-04 | Pre-game Ready Check and tracking health diagnostic (docs/specs/NF-04.md, migration 160, evaluator, tests) | verified | pending |
+| 2026-11-15 | NF-05 | Silent-by-default tactical notification channels & settings toggle (docs/specs/NF-05.md, channels, tests) | verified | pending |
+| 2026-11-15 | NF-06 | Safety check-in & night curfew prompts (docs/specs/NF-06.md, migration 170, useSafetyCheckin, tests) | verified | pending |
+| 2026-11-15 | NF-03 | Rematch & role rotation engine, ratio guard (docs/specs/NF-03.md, migration 180, teamRotation, tests) | verified | pending |
+| 2026-11-15 | NF-02 | Invite links, share sheet, QR modal, App Links & web landing fallback (docs/specs/NF-02.md, invite, tests) | verified | pending |
+| 2026-11-15 | WAVE-1 | Wave 1: Easy to start, hard to fail — All 5 features implemented, tested and verified | verified | pending |
 
 
 

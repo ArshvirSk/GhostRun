@@ -10,6 +10,7 @@ import { Card } from '../src/ui/Card';
 import { CodeBoxes } from '../src/ui/CodeBoxes';
 import { triggerHaptic } from '../src/motion/haptics';
 import { supabase } from '../src/lib/supabase';
+import { parseInviteUrl } from '../src/lib/invite';
 
 const CODE_LENGTH = 4;
 
@@ -20,7 +21,7 @@ export default function JoinGameScreen() {
   const params = useLocalSearchParams<{ code?: string }>();
 
   const initialCode = typeof params.code === 'string'
-    ? params.code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH)
+    ? (parseInviteUrl(params.code).code || params.code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH))
     : '';
   const [code, setCode] = useState(initialCode);
   const [busy, setBusy] = useState(false);
@@ -31,7 +32,7 @@ export default function JoinGameScreen() {
   // Handle deep-link prefill (?code=ABCD)
   useEffect(() => {
     if (params.code) {
-      const clean = params.code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH);
+      const clean = parseInviteUrl(params.code).code || params.code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH);
       if (clean && clean !== code) {
         const timer = setTimeout(() => setCode(clean), 0);
         return () => clearTimeout(timer);
@@ -122,12 +123,14 @@ export default function JoinGameScreen() {
             length={CODE_LENGTH}
             value={code}
             onChangeCode={(newCode) => {
-              setCode(newCode);
+              const parsed = parseInviteUrl(newCode).code ?? newCode;
+              setCode(parsed.slice(0, CODE_LENGTH));
               setErrorMessage('');
               setHasError(false);
             }}
             onComplete={(fullCode) => {
-              void handleJoin(fullCode);
+              const parsed = parseInviteUrl(fullCode).code ?? fullCode;
+              void handleJoin(parsed);
             }}
             hasError={hasError}
             disabled={busy}
