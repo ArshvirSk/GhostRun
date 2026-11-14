@@ -66,6 +66,12 @@
 | 2026-11-15 | NF-18 | In-app feedback & bug report form (feedback table, submit_feedback RPC, FeedbackModal) | verified | pending |
 | 2026-11-15 | NF-32 | In-app review prompt & support contact (Play store link, mailto diagnostics intent in settings) | verified | pending |
 | 2026-11-15 | WAVE-2 | Wave 2: Comms, Safety & Player Progress — All 7 features implemented, tested and verified | verified | pending |
+| 2026-11-15 | NF-12 | Remote push notifications (FCM & Expo push tokens, categories, payload builder) | verified | pending |
+| 2026-11-15 | NF-13 | Scheduled games & calendar reminders (.ics RFC 5545 export & RSVP) | verified | pending |
+| 2026-11-15 | NF-15 | Season recap card ("Wrapped" monthly/seasonal statistics & dossier modal) | verified | pending |
+| 2026-11-15 | NF-16 | Persistent Crews & squad lists (create/join crew, crew invites, CrewManagementModal) | verified | pending |
+| 2026-11-15 | NF-31 | Season framework & remote promo announcement banners on Play tab | verified | pending |
+| 2026-11-15 | WAVE-3 | Wave 3: Operations & Group Retention — All 5 features implemented, tested and verified | verified | pending |
 
 
 

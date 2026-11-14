@@ -46,16 +46,16 @@ flowchart TD
 
 ---
 
-## Wave 3: Operations & Group Retention
+## Wave 3: Operations & Group Retention (Completed)
 *Focus: Group scheduling, asynchronous alerts, and seasonal calendar.*
 
 | ID | Feature | Priority | Effort | Status | Notes |
 |---|---|---|---|---|---|
-| **NF-12** | Remote push notifications (FCM / Expo) | B | M | Queued | Inactive invites and start alerts. |
-| **NF-13** | Scheduled games & calendar reminders | C | M | Queued | RSVP tracking and `.ics` integration. |
-| **NF-15** | Season recap card ("Wrapped") | C | S–M | Queued | Monthly/yearly statistical highlights. |
-| **NF-16** | Crews & squad lists | C | M–L | Queued | Persistent group lists with one-tap invites. |
-| **NF-31** | Season framework & promo announcement banners | C | S–M | Queued | Remote-config banner slots on Play tab. |
+| **NF-12** | Remote push notifications (FCM / Expo) | B | M | Completed | `docs/specs/NF-12.md`. Inactive invites, start alerts, channel mapping. |
+| **NF-13** | Scheduled games & calendar reminders | C | M | Completed | `docs/specs/NF-13.md`. RSVP tracking and RFC 5545 `.ics` export. |
+| **NF-15** | Season recap card ("Wrapped") | C | S–M | Completed | `docs/specs/NF-15.md`. Aggregated metrics, tactical dossier card. |
+| **NF-16** | Crews & squad lists | C | M–L | Completed | `docs/specs/NF-16.md`. Minimal privacy-safe persistent squads. |
+| **NF-31** | Season framework & promo announcement banners | C | S–M | Completed | `docs/specs/NF-31.md`. Remote-config banner slots on Play tab. |
 
 ---
 
