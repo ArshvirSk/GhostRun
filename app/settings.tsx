@@ -29,6 +29,9 @@ import {
   initTacticalNotificationChannels,
   STORAGE_KEY_SILENT_ALERTS,
 } from '../src/lib/notifications';
+import { FeedbackModal } from '../src/components/FeedbackModal';
+import { getAnalyticsOptIn, setAnalyticsOptIn } from '../src/lib/analytics';
+import { formatSupportEmailUrl, getPlayStoreReviewUrl } from '../src/lib/diagnostics';
 
 const DELETE_WORD = 'DELETE';
 
@@ -43,6 +46,8 @@ export default function SettingsScreen() {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [silentAlertsEnabled, setSilentAlertsEnabled] = useState(true);
+  const [analyticsOptIn, setLocalAnalyticsOptIn] = useState(false);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Busy/Error states
@@ -55,11 +60,12 @@ export default function SettingsScreen() {
   useEffect(() => {
     async function loadPreferences() {
       try {
-        const [storedMap, storedAudio, storedHaptics, storedSilentAlerts] = await Promise.all([
+        const [storedMap, storedAudio, storedHaptics, storedSilentAlerts, storedAnalytics] = await Promise.all([
           AsyncStorage.getItem('@ghostrun:map_style'),
           AsyncStorage.getItem('@ghostrun:audio_enabled'),
           AsyncStorage.getItem('@ghostrun:haptics_enabled'),
           AsyncStorage.getItem(STORAGE_KEY_SILENT_ALERTS),
+          getAnalyticsOptIn(),
         ]);
 
         if (storedMap === 'standard' || storedMap === 'night') {
@@ -72,6 +78,7 @@ export default function SettingsScreen() {
         } else {
           setSilentAlertsEnabled(true);
         }
+        setLocalAnalyticsOptIn(storedAnalytics);
 
         if (supabase) {
           const { data } = await supabase.auth.getUser();
@@ -104,6 +111,15 @@ export default function SettingsScreen() {
     setSilentAlertsEnabled(val);
     await AsyncStorage.setItem(STORAGE_KEY_SILENT_ALERTS, String(val));
     void initTacticalNotificationChannels(!val);
+  };
+
+  const toggleAnalytics = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setLocalAnalyticsOptIn(val);
+    await setAnalyticsOptIn(val);
+    if (supabase) {
+      void supabase.rpc('set_consent', { consent_type: 'diagnostics', granted: val });
+    }
   };
 
   const handleSignOut = async () => {
@@ -484,6 +500,77 @@ export default function SettingsScreen() {
               <MaterialCommunityIcons name="download-outline" size={20} color={colors.textMuted} />
             )}
           </Pressable>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Privacy-Safe Diagnostics
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Anonymous error and telemetry events. Zero coordinates, names, or messages recorded (Consent C7).
+              </Text>
+            </View>
+            <Switch
+              value={analyticsOptIn}
+              onValueChange={(val) => void toggleAnalytics(val)}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+        </Card>
+
+        {/* Support & Community (NF-18 & NF-32) */}
+        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
+          COMMUNITY & SUPPORT
+        </Text>
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, padding: 0 }]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setFeedbackModalVisible(true)}
+            style={[styles.settingRow, { padding: spacing.md }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Transmit Field Feedback
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Report bugs, glitches, or suggest tactical enhancements.
+              </Text>
+            </View>
+            <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.accent} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void Linking.openURL(getPlayStoreReviewUrl())}
+            style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Rate GhostRun on Play Store
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Support the squad with a field rating on Google Play.
+              </Text>
+            </View>
+            <Ionicons name="star-outline" size={20} color={colors.warning} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void Linking.openURL(formatSupportEmailUrl())}
+            style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Contact Tactical Support
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Email our operations team with attached hardware diagnostics.
+              </Text>
+            </View>
+            <Ionicons name="mail-outline" size={20} color={colors.primary} />
+          </Pressable>
         </Card>
 
         {/* Sign Out & Session */}
@@ -600,6 +687,11 @@ export default function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      <FeedbackModal
+        visible={feedbackModalVisible}
+        onClose={() => setFeedbackModalVisible(false)}
+      />
     </View>
   );
 }

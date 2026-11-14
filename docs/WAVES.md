@@ -31,18 +31,18 @@ flowchart TD
 
 ---
 
-## Wave 2: Comms, Safety & Player Progress
+## Wave 2: Comms, Safety & Player Progress (Completed)
 *Focus: In-game team tactical coordination, boundary penalties, and personal records.*
 
 | ID | Feature | Priority | Effort | Status | Notes |
 |---|---|---|---|---|---|
-| **NF-07** | Team Radio (team text chat & quick-chat chips) | B | M | Queued | Team-isolated channels only. |
-| **NF-09** | Boundary rule options (`reveal_live`, `auto_tag`) | B | S–M | Queued | Server-enforced via scheduled pings. |
-| **NF-10** | Shareable round card (privacy-trimmed graphic) | B | S–M | Queued | 150m privacy start/finish trim + blurred map. |
-| **NF-11** | Badges & personal records (server-computed) | B | M | Queued | Achievements based on existing telemetry. |
-| **NF-17** | Privacy-safe analytics & crash reporting | B | S–M | Queued | Opt-in consent C7; zero GPS/name telemetry. |
-| **NF-18** | In-app feedback & bug report form | B | S | Queued | Diagnostics bundle without raw coordinates. |
-| **NF-32** | In-app review prompt & support contact | B | S | Queued | Google Play review API after positive events. |
+| **NF-07** | Team Radio (team text chat & quick-chat chips) | B | M | Completed | `docs/specs/NF-07.md`. Team-isolated channels, quick chips, moderation. |
+| **NF-09** | Boundary rule options (`reveal_live`, `auto_tag`) | B | S–M | Completed | `docs/specs/NF-09.md`. Drift buffer, accuracy gating, auto-tag. |
+| **NF-10** | Shareable round card (privacy-trimmed graphic) | B | S–M | Completed | `docs/specs/NF-10.md`. 150m privacy start/finish trim, scorecard modal. |
+| **NF-11** | Badges & personal records (server-computed) | B | M | Completed | `docs/specs/NF-11.md`. 7 canonical medals, dossier achievements. |
+| **NF-17** | Privacy-safe analytics & crash reporting | B | S–M | Completed | `docs/specs/NF-17.md`. Opt-in consent C7; zero GPS/name telemetry. |
+| **NF-18** | In-app feedback & bug report form | B | S | Completed | `docs/specs/NF-18.md`. Diagnostics bundle without raw coordinates. |
+| **NF-32** | In-app review prompt & support contact | B | S | Completed | `docs/specs/NF-32.md`. Google Play review & support mailto intent. |
 
 ---
 

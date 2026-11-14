@@ -56,7 +56,16 @@
 | 2026-11-15 | NF-06 | Safety check-in & night curfew prompts (docs/specs/NF-06.md, migration 170, useSafetyCheckin, tests) | verified | pending |
 | 2026-11-15 | NF-03 | Rematch & role rotation engine, ratio guard (docs/specs/NF-03.md, migration 180, teamRotation, tests) | verified | pending |
 | 2026-11-15 | NF-02 | Invite links, share sheet, QR modal, App Links & web landing fallback (docs/specs/NF-02.md, invite, tests) | verified | pending |
-| 2026-11-15 | WAVE-1 | Wave 1: Easy to start, hard to fail — All 5 features implemented, tested and verified | verified | pending |
+| 2026-11-15 | WAVE-1 | Wave 1: Easy to start, hard to fail — All 5 features implemented, tested and verified | verified | approved |
+| 2026-11-15 | NF-07 | Team Radio (team text chat, quick chips, rate limit, profanity filter, TeamRadioSheet) | verified | pending |
+| 2026-11-15 | NF-08 | Moderation basics (blocks & reports tables, block_user & report_player RPCs) | verified | pending |
+| 2026-11-15 | NF-09 | Boundary rule options (reveal_live, auto_tag, drift buffer, accuracy gating, boundary rules evaluator) | verified | pending |
+| 2026-11-15 | NF-10 | Shareable round card (150m privacy start/finish trim, scorecard modal, ShareRoundCardModal) | verified | pending |
+| 2026-11-15 | NF-11 | Badges & personal records (7 canonical medals, player_badges table, dossier achievements in YouTab) | verified | pending |
+| 2026-11-15 | NF-17 | Privacy-safe analytics & crash reporting (opt-in consent C7, zero GPS/name telemetry, analyticsCore) | verified | pending |
+| 2026-11-15 | NF-18 | In-app feedback & bug report form (feedback table, submit_feedback RPC, FeedbackModal) | verified | pending |
+| 2026-11-15 | NF-32 | In-app review prompt & support contact (Play store link, mailto diagnostics intent in settings) | verified | pending |
+| 2026-11-15 | WAVE-2 | Wave 2: Comms, Safety & Player Progress — All 7 features implemented, tested and verified | verified | pending |
 
 
 
