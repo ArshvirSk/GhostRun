@@ -20,6 +20,7 @@
     "test:invite": "node --import tsx scripts/test-invite.ts",
     "test:radio": "node --import tsx scripts/test-team-radio.ts",
     "test:boundary": "node --import tsx scripts/test-boundary-rules.ts",
+    "test:card": "node --import tsx scripts/test-share-card.ts",
     "test:routes": "node --import tsx scripts/test-route-resolution.ts",
     "test:theme": "node --import tsx scripts/test-theme-persistence.ts",
     "profile:hud": "node --env-file=.env --import tsx scripts/profile-hud-renders.ts",

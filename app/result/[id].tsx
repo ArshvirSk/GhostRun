@@ -25,6 +25,8 @@ import { supabase } from '../../src/lib/supabase';
 import { colors, radii, spacing } from '../../src/theme/tokens';
 import { Button, Card, Chip, Text } from '../../src/ui';
 import { formatDistance, useUnits } from '../../src/utils/units';
+import { ShareRoundCardModal } from '../../src/components/ShareRoundCardModal';
+import { getModeModule } from '../../src/modes/registry';
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
@@ -220,6 +222,7 @@ export default function ResultScreen() {
   const [ghostScore, setGhostScore] = useState<GhostDuelScore | null>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [shareRecapFeedback, setShareRecapFeedback] = useState(false);
+  const [shareCardModalVisible, setShareCardModalVisible] = useState(false);
 
   const mountedRef = useRef(true);
   const leavingRef = useRef(false);
@@ -428,6 +431,27 @@ export default function ResultScreen() {
     }
     return grouped;
   }, [trails]);
+
+  const activeModule = getModeModule(state?.game.mode || 'classic_chase');
+  const myPlayer = useMemo(() => {
+    return state?.players.find((p) => p.id === state.my_player_id) || null;
+  }, [state]);
+
+  const myTrailPoints = useMemo<LngLat[]>(() => {
+    if (!state) return [];
+    return (trailsByPlayer.get(state.my_player_id) ?? []).map((p) => ({
+      latitude: p.latitude,
+      longitude: p.longitude,
+    }));
+  }, [state, trailsByPlayer]);
+
+  const myDistanceMeters = useMemo(() => {
+    let total = 0;
+    for (let i = 1; i < myTrailPoints.length; i++) {
+      total += distanceM(myTrailPoints[i - 1], myTrailPoints[i]);
+    }
+    return total;
+  }, [myTrailPoints]);
 
   const trailFeatures = useMemo(() => {
     if (!state) return [];
@@ -1379,13 +1403,13 @@ export default function ResultScreen() {
 
               <View style={{ marginTop: spacing.md }}>
                 <Button
-                  title={shareRecapFeedback ? 'Recap Card Export Ready (Phase D)' : 'Share Mission Recap'}
+                  title="Share Mission Recap Card"
                   variant="primary"
                   size="md"
-                  onPress={() => setShareRecapFeedback(true)}
+                  onPress={() => setShareCardModalVisible(true)}
                 />
                 <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', marginTop: spacing.xs }}>
-                  Card sharing slot (Addendum C #4) — Image generation enabled in Phase D.
+                  Generates privacy-guarded mission scorecard with 150m boundary trim (NF-10).
                 </Text>
               </View>
             </Card>
@@ -1440,6 +1464,22 @@ export default function ResultScreen() {
           </View>
         </ScrollView>
       </View>
+
+      <ShareRoundCardModal
+        visible={shareCardModalVisible}
+        metrics={{
+          modeName: activeModule?.name || state?.game?.mode || 'Classic Chase',
+          outcome: isVictory ? 'victorious' : 'completed',
+          durationSeconds: gameStats?.duration_s || 0,
+          distanceMeters: Math.round(myDistanceMeters),
+          topSpeedKmh: myPlayerStats?.peak_speed_mps ? myPlayerStats.peak_speed_mps * 3.6 : undefined,
+          role: myPlayer?.team || 'runner',
+          date: new Date().toLocaleDateString(),
+          shareTrailConsent: myPlayerStats?.share_trail !== false,
+        }}
+        rawTrailPoints={myTrailPoints}
+        onClose={() => setShareCardModalVisible(false)}
+      />
     </View>
   );
 }
