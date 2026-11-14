@@ -86,6 +86,7 @@
 | 2026-11-15 | NF-28 | Hosting purchase & monetisation safeguards (disabled by default per F-D9, free community tier, event pass) | verified | pending |
 | 2026-11-15 | NF-36 | Community rule packs (strictly data-only, physical safety bounds validator, no code execution) | verified | pending |
 | 2026-11-15 | WAVE-5 | Wave 5: Scale & Extras — All 5 features implemented, tested and verified | verified | pending |
+| 2026-11-15 | FL0 | Friends & Echo audit (docs/FL_AUDIT.md, system inventory, scoring gaps, baseline tests, FL-D1 to FL-D8) | verified | pending |
 
 
 
