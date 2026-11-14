@@ -241,7 +241,7 @@ export interface RoundState {
     area: GameArea;
     target_set: boolean;
     boundary_grace_s?: number;
-    boundary_penalty?: 'warn' | 'extra_ping';
+    boundary_penalty?: 'warn' | 'extra_ping' | 'reveal_live' | 'auto_tag';
     jail?: JailState | null;
     vip_escort?: VipEscortState | null;
     territory_pulse?: TerritoryPulseState | null;

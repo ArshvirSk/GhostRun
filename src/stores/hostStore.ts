@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { getModeModule } from '../modes/registry';
 
 export type PresetType = 'casual' | 'standard' | 'hardcore' | 'custom';
-export type BoundaryPenalty = 'warn' | 'extra_ping';
+export type BoundaryPenalty = 'warn' | 'extra_ping' | 'reveal_live' | 'auto_tag';
 
 export interface HostRulesState {
   headStartS: number;

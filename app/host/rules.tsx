@@ -279,24 +279,56 @@ export default function HostRulesScreen() {
               </View>
             </View>
 
-            {/* Boundary Penalty Toggle */}
-            <View style={styles.paramRow}>
-              <View style={styles.paramTextCol}>
-                <Text variant="title" style={{ color: colors.text, fontSize: 14 }}>
-                  Excursion Penalty
-                </Text>
-                <Text variant="body" style={{ color: colors.textMuted, fontSize: 12 }}>
-                  {rules.boundaryPenalty === 'extra_ping'
-                    ? 'Releases immediate radar ping to hunters when boundary is breached'
-                    : 'Advisory warning only'}
-                </Text>
+            {/* Boundary Penalty Selector (NF-09) */}
+            <View style={{ marginTop: spacing.md }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 14 }}>
+                Excursion Penalty
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, fontSize: 12, marginTop: 2, marginBottom: spacing.sm }}>
+                {rules.boundaryPenalty === 'warn' && 'Advisory warning only; no telemetry shared with hunters.'}
+                {rules.boundaryPenalty === 'extra_ping' && 'Releases immediate radar ping to hunters when boundary grace expires.'}
+                {rules.boundaryPenalty === 'reveal_live' && 'Continuous radar pings every 5s until runner returns inside boundary.'}
+                {rules.boundaryPenalty === 'auto_tag' && 'Runner is automatically eliminated after 120s outside boundary.'}
+              </Text>
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {[
+                  { id: 'warn', label: 'Warn' },
+                  { id: 'extra_ping', label: 'Extra Ping' },
+                  { id: 'reveal_live', label: 'Live Reveal' },
+                  { id: 'auto_tag', label: 'Auto Tag' },
+                ].map((opt) => {
+                  const isSelected = rules.boundaryPenalty === opt.id;
+                  return (
+                    <Pressable
+                      key={opt.id}
+                      accessibilityRole="button"
+                      onPress={() => {
+                        triggerHaptic('buttonTap');
+                        setRule('boundaryPenalty', opt.id as any);
+                      }}
+                      style={[
+                        styles.penaltyChip,
+                        {
+                          backgroundColor: isSelected ? colors.primary : colors.surfaceElevated,
+                          borderColor: isSelected ? colors.primary : colors.borderDark,
+                        },
+                      ]}
+                    >
+                      <Text
+                        variant="label"
+                        style={{
+                          color: isSelected ? '#000' : colors.text,
+                          fontSize: 11,
+                          fontWeight: isSelected ? '700' : '500',
+                        }}
+                      >
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-              <Switch
-                value={rules.boundaryPenalty === 'extra_ping'}
-                onValueChange={(val) => setRule('boundaryPenalty', val ? 'extra_ping' : 'warn')}
-                thumbColor={colors.accent}
-                trackColor={{ false: colors.surface, true: colors.surfaceElevated }}
-              />
             </View>
           </Card>
         )}
@@ -398,5 +430,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     zIndex: 10,
     elevation: 8,
+  },
+  penaltyChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
   },
 });
