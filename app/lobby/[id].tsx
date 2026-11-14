@@ -331,6 +331,13 @@ export default function LobbyScreen() {
     );
   }
 
+  async function rotateRoles() {
+    if (!supabase || !gameId) return;
+    await runAction('rotate', () =>
+      (supabase!.rpc as any)('rotate_teams', { game_id: gameId }),
+    );
+  }
+
   async function continueLobby() {
     if (!supabase || !gameId) return;
     await runAction('continue', () => supabase!.rpc('begin_target_selection', { game_id: gameId }));
@@ -827,13 +834,24 @@ export default function LobbyScreen() {
               {isHost && (
                 <View style={{ gap: 10, marginTop: spacing.md }}>
                   {!isSoloMode && (
-                    <Button
-                      title="Randomize Teams"
-                      variant="secondary"
-                      size="sm"
-                      disabled={busyAction === 'randomize'}
-                      onPress={() => void randomizeTeams()}
-                    />
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <Button
+                        title="Rotate Roles"
+                        variant="secondary"
+                        size="sm"
+                        style={{ flex: 1 }}
+                        disabled={busyAction === 'rotate'}
+                        onPress={() => void rotateRoles()}
+                      />
+                      <Button
+                        title="Randomize"
+                        variant="ghost"
+                        size="sm"
+                        style={{ flex: 1 }}
+                        disabled={busyAction === 'randomize'}
+                        onPress={() => void randomizeTeams()}
+                      />
+                    </View>
                   )}
 
                   {state.game.mode === 'classic_chase' ? (

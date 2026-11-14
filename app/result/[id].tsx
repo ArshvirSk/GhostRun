@@ -350,11 +350,14 @@ export default function ResultScreen() {
     }
   }, [gameId, router, state]);
 
-  async function playAgain() {
+  async function playAgain(rotate: boolean = true) {
     if (!supabase || !gameId || rematchBusy) return;
     setRematchBusy(true);
     setRematchError('');
-    const { data, error } = await supabase.rpc('rematch_game', { p_game_id: gameId });
+    const { data, error } = await (supabase.rpc as any)('rematch_game', {
+      p_game_id: gameId,
+      p_rotate: rotate,
+    });
     if (!mountedRef.current) return;
     if (error) {
       setRematchBusy(false);
@@ -1403,11 +1406,18 @@ export default function ResultScreen() {
 
               <View style={{ gap: spacing.sm }}>
                 <Button
-                  title={rematchBusy ? 'Opening Rematch Lobby…' : 'Play Again (Rematch)'}
+                  title={rematchBusy ? 'Opening Rematch Lobby…' : 'Play Again (Rotate Roles)'}
                   variant="primary"
                   size="lg"
                   disabled={rematchBusy}
-                  onPress={() => void playAgain()}
+                  onPress={() => void playAgain(true)}
+                />
+                <Button
+                  title="Play Again (Keep Roles)"
+                  variant="ghost"
+                  size="md"
+                  disabled={rematchBusy}
+                  onPress={() => void playAgain(false)}
                 />
                 <Button
                   title="Watch Replay (±15s Controls)"
