@@ -87,15 +87,16 @@ flowchart TD
 
 ---
 
-## Wave 6: Friends, Moderation & Echo Leaderboards
+## Wave 6: Friends, Moderation & Echo Leaderboards (Completed)
 *Source: `docs/FRIENDS_LEADERBOARDS.md` (Dedicated 4-Phase System)*
 
 | Phase | Milestone | Scope | Status | Notes |
 |---|---|---|---|---|
-| **FL1** | **Phase P0: Foundations** | Unique `@handle`, Report & Block, Moderation guide | Queued | Fulfills & deepens base NF-08. |
-| **FL2** | **Phase P1: Friends Graph** | Exact-handle requests, signed invite links/QR, presence | Queued | Fulfills & deepens base NF-30 & NF-02. |
-| **FL3** | **Phase P2: Echo Scoring Engine** | Original ping metric, 3 ranked modes, anti-cheat, owner-only | Queued | Calibration in `docs/ECHO_CALIBRATION.md`. |
-| **FL4** | **Phase P3: Private Friends Board** | Hourly refresh, 60m delay, head-to-head records | Queued | Fulfills & deepens private NF-14. |
+| **FL0** | **Readiness Audit** | Systems audit, scoring gaps, baseline tests, FL-D1 to D8 | Completed | `docs/FL_AUDIT.md`. |
+| **FL1** | **Phase P0: Foundations** | Unique `@handle`, Report & Block, Moderation guide | Completed | `docs/specs/FL-P0.md`, `docs/MODERATION.md`. Fulfills & deepens base NF-08. |
+| **FL2** | **Phase P1: Friends Graph** | Exact-handle requests, signed invite links/QR, presence | Completed | `docs/specs/FL-P1.md`. Fulfills & deepens base NF-30 & NF-02. |
+| **FL3** | **Phase P2: Echo Scoring Engine** | Original ping metric, 3 ranked modes, anti-cheat, owner-only | Completed | `docs/specs/FL-P2.md`, calibration in `docs/ECHO_CALIBRATION.md`. |
+| **FL4** | **Phase P3: Private Friends Board** | Hourly refresh, 60m delay, head-to-head records | Completed | `docs/specs/FL-P3.md`. Fulfills & deepens private NF-14. |
 | — | *Phase P4: Public Boards* | Opt-in global leaderboard (top 100, no country/flags) | Deferred | Gated on post-P3 review. |
 
 ---

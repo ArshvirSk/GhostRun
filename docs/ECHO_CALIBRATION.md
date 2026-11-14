@@ -28,10 +28,10 @@ The calibration simulated **200 matches per mode** (600 total simulated rounds) 
 
 | Target Criterion | Specification Threshold | Measured Result | Status |
 |---|---|---|---|
-| **Role Balance (Runner vs. Hunter Parity)** | Difference <= 5% (acceptable <= 6%) | **5.9%** (`classic_chase`), **4.2%** (`tag_hunt`), **0.2%** (`jailbreak`) | **PASSED** |
+| **Role Balance (Runner vs. Hunter Parity)** | Difference <= 5% (acceptable <= 6%) | **2.7%** (`classic_chase`), **0.4%** (`tag_hunt`), **3.9%** (`jailbreak`) | **PASSED** |
 | **Idle Player Suppression** | Score < 20 | **10** (runner) / **9** (hunter) | **PASSED** |
-| **Collusion / Win-Trading Penalty** | Colluder score must not exceed honest strong score | **36** vs. **67.4** | **PASSED** |
-| **Score Range & Stability** | Typical good rounds: 60–90; theoretical max ~115 | Typical strong: **67.4**, Max observed: **94** | **PASSED** |
+| **Collusion / Win-Trading Penalty** | Colluder score must not exceed honest strong score | **36** vs. **64.5** | **PASSED** |
+| **Score Range & Stability** | Typical good rounds: 60–90; theoretical max ~115 | Typical strong: **64.5**, Max observed: **94** | **PASSED** |
 
 ---
 
@@ -39,9 +39,9 @@ The calibration simulated **200 matches per mode** (600 total simulated rounds) 
 
 | Mode ID | Strong Runner | Average Runner | Idle Runner | Strong Hunter | Average Hunter | Idle Hunter | Colluder (Discounted) | Disparity |
 |---|---|---|---|---|---|---|---|---|
-| `classic_chase` | 67.4 | 52.4 | 10 | 63.5 | 51.6 | 9 | 36 | 5.9% |
-| `tag_hunt` | 66.7 | 52.1 | 10 | 63.9 | 52 | 9 | 36 | 4.2% |
-| `jailbreak` | 65.2 | 51.8 | 10 | 65.1 | 53.2 | 9 | 36 | 0.2% |
+| `classic_chase` | 64.5 | 50 | 10 | 66.2 | 54.4 | 9 | 36 | 2.7% |
+| `tag_hunt` | 65.7 | 51.3 | 10 | 65.4 | 53.4 | 9 | 36 | 0.4% |
+| `jailbreak` | 66.8 | 52 | 10 | 64.3 | 52.2 | 9 | 36 | 3.9% |
 
 ---
 

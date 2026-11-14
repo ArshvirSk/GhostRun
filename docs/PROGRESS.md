@@ -90,6 +90,8 @@
 | 2026-11-15 | FL1 | Phase P0: Foundations (docs/specs/FL-P0.md, docs/MODERATION.md, migration 410, handlesCore, moderationCore, test:handles) | verified | pending |
 | 2026-11-15 | FL2 | Phase P1: Friends Graph (docs/specs/FL-P1.md, migration 420, friendsCore, FriendsSheet, Play presence, test:friends) | verified | pending |
 | 2026-11-15 | FL3 | Phase P2: Echo Scoring Engine (docs/specs/FL-P2.md, docs/ECHO_CALIBRATION.md, migration 430, echoCore, calibrate:echo, test:echo) | verified | pending |
+| 2026-11-15 | FL4 | Phase P3: Private Friends Board (docs/specs/FL-P3.md, migration 440, friendsBoardCore, FriendsBoardModal, 60m delay, test:board) | verified | pending |
+| 2026-11-15 | WAVE-6 | Wave 6: Friends, Moderation & Echo Leaderboards — All 4 phases implemented, calibrated and tested | verified | pending |
 
 
 

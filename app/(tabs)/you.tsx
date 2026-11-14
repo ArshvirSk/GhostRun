@@ -22,6 +22,7 @@ import { useUnits } from '../../src/utils/units';
 import { BADGE_CATALOG } from '../../src/lib/badges';
 import { SeasonRecapModal } from '../../src/components/SeasonRecapModal';
 import { FriendsSheet } from '../../src/components/FriendsSheet';
+import { FriendsBoardModal } from '../../src/components/FriendsBoardModal';
 import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
 
 interface MatchHistoryItem {
@@ -64,6 +65,7 @@ export default function YouTab() {
   const [recapData, setRecapData] = useState<SeasonRecapData | null>(null);
   const [loadingRecap, setLoadingRecap] = useState(false);
   const [friendsVisible, setFriendsVisible] = useState(false);
+  const [friendsBoardVisible, setFriendsBoardVisible] = useState(false);
 
   const handleOpenRecap = async () => {
     triggerHaptic('buttonTap');
@@ -779,6 +781,21 @@ export default function YouTab() {
             accessibilityRole="button"
             onPress={() => {
               triggerHaptic('buttonTap');
+              setFriendsBoardVisible(true);
+            }}
+            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
+          >
+            <Ionicons name="trophy-outline" size={19} color={colors.accent || colors.primary} />
+            <Text style={[styles.menuRowText, { color: colors.text }]}>
+              Friends Echo Leaderboard
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              triggerHaptic('buttonTap');
               router.push('/settings' as any);
             }}
             style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
@@ -801,6 +818,11 @@ export default function YouTab() {
       <FriendsSheet
         visible={friendsVisible}
         onClose={() => setFriendsVisible(false)}
+      />
+
+      <FriendsBoardModal
+        visible={friendsBoardVisible}
+        onClose={() => setFriendsBoardVisible(false)}
       />
     </View>
   );
