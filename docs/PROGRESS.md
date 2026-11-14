@@ -80,6 +80,12 @@
 | 2026-11-15 | NF-26 | Admin console & remote config (admin role, RLS kill-switches, disabled_modes, system health metrics) | verified | pending |
 | 2026-11-15 | NF-33 | Spoken TTS narration for AI Game Master (priority speech queue, screen-off tactical audio cues) | verified | pending |
 | 2026-11-15 | WAVE-4 | Wave 4: Reach, Platform & Accessibility — All 7 features implemented, tested and verified | verified | pending |
+| 2026-11-15 | NF-23 | Event mode for large games (Realtime broadcast channels, delayed spectator buffer, referee controls) | verified | pending |
+| 2026-11-15 | NF-24 | Wear OS companion protocol (HUD updates, wrist haptics, one-tap check-in, wrist SOS) | verified | pending |
+| 2026-11-15 | NF-27 | Replay trail animation & video export (150m privacy start/finish trimming, relative screen coordinates, SVG keyframes) | verified | pending |
+| 2026-11-15 | NF-28 | Hosting purchase & monetisation safeguards (disabled by default per F-D9, free community tier, event pass) | verified | pending |
+| 2026-11-15 | NF-36 | Community rule packs (strictly data-only, physical safety bounds validator, no code execution) | verified | pending |
+| 2026-11-15 | WAVE-5 | Wave 5: Scale & Extras — All 5 features implemented, tested and verified | verified | pending |
 
 
 

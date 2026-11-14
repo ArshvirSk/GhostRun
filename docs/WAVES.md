@@ -74,16 +74,16 @@ flowchart TD
 
 ---
 
-## Wave 5: Scale & Extras
+## Wave 5: Scale & Extras (Completed)
 *Focus: Large community events, wearables, and optional commercial tooling.*
 
 | ID | Feature | Priority | Effort | Status | Notes |
 |---|---|---|---|---|---|
-| **NF-23** | Event mode for large games (50–150 players) | D | L | Queued | Realtime broadcast channels & spectator feeds. |
-| **NF-24** | Wear OS companion app | D | L | Queued | Wrist haptics and one-tap actions. |
-| **NF-27** | Replay video export (MP4/GIF) | D | L | Queued | Animated trail video with privacy trimming. |
-| **NF-28** | Hosting purchase (Monetisation) | D | M | Queued | One-time unlock (only if public release). |
-| **NF-36** | Community rule packs (Data-only) | D | M | Queued | Validated custom rules (no code/scripts). |
+| **NF-23** | Event mode for large games (50–150 players) | D | L | Completed | `docs/specs/NF-23.md`. Realtime broadcast channels & spectator feeds. |
+| **NF-24** | Wear OS companion app | D | L | Completed | `docs/specs/NF-24.md`. Wrist haptics, SOS, and one-tap actions. |
+| **NF-27** | Replay video export (MP4/GIF) | D | L | Completed | `docs/specs/NF-27.md`. Animated trail frames with 150m privacy trimming. |
+| **NF-28** | Hosting purchase (Monetisation) | D | M | Completed | `docs/specs/NF-28.md`. Entitlement guards, strictly off by default per F-D9. |
+| **NF-36** | Community rule packs (Data-only) | D | M | Completed | `docs/specs/NF-36.md`. Validated pure JSON data packs (no code/scripts). |
 
 ---
 
