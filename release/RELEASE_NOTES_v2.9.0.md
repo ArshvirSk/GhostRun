@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-15  
 **Artifact:** `release/GhostRun-v2.9.0.apk`  
-**Size:** 56,559,112 bytes (53.94 MB)  
-**SHA-256 Checksum:** `DC6619B6BED25590F523F81B2027F694C2A4144F5214A60E4ADC81A0DAD0794A`  
+**Size:** 56,561,664 bytes (53.94 MB)  
+**SHA-256 Checksum:** `2649B8B722522F0445D03FD66967D53220FF02ABFE1E581E9B5EAF2D137A2D16`  
 **Version:** `2.9.0`  
 **VersionCode:** `15`  
 **Architecture:** `arm64-v8a`  
@@ -57,15 +57,25 @@ GhostRun **v2.9.0** introduces the game-changing **Extreme / Blackout** difficul
   - Adjusting any rule stepper (Head Start, Round Duration, Ping Cadence, Tag Radius, Boundary Excursion Penalty, or Mode Parameters) immediately unhighlights all presets and displays a tactical `CUSTOM` badge.
   - Verified with dedicated test suite `scripts/test-rules-presets.ts`.
 
-### 4. Live Round Operative Heading Lock & Modular Lobby
+### 4. Comprehensive Mission Lobby Overhaul (`app/lobby/[id].tsx`)
+- **Full Visibility for Unassigned & All Operatives:**
+  - Expanded ScrollView bottom clearance to `+ 190px` and slimmed the floating action dock down from ~210px to ~95px, completely eliminating any overlap so every operative card is 100% visible even at maximum scroll.
+- **Dedicated Team Roster Cards:**
+  - Replaced scattered text rows with cohesive cards for **Runners** (cyan/teal), **Hunters** (orange/coral), and **Unassigned Operatives**.
+  - Integrated visual team count chips, `[YOUR SQUAD]` active indicators, and prominent `[JOIN RUNNERS]` / `[JOIN HUNTERS]` buttons.
+- **Uncluttered Action Dock:**
+  - Removed the cramped 3-button utility row that caused awkward line wrapping (`CANCEL MISSIO N`).
+  - Moved **Rotate Roles** and **Shuffle Squads** into a clean **Host Roster Controls** card inside the Roster tab.
+  - Floating dock is now dedicated strictly to `[READY UP] / [STAND DOWN]` and `[LAUNCH ROUND] / [TARGET SELECT]`.
+- **Top Navigation Bar & Mission Access Card:**
+  - Added a clean top navigation back button with native confirmation dialogs (cancelling mission for host, leaving lobby for operative).
+  - Designed a high-contrast Mission Code card with side-by-side `[SHARE]` and `[QR CODE]` actions.
 - **Compass Heading Lock in Live Rounds (`src/game-shell/MapView.tsx`):**
   - In standard and hardcore modes, the live map locks onto the operative's position and rotates smoothly with physical phone movement, preventing accidental manual map spins or panning during intense chases.
 - **Lobby Advanced Host Controls (`app/lobby/[id].tsx`):**
   - Host configuration card now includes quick switches to enable/disable **Tactical Heading Lock** and **Radar Blackout** directly prior to launch.
-- **Streamlined Lobby UI:**
-  - Re-architected lobby layout into structured card modules: Mission Overview, Operative Roster, Live Actions, and Host Rules Configuration.
 
-### 4. Movable 4-Corner Headstart Mini-Map
+### 5. Movable 4-Corner Headstart Mini-Map
 - **Runner Headstart Contracting:**
   - During the runner headstart phase, the full-screen map contracts into a compact corner widget displaying live headstart countdown time.
   - Automatically transitions back to full-screen view once the headstart countdown expires.
