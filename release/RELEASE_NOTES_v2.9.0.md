@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-15  
 **Artifact:** `release/GhostRun-v2.9.0.apk`  
-**Size:** 56,579,584 bytes (53.96 MB)  
-**SHA-256 Checksum:** `725BF02F6861EE65C52F42BABB32A540F3D621FDCB50AEBDBB1A3871A308F890`  
+**Size:** 56,584,700 bytes (53.96 MB)  
+**SHA-256 Checksum:** `82672E0991B9EADD38647CDBA9288A9D9ABA9339E8C76BEA781DBC63447FACE7`  
 **Version:** `2.9.0`  
 **VersionCode:** `15`  
 **Architecture:** `arm64-v8a`  
@@ -63,31 +63,25 @@ GhostRun **v2.9.0** introduces the game-changing **Extreme / Blackout** difficul
   - Adjusting any rule stepper (Head Start, Round Duration, Ping Cadence, Tag Radius, Boundary Excursion Penalty, or Mode Parameters) immediately unhighlights all presets and displays a tactical `CUSTOM` badge.
   - Verified with dedicated test suite `scripts/test-rules-presets.ts`.
 
-### 4. Comprehensive Mission Lobby Overhaul (`app/lobby/[id].tsx`)
-- **Side-by-Side 2-Column Squad Arena:**
-  - Redesigned the squad section into equal side-by-side columns: **RUNNERS** on the left with lime accents, and **HUNTERS** on the right with coral-orange accents.
-  - If unassigned or on opposing team, an immediate `[JOIN]` button is rendered in the column header.
-  - Upon joining, the operative's card is highlighted inside their squad column with an inline `[↳ LEAVE]` button to freely step down to unassigned.
-  - Cuts squad vertical footprint by ~50% and provides a crisp competitive "VS" atmosphere.
-- **Compact Quick-Bar (Route Privacy & Diagnostics):**
-  - Replaced the full-width privacy warning banner and sensor diagnostic strip with two 36px side-by-side quick-action pills directly beneath the tab bar:
-    - `[🛡 Privacy: Keep Private ⌄]`: Tapping presents a native action modal to switch between "Keep Private" and "Share Trail".
-    - `[✔ Diagnostics: Ready]`: Tapping opens the sensor and GPS health inspection modal.
-- **Unassigned Operatives Card:**
-  - Dedicated card below the squad arena showing unassigned players with avatar dot, host crown, ready badge, and quick-action `[JOIN RUNNERS]` / `[JOIN HUNTERS]` buttons for the operative.
-  - Displays a clean `"No unassigned operatives"` status when all players have chosen squads.
-- **Top Navigation Bar & Mission Access Card:**
-  - Circular back button with confirmation dialog, purple `MISSION LOBBY` category tracker, bold mode title, and glowing `PREPARING ●` / `READY ●` status chip.
-  - Access Code card featuring 4-letter code, side-by-side `[SHARE]` and `[QR]` buttons, and subtle alert notice when under 2 players.
-- **Host Squad Controls:**
-  - Card with `[ROTATE ROLES]` and `[SHUFFLE SQUADS]` buttons that activate cleanly when at least 2 players are present.
+### 4. Mission Lobby 3-Tab UI Redesign (`app/lobby/[id].tsx`)
+- **Single-Row Compact Code Bar:**
+  - Elongated dark pill container with `CODE: {code}` (letterSpacing 2) alongside two 42x42 square icon buttons: `[ ⇪ ]` Share and `[ ☵ ]` QR code modal.
+- **Purple Underline Tab Navigation:**
+  - Modern horizontal tabs: `ROSTER (N)`, `RULES & INTEL`, and `TACTICAL AREA` with an active purple underline indicator bar.
+- **Roster Tab & Side-by-Side Squad Arena:**
+  - Centered minimal quick status row: `🔒 Privacy: Keep Private • 📡 GPS Ready`.
+  - Equal side-by-side columns: **RUNNERS** (lime green border & dot) vs **HUNTERS** (coral red border & dot), with individual operative cards, ready badges, and `[ Leave ]` / `[ JOIN ]` actions.
+  - Automatically collapses the `UNASSIGNED OPERATIVES` card when all players are assigned.
+  - Minimal `HOST CONTROLS` card with `[ ROTATE ROLES ]` and `[ SHUFFLE SQUADS ]`.
+- **Rules & Intel Tab:**
+  - Dedicated `GAME MODE` card with mode icon, title, and descriptive tactical mission briefing.
+  - `TACTICAL RULES` card with structured icon rows for Game Duration, Head Start, Radar Pings, and Victory Conditions.
+  - Amber/Coral `⚠ SAFETY & FAIR PLAY` warning card.
+- **Tactical Area Tab:**
+  - Embedded interactive MapLibre map preview card (~280px) displaying purple boundary geofence circle (`PLAY AREA (500m)`), concentric neon-green extraction target rings (`EXTRACTION TARGET`), operative `YOU` marker pin, zoom `+`/`-` controls, and a floating `[ 🔍 RE-CENTER ]` pill button.
+  - Area Details card with Pin icon, Area Radius, extraction status, out-of-bounds penalty grace period, and `[ 📍 CHANGE AREA ]` action.
 - **Fixed Bottom Action Dock:**
-  - Compact ~85px height dock with `[READY UP]` (or `[STAND DOWN]`), `[SELECT TARGET]` / `[LAUNCH ROUND]`, and live status text (`1 operative awaiting ready • Requires 1 Runner & 1 Hunter`).
-  - ScrollView padding cleared to `+ 210px` ensuring zero obstruction of roster or settings.
-- **Compass Heading Lock in Live Rounds (`src/game-shell/MapView.tsx`):**
-  - In standard and hardcore modes, the live map locks onto the operative's position and rotates smoothly with physical phone movement, preventing accidental manual map spins or panning during intense chases.
-- **Lobby Advanced Host Controls (`app/lobby/[id].tsx`):**
-  - Host configuration card now includes quick switches to enable/disable **Tactical Heading Lock** and **Radar Blackout** directly prior to launch.
+  - High-contrast neon-lime `[ READY UP ]` (or `[ STAND DOWN ]`) and `[ SELECT TARGET ]` / `[ LAUNCH ROUND ]` action dock with live operative ready counter.
 
 ### 5. Movable 4-Corner Headstart Mini-Map
 - **Runner Headstart Contracting:**

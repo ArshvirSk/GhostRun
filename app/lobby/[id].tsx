@@ -28,10 +28,16 @@ import { ReadyCheckModal } from '../../src/components/ReadyCheckModal';
 import { LobbyInviteModal } from '../../src/components/LobbyInviteModal';
 import { buildInvitePayload } from '../../src/lib/invite';
 import { pregenerateQrUri } from '../../src/lib/qrCache';
+import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from '../../src/lib/map';
+import { circleRing } from '../../src/lib/geo';
+import { getInstantLocation } from '../../src/lib/locationCache';
 import {
   runTrackingHealthDiagnostic,
   type TrackingHealthReport,
 } from '../../src/lib/trackingHealth';
+
+const DARK_MAP_STYLE =
+  process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
 
 type Team = 'runner' | 'hunter' | 'unassigned';
 
@@ -301,6 +307,75 @@ export default function LobbyScreen() {
 
   const jailPlaced = Boolean(state?.game.jail);
   const canStart = hasBothTeams && everyoneAssigned && (!isJailbreak || jailPlaced);
+
+  const cameraRef = useRef<CameraRef>(null);
+  const [mapZoom, setMapZoom] = useState(14.2);
+
+  const centerCoords = useMemo<[number, number]>(() => {
+    if (state?.game?.area_center) {
+      if (Array.isArray(state.game.area_center)) {
+        return [state.game.area_center[0], state.game.area_center[1]];
+      }
+      if (typeof state.game.area_center === 'object') {
+        return [state.game.area_center.longitude, state.game.area_center.latitude];
+      }
+    }
+    const instant = getInstantLocation();
+    if (instant) return instant;
+    return [0, 0];
+  }, [state?.game?.area_center]);
+
+  const boundaryGeoJSON = useMemo(() => {
+    return circleRing(
+      { longitude: centerCoords[0], latitude: centerCoords[1] },
+      state?.game?.area_radius_m || 500,
+    );
+  }, [centerCoords, state?.game?.area_radius_m]);
+
+  const targetCoords = useMemo<[number, number]>(() => {
+    if (state?.game?.extraction) {
+      return [state.game.extraction.longitude, state.game.extraction.latitude];
+    }
+    return [centerCoords[0] + 0.0018, centerCoords[1] + 0.0012];
+  }, [state?.game?.extraction, centerCoords]);
+
+  const targetGeoJSON = useMemo(() => {
+    return {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          type: 'Feature' as const,
+          properties: {},
+          geometry: {
+            type: 'Point' as const,
+            coordinates: targetCoords,
+          },
+        },
+      ],
+    };
+  }, [targetCoords]);
+
+  const youCoords = useMemo<[number, number]>(() => {
+    const instant = getInstantLocation();
+    if (instant) return instant;
+    return [centerCoords[0] - 0.0012, centerCoords[1] - 0.001];
+  }, [centerCoords]);
+
+  const youGeoJSON = useMemo(() => {
+    return {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          type: 'Feature' as const,
+          properties: {},
+          geometry: {
+            type: 'Point' as const,
+            coordinates: youCoords,
+          },
+        },
+      ],
+    };
+  }, [youCoords]);
 
   // Ensure push notifications and location permissions are ready before match begins
   const ensureGamePermissions = useCallback(async () => {
@@ -712,47 +787,40 @@ export default function LobbyScreen() {
           </View>
         </View>
 
-        {/* Mission Code & Share Card */}
-        <Card
-          variant="default"
-          style={[styles.missionCodeCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
-        >
-          <View style={styles.missionCodeTopRow}>
-            <View style={styles.missionCodeLeft}>
-              <Text style={styles.missionCodeCaption}>ACCESS CODE:</Text>
-              <Text style={styles.missionCodeValue}>{state.game.code}</Text>
-            </View>
-            <View style={styles.missionCodeActions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Share invite code"
-                onPress={() => void shareCode()}
-                style={[styles.shareActionBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-              >
-                <Ionicons name="share-outline" size={15} color={colors.runner} />
-                <Text style={[styles.shareActionText, { color: colors.runner }]}>SHARE</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Show QR code and invite link"
-                onPress={() => setInviteModalVisible(true)}
-                style={[styles.shareActionBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-              >
-                <Ionicons name="qr-code-outline" size={15} color={colors.accent} />
-                <Text style={[styles.shareActionText, { color: colors.accent }]}>QR</Text>
-              </Pressable>
-            </View>
+        {/* Mission Code Bar (Compact Single-Row Pill + 2 Square Icon Buttons) */}
+        <View style={styles.compactCodeBar}>
+          <View style={[styles.codePill, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
+            <Text style={styles.codePillLabel}>CODE: </Text>
+            <Text style={styles.codePillValue}>{state.game.code}</Text>
           </View>
+          <View style={styles.codeIconButtons}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Share invite code"
+              onPress={() => void shareCode()}
+              style={[styles.squareIconButton, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
+            >
+              <Ionicons name="share-outline" size={18} color={colors.text} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Show QR code and invite link"
+              onPress={() => setInviteModalVisible(true)}
+              style={[styles.squareIconButton, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
+            >
+              <Ionicons name="qr-code-outline" size={18} color={colors.text} />
+            </Pressable>
+          </View>
+        </View>
 
-          {activePlayers.length < 2 && !isSoloMode && (
-            <View style={styles.warningAlertRow}>
-              <Ionicons name="warning-outline" size={14} color={colors.warning} />
-              <Text style={styles.warningAlertText}>
-                At least 2 players needed to assign teams.
-              </Text>
-            </View>
-          )}
-        </Card>
+        {activePlayers.length < 2 && !isSoloMode && (
+          <View style={styles.warningAlertRow}>
+            <Ionicons name="warning-outline" size={14} color={colors.warning} />
+            <Text style={styles.warningAlertText}>
+              At least 2 players needed to assign teams.
+            </Text>
+          </View>
+        )}
 
         {bannerMessage !== '' && (
           <Card
@@ -776,116 +844,79 @@ export default function LobbyScreen() {
           </Card>
         )}
 
-        {/* 3-Segment Bar */}
-        <View style={{ marginTop: 10 }}>
-          <SegmentBar
-            items={[
-              { id: 'roster', label: `ROSTER (${activePlayers.length})` },
-              { id: 'rules', label: 'RULES & INTEL' },
-              { id: 'map', label: 'TACTICAL AREA' },
-            ]}
-            activeId={activeSegment}
-            onChange={setActiveSegment}
-          />
-        </View>
-
-        {/* Compact Quick-Bar: Route Privacy & Sensor Diagnostics (Side-by-side pills from mockup) */}
-        <View style={styles.quickBarRow}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Configure route privacy"
-            onPress={handleTogglePrivacy}
-            style={[
-              styles.quickPill,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor: shareChoice === true ? colors.accent : colors.borderDark,
-              },
-            ]}
-          >
-            <Ionicons
-              name={shareChoice === true ? 'eye-outline' : 'shield-checkmark-outline'}
-              size={14}
-              color={shareChoice === true ? colors.accent : colors.textMuted}
-            />
-            <Text
-              variant="caption"
-              numberOfLines={1}
-              style={{
-                color: colors.text,
-                fontSize: 11,
-                fontWeight: '600',
-                marginLeft: 5,
-                flex: 1,
-              }}
-            >
-              Privacy: {shareChoice === true ? 'Shared' : 'Keep Private'}
-            </Text>
-            <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Check Sensors and GPS"
-            onPress={() => {
-              setReadyCheckVisible(true);
-              void handleRunDiagnostic();
-            }}
-            style={[
-              styles.quickPill,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor:
-                  healthReport?.overall === 'healthy'
-                    ? colors.accent
-                    : healthReport?.overall === 'warning'
-                    ? colors.warning
-                    : colors.borderDark,
-              },
-            ]}
-          >
-            <Ionicons
-              name={
-                healthReport?.overall === 'healthy'
-                  ? 'checkmark-circle'
-                  : healthReport?.overall === 'warning'
-                  ? 'alert-circle'
-                  : 'shield-checkmark-outline'
-              }
-              size={14}
-              color={
-                healthReport?.overall === 'healthy'
-                  ? colors.accent
-                  : healthReport?.overall === 'warning'
-                  ? colors.warning
-                  : colors.primary
-              }
-            />
-            <Text
-              variant="caption"
-              numberOfLines={1}
-              style={{
-                color:
-                  healthReport?.overall === 'healthy'
-                    ? colors.accent
-                    : healthReport?.overall === 'warning'
-                    ? colors.warning
-                    : colors.text,
-                fontSize: 11,
-                fontWeight: '600',
-                marginLeft: 5,
-                flex: 1,
-              }}
-            >
-              Diagnostics: {healthReport?.overall === 'healthy' ? 'Ready' : healthReport?.overall === 'warning' ? 'Warning' : 'Check'}
-            </Text>
-            <Ionicons name="chevron-forward" size={12} color={colors.textMuted} />
-          </Pressable>
+        {/* Underline Tab Bar (ROSTER | RULES & INTEL | TACTICAL AREA) */}
+        <View style={styles.underlineTabBar}>
+          {[
+            { id: 'roster', label: `ROSTER (${activePlayers.length})` },
+            { id: 'rules', label: 'RULES & INTEL' },
+            { id: 'map', label: 'TACTICAL AREA' },
+          ].map((tab) => {
+            const isActive = activeSegment === tab.id;
+            return (
+              <Pressable
+                key={tab.id}
+                onPress={() => setActiveSegment(tab.id)}
+                style={styles.underlineTabItem}
+              >
+                <Text
+                  style={[
+                    styles.underlineTabText,
+                    { color: isActive ? colors.accent : colors.textMuted },
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+                {isActive && <View style={[styles.activeUnderlineBar, { backgroundColor: colors.accent }]} />}
+              </Pressable>
+            );
+          })}
         </View>
 
         {/* ==================== SEGMENT 1: ROSTER ==================== */}
         {activeSegment === 'roster' && (
-          <View style={{ marginTop: 8 }}>
+          <View style={{ gap: 8 }}>
+            {/* Quick Status Row: 🔒 Privacy: Keep Private • 📡 GPS Ready */}
+            <View style={styles.quickStatusRow}>
+              <Pressable
+                onPress={handleTogglePrivacy}
+                style={styles.quickStatusItem}
+                accessibilityRole="button"
+                accessibilityLabel="Configure route privacy"
+              >
+                <Ionicons
+                  name={shareChoice === true ? 'eye-outline' : 'lock-closed-outline'}
+                  size={13}
+                  color={shareChoice === true ? colors.accent : '#8E8E93'}
+                />
+                <Text style={styles.quickStatusText}>
+                  Privacy: <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{shareChoice === true ? 'Shared' : 'Keep Private'}</Text>
+                </Text>
+              </Pressable>
+
+              <Text style={styles.quickStatusDot}>•</Text>
+
+              <Pressable
+                onPress={() => {
+                  setReadyCheckVisible(true);
+                  void handleRunDiagnostic();
+                }}
+                style={styles.quickStatusItem}
+                accessibilityRole="button"
+                accessibilityLabel="Check Sensors and GPS"
+              >
+                <Ionicons
+                  name={healthReport?.overall === 'healthy' ? 'radio' : 'radio-outline'}
+                  size={13}
+                  color={healthReport?.overall === 'healthy' ? colors.accent : '#8E8E93'}
+                />
+                <Text style={styles.quickStatusText}>
+                  <Text style={{ color: healthReport?.overall === 'healthy' ? colors.accent : '#FFFFFF', fontWeight: '700' }}>
+                    GPS Ready
+                  </Text>
+                </Text>
+              </Pressable>
+            </View>
+
             {isSoloMode ? (
               <View>
                 <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
@@ -908,12 +939,11 @@ export default function LobbyScreen() {
                 ))}
               </View>
             ) : (
-              <View style={{ gap: 8 }}>
-                {/* Squad Arena: Side-by-Side Runners vs Hunters (Mockup Layout) */}
+              <View style={{ gap: 10 }}>
+                {/* Squad Arena: Side-by-Side Runners vs Hunters (Mockup 1) */}
                 <View style={styles.squadArenaRow}>
                   {/* RUNNERS COLUMN */}
-                  <Card
-                    variant="default"
+                  <View
                     style={[
                       styles.squadColumnCard,
                       {
@@ -929,17 +959,6 @@ export default function LobbyScreen() {
                       </Text>
                     </View>
 
-                    {ownPlayer?.team !== 'runner' ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Join Runners squad"
-                        onPress={() => ownPlayer && void setTeam(ownPlayer, 'runner')}
-                        style={[styles.squadJoinButton, { borderColor: colors.runner }]}
-                      >
-                        <Text style={[styles.squadJoinText, { color: colors.runner }]}>JOIN</Text>
-                      </Pressable>
-                    ) : null}
-
                     {runners.length === 0 ? (
                       <Text style={styles.squadEmptyText}>No operatives assigned</Text>
                     ) : (
@@ -950,47 +969,53 @@ export default function LobbyScreen() {
                             <View
                               key={p.id}
                               style={[
-                                styles.miniPlayerCard,
+                                styles.squadPlayerBox,
                                 {
                                   backgroundColor: isSelf ? colors.surfaceElevated : 'transparent',
                                   borderColor: isSelf ? colors.runner : colors.borderDark,
                                 },
                               ]}
                             >
-                              <View style={styles.miniPlayerTop}>
-                                <View style={[styles.miniAvatarDot, { backgroundColor: p.color || colors.runner }]} />
-                                <Text style={styles.miniPlayerName} numberOfLines={1}>
+                              <View style={styles.squadPlayerHeader}>
+                                <View style={[styles.avatarDotSmall, { backgroundColor: p.color || colors.warning }]} />
+                                <Text style={styles.squadPlayerName} numberOfLines={1}>
                                   {p.display_name} {isSelf ? '(YOU)' : ''}
                                 </Text>
                               </View>
-                              <View style={styles.miniPlayerBottom}>
-                                <Chip
-                                  label={p.is_ready ? 'READY' : 'PREPARING'}
-                                  variant={p.is_ready ? 'accent' : 'muted'}
-                                  size="sm"
-                                />
-                                {isSelf && (
-                                  <Pressable
-                                    accessibilityRole="button"
-                                    accessibilityLabel="Leave Runners squad"
-                                    onPress={() => void setTeam(ownPlayer!, 'unassigned')}
-                                    style={styles.miniLeaveBtn}
-                                  >
-                                    <Ionicons name="exit-outline" size={11} color={colors.textMuted} />
-                                    <Text style={styles.miniLeaveText}>LEAVE</Text>
-                                  </Pressable>
-                                )}
-                              </View>
+                              <Text style={styles.squadPlayerStatus}>
+                                {p.is_ready ? 'Ready' : 'Preparing'}
+                              </Text>
+                              {isSelf && (
+                                <Pressable
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Leave Runners squad"
+                                  onPress={() => void setTeam(ownPlayer!, 'unassigned')}
+                                  style={styles.squadLeaveBtn}
+                                >
+                                  <Ionicons name="exit-outline" size={12} color={colors.textMuted} />
+                                  <Text style={styles.squadLeaveText}>Leave</Text>
+                                </Pressable>
+                              )}
                             </View>
                           );
                         })}
                       </View>
                     )}
-                  </Card>
+
+                    {ownPlayer?.team !== 'runner' && (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Join Runners squad"
+                        onPress={() => ownPlayer && void setTeam(ownPlayer, 'runner')}
+                        style={[styles.squadColJoinBtn, { borderColor: colors.runner }]}
+                      >
+                        <Text style={[styles.squadColJoinText, { color: colors.runner }]}>JOIN</Text>
+                      </Pressable>
+                    )}
+                  </View>
 
                   {/* HUNTERS COLUMN */}
-                  <Card
-                    variant="default"
+                  <View
                     style={[
                       styles.squadColumnCard,
                       {
@@ -1006,17 +1031,6 @@ export default function LobbyScreen() {
                       </Text>
                     </View>
 
-                    {ownPlayer?.team !== 'hunter' ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Join Hunters squad"
-                        onPress={() => ownPlayer && void setTeam(ownPlayer, 'hunter')}
-                        style={[styles.squadJoinButton, { borderColor: colors.hunter }]}
-                      >
-                        <Text style={[styles.squadJoinText, { color: colors.hunter }]}>JOIN</Text>
-                      </Pressable>
-                    ) : null}
-
                     {hunters.length === 0 ? (
                       <Text style={styles.squadEmptyText}>No operatives assigned</Text>
                     ) : (
@@ -1027,66 +1041,71 @@ export default function LobbyScreen() {
                             <View
                               key={p.id}
                               style={[
-                                styles.miniPlayerCard,
+                                styles.squadPlayerBox,
                                 {
                                   backgroundColor: isSelf ? colors.surfaceElevated : 'transparent',
                                   borderColor: isSelf ? colors.hunter : colors.borderDark,
                                 },
                               ]}
                             >
-                              <View style={styles.miniPlayerTop}>
-                                <View style={[styles.miniAvatarDot, { backgroundColor: p.color || colors.hunter }]} />
-                                <Text style={styles.miniPlayerName} numberOfLines={1}>
+                              <View style={styles.squadPlayerHeader}>
+                                <View style={[styles.avatarDotSmall, { backgroundColor: p.color || colors.hunter }]} />
+                                <Text style={styles.squadPlayerName} numberOfLines={1}>
                                   {p.display_name} {isSelf ? '(YOU)' : ''}
                                 </Text>
                               </View>
-                              <View style={styles.miniPlayerBottom}>
-                                <Chip
-                                  label={p.is_ready ? 'READY' : 'PREPARING'}
-                                  variant={p.is_ready ? 'accent' : 'muted'}
-                                  size="sm"
-                                />
-                                {isSelf && (
-                                  <Pressable
-                                    accessibilityRole="button"
-                                    accessibilityLabel="Leave Hunters squad"
-                                    onPress={() => void setTeam(ownPlayer!, 'unassigned')}
-                                    style={styles.miniLeaveBtn}
-                                  >
-                                    <Ionicons name="exit-outline" size={11} color={colors.textMuted} />
-                                    <Text style={styles.miniLeaveText}>LEAVE</Text>
-                                  </Pressable>
-                                )}
-                              </View>
+                              <Text style={styles.squadPlayerStatus}>
+                                {p.is_ready ? 'Ready' : 'Preparing'}
+                              </Text>
+                              {isSelf && (
+                                <Pressable
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Leave Hunters squad"
+                                  onPress={() => void setTeam(ownPlayer!, 'unassigned')}
+                                  style={styles.squadLeaveBtn}
+                                >
+                                  <Ionicons name="exit-outline" size={12} color={colors.textMuted} />
+                                  <Text style={styles.squadLeaveText}>Leave</Text>
+                                </Pressable>
+                              )}
                             </View>
                           );
                         })}
                       </View>
                     )}
-                  </Card>
+
+                    {ownPlayer?.team !== 'hunter' && (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Join Hunters squad"
+                        onPress={() => ownPlayer && void setTeam(ownPlayer, 'hunter')}
+                        style={[styles.squadColJoinBtn, { borderColor: colors.hunter }]}
+                      >
+                        <Text style={[styles.squadColJoinText, { color: colors.hunter }]}>JOIN</Text>
+                      </Pressable>
+                    )}
+                  </View>
                 </View>
 
-                {/* Unassigned Operatives Card */}
-                <Card
-                  variant="default"
-                  style={[
-                    styles.unassignedCard,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: unassigned.length > 0 && ownPlayer?.team === 'unassigned' ? colors.warning : colors.borderDark,
-                    },
-                  ]}
-                >
-                  <View style={styles.unassignedHeader}>
-                    <Ionicons name="people-outline" size={15} color={colors.textMuted} />
-                    <Text style={styles.unassignedTitle}>
-                      UNASSIGNED OPERATIVES ({unassigned.length})
-                    </Text>
-                  </View>
+                {/* Unassigned Operatives Card (Only rendered if operatives are unassigned) */}
+                {unassigned.length > 0 && (
+                  <Card
+                    variant="default"
+                    style={[
+                      styles.unassignedCard,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.borderDark,
+                      },
+                    ]}
+                  >
+                    <View style={styles.unassignedHeader}>
+                      <Ionicons name="people-outline" size={15} color={colors.textMuted} />
+                      <Text style={styles.unassignedTitle}>
+                        UNASSIGNED OPERATIVES ({unassigned.length})
+                      </Text>
+                    </View>
 
-                  {unassigned.length === 0 ? (
-                    <Text style={styles.unassignedEmptyText}>No unassigned operatives</Text>
-                  ) : (
                     <View style={{ gap: 6, marginTop: 4 }}>
                       {unassigned.map((p) => {
                         const isSelf = p.id === state.my_player_id;
@@ -1102,7 +1121,7 @@ export default function LobbyScreen() {
                             ]}
                           >
                             <View style={styles.unassignedRowLeft}>
-                              <View style={[styles.miniAvatarDot, { backgroundColor: p.color || colors.primary }]} />
+                              <View style={[styles.avatarDotSmall, { backgroundColor: p.color || colors.primary }]} />
                               <Text style={styles.unassignedRowName} numberOfLines={1}>
                                 {p.display_name} {isSelf ? '(YOU)' : ''}
                               </Text>
@@ -1137,13 +1156,12 @@ export default function LobbyScreen() {
                         );
                       })}
                     </View>
-                  )}
-                </Card>
+                  </Card>
+                )}
 
                 {/* Host Squad Controls Card */}
                 {isHost && !isSoloMode && (
-                  <Card
-                    variant="default"
+                  <View
                     style={[
                       styles.hostControlsCard,
                       {
@@ -1155,7 +1173,7 @@ export default function LobbyScreen() {
                     <Text style={styles.hostControlsLabel}>HOST CONTROLS</Text>
                     <View style={styles.hostControlsButtons}>
                       <Button
-                        title="Rotate Roles"
+                        title="ROTATE ROLES"
                         variant="secondary"
                         size="sm"
                         style={{ flex: 1 }}
@@ -1163,7 +1181,7 @@ export default function LobbyScreen() {
                         onPress={() => void rotateRoles()}
                       />
                       <Button
-                        title="Shuffle Squads"
+                        title="SHUFFLE SQUADS"
                         variant="secondary"
                         size="sm"
                         style={{ flex: 1 }}
@@ -1171,7 +1189,7 @@ export default function LobbyScreen() {
                         onPress={() => void randomizeTeams()}
                       />
                     </View>
-                  </Card>
+                  </View>
                 )}
               </View>
             )}
@@ -1180,226 +1198,346 @@ export default function LobbyScreen() {
 
         {/* ==================== SEGMENT 2: RULES & INTEL ==================== */}
         {activeSegment === 'rules' && (
-          <View style={{ marginTop: spacing.md }}>
-            {/* Private Role Briefing Card (Addendum C #3) */}
-            <Text variant="label" style={{ color: colors.radarScan, marginBottom: spacing.xs }}>
-              YOUR ASSIGNED BRIEFING (PRIVATE · EYES ONLY)
-            </Text>
-            <RoleBriefingCard
-              roleId={mySecretRole || ownPlayer?.team || 'runner'}
-              team={ownPlayer?.team}
-              acknowledged={roleAcknowledged}
-              onToggleAcknowledge={setRoleAcknowledged}
-            />
-
-            {/* Mode Rules Dossier */}
-            <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
-              TACTICAL RULES DOSSIER
-            </Text>
-            {activeModule && <RulesCard module={activeModule} />}
-
-            {/* Modifiers & Roles Summary */}
-            <Card
-              variant="default"
-              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
-            >
-              <Text variant="label" style={{ color: colors.primary, marginBottom: spacing.xs }}>
-                ACTIVE MODIFIERS & PARAMETERS
-              </Text>
-              {(state.game.modifiers?.length ?? 0) === 0 ? (
-                <Text variant="caption" style={{ color: colors.textMuted }}>
-                  Standard mode rules active (no modifiers added).
-                </Text>
-              ) : (
-                <View style={styles.chipRow}>
-                  {state.game.modifiers?.map((mod) => (
-                    <Chip key={mod} label={mod.replace(/_/g, ' ').toUpperCase()} variant="accent" size="sm" />
-                  ))}
+          <View style={{ gap: 12, marginTop: 4 }}>
+            {/* GAME MODE CARD */}
+            <View style={[styles.rulesSectionCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
+              <Text style={styles.rulesCardCaption}>GAME MODE</Text>
+              <View style={styles.modeTitleRow}>
+                <View style={[styles.modeIconSquare, { backgroundColor: colors.surfaceElevated }]}>
+                  <Ionicons name="map-outline" size={20} color={colors.accent} />
                 </View>
-              )}
+                <Text style={styles.modeTitleText}>
+                  {activeModule?.name || 'Classic Chase'}
+                </Text>
+              </View>
+              <Text style={styles.modeDescriptionText}>
+                {activeModule?.rules?.summary ||
+                  activeModule?.tagline ||
+                  'One runner team infiltrates to reach a secret extraction target or survive the clock. Hunters must track, corner, and physically tag them.'}
+              </Text>
+            </View>
 
-              {isHost && (
-                <View style={[styles.hostModBox, { borderTopColor: colors.borderDark, marginTop: spacing.md }]}>
-                  <Text variant="label" style={{ color: colors.warning, marginBottom: spacing.xs }}>
-                    HOST MODIFIER MANAGEMENT
-                  </Text>
-                  <View style={styles.chipRow}>
-                    {['ai_gm', 'hot_cold', 'noise_meter', 'shrinking_zone', 'dead_drops'].map((mod) => {
-                      const active = draftModifiers.includes(mod);
-                      return (
-                        <Chip
-                          key={mod}
-                          label={mod.replace(/_/g, ' ').toUpperCase()}
-                          variant={active ? 'accent' : 'muted'}
-                          size="sm"
-                          onPress={() => toggleDraft('modifiers', mod)}
-                        />
-                      );
-                    })}
+            {/* TACTICAL RULES CARD */}
+            <View style={[styles.rulesSectionCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
+              <Text style={styles.rulesCardCaption}>TACTICAL RULES</Text>
+              <View style={styles.tacticalRulesList}>
+                {/* Game Duration */}
+                <View style={styles.tacticalRuleRow}>
+                  <View style={styles.ruleIconCircle}>
+                    <Ionicons name="time-outline" size={18} color="#A1A1AA" />
                   </View>
-                  <Button
-                    title={savingModes ? 'Saving...' : 'Apply Modifier Updates'}
-                    variant="secondary"
-                    size="sm"
-                    style={{ marginTop: spacing.sm }}
-                    disabled={savingModes}
-                    onPress={() => void saveModeConfig()}
-                  />
-                  {modesMessage !== '' && (
-                    <Text variant="caption" style={{ color: colors.primary, marginTop: 4 }}>
-                      {modesMessage}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.ruleTitle}>Game Duration</Text>
+                    <Text style={styles.ruleSubtext}>
+                      {((state.game.mode_params as any)?.time_limit_minutes || 15)} mins
                     </Text>
-                  )}
-                </View>
-              )}
-            </Card>
-
-            {/* Tactical Map Orientation & Heading Lock Setting */}
-            <Card
-              variant="default"
-              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
-                <Ionicons name="compass-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
-                <Text variant="label" style={{ color: colors.primary }}>
-                  TACTICAL MAP INTERACTION & HEADING LOCK
-                </Text>
-              </View>
-              <Text variant="caption" style={{ color: colors.textMuted, marginBottom: spacing.sm, lineHeight: 18 }}>
-                Locks touch gestures during the round to prevent manual panning/zooming, keeping the operative centered and automatically rotating the map to your phone's physical compass heading.
-              </Text>
-              {isHost ? (
-                <View style={{ gap: 8 }}>
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <Button
-                      title={draftLockedMap ? 'LOCKED (COMPASS) ✓' : 'LOCKED (COMPASS)'}
-                      variant={draftLockedMap ? 'primary' : 'secondary'}
-                      size="sm"
-                      style={{ flex: 1 }}
-                      onPress={() => {
-                        draftTouchedRef.current = true;
-                        setDraftLockedMap(true);
-                      }}
-                    />
-                    <Button
-                      title={!draftLockedMap ? 'FREE MAP ✓' : 'FREE MAP'}
-                      variant={!draftLockedMap ? 'primary' : 'secondary'}
-                      size="sm"
-                      style={{ flex: 1 }}
-                      onPress={() => {
-                        draftTouchedRef.current = true;
-                        setDraftLockedMap(false);
-                      }}
-                    />
                   </View>
-                  <Button
-                    title={savingModes ? 'Saving...' : 'Save Map Orientation Setting'}
-                    variant="ghost"
-                    size="sm"
-                    disabled={savingModes}
-                    onPress={() => void saveModeConfig()}
-                  />
                 </View>
-              ) : (
-                <Chip
-                  label={draftLockedMap ? 'MAP LOCKED · COMPASS HEADING' : 'FREE INTERACTION MAP'}
-                  variant={draftLockedMap ? 'accent' : 'muted'}
-                  size="sm"
-                />
-              )}
-            </Card>
 
-            {/* Tactical Visibility & Blackout Radar Mode */}
-            <Card
-              variant="default"
-              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
-                <Ionicons
-                  name="radio"
-                  size={18}
-                  color={draftBlackout ? colors.danger : colors.primary}
-                  style={{ marginRight: 8 }}
-                />
-                <Text variant="label" style={{ color: draftBlackout ? colors.danger : colors.primary }}>
-                  TACTICAL VISIBILITY & COMBAT DISPLAY
-                </Text>
-              </View>
-              <Text variant="caption" style={{ color: colors.textMuted, marginBottom: spacing.sm, lineHeight: 18 }}>
-                {draftBlackout
-                  ? 'Extreme Blackout Active: Street map tiles are removed. Operatives navigate via 360° radial sonar with operative fixed at center, thermal proximity heat signatures, and vector guide lines to objectives.'
-                  : 'Standard street map tiles active.'}
-              </Text>
-              {isHost ? (
-                <View style={{ gap: 8 }}>
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <Button
-                      title={!draftBlackout ? 'STANDARD MAP ✓' : 'STANDARD MAP'}
-                      variant={!draftBlackout ? 'primary' : 'secondary'}
-                      size="sm"
-                      style={{ flex: 1 }}
-                      onPress={() => {
-                        draftTouchedRef.current = true;
-                        setDraftBlackout(false);
-                      }}
-                    />
-                    <Button
-                      title={draftBlackout ? 'BLACKOUT RADAR ✓' : 'BLACKOUT RADAR'}
-                      variant={draftBlackout ? 'danger' : 'secondary'}
-                      size="sm"
-                      style={{ flex: 1.1 }}
-                      onPress={() => {
-                        draftTouchedRef.current = true;
-                        setDraftBlackout(true);
-                      }}
-                    />
+                {/* Head Start */}
+                <View style={styles.tacticalRuleRow}>
+                  <View style={styles.ruleIconCircle}>
+                    <Ionicons name="walk-outline" size={18} color="#A1A1AA" />
                   </View>
-                  <Button
-                    title={savingModes ? 'Saving...' : 'Save Visibility Setting'}
-                    variant="ghost"
-                    size="sm"
-                    disabled={savingModes}
-                    onPress={() => void saveModeConfig()}
-                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.ruleTitle}>Head Start</Text>
+                    <Text style={styles.ruleSubtext}>
+                      {((state.game.mode_params as any)?.head_start_seconds || 90)}s countdown for Runners to scatter before Hunters release
+                    </Text>
+                  </View>
                 </View>
-              ) : (
-                <Chip
-                  label={draftBlackout ? 'DIFFICULTY: EXTREME · BLACKOUT RADAR' : 'DIFFICULTY: STANDARD MAP'}
-                  variant={draftBlackout ? 'accent' : 'muted'}
+
+                {/* Radar Pings */}
+                <View style={styles.tacticalRuleRow}>
+                  <View style={styles.ruleIconCircle}>
+                    <Ionicons name="radio-outline" size={18} color="#A1A1AA" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.ruleTitle}>Radar Pings</Text>
+                    <Text style={styles.ruleSubtext}>
+                      Server broadcasts a delayed location pulse every {((state.game.mode_params as any)?.ping_interval_seconds || 45)}s (visible for {((state.game.mode_params as any)?.ping_duration_seconds || 10)}s only). Expect haptic pulse when it fires.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Victory Conditions */}
+                <View style={styles.tacticalRuleRow}>
+                  <View style={styles.ruleIconCircle}>
+                    <Ionicons name="locate-outline" size={18} color="#A1A1AA" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.ruleTitle}>Victory Conditions</Text>
+                    <Text style={styles.ruleSubtext}>
+                      {state.game.mode_id === 'jailbreak'
+                        ? 'Runners win by freeing captured teammates and evading capture. Hunters win by securing all Runners in the jail facility.'
+                        : 'Runners win by reaching the secret extraction point undetected. Hunters win if all Runners are tagged, or time expires.'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* SAFETY & FAIR PLAY ALERT CARD */}
+            <View style={[styles.safetyCard, { backgroundColor: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
+              <View style={styles.safetyHeader}>
+                <Ionicons name="warning-outline" size={15} color="#F87171" style={{ marginRight: 6 }} />
+                <Text style={styles.safetyTitle}>SAFETY & FAIR PLAY</Text>
+              </View>
+              <Text style={styles.safetyBody}>
+                Play in pedestrian-friendly public spaces only. Respect private property. Check the SOS button in active game HUD for emergencies.
+              </Text>
+            </View>
+
+            {/* Private Role Briefing Card (if assigned) */}
+            {mySecretRole && (
+              <RoleBriefingCard
+                roleId={mySecretRole || ownPlayer?.team || 'runner'}
+                team={ownPlayer?.team}
+                acknowledged={roleAcknowledged}
+                onToggleAcknowledge={setRoleAcknowledged}
+              />
+            )}
+
+            {/* Host Modifiers Management (For Host) */}
+            {isHost && (
+              <Card
+                variant="default"
+                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
+              >
+                <Text variant="label" style={{ color: colors.warning, marginBottom: spacing.xs }}>
+                  HOST MODIFIER MANAGEMENT
+                </Text>
+                <View style={styles.chipRow}>
+                  {['ai_gm', 'hot_cold', 'noise_meter', 'shrinking_zone', 'dead_drops'].map((mod) => {
+                    const active = draftModifiers.includes(mod);
+                    return (
+                      <Chip
+                        key={mod}
+                        label={mod.replace(/_/g, ' ').toUpperCase()}
+                        variant={active ? 'accent' : 'muted'}
+                        size="sm"
+                        onPress={() => toggleDraft('modifiers', mod)}
+                      />
+                    );
+                  })}
+                </View>
+                <Button
+                  title={savingModes ? 'Saving...' : 'Apply Modifier Updates'}
+                  variant="secondary"
                   size="sm"
+                  style={{ marginTop: spacing.sm }}
+                  disabled={savingModes}
+                  onPress={() => void saveModeConfig()}
                 />
-              )}
-            </Card>
+                {modesMessage !== '' && (
+                  <Text variant="caption" style={{ color: colors.primary, marginTop: 4 }}>
+                    {modesMessage}
+                  </Text>
+                )}
+              </Card>
+            )}
           </View>
         )}
 
-        {/* ==================== SEGMENT 3: TACTICAL MAP ==================== */}
+        {/* ==================== SEGMENT 3: TACTICAL AREA ==================== */}
         {activeSegment === 'map' && (
-          <View style={{ marginTop: spacing.md }}>
-            <Card
-              variant="default"
-              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
-            >
-              <Text variant="label" style={{ color: colors.primary, marginBottom: spacing.xs }}>
-                OPERATIONAL PERIMETER
-              </Text>
-              <Text variant="body" style={{ color: colors.text, fontSize: 15 }}>
-                Boundary Radius: {formatDistance(state.game.area_radius_m || 500)}
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 4 }}>
-                Center Lat/Lng: {Array.isArray(state.game.area_center)
-                  ? `${state.game.area_center[1].toFixed(5)}, ${state.game.area_center[0].toFixed(5)}`
-                  : state.game.area_center
-                    ? `${state.game.area_center.latitude.toFixed(5)}, ${state.game.area_center.longitude.toFixed(5)}`
-                    : 'Tactical Center Set'}
-              </Text>
-            </Card>
+          <View style={{ gap: 12, marginTop: 4 }}>
+            {/* EMBEDDED INTERACTIVE MAP PREVIEW CARD */}
+            <View style={[styles.mapContainerCard, { borderColor: 'rgba(167, 139, 250, 0.4)' }]}>
+              <MapLibreMap
+                style={StyleSheet.absoluteFill}
+                mapStyle={DARK_MAP_STYLE}
+                compass={false}
+                logo={false}
+                attribution={false}
+              >
+                <Camera
+                  ref={cameraRef}
+                  initialViewState={{ center: centerCoords, zoom: mapZoom }}
+                />
 
-            {/* Placements info */}
+                {/* Boundary Geofence Circle */}
+                <GeoJSONSource id="lobby-boundary" data={boundaryGeoJSON}>
+                  <Layer
+                    id="lobby-boundary-fill"
+                    type="fill"
+                    paint={{
+                      'fill-color': '#8B5CF6',
+                      'fill-opacity': 0.08,
+                    }}
+                  />
+                  <Layer
+                    id="lobby-boundary-line"
+                    type="line"
+                    paint={{
+                      'line-color': '#A78BFA',
+                      'line-width': 2.5,
+                      'line-opacity': 0.85,
+                    }}
+                  />
+                </GeoJSONSource>
+
+                {/* Extraction Target Concentric Rings */}
+                <GeoJSONSource id="lobby-target" data={targetGeoJSON}>
+                  <Layer
+                    id="lobby-target-outer"
+                    type="circle"
+                    paint={{
+                      'circle-radius': 28,
+                      'circle-color': '#A3E635',
+                      'circle-opacity': 0.15,
+                    }}
+                  />
+                  <Layer
+                    id="lobby-target-ring"
+                    type="circle"
+                    paint={{
+                      'circle-radius': 18,
+                      'circle-color': '#A3E635',
+                      'circle-opacity': 0.35,
+                      'circle-stroke-width': 2,
+                      'circle-stroke-color': '#A3E635',
+                    }}
+                  />
+                  <Layer
+                    id="lobby-target-core"
+                    type="circle"
+                    paint={{
+                      'circle-radius': 7,
+                      'circle-color': '#A3E635',
+                    }}
+                  />
+                </GeoJSONSource>
+
+                {/* Operative YOU Marker */}
+                <GeoJSONSource id="lobby-you" data={youGeoJSON}>
+                  <Layer
+                    id="lobby-you-halo"
+                    type="circle"
+                    paint={{
+                      'circle-radius': 18,
+                      'circle-color': '#A78BFA',
+                      'circle-opacity': 0.3,
+                    }}
+                  />
+                  <Layer
+                    id="lobby-you-core"
+                    type="circle"
+                    paint={{
+                      'circle-radius': 8,
+                      'circle-color': '#A78BFA',
+                      'circle-stroke-width': 2,
+                      'circle-stroke-color': '#FFFFFF',
+                    }}
+                  />
+                </GeoJSONSource>
+              </MapLibreMap>
+
+              {/* Floating Badges on Map */}
+              <View style={styles.mapPlayAreaBadge}>
+                <Text style={styles.mapPlayAreaBadgeText}>
+                  PLAY AREA ({formatDistance(state.game.area_radius_m || 500)})
+                </Text>
+              </View>
+
+              <View style={styles.mapExtractionBadge}>
+                <View style={styles.mapExtractionDot} />
+                <Text style={styles.mapExtractionBadgeText}>EXTRACTION TARGET</Text>
+              </View>
+
+              <View style={styles.mapYouBadge}>
+                <View style={styles.mapYouAvatar}>
+                  <Ionicons name="person" size={10} color="#FFFFFF" />
+                </View>
+                <Text style={styles.mapYouBadgeText}>YOU</Text>
+              </View>
+
+              {/* Map Zoom Controls (+ / -) */}
+              <View style={styles.mapZoomControls}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Zoom In"
+                  onPress={() => {
+                    const next = Math.min(mapZoom + 1, 18);
+                    setMapZoom(next);
+                    cameraRef.current?.easeTo({ center: centerCoords, zoom: next, duration: 250 });
+                  }}
+                  style={styles.mapZoomBtn}
+                >
+                  <Ionicons name="add" size={18} color="#FFFFFF" />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Zoom Out"
+                  onPress={() => {
+                    const next = Math.max(mapZoom - 1, 10);
+                    setMapZoom(next);
+                    cameraRef.current?.easeTo({ center: centerCoords, zoom: next, duration: 250 });
+                  }}
+                  style={styles.mapZoomBtn}
+                >
+                  <Ionicons name="remove" size={18} color="#FFFFFF" />
+                </Pressable>
+              </View>
+
+              {/* Re-Center Button */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Re-center Map"
+                onPress={() => {
+                  cameraRef.current?.easeTo({ center: centerCoords, zoom: 14.5, duration: 300 });
+                }}
+                style={styles.mapRecenterPill}
+              >
+                <Ionicons name="search" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                <Text style={styles.mapRecenterText}>RE-CENTER</Text>
+              </Pressable>
+            </View>
+
+            {/* AREA DETAILS CARD */}
+            <View style={[styles.areaDetailsCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
+              <View style={styles.areaDetailsHeader}>
+                <Ionicons name="location-sharp" size={16} color="#EF4444" style={{ marginRight: 6 }} />
+                <Text style={styles.areaDetailsHeaderTitle}>PEDESTRIAN PLAY ZONE</Text>
+              </View>
+
+              <View style={styles.areaDetailRow}>
+                <Ionicons name="earth-outline" size={16} color="#8E8E93" style={styles.areaDetailIcon} />
+                <Text style={styles.areaDetailLabel}>Area Radius</Text>
+                <Text style={styles.areaDetailValue}>
+                  {formatDistance(state.game.area_radius_m || 500)} (Safe pedestrian boundary)
+                </Text>
+              </View>
+
+              <View style={styles.areaDetailRow}>
+                <Ionicons name="key-outline" size={16} color="#8E8E93" style={styles.areaDetailIcon} />
+                <Text style={styles.areaDetailLabel}>extraction</Text>
+                <Text style={styles.areaDetailValue}>Secret location within boundary</Text>
+              </View>
+
+              <View style={styles.areaDetailRow}>
+                <Ionicons name="ban-outline" size={16} color="#8E8E93" style={styles.areaDetailIcon} />
+                <Text style={styles.areaDetailLabel}>out of bounds</Text>
+                <Text style={styles.areaDetailValue}>Stealth penalty triggers after 30s exiting geofence</Text>
+              </View>
+
+              {isHost && (
+                <Button
+                  title="CHANGE AREA"
+                  variant="secondary"
+                  size="sm"
+                  icon="location-outline"
+                  style={{ marginTop: 12 }}
+                  onPress={() => router.push('/host/area' as any)}
+                />
+              )}
+            </View>
+
+            {/* Jailbreak Placement Helper Card */}
             {isJailbreak && (
               <Card
                 variant="default"
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
+                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
               >
                 <View style={styles.placementHeader}>
                   <Text variant="label" style={{ color: colors.warning }}>
@@ -1428,10 +1566,11 @@ export default function LobbyScreen() {
               </Card>
             )}
 
+            {/* Relay Heist Placement Helper Card */}
             {isRelayHeist && (
               <Card
                 variant="default"
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
+                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
               >
                 <View style={styles.placementHeader}>
                   <Text variant="label" style={{ color: colors.radarScan }}>
@@ -1454,20 +1593,6 @@ export default function LobbyScreen() {
                 )}
               </Card>
             )}
-
-            {state.game.mode === 'classic_chase' && (
-              <Card
-                variant="default"
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
-              >
-                <Text variant="label" style={{ color: colors.primary, marginBottom: spacing.xs }}>
-                  CLASSIC CHASE TARGET
-                </Text>
-                <Text variant="caption" style={{ color: colors.textMuted }}>
-                  Target coordinates are kept strictly secret and revealed only when the countdown phase initiates.
-                </Text>
-              </Card>
-            )}
           </View>
         )}
       </ScrollView>
@@ -1477,74 +1602,78 @@ export default function LobbyScreen() {
         style={[
           styles.actionDock,
           {
-            backgroundColor: colors.surfaceElevated,
+            backgroundColor: '#0F0F14',
             borderTopColor: colors.borderDark,
-            paddingBottom: Math.max(insets.bottom, 14) + 6,
+            paddingBottom: Math.max(insets.bottom, 12) + 6,
             paddingTop: 10,
             paddingHorizontal: spacing.lg,
           },
         ]}
       >
-        {/* Primary Action Buttons Row */}
         <View style={styles.dockPrimaryRow}>
-          {!isHost && (
-            <Button
-              title="Leave"
-              variant="ghost"
-              size="md"
-              disabled={busyAction === 'leave'}
-              onPress={() => void handleExitLobby()}
-            />
-          )}
-
-          <Button
-            title={ownPlayer?.is_ready ? 'STAND DOWN' : 'READY UP'}
-            variant={ownPlayer?.is_ready ? 'secondary' : 'primary'}
-            size="md"
-            style={{ flex: 1 }}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={ownPlayer?.is_ready ? 'Stand down' : 'Ready up'}
             onPress={() => void toggleReady()}
-          />
+            style={[
+              styles.dockReadyBtn,
+              { backgroundColor: ownPlayer?.is_ready ? colors.surfaceElevated : '#CCFF00' },
+            ]}
+          >
+            <Text
+              style={[
+                styles.dockReadyBtnText,
+                { color: ownPlayer?.is_ready ? colors.accent : '#000000' },
+              ]}
+            >
+              {ownPlayer?.is_ready ? 'STAND DOWN' : 'READY UP'}
+            </Text>
+          </Pressable>
 
           {isHost && (
-            state.game.mode === 'classic_chase' ? (
-              <Button
-                title={busyAction === 'start' ? 'Starting...' : 'Target Select'}
-                variant="primary"
-                size="md"
-                style={{ flex: 1.2 }}
-                disabled={!canStart || !everyoneReady || busyAction !== ''}
-                onPress={() => void continueLobby()}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={state.game.mode === 'classic_chase' ? 'Select target' : 'Launch round'}
+              disabled={!canStart || !everyoneReady || busyAction !== ''}
+              onPress={() => {
+                if (state.game.mode === 'classic_chase') {
+                  void continueLobby();
+                } else {
+                  void startRound();
+                }
+              }}
+              style={[
+                styles.dockLaunchBtn,
+                {
+                  backgroundColor: canStart && everyoneReady ? '#CCFF00' : '#1F1F28',
+                  borderColor: canStart && everyoneReady ? '#CCFF00' : '#2C2C38',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.dockLaunchBtnText,
+                  { color: canStart && everyoneReady ? '#000000' : '#6B7280' },
+                ]}
+              >
+                {state.game.mode === 'classic_chase' ? 'SELECT TARGET' : 'LAUNCH ROUND'}
+              </Text>
+              <Ionicons
+                name="sparkles"
+                size={14}
+                color={canStart && everyoneReady ? '#000000' : '#4B5563'}
+                style={{ marginLeft: 5 }}
               />
-            ) : (
-              <Button
-                title={busyAction === 'start' ? 'Launching...' : 'Launch Round'}
-                variant="primary"
-                size="md"
-                style={{ flex: 1.2 }}
-                disabled={!canStart || !everyoneReady || busyAction !== ''}
-                onPress={() => void startRound()}
-              />
-            )
+            </Pressable>
           )}
         </View>
 
-        {/* Status hint below dock buttons */}
         <View style={styles.dockStatusRow}>
-          {!everyoneReady && (
-            <Text variant="caption" style={{ color: colors.textMuted, fontSize: 11 }}>
-              {activePlayers.filter((p) => !p.is_ready).length} operative(s) awaiting ready status
-            </Text>
-          )}
-          {everyoneReady && canStart && (
-            <Text variant="caption" style={{ color: colors.accent, fontSize: 11, fontWeight: '700' }}>
-              ALL OPERATIVES READY · READY TO ENGAGE
-            </Text>
-          )}
-          {!canStart && isHost && (
-            <Text variant="caption" style={{ color: colors.warning, fontSize: 11 }}>
-              {!hasBothTeams ? 'Teams require at least 1 Runner & 1 Hunter' : 'Deploy jail facility in Tactical Area'}
-            </Text>
-          )}
+          <Text style={styles.dockStatusText}>
+            {!everyoneReady
+              ? `${activePlayers.filter((p) => !p.is_ready).length} operative(s) awaiting ready status • ⚠ Requires 1 Runner & 1 Hunter`
+              : 'ALL OPERATIVES READY • READY TO ENGAGE'}
+          </Text>
         </View>
       </View>
 
@@ -1722,59 +1851,57 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
   },
-  missionCodeCard: {
-    padding: 14,
-    borderWidth: 1,
-    borderRadius: 12,
-  },
-  missionCodeTopRow: {
+  compactCodeBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 4,
   },
-  missionCodeLeft: {
+  codePill: {
     flex: 1,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
   },
-  missionCodeCaption: {
+  codePillLabel: {
     color: '#8E8E93',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
-    marginBottom: 2,
   },
-  missionCodeValue: {
+  codePillValue: {
     color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: 16,
     fontWeight: '900',
-    letterSpacing: 3,
+    letterSpacing: 2,
+    marginLeft: 4,
   },
-  missionCodeActions: {
+  codeIconButtons: {
     flexDirection: 'row',
     gap: 8,
-    alignItems: 'center',
   },
-  shareActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
+  squareIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     borderWidth: 1,
-  },
-  shareActionText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   warningAlertRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 69, 58, 0.25)',
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(255, 69, 58, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 69, 58, 0.3)',
   },
   warningAlertText: {
     color: '#FF6961',
@@ -1782,23 +1909,61 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
   },
-  quickBarRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
+  bannerCard: {
+    padding: 12,
+    borderWidth: 1,
   },
-  quickPill: {
+  underlineTabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  underlineTabItem: {
     flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    position: 'relative',
+  },
+  underlineTabText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  activeUnderlineBar: {
+    position: 'absolute',
+    bottom: -1,
+    left: 8,
+    right: 8,
+    height: 2.5,
+    borderRadius: 2,
+  },
+  quickStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
+    justifyContent: 'center',
+    gap: 10,
+    marginVertical: 4,
+  },
+  quickStatusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 4,
+  },
+  quickStatusText: {
+    color: '#8E8E93',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  quickStatusDot: {
+    color: '#636366',
+    fontSize: 12,
   },
   squadArenaRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   squadColumnCard: {
     flex: 1,
@@ -1806,6 +1971,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     minHeight: 120,
+    justifyContent: 'space-between',
   },
   squadColHeader: {
     flexDirection: 'row',
@@ -1823,66 +1989,70 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  squadJoinButton: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  squadJoinText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
   squadEmptyText: {
     color: '#636366',
     fontSize: 11,
     fontStyle: 'italic',
     textAlign: 'center',
-    marginVertical: 12,
+    marginVertical: 14,
   },
-  miniPlayerCard: {
+  squadPlayerBox: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 8,
-    gap: 6,
-    marginBottom: 4,
+    marginBottom: 6,
+    gap: 4,
   },
-  miniPlayerTop: {
+  squadPlayerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  miniAvatarDot: {
+  avatarDotSmall: {
     width: 10,
     height: 10,
     borderRadius: 5,
   },
-  miniPlayerName: {
+  squadPlayerName: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
     flex: 1,
   },
-  miniPlayerBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  miniLeaveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  miniLeaveText: {
+  squadPlayerStatus: {
     color: '#8E8E93',
-    fontSize: 9,
+    fontSize: 10,
+    marginLeft: 16,
+  },
+  squadLeaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3F3F46',
+    backgroundColor: '#1F1F24',
+    marginTop: 4,
+  },
+  squadLeaveText: {
+    color: '#D4D4D8',
+    fontSize: 10,
     fontWeight: '700',
+  },
+  squadColJoinBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  squadColJoinText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   unassignedCard: {
     padding: 12,
@@ -1900,12 +2070,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
-  },
-  unassignedEmptyText: {
-    color: '#636366',
-    fontSize: 11,
-    fontStyle: 'italic',
-    marginTop: 2,
   },
   unassignedRow: {
     flexDirection: 'row',
@@ -1962,63 +2126,288 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
-  teamCard: {
-    padding: 12,
+  rulesSectionCard: {
+    padding: 14,
     borderWidth: 1,
     borderRadius: 12,
   },
-  teamCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  rulesCardCaption: {
+    color: '#8E8E93',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
     marginBottom: 8,
   },
-  teamTitleRow: {
+  modeTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
-  teamDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
+  modeIconSquare: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  myTeamBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
+  modeTitleText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  modeDescriptionText: {
+    color: '#A1A1AA',
+    fontSize: 12,
+    lineHeight: 18,
     marginTop: 8,
   },
-  codeWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  tacticalRulesList: {
     gap: 12,
     marginTop: 4,
   },
-  bannerCard: {
-    padding: 12,
-    borderWidth: 1,
+  tacticalRuleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
   },
-  shareSheetCard: {
+  ruleIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#1F1F24',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  ruleTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  ruleSubtext: {
+    color: '#A1A1AA',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  safetyCard: {
     padding: 14,
     borderWidth: 1,
+    borderRadius: 12,
   },
-  shareActionRow: {
+  safetyHeader: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 10,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
+  },
+  safetyTitle: {
+    color: '#F87171',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  safetyBody: {
+    color: '#FCA5A5',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  mapContainerCard: {
+    height: 280,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    backgroundColor: '#0B0B0E',
+    position: 'relative',
+  },
+  mapPlayAreaBadge: {
+    position: 'absolute',
+    top: 10,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(20, 20, 26, 0.85)',
+    borderWidth: 1,
+    borderColor: '#A78BFA',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  mapPlayAreaBadgeText: {
+    color: '#A78BFA',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  mapExtractionBadge: {
+    position: 'absolute',
+    top: 75,
+    right: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(20, 20, 26, 0.85)',
+    borderWidth: 1,
+    borderColor: '#A3E635',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  mapExtractionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#A3E635',
+  },
+  mapExtractionBadgeText: {
+    color: '#A3E635',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  mapYouBadge: {
+    position: 'absolute',
+    bottom: 55,
+    left: 80,
+    alignItems: 'center',
+  },
+  mapYouAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#8B5CF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  mapYouBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowRadius: 3,
+  },
+  mapZoomControls: {
+    position: 'absolute',
+    right: 12,
+    top: 90,
+    gap: 4,
+  },
+  mapZoomBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: 'rgba(26, 26, 32, 0.9)',
+    borderWidth: 1,
+    borderColor: '#3F3F46',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapRecenterPill: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(26, 26, 32, 0.9)',
+    borderWidth: 1,
+    borderColor: '#3F3F46',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  mapRecenterText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  areaDetailsCard: {
+    padding: 14,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  areaDetailsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  areaDetailsHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  areaDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  areaDetailIcon: {
+    width: 20,
+  },
+  areaDetailLabel: {
+    color: '#8E8E93',
+    fontSize: 11,
+    fontWeight: '700',
+    width: 95,
+  },
+  areaDetailValue: {
+    color: '#D4D4D8',
+    fontSize: 11,
+    flex: 1,
+  },
+  actionDock: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopWidth: 1,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    zIndex: 100,
+  },
+  dockPrimaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dockReadyBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dockReadyBtnText: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  dockLaunchBtn: {
+    flex: 1.1,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dockLaunchBtnText: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  dockStatusRow: {
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  dockStatusText: {
+    color: '#8E8E93',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   card: {
     padding: 16,
@@ -2029,13 +2418,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 8,
-  },
-  hostModBox: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  actionSection: {
-    gap: 12,
   },
   playerRow: {
     padding: 10,
@@ -2071,36 +2453,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  actionDock: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopWidth: 1,
-    elevation: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    zIndex: 100,
-  },
-  dockPrimaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  dockStatusRow: {
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  sensorCheckPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 12,
   },
 });
