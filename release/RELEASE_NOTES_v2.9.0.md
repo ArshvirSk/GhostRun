@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-15  
 **Artifact:** `release/GhostRun-v2.9.0.apk`  
-**Size:** 56,556,664 bytes (53.94 MB)  
-**SHA-256 Checksum:** `E783652B25C23DA4000121BB4DD692285F45A3EB8DB5B76F92AB3320727A72BC`  
+**Size:** 56,559,112 bytes (53.94 MB)  
+**SHA-256 Checksum:** `DC6619B6BED25590F523F81B2027F694C2A4144F5214A60E4ADC81A0DAD0794A`  
 **Version:** `2.9.0`  
 **VersionCode:** `15`  
 **Architecture:** `arm64-v8a`  
@@ -42,15 +42,22 @@ GhostRun **v2.9.0** introduces the game-changing **Extreme / Blackout** difficul
 ### 2. Zone Creation & Area Setup Enhancements
 - **Free Tap Repositioning (`app/host/area.tsx`):**
   - Operatives can tap anywhere on the map to immediately recenter and place the boundary perimeter without needing to tap inside an existing zone circle.
-- **Clean GPS Recenter FAB:**
-  - Removed top GPS button in favor of default initial centering on the operative's device GPS.
-  - Added a Google Maps-style floating recenter action button above the bottom area configuration sheet.
+- **Instantaneous Recenter Snap & Detached Control:**
+  - Fast-path 0ms GPS snap via Android fused location cache (`getLastKnownPositionAsync`) and zero-lag camera snap (`jumpTo`), followed by background live lock.
+  - Floating recenter FAB elevated with a clean 25px airspace above the bottom Continue button dock, eliminating overlap.
 - **Smooth Zone Size Camera Transitions:**
   - Changing zone radius activates dynamic camera animations (`easeTo` 500ms) with auto-calculated altitude zoom (`getZoomForRadius`).
 - **Compass & Logo Cleanup:**
   - Disabled default MapLibre compass and watermark logos across all game, area, replay, and result screens for a sleek, unobtrusive tactical UI.
 
-### 3. Live Round Operative Heading Lock & Modular Lobby
+### 3. Step 2 Rules: 2x2 Presets Grid & Dynamic Unhighlighting
+- **2 x 2 Presets Grid Layout (`app/host/rules.tsx`):**
+  - Transformed difficulty selector from a compressed single-row chip strip into an expansive 2x2 responsive card grid (Row 1: `CASUAL` | `STANDARD`; Row 2: `HARDCORE` | `BLACKOUT`).
+- **Dynamic Preset Unhighlighting on Setting Modification:**
+  - Adjusting any rule stepper (Head Start, Round Duration, Ping Cadence, Tag Radius, Boundary Excursion Penalty, or Mode Parameters) immediately unhighlights all presets and displays a tactical `CUSTOM` badge.
+  - Verified with dedicated test suite `scripts/test-rules-presets.ts`.
+
+### 4. Live Round Operative Heading Lock & Modular Lobby
 - **Compass Heading Lock in Live Rounds (`src/game-shell/MapView.tsx`):**
   - In standard and hardcore modes, the live map locks onto the operative's position and rotates smoothly with physical phone movement, preventing accidental manual map spins or panning during intense chases.
 - **Lobby Advanced Host Controls (`app/lobby/[id].tsx`):**

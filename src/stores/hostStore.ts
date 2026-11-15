@@ -190,6 +190,7 @@ export const useHostStore = create<HostState>((set, get) => ({
 
   setModeParam: (namespace: string, key: string, value: any) => {
     set((state) => ({
+      preset: 'custom',
       modeParams: {
         ...state.modeParams,
         [namespace]: {

@@ -204,12 +204,45 @@ export default function HostAreaScreen() {
     }
   };
 
-  // Google Maps-style Recenter GPS Action
+  // Google Maps-style Recenter GPS Action (Instantaneous 0ms snap)
   const handleRecenterGps = async () => {
-    setLocating(true);
-    setPlacementError('');
     triggerHaptic('buttonTap');
+    setPlacementError('');
+
+    // Phase 1: Instant 0ms snap from last known / cached location
     try {
+      const lastPos = await Location.getLastKnownPositionAsync();
+      if (lastPos) {
+        const instantCoords: [number, number] = [lastPos.coords.longitude, lastPos.coords.latitude];
+        setCenter(instantCoords, 'my_location');
+        cameraRef.current?.jumpTo({
+          center: instantCoords,
+          zoom: 14,
+        });
+        if (needsTarget) {
+          setPlacement('target', [instantCoords[0] + 0.0018, instantCoords[1] + 0.0018]);
+        }
+        if (needsJail) {
+          setPlacement('jail', [instantCoords[0], instantCoords[1] + 0.0018]);
+        }
+      } else {
+        const stored = await AsyncStorage.getItem(LAST_LOCATION_KEY);
+        if (stored) {
+          const cachedCoords = JSON.parse(stored) as [number, number];
+          setCenter(cachedCoords, 'my_location');
+          cameraRef.current?.jumpTo({
+            center: cachedCoords,
+            zoom: 14,
+          });
+        }
+      }
+    } catch {
+      // Non-fatal, proceed to live GPS
+    }
+
+    // Phase 2: Live GPS lock in background
+    try {
+      setLocating(true);
       let perm = await Location.getForegroundPermissionsAsync();
       if (!perm.granted) {
         perm = await Location.requestForegroundPermissionsAsync();
@@ -223,10 +256,9 @@ export default function HostAreaScreen() {
       const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
 
       setCenter(coords, 'my_location');
-      cameraRef.current?.flyTo({
+      cameraRef.current?.jumpTo({
         center: coords,
         zoom: 14,
-        duration: 600,
       });
 
       // Keep target/jail aligned with user location
@@ -532,7 +564,7 @@ export default function HostAreaScreen() {
         style={({ pressed }) => [
           styles.recenterFab,
           {
-            bottom: Math.max(insets.bottom, 16) + 80,
+            bottom: Math.max(insets.bottom, 16) + 116,
             right: spacing.lg,
             backgroundColor: colors.surfaceElevated,
             borderColor: colors.borderDark,

@@ -10,7 +10,7 @@ import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
 import { ParamField } from '../../src/ui/ParamField';
 import { getModeModule } from '../../src/modes/registry';
-import { useHostStore, PresetType } from '../../src/stores/hostStore';
+import { useHostStore, PresetType, PRESET_VALUES } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
 
 export default function HostRulesScreen() {
@@ -30,6 +30,25 @@ export default function HostRulesScreen() {
   const modeModule = getModeModule(modeId);
 
   const isGhostDuel = modeId === 'ghost_duel';
+
+  // Preset is strictly active only if preset key matches AND all timing/boundary rules match expected preset values
+  const isPresetActive = (pKey: PresetType) => {
+    if (preset !== pKey || pKey === 'custom') return false;
+    const expected = PRESET_VALUES[pKey as keyof typeof PRESET_VALUES];
+    if (!expected) return false;
+    return (
+      rules.headStartS === (isGhostDuel ? 0 : expected.headStartS) &&
+      rules.durationS === expected.durationS &&
+      rules.pingIntervalS === expected.pingIntervalS &&
+      rules.tagRadiusM === expected.tagRadiusM &&
+      rules.boundaryGraceS === expected.boundaryGraceS &&
+      rules.boundaryPenalty === expected.boundaryPenalty
+    );
+  };
+
+  const activePreset = (['casual', 'standard', 'hardcore', 'blackout'] as PresetType[]).find(
+    (pKey) => isPresetActive(pKey)
+  ) || null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -80,36 +99,141 @@ export default function HostRulesScreen() {
           Select a balance preset or tailor individual tactical timing parameters.
         </Text>
 
-        {/* Presets Selector */}
+        {/* Presets Selector (2 x 2 Grid) */}
         <Card variant="default" style={{ padding: spacing.md, marginBottom: spacing.lg }}>
-          <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.sm }}>
-            DIFFICULTY & PACE PRESETS
-          </Text>
-          <View style={styles.presetsRow}>
-            {(['casual', 'standard', 'hardcore', 'blackout'] as PresetType[]).map((pKey) => {
-              const isSelected = preset === pKey;
-              return (
-                <Chip
-                  key={pKey}
-                  label={pKey.toUpperCase()}
-                  size="sm"
-                  selected={isSelected}
-                  variant={isSelected ? 'accent' : 'default'}
-                  onPress={() => {
-                    triggerHaptic('buttonTap');
-                    applyPreset(pKey);
-                  }}
-                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-                />
-              );
-            })}
+          <View style={styles.presetsHeaderRow}>
+            <Text variant="label" style={{ color: colors.textMuted }}>
+              DIFFICULTY & PACE PRESETS
+            </Text>
+            {!activePreset && (
+              <View
+                style={[
+                  styles.customBadge,
+                  { backgroundColor: 'rgba(255, 184, 0, 0.15)', borderColor: colors.warning },
+                ]}
+              >
+                <Text style={{ color: colors.warning, fontSize: 10, fontWeight: '800' }}>
+                  CUSTOM
+                </Text>
+              </View>
+            )}
           </View>
-          <Text variant="body" style={{ color: colors.textMuted, marginTop: spacing.sm, fontSize: 13 }}>
-            {preset === 'casual' && 'Generous head start (4 min), longer round (60 min), and frequent 90s radar pings.'}
-            {preset === 'standard' && 'Balanced competitive defaults: 3 min head start, 45 min round, 150s ping interval.'}
-            {preset === 'hardcore' && 'High pressure: 90s head start, 30 min duration, delayed 240s pings, extra ping penalty.'}
-            {preset === 'blackout' && 'Extreme zero-vis combat: Map tiles disabled in favor of a 360° radial sonar with operative fixed at center, thermal proximity heat signatures, and vector guide lines to objectives.'}
-            {preset === 'custom' && 'Customized timing and boundary configuration applied.'}
+
+          {/* 2 x 2 Grid: Row 1 (Casual, Standard) & Row 2 (Hardcore, Blackout) */}
+          <View style={[styles.presetsGrid, { marginTop: spacing.sm }]}>
+            <View style={styles.presetsGridRow}>
+              {[
+                { key: 'casual', label: 'CASUAL', icon: 'speedometer-outline' },
+                { key: 'standard', label: 'STANDARD', icon: 'shield-outline' },
+              ].map((p) => {
+                const isSelected = activePreset === p.key;
+                return (
+                  <Pressable
+                    key={p.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Preset ${p.label}`}
+                    onPress={() => {
+                      triggerHaptic('buttonTap');
+                      applyPreset(p.key as PresetType);
+                    }}
+                    style={[
+                      styles.presetGridCard,
+                      {
+                        backgroundColor: isSelected ? 'rgba(0, 240, 255, 0.12)' : colors.surfaceElevated,
+                        borderColor: isSelected ? colors.primary : colors.borderDark,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={p.icon as any}
+                      size={18}
+                      color={isSelected ? colors.primary : colors.textMuted}
+                    />
+                    <Text
+                      variant="title"
+                      style={{
+                        color: isSelected ? colors.primary : colors.text,
+                        fontSize: 13,
+                        fontWeight: isSelected ? '800' : '600',
+                        marginLeft: 8,
+                      }}
+                    >
+                      {p.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={[styles.presetsGridRow, { marginTop: 8 }]}>
+              {[
+                { key: 'hardcore', label: 'HARDCORE', icon: 'flame-outline' },
+                { key: 'blackout', label: 'BLACKOUT', icon: 'radio-outline' },
+              ].map((p) => {
+                const isSelected = activePreset === p.key;
+                return (
+                  <Pressable
+                    key={p.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Preset ${p.label}`}
+                    onPress={() => {
+                      triggerHaptic('buttonTap');
+                      applyPreset(p.key as PresetType);
+                    }}
+                    style={[
+                      styles.presetGridCard,
+                      {
+                        backgroundColor: isSelected
+                          ? p.key === 'blackout'
+                            ? 'rgba(255, 42, 85, 0.15)'
+                            : 'rgba(0, 240, 255, 0.12)'
+                          : colors.surfaceElevated,
+                        borderColor: isSelected
+                          ? p.key === 'blackout'
+                            ? colors.danger
+                            : colors.primary
+                          : colors.borderDark,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={p.icon as any}
+                      size={18}
+                      color={
+                        isSelected
+                          ? p.key === 'blackout'
+                            ? colors.danger
+                            : colors.primary
+                          : colors.textMuted
+                      }
+                    />
+                    <Text
+                      variant="title"
+                      style={{
+                        color: isSelected
+                          ? p.key === 'blackout'
+                            ? colors.danger
+                            : colors.primary
+                          : colors.text,
+                        fontSize: 13,
+                        fontWeight: isSelected ? '800' : '600',
+                        marginLeft: 8,
+                      }}
+                    >
+                      {p.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <Text variant="body" style={{ color: colors.textMuted, marginTop: spacing.sm, fontSize: 13, lineHeight: 18 }}>
+            {activePreset === 'casual' && 'Generous head start (4 min), longer round (60 min), and frequent 90s radar pings.'}
+            {activePreset === 'standard' && 'Balanced competitive defaults: 3 min head start, 45 min round, 150s ping interval.'}
+            {activePreset === 'hardcore' && 'High pressure: 90s head start, 30 min duration, delayed 240s pings, extra ping penalty.'}
+            {activePreset === 'blackout' && 'Extreme zero-vis combat: Map tiles disabled in favor of a 360° radial sonar with operative fixed at center, thermal proximity heat signatures, and vector guide lines to objectives.'}
+            {!activePreset && 'Customized rules applied. Select a preset above to reset defaults.'}
           </Text>
         </Card>
 
@@ -385,9 +509,33 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 110,
   },
-  presetsRow: {
+  presetsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  customBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  presetsGrid: {
+    width: '100%',
+  },
+  presetsGridRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  presetGridCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1.5,
   },
   accordionHeader: {
     flexDirection: 'row',
