@@ -393,6 +393,18 @@ export default function LobbyScreen() {
       return;
     }
 
+    // Guard: In team mode, require operative to pick a team before readying up
+    if (!isSoloMode && ownPlayer?.team === 'unassigned') {
+      setErrorMessage('Please join either Runners or Hunters before readying up.');
+      return;
+    }
+
+    // Privacy guard: If replay trail consent hasn't been explicitly selected yet, default to Keep Private
+    if (shareChoice === null || shareChoice === undefined) {
+      const ok = await chooseShare(false);
+      if (!ok) return;
+    }
+
     // If becoming ready, ensure match notifications & location permissions are active
     await ensureGamePermissions();
 
@@ -486,18 +498,19 @@ export default function LobbyScreen() {
     }
   }
 
-  async function chooseShare(share: boolean) {
-    if (!supabase || !gameId) return;
+  async function chooseShare(share: boolean): Promise<boolean> {
+    if (!supabase || !gameId) return false;
     setSavingShare(true);
     setErrorMessage('');
     const { error } = await supabase.rpc('set_share_trail', { game_id: gameId, share });
     setSavingShare(false);
     if (error) {
       setErrorMessage(error.message);
-      return;
+      return false;
     }
     setShareChoice(share);
     await loadState();
+    return true;
   }
 
   function toggleDraft(list: 'modifiers' | 'roles', modId: string) {
@@ -634,7 +647,7 @@ export default function LobbyScreen() {
           {
             paddingHorizontal: spacing.lg,
             paddingTop: Math.max(insets.top, 16) + 8,
-            paddingBottom: Math.max(insets.bottom, 16) + 190,
+            paddingBottom: Math.max(insets.bottom, 16) + 210,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -727,7 +740,7 @@ export default function LobbyScreen() {
           </Card>
         )}
 
-        {/* C3 Replay Sharing Choice Banner (Compact) */}
+        {/* C3 Replay Sharing Choice Banner (Compact & Dismissible) */}
         {shareChoice === null && (
           <Card
             variant="elevated"
@@ -736,19 +749,29 @@ export default function LobbyScreen() {
               { backgroundColor: colors.surfaceElevated, borderColor: colors.borderAccent, marginTop: spacing.sm },
             ]}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-              <Ionicons name="eye-off-outline" size={16} color={colors.primary} />
-              <Text variant="title" style={{ color: colors.text, fontSize: 14, marginLeft: 6 }}>
-                Route Privacy in Mission Replays
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
+                <Text variant="label" style={{ color: colors.text, fontSize: 13, fontWeight: '700', marginLeft: 6 }}>
+                  POST-MATCH ROUTE PRIVACY
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Dismiss and keep private"
+                onPress={() => void chooseShare(false)}
+                hitSlop={8}
+                style={{ padding: 2 }}
+              >
+                <Ionicons name="close" size={18} color={colors.textMuted} />
+              </Pressable>
             </View>
-            <Text variant="caption" style={{ color: colors.textMuted, fontSize: 12, lineHeight: 16 }}>
-              Choose whether opponents can inspect your exact movement trail during post-match replays.
+            <Text variant="caption" style={{ color: colors.textMuted, fontSize: 12, marginTop: 4, lineHeight: 16 }}>
+              Allow opponents to inspect your exact movement trail during post-match tactical replays?
             </Text>
             <View style={[styles.shareActionRow, { marginTop: 10 }]}>
               <Button
-                title={savingShare ? 'Saving...' : 'Share with Crew'}
-                variant="primary"
+                title={savingShare ? 'Saving...' : 'Share Trail'}
+                variant="secondary"
                 size="sm"
                 disabled={savingShare}
                 style={{ flex: 1 }}
@@ -756,7 +779,7 @@ export default function LobbyScreen() {
               />
               <Button
                 title="Keep Private"
-                variant="secondary"
+                variant="primary"
                 size="sm"
                 disabled={savingShare}
                 style={{ flex: 1 }}
@@ -992,7 +1015,7 @@ export default function LobbyScreen() {
                       styles.teamCard,
                       {
                         backgroundColor: colors.surface,
-                        borderColor: colors.borderDark,
+                        borderColor: ownPlayer?.team === 'unassigned' ? colors.warning : colors.borderDark,
                       },
                     ]}
                   >
@@ -1004,9 +1027,28 @@ export default function LobbyScreen() {
                         </Text>
                       </View>
                       <Text variant="caption" style={{ color: colors.warning, fontSize: 11 }}>
-                        Select team above
+                        {ownPlayer?.team === 'unassigned' ? 'Select team below' : 'Awaiting squad'}
                       </Text>
                     </View>
+
+                    {ownPlayer?.team === 'unassigned' && (
+                      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                        <Button
+                          title="Join Runners"
+                          variant="secondary"
+                          size="sm"
+                          style={{ flex: 1, borderColor: colors.runner }}
+                          onPress={() => void setTeam(ownPlayer, 'runner')}
+                        />
+                        <Button
+                          title="Join Hunters"
+                          variant="secondary"
+                          size="sm"
+                          style={{ flex: 1, borderColor: colors.hunter }}
+                          onPress={() => void setTeam(ownPlayer, 'hunter')}
+                        />
+                      </View>
+                    )}
 
                     <View style={{ gap: 6, marginTop: 4 }}>
                       {unassigned.map((player) => (
@@ -1393,7 +1435,6 @@ export default function LobbyScreen() {
             variant={ownPlayer?.is_ready ? 'secondary' : 'primary'}
             size="md"
             style={{ flex: 1 }}
-            disabled={shareChoice === null}
             onPress={() => void toggleReady()}
           />
 
