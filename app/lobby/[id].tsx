@@ -323,7 +323,7 @@ export default function LobbyScreen() {
     return true;
   }
 
-  async function setTeam(player: LobbyPlayer, team: Exclude<Team, 'unassigned'>) {
+  async function setTeam(player: LobbyPlayer, team: Team) {
     if (!supabase || !gameId) return;
     await runAction('team', () =>
       supabase!.rpc('set_team', { game_id: gameId, player_id: player.id, team }),
@@ -634,6 +634,24 @@ export default function LobbyScreen() {
     );
   }
 
+  function handleTogglePrivacy() {
+    Alert.alert(
+      'Post-Match Route Privacy',
+      'Choose whether opponents can inspect your movement trail during post-match replays.',
+      [
+        {
+          text: 'Share with Crew',
+          onPress: () => void chooseShare(true),
+        },
+        {
+          text: 'Keep Private (Default)',
+          onPress: () => void chooseShare(false),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }
+
   const ownPlayer = state.players.find((p) => p.id === state.my_player_id);
   const runners = activePlayers.filter((p) => p.team === 'runner');
   const hunters = activePlayers.filter((p) => p.team === 'hunter');
@@ -664,64 +682,68 @@ export default function LobbyScreen() {
           </Pressable>
 
           <View style={{ flex: 1, marginHorizontal: spacing.sm }}>
-            <Text variant="caption" numberOfLines={1} style={{ color: colors.primary, fontWeight: '700', letterSpacing: 1 }}>
+            <Text variant="caption" numberOfLines={1} style={{ color: colors.accent, fontWeight: '800', letterSpacing: 1.5, fontSize: 10 }}>
               MISSION LOBBY
             </Text>
-            <Text variant="title" numberOfLines={1} style={{ color: colors.text, fontSize: 16 }}>
-              {activeModule?.name || 'Tactical Grid'}
+            <Text variant="title" numberOfLines={1} style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>
+              {activeModule?.name || 'Classic Chase'}
             </Text>
           </View>
 
-          <Chip
-            label={everyoneReady ? 'READY' : 'PREPARING'}
-            variant={everyoneReady ? 'accent' : 'muted'}
-            size="sm"
-          />
+          <View style={[styles.statusChipWrap, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}>
+            <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700', marginRight: 6 }}>
+              {everyoneReady ? 'READY' : 'PREPARING'}
+            </Text>
+            <View style={[styles.statusPulseDot, { backgroundColor: everyoneReady ? colors.accent : colors.radarScan }]} />
+          </View>
         </View>
 
         {/* Mission Code & Share Card */}
         <Card
           variant="default"
-          style={[styles.missionCodeCard, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.xs }]}
+          style={[styles.missionCodeCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
         >
-          <View style={styles.missionCodeLeft}>
-            <Text variant="caption" style={{ color: colors.textMuted, fontSize: 10, letterSpacing: 1 }}>
-              ACCESS CODE
-            </Text>
-            <Text variant="display" style={{ color: colors.text, fontSize: 26, letterSpacing: 3 }}>
-              {state.game.code}
-            </Text>
+          <View style={styles.missionCodeTopRow}>
+            <View style={styles.missionCodeLeft}>
+              <Text style={styles.missionCodeCaption}>ACCESS CODE:</Text>
+              <Text style={styles.missionCodeValue}>{state.game.code}</Text>
+            </View>
+            <View style={styles.missionCodeActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Share invite code"
+                onPress={() => void shareCode()}
+                style={[styles.shareActionBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
+              >
+                <Ionicons name="share-outline" size={15} color={colors.runner} />
+                <Text style={[styles.shareActionText, { color: colors.runner }]}>SHARE</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Show QR code and invite link"
+                onPress={() => setInviteModalVisible(true)}
+                style={[styles.shareActionBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
+              >
+                <Ionicons name="qr-code-outline" size={15} color={colors.accent} />
+                <Text style={[styles.shareActionText, { color: colors.accent }]}>QR</Text>
+              </Pressable>
+            </View>
           </View>
-          <View style={styles.missionCodeActions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Share invite code"
-              onPress={() => void shareCode()}
-              style={[styles.shareActionBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-            >
-              <Ionicons name="share-outline" size={16} color={colors.primary} />
-              <Text variant="label" style={{ color: colors.primary, marginLeft: 6, fontSize: 11 }}>
-                SHARE
+
+          {activePlayers.length < 2 && !isSoloMode && (
+            <View style={styles.warningAlertRow}>
+              <Ionicons name="warning-outline" size={14} color={colors.warning} />
+              <Text style={styles.warningAlertText}>
+                At least 2 players needed to assign teams.
               </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Show QR code and invite link"
-              onPress={() => setInviteModalVisible(true)}
-              style={[styles.shareActionBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-            >
-              <Ionicons name="qr-code-outline" size={16} color={colors.accent} />
-              <Text variant="label" style={{ color: colors.accent, marginLeft: 6, fontSize: 11 }}>
-                QR
-              </Text>
-            </Pressable>
-          </View>
+            </View>
+          )}
         </Card>
 
         {bannerMessage !== '' && (
           <Card
             variant="elevated"
-            style={[styles.bannerCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.warning, marginTop: spacing.sm }]}
+            style={[styles.bannerCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.warning, marginTop: 8 }]}
           >
             <Text variant="body" style={{ color: colors.warning, fontSize: 13 }}>
               {bannerMessage}
@@ -732,7 +754,7 @@ export default function LobbyScreen() {
         {errorMessage !== '' && (
           <Card
             variant="elevated"
-            style={[styles.bannerCard, { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder, marginTop: spacing.sm }]}
+            style={[styles.bannerCard, { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder, marginTop: 8 }]}
           >
             <Text variant="body" style={{ color: colors.dangerText, fontSize: 13 }}>
               {errorMessage}
@@ -740,57 +762,8 @@ export default function LobbyScreen() {
           </Card>
         )}
 
-        {/* C3 Replay Sharing Choice Banner (Compact & Dismissible) */}
-        {shareChoice === null && (
-          <Card
-            variant="elevated"
-            style={[
-              styles.shareSheetCard,
-              { backgroundColor: colors.surfaceElevated, borderColor: colors.borderAccent, marginTop: spacing.sm },
-            ]}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
-                <Text variant="label" style={{ color: colors.text, fontSize: 13, fontWeight: '700', marginLeft: 6 }}>
-                  POST-MATCH ROUTE PRIVACY
-                </Text>
-              </View>
-              <Pressable
-                accessibilityLabel="Dismiss and keep private"
-                onPress={() => void chooseShare(false)}
-                hitSlop={8}
-                style={{ padding: 2 }}
-              >
-                <Ionicons name="close" size={18} color={colors.textMuted} />
-              </Pressable>
-            </View>
-            <Text variant="caption" style={{ color: colors.textMuted, fontSize: 12, marginTop: 4, lineHeight: 16 }}>
-              Allow opponents to inspect your exact movement trail during post-match tactical replays?
-            </Text>
-            <View style={[styles.shareActionRow, { marginTop: 10 }]}>
-              <Button
-                title={savingShare ? 'Saving...' : 'Share Trail'}
-                variant="secondary"
-                size="sm"
-                disabled={savingShare}
-                style={{ flex: 1 }}
-                onPress={() => void chooseShare(true)}
-              />
-              <Button
-                title="Keep Private"
-                variant="primary"
-                size="sm"
-                disabled={savingShare}
-                style={{ flex: 1 }}
-                onPress={() => void chooseShare(false)}
-              />
-            </View>
-          </Card>
-        )}
-
         {/* 3-Segment Bar */}
-        <View style={{ marginTop: spacing.lg }}>
+        <View style={{ marginTop: 10 }}>
           <SegmentBar
             items={[
               { id: 'roster', label: `ROSTER (${activePlayers.length})` },
@@ -802,60 +775,103 @@ export default function LobbyScreen() {
           />
         </View>
 
-        {/* ==================== SEGMENT 1: ROSTER ==================== */}
-        {activeSegment === 'roster' && (
-          <View style={{ marginTop: spacing.md }}>
-            {/* Quick Sensors & Ready Health Check Pill */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Check Sensors and GPS"
-              onPress={() => {
-                setReadyCheckVisible(true);
-                void handleRunDiagnostic();
+        {/* Compact Quick-Bar: Route Privacy & Sensor Diagnostics (Side-by-side pills from mockup) */}
+        <View style={styles.quickBarRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Configure route privacy"
+            onPress={handleTogglePrivacy}
+            style={[
+              styles.quickPill,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: shareChoice === true ? colors.accent : colors.borderDark,
+              },
+            ]}
+          >
+            <Ionicons
+              name={shareChoice === true ? 'eye-outline' : 'shield-checkmark-outline'}
+              size={14}
+              color={shareChoice === true ? colors.accent : colors.textMuted}
+            />
+            <Text
+              variant="caption"
+              numberOfLines={1}
+              style={{
+                color: colors.text,
+                fontSize: 11,
+                fontWeight: '600',
+                marginLeft: 5,
+                flex: 1,
               }}
-              style={[
-                styles.sensorCheckPill,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor:
-                    healthReport?.overall === 'healthy'
-                      ? colors.accent
-                      : healthReport?.overall === 'warning'
-                      ? colors.warning
-                      : colors.borderDark,
-                },
-              ]}
             >
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={16}
-                color={
+              Privacy: {shareChoice === true ? 'Shared' : 'Keep Private'}
+            </Text>
+            <Ionicons name="chevron-down" size={12} color={colors.textMuted} />
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Check Sensors and GPS"
+            onPress={() => {
+              setReadyCheckVisible(true);
+              void handleRunDiagnostic();
+            }}
+            style={[
+              styles.quickPill,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor:
                   healthReport?.overall === 'healthy'
                     ? colors.accent
                     : healthReport?.overall === 'warning'
                     ? colors.warning
-                    : colors.primary
-                }
-              />
-              <Text
-                variant="caption"
-                style={{
-                  color:
-                    healthReport?.overall === 'healthy'
-                      ? colors.accent
-                      : healthReport?.overall === 'warning'
-                      ? colors.warning
-                      : colors.text,
-                  fontWeight: '700',
-                  marginLeft: 8,
-                  flex: 1,
-                }}
-              >
-                {healthReport ? `HARDWARE: ${healthReport.summary.toUpperCase()}` : 'RUN SENSOR & GPS DIAGNOSTIC'}
-              </Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-            </Pressable>
+                    : colors.borderDark,
+              },
+            ]}
+          >
+            <Ionicons
+              name={
+                healthReport?.overall === 'healthy'
+                  ? 'checkmark-circle'
+                  : healthReport?.overall === 'warning'
+                  ? 'alert-circle'
+                  : 'shield-checkmark-outline'
+              }
+              size={14}
+              color={
+                healthReport?.overall === 'healthy'
+                  ? colors.accent
+                  : healthReport?.overall === 'warning'
+                  ? colors.warning
+                  : colors.primary
+              }
+            />
+            <Text
+              variant="caption"
+              numberOfLines={1}
+              style={{
+                color:
+                  healthReport?.overall === 'healthy'
+                    ? colors.accent
+                    : healthReport?.overall === 'warning'
+                    ? colors.warning
+                    : colors.text,
+                fontSize: 11,
+                fontWeight: '600',
+                marginLeft: 5,
+                flex: 1,
+              }}
+            >
+              Diagnostics: {healthReport?.overall === 'healthy' ? 'Ready' : healthReport?.overall === 'warning' ? 'Warning' : 'Check'}
+            </Text>
+            <Ionicons name="chevron-forward" size={12} color={colors.textMuted} />
+          </Pressable>
+        </View>
 
+        {/* ==================== SEGMENT 1: ROSTER ==================== */}
+        {activeSegment === 'roster' && (
+          <View style={{ marginTop: 8 }}>
             {isSoloMode ? (
               <View>
                 <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
@@ -878,221 +894,258 @@ export default function LobbyScreen() {
                 ))}
               </View>
             ) : (
-              <View style={{ gap: spacing.md }}>
-                {/* Runners Team Card */}
-                <Card
-                  variant="default"
-                  style={[
-                    styles.teamCard,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: ownPlayer?.team === 'runner' ? colors.runner : colors.borderDark,
-                    },
-                  ]}
-                >
-                  <View style={styles.teamCardHeader}>
-                    <View style={styles.teamTitleRow}>
-                      <View style={[styles.teamDot, { backgroundColor: colors.runner }]} />
-                      <Text variant="label" style={{ color: colors.runner, fontSize: 13, fontWeight: '800' }}>
-                        RUNNERS ({runners.length})
-                      </Text>
-                    </View>
-                    {ownPlayer?.team === 'runner' ? (
-                      <View style={[styles.myTeamBadge, { borderColor: colors.runner, backgroundColor: 'rgba(0, 240, 255, 0.12)' }]}>
-                        <Text style={{ color: colors.runner, fontSize: 10, fontWeight: '800' }}>
-                          YOUR SQUAD
-                        </Text>
-                      </View>
-                    ) : (
-                      <Button
-                        title="Join Runners"
-                        variant="secondary"
-                        size="sm"
-                        onPress={() => ownPlayer && void setTeam(ownPlayer, 'runner')}
-                      />
-                    )}
-                  </View>
-
-                  {runners.length === 0 ? (
-                    <Text variant="caption" style={{ color: colors.textMuted, fontStyle: 'italic', paddingVertical: 4 }}>
-                      No operatives assigned to Runners yet.
-                    </Text>
-                  ) : (
-                    <View style={{ gap: 6, marginTop: 4 }}>
-                      {runners.map((player) => (
-                        <PlayerRow
-                          key={player.id}
-                          player={player}
-                          isHost={isHost}
-                          isSelf={player.id === state.my_player_id}
-                          isGameHost={player.user_id === state.game.host_id}
-                          kickingId={kickingPlayerId}
-                          colors={colors}
-                          radii={radii}
-                          onStartKick={setKickingPlayerId}
-                          onConfirmKick={() => void confirmKick(player)}
-                          onCancelKick={() => setKickingPlayerId(null)}
-                          onToggleRemote={
-                            state.game.roles?.includes('operator')
-                              ? () => void toggleRemote(player)
-                              : undefined
-                          }
-                        />
-                      ))}
-                    </View>
-                  )}
-                </Card>
-
-                {/* Hunters Team Card */}
-                <Card
-                  variant="default"
-                  style={[
-                    styles.teamCard,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: ownPlayer?.team === 'hunter' ? colors.hunter : colors.borderDark,
-                    },
-                  ]}
-                >
-                  <View style={styles.teamCardHeader}>
-                    <View style={styles.teamTitleRow}>
-                      <View style={[styles.teamDot, { backgroundColor: colors.hunter }]} />
-                      <Text variant="label" style={{ color: colors.hunter, fontSize: 13, fontWeight: '800' }}>
-                        HUNTERS ({hunters.length})
-                      </Text>
-                    </View>
-                    {ownPlayer?.team === 'hunter' ? (
-                      <View style={[styles.myTeamBadge, { borderColor: colors.hunter, backgroundColor: 'rgba(255, 92, 0, 0.15)' }]}>
-                        <Text style={{ color: colors.hunter, fontSize: 10, fontWeight: '800' }}>
-                          YOUR SQUAD
-                        </Text>
-                      </View>
-                    ) : (
-                      <Button
-                        title="Join Hunters"
-                        variant="secondary"
-                        size="sm"
-                        onPress={() => ownPlayer && void setTeam(ownPlayer, 'hunter')}
-                      />
-                    )}
-                  </View>
-
-                  {hunters.length === 0 ? (
-                    <Text variant="caption" style={{ color: colors.textMuted, fontStyle: 'italic', paddingVertical: 4 }}>
-                      No operatives assigned to Hunters yet.
-                    </Text>
-                  ) : (
-                    <View style={{ gap: 6, marginTop: 4 }}>
-                      {hunters.map((player) => (
-                        <PlayerRow
-                          key={player.id}
-                          player={player}
-                          isHost={isHost}
-                          isSelf={player.id === state.my_player_id}
-                          isGameHost={player.user_id === state.game.host_id}
-                          kickingId={kickingPlayerId}
-                          colors={colors}
-                          radii={radii}
-                          onStartKick={setKickingPlayerId}
-                          onConfirmKick={() => void confirmKick(player)}
-                          onCancelKick={() => setKickingPlayerId(null)}
-                          onToggleRemote={
-                            state.game.roles?.includes('operator')
-                              ? () => void toggleRemote(player)
-                              : undefined
-                          }
-                        />
-                      ))}
-                    </View>
-                  )}
-                </Card>
-
-                {/* Unassigned Operatives Card */}
-                {unassigned.length > 0 && (
+              <View style={{ gap: 8 }}>
+                {/* Squad Arena: Side-by-Side Runners vs Hunters (Mockup Layout) */}
+                <View style={styles.squadArenaRow}>
+                  {/* RUNNERS COLUMN */}
                   <Card
                     variant="default"
                     style={[
-                      styles.teamCard,
+                      styles.squadColumnCard,
                       {
                         backgroundColor: colors.surface,
-                        borderColor: ownPlayer?.team === 'unassigned' ? colors.warning : colors.borderDark,
+                        borderColor: ownPlayer?.team === 'runner' ? colors.runner : colors.borderDark,
                       },
                     ]}
                   >
-                    <View style={styles.teamCardHeader}>
-                      <View style={styles.teamTitleRow}>
-                        <Ionicons name="people-outline" size={16} color={colors.textMuted} />
-                        <Text variant="label" style={{ color: colors.textMuted, fontSize: 13, fontWeight: '700', marginLeft: 6 }}>
-                          UNASSIGNED OPERATIVES ({unassigned.length})
-                        </Text>
-                      </View>
-                      <Text variant="caption" style={{ color: colors.warning, fontSize: 11 }}>
-                        {ownPlayer?.team === 'unassigned' ? 'Select team below' : 'Awaiting squad'}
+                    <View style={styles.squadColHeader}>
+                      <View style={[styles.squadColDot, { backgroundColor: colors.runner }]} />
+                      <Text style={[styles.squadColTitle, { color: colors.runner }]}>
+                        RUNNERS ({runners.length})
                       </Text>
                     </View>
 
-                    {ownPlayer?.team === 'unassigned' && (
-                      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                        <Button
-                          title="Join Runners"
-                          variant="secondary"
-                          size="sm"
-                          style={{ flex: 1, borderColor: colors.runner }}
-                          onPress={() => void setTeam(ownPlayer, 'runner')}
-                        />
-                        <Button
-                          title="Join Hunters"
-                          variant="secondary"
-                          size="sm"
-                          style={{ flex: 1, borderColor: colors.hunter }}
-                          onPress={() => void setTeam(ownPlayer, 'hunter')}
-                        />
+                    {ownPlayer?.team !== 'runner' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Join Runners squad"
+                        onPress={() => ownPlayer && void setTeam(ownPlayer, 'runner')}
+                        style={[styles.squadJoinButton, { borderColor: colors.runner }]}
+                      >
+                        <Text style={[styles.squadJoinText, { color: colors.runner }]}>JOIN</Text>
+                      </Pressable>
+                    ) : null}
+
+                    {runners.length === 0 ? (
+                      <Text style={styles.squadEmptyText}>No operatives assigned</Text>
+                    ) : (
+                      <View style={{ gap: 6 }}>
+                        {runners.map((p) => {
+                          const isSelf = p.id === state.my_player_id;
+                          return (
+                            <View
+                              key={p.id}
+                              style={[
+                                styles.miniPlayerCard,
+                                {
+                                  backgroundColor: isSelf ? colors.surfaceElevated : 'transparent',
+                                  borderColor: isSelf ? colors.runner : colors.borderDark,
+                                },
+                              ]}
+                            >
+                              <View style={styles.miniPlayerTop}>
+                                <View style={[styles.miniAvatarDot, { backgroundColor: p.color || colors.runner }]} />
+                                <Text style={styles.miniPlayerName} numberOfLines={1}>
+                                  {p.display_name} {isSelf ? '(YOU)' : ''}
+                                </Text>
+                              </View>
+                              <View style={styles.miniPlayerBottom}>
+                                <Chip
+                                  label={p.is_ready ? 'READY' : 'PREPARING'}
+                                  variant={p.is_ready ? 'accent' : 'muted'}
+                                  size="sm"
+                                />
+                                {isSelf && (
+                                  <Pressable
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Leave Runners squad"
+                                    onPress={() => void setTeam(ownPlayer!, 'unassigned')}
+                                    style={styles.miniLeaveBtn}
+                                  >
+                                    <Ionicons name="exit-outline" size={11} color={colors.textMuted} />
+                                    <Text style={styles.miniLeaveText}>LEAVE</Text>
+                                  </Pressable>
+                                )}
+                              </View>
+                            </View>
+                          );
+                        })}
                       </View>
                     )}
-
-                    <View style={{ gap: 6, marginTop: 4 }}>
-                      {unassigned.map((player) => (
-                        <PlayerRow
-                          key={player.id}
-                          player={player}
-                          isHost={isHost}
-                          isSelf={player.id === state.my_player_id}
-                          isGameHost={player.user_id === state.game.host_id}
-                          kickingId={kickingPlayerId}
-                          colors={colors}
-                          radii={radii}
-                          onStartKick={setKickingPlayerId}
-                          onConfirmKick={() => void confirmKick(player)}
-                          onCancelKick={() => setKickingPlayerId(null)}
-                        />
-                      ))}
-                    </View>
                   </Card>
-                )}
+
+                  {/* HUNTERS COLUMN */}
+                  <Card
+                    variant="default"
+                    style={[
+                      styles.squadColumnCard,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: ownPlayer?.team === 'hunter' ? colors.hunter : colors.borderDark,
+                      },
+                    ]}
+                  >
+                    <View style={styles.squadColHeader}>
+                      <View style={[styles.squadColDot, { backgroundColor: colors.hunter }]} />
+                      <Text style={[styles.squadColTitle, { color: colors.hunter }]}>
+                        HUNTERS ({hunters.length})
+                      </Text>
+                    </View>
+
+                    {ownPlayer?.team !== 'hunter' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Join Hunters squad"
+                        onPress={() => ownPlayer && void setTeam(ownPlayer, 'hunter')}
+                        style={[styles.squadJoinButton, { borderColor: colors.hunter }]}
+                      >
+                        <Text style={[styles.squadJoinText, { color: colors.hunter }]}>JOIN</Text>
+                      </Pressable>
+                    ) : null}
+
+                    {hunters.length === 0 ? (
+                      <Text style={styles.squadEmptyText}>No operatives assigned</Text>
+                    ) : (
+                      <View style={{ gap: 6 }}>
+                        {hunters.map((p) => {
+                          const isSelf = p.id === state.my_player_id;
+                          return (
+                            <View
+                              key={p.id}
+                              style={[
+                                styles.miniPlayerCard,
+                                {
+                                  backgroundColor: isSelf ? colors.surfaceElevated : 'transparent',
+                                  borderColor: isSelf ? colors.hunter : colors.borderDark,
+                                },
+                              ]}
+                            >
+                              <View style={styles.miniPlayerTop}>
+                                <View style={[styles.miniAvatarDot, { backgroundColor: p.color || colors.hunter }]} />
+                                <Text style={styles.miniPlayerName} numberOfLines={1}>
+                                  {p.display_name} {isSelf ? '(YOU)' : ''}
+                                </Text>
+                              </View>
+                              <View style={styles.miniPlayerBottom}>
+                                <Chip
+                                  label={p.is_ready ? 'READY' : 'PREPARING'}
+                                  variant={p.is_ready ? 'accent' : 'muted'}
+                                  size="sm"
+                                />
+                                {isSelf && (
+                                  <Pressable
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Leave Hunters squad"
+                                    onPress={() => void setTeam(ownPlayer!, 'unassigned')}
+                                    style={styles.miniLeaveBtn}
+                                  >
+                                    <Ionicons name="exit-outline" size={11} color={colors.textMuted} />
+                                    <Text style={styles.miniLeaveText}>LEAVE</Text>
+                                  </Pressable>
+                                )}
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </Card>
+                </View>
+
+                {/* Unassigned Operatives Card */}
+                <Card
+                  variant="default"
+                  style={[
+                    styles.unassignedCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: unassigned.length > 0 && ownPlayer?.team === 'unassigned' ? colors.warning : colors.borderDark,
+                    },
+                  ]}
+                >
+                  <View style={styles.unassignedHeader}>
+                    <Ionicons name="people-outline" size={15} color={colors.textMuted} />
+                    <Text style={styles.unassignedTitle}>
+                      UNASSIGNED OPERATIVES ({unassigned.length})
+                    </Text>
+                  </View>
+
+                  {unassigned.length === 0 ? (
+                    <Text style={styles.unassignedEmptyText}>No unassigned operatives</Text>
+                  ) : (
+                    <View style={{ gap: 6, marginTop: 4 }}>
+                      {unassigned.map((p) => {
+                        const isSelf = p.id === state.my_player_id;
+                        return (
+                          <View
+                            key={p.id}
+                            style={[
+                              styles.unassignedRow,
+                              {
+                                backgroundColor: isSelf ? colors.surfaceElevated : 'transparent',
+                                borderColor: isSelf ? colors.borderAccent : colors.borderDark,
+                              },
+                            ]}
+                          >
+                            <View style={styles.unassignedRowLeft}>
+                              <View style={[styles.miniAvatarDot, { backgroundColor: p.color || colors.primary }]} />
+                              <Text style={styles.unassignedRowName} numberOfLines={1}>
+                                {p.display_name} {isSelf ? '(YOU)' : ''}
+                              </Text>
+                              {p.user_id === state.game.host_id && (
+                                <MaterialCommunityIcons name="crown" size={14} color={colors.warning} style={{ marginLeft: 4 }} />
+                              )}
+                            </View>
+                            <View style={styles.unassignedRowRight}>
+                              <Chip
+                                label={p.is_ready ? 'READY' : 'PREPARING'}
+                                variant={p.is_ready ? 'accent' : 'muted'}
+                                size="sm"
+                              />
+                              {isSelf && (
+                                <View style={styles.quickJoinRow}>
+                                  <Pressable
+                                    onPress={() => void setTeam(ownPlayer!, 'runner')}
+                                    style={[styles.quickJoinBtn, { borderColor: colors.runner }]}
+                                  >
+                                    <Text style={[styles.quickJoinText, { color: colors.runner }]}>JOIN RUNNERS</Text>
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={() => void setTeam(ownPlayer!, 'hunter')}
+                                    style={[styles.quickJoinBtn, { borderColor: colors.hunter }]}
+                                  >
+                                    <Text style={[styles.quickJoinText, { color: colors.hunter }]}>JOIN HUNTERS</Text>
+                                  </Pressable>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                </Card>
 
                 {/* Host Squad Controls Card */}
                 {isHost && !isSoloMode && (
                   <Card
                     variant="default"
                     style={[
-                      styles.teamCard,
+                      styles.hostControlsCard,
                       {
-                        backgroundColor: colors.surfaceElevated,
+                        backgroundColor: colors.surface,
                         borderColor: colors.borderDark,
-                        marginTop: spacing.xs,
                       },
                     ]}
                   >
-                    <Text variant="label" style={{ color: colors.textMuted, fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>
-                      HOST ROSTER CONTROLS
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Text style={styles.hostControlsLabel}>HOST CONTROLS</Text>
+                    <View style={styles.hostControlsButtons}>
                       <Button
                         title="Rotate Roles"
                         variant="secondary"
                         size="sm"
                         style={{ flex: 1 }}
-                        disabled={busyAction === 'rotate'}
+                        disabled={activePlayers.length < 2 || busyAction === 'rotate'}
                         onPress={() => void rotateRoles()}
                       />
                       <Button
@@ -1100,7 +1153,7 @@ export default function LobbyScreen() {
                         variant="secondary"
                         size="sm"
                         style={{ flex: 1 }}
-                        disabled={busyAction === 'randomize'}
+                        disabled={activePlayers.length < 2 || busyAction === 'randomize'}
                         onPress={() => void randomizeTeams()}
                       />
                     </View>
@@ -1642,16 +1695,44 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  missionCodeCard: {
+  statusChipWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  statusPulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  missionCodeCard: {
+    padding: 14,
     borderWidth: 1,
     borderRadius: 12,
   },
+  missionCodeTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   missionCodeLeft: {
     flex: 1,
+  },
+  missionCodeCaption: {
+    color: '#8E8E93',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  missionCodeValue: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: 3,
   },
   missionCodeActions: {
     flexDirection: 'row',
@@ -1661,10 +1742,211 @@ const styles = StyleSheet.create({
   shareActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
+  },
+  shareActionText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  warningAlertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 69, 58, 0.25)',
+  },
+  warningAlertText: {
+    color: '#FF6961',
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+  },
+  quickBarRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  quickPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  squadArenaRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  squadColumnCard: {
+    flex: 1,
+    padding: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 120,
+  },
+  squadColHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  squadColDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  squadColTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  squadJoinButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  squadJoinText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  squadEmptyText: {
+    color: '#636366',
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginVertical: 12,
+  },
+  miniPlayerCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    gap: 6,
+    marginBottom: 4,
+  },
+  miniPlayerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  miniAvatarDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  miniPlayerName: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+  },
+  miniPlayerBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  miniLeaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  miniLeaveText: {
+    color: '#8E8E93',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  unassignedCard: {
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  unassignedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  unassignedTitle: {
+    color: '#8E8E93',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  unassignedEmptyText: {
+    color: '#636366',
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  unassignedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+  },
+  unassignedRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  unassignedRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  unassignedRowName: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  quickJoinRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  quickJoinBtn: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  quickJoinText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  hostControlsCard: {
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  hostControlsLabel: {
+    color: '#8E8E93',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  hostControlsButtons: {
+    flexDirection: 'row',
+    gap: 10,
   },
   teamCard: {
     padding: 12,
