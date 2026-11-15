@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text } from '../../src/ui/Text';
 import { Button } from '../../src/ui/Button';
@@ -10,7 +12,7 @@ import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
 import { RulesCard } from '../../src/ui/RulesCard';
 import { getAllBaseModes, getModeModule } from '../../src/modes/registry';
-import { useHostStore } from '../../src/stores/hostStore';
+import { useHostStore, LAST_LOCATION_KEY } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
 
 export default function HostModeScreen() {
@@ -25,6 +27,51 @@ export default function HostModeScreen() {
   const [inspectModeId, setInspectModeId] = useState<string | null>(null);
 
   const inspectingModule = inspectModeId ? getModeModule(inspectModeId) : null;
+
+  // Background GPS pre-fetch as soon as host flow starts
+  useEffect(() => {
+    async function prefetchGps() {
+      try {
+        // 1. Try local cache first for 0ms availability
+        const stored = await AsyncStorage.getItem(LAST_LOCATION_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored) as [number, number];
+          if (Array.isArray(parsed) && parsed.length === 2) {
+            useHostStore.getState().setCenter(parsed, 'my_location');
+          }
+        }
+
+        // 2. Request permission if not already granted
+        let perm = await Location.getForegroundPermissionsAsync();
+        if (!perm.granted && perm.canAskAgain) {
+          perm = await Location.requestForegroundPermissionsAsync();
+        }
+        if (perm.granted) {
+          const last = await Location.getLastKnownPositionAsync({ maxAge: 86400000 });
+          if (last?.coords?.longitude && last?.coords?.latitude) {
+            const coords: [number, number] = [last.coords.longitude, last.coords.latitude];
+            useHostStore.getState().setCenter(coords, 'my_location');
+            void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
+          }
+
+          // 3. Refine with live GPS in background with 3.5s timeout
+          Promise.race([
+            Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500)),
+          ]).then((pos) => {
+            if (pos?.coords) {
+              const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+              useHostStore.getState().setCenter(coords, 'my_location');
+              void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
+            }
+          }).catch(() => {});
+        }
+      } catch {
+        // Non-blocking prefetch failure
+      }
+    }
+    void prefetchGps();
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

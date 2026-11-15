@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getModeModule } from '../modes/registry';
 
 export type PresetType = 'casual' | 'standard' | 'hardcore' | 'blackout' | 'custom';
@@ -105,7 +106,8 @@ export const PRESET_VALUES: Record<'casual' | 'standard' | 'hardcore' | 'blackou
   },
 };
 
-const DEFAULT_CENTER: [number, number] = [-97, 38];
+export const LAST_LOCATION_KEY = '@ghostrun:last_location_coords';
+const DEFAULT_CENTER: [number, number] = [77.2090, 28.6139];
 
 export const useHostStore = create<HostState>((set, get) => ({
   mode: 'classic_chase',
@@ -322,3 +324,21 @@ export const useHostStore = create<HostState>((set, get) => ({
     });
   },
 }));
+
+// Hydrate cached GPS coordinates into store on boot
+AsyncStorage.getItem(LAST_LOCATION_KEY)
+  .then((stored) => {
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length === 2 && typeof parsed[0] === 'number') {
+          const current = useHostStore.getState().center;
+          if (current[0] === DEFAULT_CENTER[0] && current[1] === DEFAULT_CENTER[1]) {
+            useHostStore.getState().setCenter(parsed as [number, number], 'my_location');
+          }
+        }
+      } catch {}
+    }
+  })
+  .catch(() => {});
+

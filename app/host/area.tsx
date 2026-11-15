@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,16 +12,55 @@ import { Text } from '../../src/ui/Text';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
-import { useHostStore } from '../../src/stores/hostStore';
+import { useHostStore, LAST_LOCATION_KEY } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
 
 const DAY_MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
 const DARK_MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
-const LAST_LOCATION_KEY = '@ghostrun:last_location_coords';
 
 const RADII = [300, 600, 1000, 1500];
+
+/**
+ * Rapid GPS coordinate resolver that priority-falls back across:
+ * 1. OS Fused Location Cache (< 5ms)
+ * 2. Persistent AsyncStorage Cache (< 10ms)
+ * 3. Fast network/cell/wifi position (low accuracy, <= 1500ms timeout)
+ */
+async function getFastestGpsCoords(): Promise<[number, number] | null> {
+  // 1. Android fused location cache (0ms)
+  try {
+    const lastPos = await Location.getLastKnownPositionAsync({ maxAge: 86400000 });
+    if (lastPos?.coords?.longitude && lastPos?.coords?.latitude) {
+      return [lastPos.coords.longitude, lastPos.coords.latitude];
+    }
+  } catch {}
+
+  // 2. Persistent storage
+  try {
+    const stored = await AsyncStorage.getItem(LAST_LOCATION_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length === 2 && typeof parsed[0] === 'number') {
+        return parsed as [number, number];
+      }
+    }
+  } catch {}
+
+  // 3. Fast network/cell/wifi position (low accuracy, <= 1500ms)
+  try {
+    const quickPos = await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
+    ]);
+    if (quickPos?.coords?.longitude && quickPos?.coords?.latitude) {
+      return [quickPos.coords.longitude, quickPos.coords.latitude];
+    }
+  } catch {}
+
+  return null;
+}
 
 /**
  * Calculates optimal camera zoom level to fit a zone of radiusM within screen bounds.
@@ -38,6 +77,8 @@ export default function HostAreaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraRef>(null);
+  const mapLoadedRef = useRef(false);
+  const pendingCameraTargetRef = useRef<[number, number] | null>(null);
 
   const mode = useHostStore((s) => s.mode);
   const center = useHostStore((s) => s.center);
@@ -50,6 +91,17 @@ export default function HostAreaScreen() {
   const [locating, setLocating] = useState(false);
   const [placementError, setPlacementError] = useState('');
   const [placementMode, setPlacementMode] = useState<'zone' | 'target' | 'jail'>('zone');
+
+  const applyCameraCenter = useCallback((coords: [number, number], animate = false) => {
+    pendingCameraTargetRef.current = coords;
+    if (mapLoadedRef.current && cameraRef.current) {
+      if (animate) {
+        cameraRef.current.easeTo({ center: coords, zoom: 14, duration: 400 });
+      } else {
+        cameraRef.current.jumpTo({ center: coords, zoom: 14 });
+      }
+    }
+  }, []);
 
   // Smooth zoom in/out transition when zone size is changed
   const prevRadiusRef = useRef(radius);
@@ -75,40 +127,43 @@ export default function HostAreaScreen() {
     async function initLocation() {
       try {
         setLocating(true);
-        // 1. Try cached recent location for immediate responsive camera
-        const stored = await AsyncStorage.getItem(LAST_LOCATION_KEY);
-        if (stored && active) {
-          const parsed = JSON.parse(stored) as [number, number];
-          setCenter(parsed, 'my_location');
-          cameraRef.current?.jumpTo({
-            center: parsed,
-            zoom: 14,
-          });
+
+        // Phase 1: Instant check (0ms) - cache, last known position
+        const fastCoords = await getFastestGpsCoords();
+        if (fastCoords && active) {
+          setCenter(fastCoords, 'my_location');
+          applyCameraCenter(fastCoords, false);
+          void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(fastCoords));
         }
 
-        // 2. Request live GPS fix
+        // Phase 2: Request foreground permissions if needed
         let perm = await Location.getForegroundPermissionsAsync();
         if (!perm.granted && perm.canAskAgain) {
           perm = await Location.requestForegroundPermissionsAsync();
         }
 
         if (perm.granted && active) {
-          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          if (active) {
-            const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
-            setCenter(coords, 'my_location');
-            if (stored) {
-              cameraRef.current?.flyTo({
-                center: coords,
-                zoom: 14,
-                duration: 500,
-              });
-            } else {
-              cameraRef.current?.jumpTo({
-                center: coords,
-                zoom: 14,
-              });
+          // If we didn't have fast coords, try getLastKnownPositionAsync again now that permission is verified
+          if (!fastCoords) {
+            const last = await Location.getLastKnownPositionAsync({ maxAge: 86400000 });
+            if (last?.coords && active) {
+              const coords: [number, number] = [last.coords.longitude, last.coords.latitude];
+              setCenter(coords, 'my_location');
+              applyCameraCenter(coords, false);
+              void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
             }
+          }
+
+          // Phase 3: Background live GPS lock with a 3.5s maximum timeout
+          const livePos = await Promise.race([
+            Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500)),
+          ]);
+
+          if (livePos?.coords && active) {
+            const coords: [number, number] = [livePos.coords.longitude, livePos.coords.latitude];
+            setCenter(coords, 'my_location');
+            applyCameraCenter(coords, true);
             void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
           }
         }
@@ -122,7 +177,7 @@ export default function HostAreaScreen() {
     return () => {
       active = false;
     };
-  }, [setCenter]);
+  }, [setCenter, applyCameraCenter]);
 
   // Ensure default target or jail exists and stays inside the zone
   useEffect(() => {
@@ -208,69 +263,55 @@ export default function HostAreaScreen() {
   const handleRecenterGps = async () => {
     triggerHaptic('buttonTap');
     setPlacementError('');
+    setLocating(true);
 
-    // Phase 1: Instant 0ms snap from last known / cached location
     try {
-      const lastPos = await Location.getLastKnownPositionAsync();
-      if (lastPos) {
-        const instantCoords: [number, number] = [lastPos.coords.longitude, lastPos.coords.latitude];
-        setCenter(instantCoords, 'my_location');
-        cameraRef.current?.jumpTo({
-          center: instantCoords,
-          zoom: 14,
-        });
+      // Step 1: 0ms INSTANT snap using fastest available coordinate
+      const fastCoords = await getFastestGpsCoords();
+      if (fastCoords) {
+        setCenter(fastCoords, 'my_location');
+        applyCameraCenter(fastCoords, false);
         if (needsTarget) {
-          setPlacement('target', [instantCoords[0] + 0.0018, instantCoords[1] + 0.0018]);
+          setPlacement('target', [fastCoords[0] + 0.0018, fastCoords[1] + 0.0018]);
         }
         if (needsJail) {
-          setPlacement('jail', [instantCoords[0], instantCoords[1] + 0.0018]);
+          setPlacement('jail', [fastCoords[0], fastCoords[1] + 0.0018]);
         }
-      } else {
-        const stored = await AsyncStorage.getItem(LAST_LOCATION_KEY);
-        if (stored) {
-          const cachedCoords = JSON.parse(stored) as [number, number];
-          setCenter(cachedCoords, 'my_location');
-          cameraRef.current?.jumpTo({
-            center: cachedCoords,
-            zoom: 14,
-          });
-        }
+        triggerHaptic('tagConfirmed');
       }
-    } catch {
-      // Non-fatal, proceed to live GPS
-    }
 
-    // Phase 2: Live GPS lock in background
-    try {
-      setLocating(true);
+      // Step 2: Ensure permissions
       let perm = await Location.getForegroundPermissionsAsync();
-      if (!perm.granted) {
+      if (!perm.granted && perm.canAskAgain) {
         perm = await Location.requestForegroundPermissionsAsync();
       }
       if (!perm.granted) {
-        setPlacementError('Location permission required to recenter on GPS.');
-        triggerHaptic('error');
+        if (!fastCoords) {
+          setPlacementError('Location permission required to recenter on GPS.');
+          triggerHaptic('error');
+        }
+        setLocating(false);
         return;
       }
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
 
-      setCenter(coords, 'my_location');
-      cameraRef.current?.jumpTo({
-        center: coords,
-        zoom: 14,
-      });
+      // Step 3: Fast race for live position with a 2.5s maximum timeout
+      const livePos = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+      ]);
 
-      // Keep target/jail aligned with user location
-      if (needsTarget) {
-        setPlacement('target', [coords[0] + 0.0018, coords[1] + 0.0018]);
+      if (livePos?.coords?.longitude && livePos?.coords?.latitude) {
+        const coords: [number, number] = [livePos.coords.longitude, livePos.coords.latitude];
+        setCenter(coords, 'my_location');
+        applyCameraCenter(coords, true);
+        if (needsTarget) {
+          setPlacement('target', [coords[0] + 0.0018, coords[1] + 0.0018]);
+        }
+        if (needsJail) {
+          setPlacement('jail', [coords[0], coords[1] + 0.0018]);
+        }
+        void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
       }
-      if (needsJail) {
-        setPlacement('jail', [coords[0], coords[1] + 0.0018]);
-      }
-
-      void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
-      triggerHaptic('tagConfirmed');
     } catch (err: unknown) {
       setPlacementError(err instanceof Error ? err.message : 'Could not acquire GPS location.');
       triggerHaptic('error');
@@ -287,6 +328,16 @@ export default function HostAreaScreen() {
         compass={false}
         logo={false}
         mapStyle={isDark ? DARK_MAP_STYLE : DAY_MAP_STYLE}
+        onDidFinishLoadingStyle={() => {
+          mapLoadedRef.current = true;
+          if (pendingCameraTargetRef.current && cameraRef.current) {
+            cameraRef.current.jumpTo({
+              center: pendingCameraTargetRef.current,
+              zoom: 14,
+            });
+            pendingCameraTargetRef.current = null;
+          }
+        }}
         onPress={handleMapPress}
         style={StyleSheet.absoluteFill}
       >
