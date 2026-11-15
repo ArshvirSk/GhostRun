@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-15  
 **Artifact:** `release/GhostRun-v2.9.0.apk`  
-**Size:** 56,563,148 bytes (53.94 MB)  
-**SHA-256 Checksum:** `DD0F82523D3D47524F2CA3867B86CF71EC4830AF425277141F3773A9C9BBFBCD`  
+**Size:** 56,568,552 bytes (53.95 MB)  
+**SHA-256 Checksum:** `2DF45F6CAAAEFFC3201E37DA0D6F14CCC452C4A75DB6DC0FE303FED52487D383`  
 **Version:** `2.9.0`  
 **VersionCode:** `15`  
 **Architecture:** `arm64-v8a`  
@@ -38,12 +38,18 @@ GhostRun **v2.9.0** introduces the game-changing **Extreme / Blackout** difficul
   - Distance readouts strictly follow the operative's preference configured in Settings (**metric** `m`/`km` or **imperial** `ft`/`mi` via `formatDistance`).
 - **Interactive Radar Scale:**
   - Operatives can toggle between 150m, 300m, 600m, and 1200m range views via bottom selector chips.
+- **Database Boundary Penalty Validation:**
+  - Applied migration `20261118029000_nf09_boundary_rules.sql` to live Supabase database, updating `games_boundary_penalty_check` to permit `'reveal_live'` and `'auto_tag'`. Completely resolves the `game settings invalid. check allowed ranges` error when creating Blackout missions.
 
 ### 2. Zone Creation & Area Setup Enhancements
 - **Free Tap Repositioning (`app/host/area.tsx`):**
   - Operatives can tap anywhere on the map to immediately recenter and place the boundary perimeter without needing to tap inside an existing zone circle.
-- **Instantaneous Recenter Snap & Detached Control:**
-  - Fast-path 0ms GPS snap via Android fused location cache (`getLastKnownPositionAsync`) and zero-lag camera snap (`jumpTo`), followed by background live lock.
+- **Eliminated USA Coordinates Fallback & Instant Opening:**
+  - Removed legacy hardcoded Kansas, USA coordinates (`[-97, 38]`).
+  - Added boot-time persistent storage hydration and Step 1 background GPS pre-fetching so the operative's true coordinates are ready before reaching the map screen.
+  - Hooked MapLibre's `onDidFinishLoadingStyle` event to immediately snap the camera to the operative's position as soon as vector tiles finish rendering.
+- **Instantaneous 0ms Recenter Snap & Detached Control:**
+  - Implemented a rapid 4-tier GPS resolution cascade (OS Fused Location Cache `<5ms` -> Persistent Cache `<10ms` -> Fast network fix `<=1500ms` -> background satellite refinement). Eliminated hardware GPS lock hangs.
   - Floating recenter FAB elevated with a clean 25px airspace above the bottom Continue button dock, eliminating overlap.
 - **Smooth Zone Size Camera Transitions:**
   - Changing zone radius activates dynamic camera animations (`easeTo` 500ms) with auto-calculated altitude zoom (`getZoomForRadius`).
