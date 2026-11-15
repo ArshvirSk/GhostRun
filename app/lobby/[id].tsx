@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   Share,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,6 +28,9 @@ import { useUnits } from '../../src/utils/units';
 import { supabase } from '../../src/lib/supabase';
 import { ReadyCheckModal } from '../../src/components/ReadyCheckModal';
 import { LobbyInviteModal } from '../../src/components/LobbyInviteModal';
+import { LobbyExitConfirmModal } from '../../src/components/LobbyExitConfirmModal';
+import { LobbyPrivacyModal } from '../../src/components/LobbyPrivacyModal';
+import { triggerHaptic } from '../../src/motion/haptics';
 import { buildInvitePayload } from '../../src/lib/invite';
 import { pregenerateQrUri } from '../../src/lib/qrCache';
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from '../../src/lib/map';
@@ -104,7 +109,11 @@ export default function LobbyScreen() {
   const { formatDistance } = useUnits();
   const gameId = Array.isArray(id) ? id[0] : id;
 
-  const [activeSegment, setActiveSegment] = useState('roster');
+  const { width: screenWidth } = useWindowDimensions();
+  const pagerRef = useRef<any>(null);
+  const [activeSegment, setActiveSegment] = useState<'roster' | 'rules' | 'map'>('roster');
+  const [exitConfirmModalVisible, setExitConfirmModalVisible] = useState(false);
+  const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [state, setState] = useState<LobbyState | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState('');
@@ -547,24 +556,16 @@ export default function LobbyScreen() {
   }
 
   function handleExitLobby() {
+    triggerHaptic('buttonTap');
+    setExitConfirmModalVisible(true);
+  }
+
+  function handleConfirmExit() {
+    setExitConfirmModalVisible(false);
     if (isHost) {
-      Alert.alert(
-        'Cancel Mission?',
-        'As the host, leaving will cancel this mission and disband the lobby for all operatives.',
-        [
-          { text: 'Keep Lobby', style: 'cancel' },
-          { text: 'Cancel Mission', style: 'destructive', onPress: () => void cancelGame() },
-        ]
-      );
+      void cancelGame();
     } else {
-      Alert.alert(
-        'Leave Lobby?',
-        'Are you sure you want to leave this mission lobby?',
-        [
-          { text: 'Stay', style: 'cancel' },
-          { text: 'Leave', style: 'destructive', onPress: () => void leaveLobby() },
-        ]
-      );
+      void leaveLobby();
     }
   }
 
@@ -724,21 +725,48 @@ export default function LobbyScreen() {
   }
 
   function handleTogglePrivacy() {
-    Alert.alert(
-      'Post-Match Route Privacy',
-      'Choose whether opponents can inspect your movement trail during post-match replays.',
-      [
-        {
-          text: 'Share with Crew',
-          onPress: () => void chooseShare(true),
-        },
-        {
-          text: 'Keep Private (Default)',
-          onPress: () => void chooseShare(false),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    triggerHaptic('buttonTap');
+    setPrivacyModalVisible(true);
+  }
+
+  function handleSelectPrivacyOption(share: boolean) {
+    setPrivacyModalVisible(false);
+    void chooseShare(share);
+  }
+
+  const TAB_SEGMENTS: Array<'roster' | 'rules' | 'map'> = ['roster', 'rules', 'map'];
+
+  function handleTabPress(segment: 'roster' | 'rules' | 'map') {
+    triggerHaptic('buttonTap');
+    setActiveSegment(segment);
+    const index = TAB_SEGMENTS.indexOf(segment);
+    if (index !== -1 && pagerRef.current) {
+      pagerRef.current.scrollTo({ x: index * screenWidth, animated: true });
+    }
+  }
+
+  function handlePagerScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const pageIndex = Math.round(offsetX / screenWidth);
+    const safeIndex = Math.max(0, Math.min(TAB_SEGMENTS.length - 1, pageIndex));
+    const nextSegment = TAB_SEGMENTS[safeIndex];
+    if (nextSegment && nextSegment !== activeSegment) {
+      triggerHaptic('buttonTap');
+      setActiveSegment(nextSegment);
+    }
+  }
+
+  function handleScrollEndDrag(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    if (Math.abs(e.nativeEvent.velocity?.x || 0) < 0.1) {
+      const offsetX = e.nativeEvent.contentOffset.x;
+      const pageIndex = Math.round(offsetX / screenWidth);
+      const safeIndex = Math.max(0, Math.min(TAB_SEGMENTS.length - 1, pageIndex));
+      const nextSegment = TAB_SEGMENTS[safeIndex];
+      if (nextSegment && nextSegment !== activeSegment) {
+        triggerHaptic('buttonTap');
+        setActiveSegment(nextSegment);
+      }
+    }
   }
 
   const ownPlayer = state.players.find((p) => p.id === state.my_player_id);
@@ -748,16 +776,15 @@ export default function LobbyScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
+      {/* FIXED TOP HEADER */}
+      <View
+        style={[
+          styles.fixedTopHeader,
           {
-            paddingHorizontal: spacing.lg,
             paddingTop: Math.max(insets.top, 16) + 8,
-            paddingBottom: Math.max(insets.bottom, 16) + 210,
+            paddingHorizontal: spacing.lg,
           },
         ]}
-        showsVerticalScrollIndicator={false}
       >
         {/* Top Navigation Bar with Back / Leave Button */}
         <View style={styles.topNavRow}>
@@ -787,12 +814,18 @@ export default function LobbyScreen() {
           </View>
         </View>
 
-        {/* Mission Code Bar (Compact Single-Row Pill + 2 Square Icon Buttons) */}
+        {/* Mission Code Bar (Bold bare text without box + Share & QR Icon Buttons) */}
         <View style={styles.compactCodeBar}>
-          <View style={[styles.codePill, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
-            <Text style={styles.codePillLabel}>CODE: </Text>
-            <Text style={styles.codePillValue}>{state.game.code}</Text>
-          </View>
+          <Pressable
+            onPress={() => void shareCode()}
+            style={styles.codeTextContainer}
+            accessibilityRole="button"
+            accessibilityLabel={`Room code ${state.game.code}`}
+          >
+            <Text style={styles.codeLabelPrefix}>CODE: </Text>
+            <Text style={styles.codeValueBold}>{state.game.code}</Text>
+          </Pressable>
+
           <View style={styles.codeIconButtons}>
             <Pressable
               accessibilityRole="button"
@@ -825,7 +858,7 @@ export default function LobbyScreen() {
         {bannerMessage !== '' && (
           <Card
             variant="elevated"
-            style={[styles.bannerCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.warning, marginTop: 8 }]}
+            style={[styles.bannerCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.warning, marginTop: 6 }]}
           >
             <Text variant="body" style={{ color: colors.warning, fontSize: 13 }}>
               {bannerMessage}
@@ -836,7 +869,7 @@ export default function LobbyScreen() {
         {errorMessage !== '' && (
           <Card
             variant="elevated"
-            style={[styles.bannerCard, { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder, marginTop: 8 }]}
+            style={[styles.bannerCard, { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder, marginTop: 6 }]}
           >
             <Text variant="body" style={{ color: colors.dangerText, fontSize: 13 }}>
               {errorMessage}
@@ -847,15 +880,15 @@ export default function LobbyScreen() {
         {/* Underline Tab Bar (ROSTER | RULES | AREA) */}
         <View style={styles.underlineTabBar}>
           {[
-            { id: 'roster', label: `ROSTER (${activePlayers.length})` },
-            { id: 'rules', label: 'RULES' },
-            { id: 'map', label: 'AREA' },
+            { id: 'roster' as const, label: `ROSTER (${activePlayers.length})` },
+            { id: 'rules' as const, label: 'RULES' },
+            { id: 'map' as const, label: 'AREA' },
           ].map((tab) => {
             const isActive = activeSegment === tab.id;
             return (
               <Pressable
                 key={tab.id}
-                onPress={() => setActiveSegment(tab.id)}
+                onPress={() => handleTabPress(tab.id)}
                 style={styles.underlineTabItem}
               >
                 <Text
@@ -873,10 +906,35 @@ export default function LobbyScreen() {
             );
           })}
         </View>
+      </View>
 
-        {/* ==================== SEGMENT 1: ROSTER ==================== */}
-        {activeSegment === 'roster' && (
-          <View style={{ gap: 8 }}>
+      {/* HORIZONTAL SWIPABLE PAGER */}
+      <ScrollView
+        ref={pagerRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={handlePagerScrollEnd}
+        onScrollEndDrag={handleScrollEndDrag}
+        style={styles.horizontalPager}
+      >
+        {/* ==================== PAGE 1: ROSTER ==================== */}
+        <View style={{ width: screenWidth, flex: 1 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+            contentContainerStyle={[
+              styles.tabContentScroll,
+              {
+                paddingHorizontal: spacing.lg,
+                paddingBottom: Math.max(insets.bottom, 12) + 120,
+              },
+            ]}
+          >
+            <View style={{ gap: 8 }}>
             {/* Quick Status Row: 🔒 Privacy: Keep Private • 📡 GPS Ready */}
             <View style={styles.quickStatusRow}>
               <Pressable
@@ -1200,12 +1258,24 @@ export default function LobbyScreen() {
                 )}
               </View>
             )}
-          </View>
-        )}
+            </View>
+          </ScrollView>
+        </View>
 
-        {/* ==================== SEGMENT 2: RULES & INTEL ==================== */}
-        {activeSegment === 'rules' && (
-          <View style={{ gap: 12, marginTop: 4 }}>
+        {/* ==================== PAGE 2: RULES ==================== */}
+        <View style={{ width: screenWidth, flex: 1 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+            contentContainerStyle={[
+              styles.tabContentScroll,
+              {
+                paddingHorizontal: spacing.lg,
+                paddingBottom: Math.max(insets.bottom, 12) + 120,
+              },
+            ]}
+          >
+            <View style={{ gap: 12, marginTop: 4 }}>
             {/* GAME MODE CARD */}
             <View style={[styles.rulesSectionCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
               <Text style={styles.rulesCardCaption}>GAME MODE</Text>
@@ -1343,21 +1413,36 @@ export default function LobbyScreen() {
                 )}
               </Card>
             )}
-          </View>
-        )}
+            </View>
+          </ScrollView>
+        </View>
 
-        {/* ==================== SEGMENT 3: TACTICAL AREA ==================== */}
-        {activeSegment === 'map' && (
-          <View style={{ gap: 12, marginTop: 4 }}>
-            {/* EMBEDDED INTERACTIVE MAP PREVIEW CARD */}
-            <View style={[styles.mapContainerCard, { borderColor: 'rgba(167, 139, 250, 0.4)' }]}>
-              <MapLibreMap
-                style={StyleSheet.absoluteFill}
-                mapStyle={DARK_MAP_STYLE}
-                compass={false}
-                logo={false}
-                attribution={false}
-              >
+        {/* ==================== PAGE 3: AREA ==================== */}
+        <View style={{ width: screenWidth, flex: 1 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+            contentContainerStyle={[
+              styles.tabContentScroll,
+              {
+                paddingHorizontal: spacing.lg,
+                paddingBottom: Math.max(insets.bottom, 12) + 120,
+              },
+            ]}
+          >
+            <View style={{ gap: 12, marginTop: 4 }}>
+              {/* EMBEDDED INTERACTIVE MAP PREVIEW CARD */}
+              <View style={[styles.mapContainerCard, { borderColor: 'rgba(167, 139, 250, 0.4)' }]}>
+                <MapLibreMap
+                  style={StyleSheet.absoluteFill}
+                  mapStyle={DARK_MAP_STYLE}
+                  compass={false}
+                  logo={false}
+                  attribution={false}
+                  dragPan={false}
+                  touchRotate={false}
+                  touchPitch={false}
+                >
                 <Camera
                   ref={cameraRef}
                   initialViewState={{ center: centerCoords, zoom: mapZoom }}
@@ -1588,8 +1673,9 @@ export default function LobbyScreen() {
                 )}
               </Card>
             )}
-          </View>
-        )}
+            </View>
+          </ScrollView>
+        </View>
       </ScrollView>
 
       {/* ==================== FIXED BOTTOM ACTION DOCK ==================== */}
@@ -1688,6 +1774,21 @@ export default function LobbyScreen() {
         modeId={state?.game.mode_id}
         playerCount={state?.players.length}
         onClose={() => setInviteModalVisible(false)}
+      />
+
+      <LobbyExitConfirmModal
+        visible={exitConfirmModalVisible}
+        isHost={isHost}
+        onConfirm={handleConfirmExit}
+        onCancel={() => setExitConfirmModalVisible(false)}
+        busy={busyAction === 'cancel' || busyAction === 'leave'}
+      />
+
+      <LobbyPrivacyModal
+        visible={privacyModalVisible}
+        shareWithCrew={shareChoice === true}
+        onSelectOption={handleSelectPrivacyOption}
+        onClose={() => setPrivacyModalVisible(false)}
       />
     </View>
   );
@@ -1849,30 +1950,41 @@ const styles = StyleSheet.create({
   compactCodeBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 4,
+    justifyContent: 'space-between',
+    marginTop: 6,
+    marginBottom: 4,
   },
-  codePill: {
-    flex: 1,
-    height: 42,
-    borderRadius: 10,
-    borderWidth: 1,
+  codeTextContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
+    alignItems: 'baseline',
+    gap: 4,
+    paddingVertical: 4,
   },
-  codePillLabel: {
+  codeLabelPrefix: {
     color: '#8E8E93',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontSize: 13,
+    fontFamily: 'Archivo-Bold',
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
-  codePillValue: {
+  codeValueBold: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 26,
+    fontFamily: 'Archivo-Bold',
     fontWeight: '900',
-    letterSpacing: 2,
-    marginLeft: 4,
+    letterSpacing: 2.5,
+  },
+  fixedTopHeader: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: '#0F0F14',
+    zIndex: 10,
+  },
+  horizontalPager: {
+    flex: 1,
+  },
+  tabContentScroll: {
+    paddingTop: 10,
   },
   codeIconButtons: {
     flexDirection: 'row',

@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-15  
 **Artifact:** `release/GhostRun-v2.9.0.apk`  
-**Size:** 56,583,316 bytes (53.96 MB)  
-**SHA-256 Checksum:** `69E7E9059BD0F094E91A360404B64BF2E1CA82B6C5C27412F54F87EB7DAB836E`  
+**Size:** 56,591,024 bytes (53.97 MB)  
+**SHA-256 Checksum:** `63631B71316E9B0A95C624B3244218ADCBE47082C6A4569A863054BA1FC924D5`  
 **Version:** `2.9.0`  
 **VersionCode:** `15`  
 **Architecture:** `arm64-v8a`  
@@ -64,8 +64,18 @@ GhostRun **v2.9.0** introduces the game-changing **Extreme / Blackout** difficul
   - Verified with dedicated test suite `scripts/test-rules-presets.ts`.
 
 ### 4. Mission Lobby 3-Tab UI & Layout Optimization (`app/lobby/[id].tsx`)
-- **Single-Row Compact Code Bar:**
-  - Elongated dark pill container with `CODE: {code}` (letterSpacing 2) alongside two 42x42 square icon buttons: `[ ⇪ ]` Share and `[ ☵ ]` QR code modal.
+- **Bare Bold Room Code Bar:**
+  - Removed the pill box border and background from around the room code (`CODE: {code}`) for clean, open presentation.
+  - Rendered with bold `Archivo-Bold` display typography (26px, letter spacing 2.5) while preserving the adjacent Share `[ ⇪ ]` and QR `[ ☵ ]` square icon button containers.
+- **Horizontal Thumb-Swipable Tab Pager:**
+  - Integrated a native horizontal paging pager (`ScrollView horizontal pagingEnabled`) allowing operatives to seamlessly swipe left and right with their thumb between **ROSTER**, **RULES**, and **AREA**.
+  - Synchronized with header tab navigation: swiping updates the active purple underline indicator, while tapping any tab header smoothly animates the pager to that section.
+  - Preserved directional scroll locking with independent vertical scrolling inside each tab and dedicated padding above the bottom action dock.
+  - Disabled gesture panning on the Tactical Area map preview (`dragPan={false}`) so horizontal thumb swipes work across the entire area screen without map interference.
+- **Custom Cyber-Tactical Popups:**
+  - Completely replaced generic Android system `Alert.alert` dialogs with bespoke tactical modals:
+    - **Mission Exit & Disband Modal (`LobbyExitConfirmModal.tsx`):** Displays amber/red tactical protocol badges (`HOST DISBAND PROTOCOL` or `OPERATIVE DEPARTURE`), bold header, explanatory body, and high-visibility destructive actions.
+    - **Post-Match Route Privacy Modal (`LobbyPrivacyModal.tsx`):** Features interactive choice cards with custom icons and active radio dots for `Keep Private (Default)` and `Share with Crew`.
 - **Fixed Tab Header Overlap & Display Typography:**
   - Streamlined tab titles strictly to `ROSTER (N)`, `RULES`, and `AREA`.
   - Configured with `Archivo-Bold` display font and tuned letter spacing (`1.2`), preventing text wrapping and tab label collisions on narrow Android screens.
