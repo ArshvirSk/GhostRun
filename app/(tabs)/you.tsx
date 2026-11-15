@@ -24,6 +24,7 @@ import { SeasonRecapModal } from '../../src/components/SeasonRecapModal';
 import { FriendsSheet } from '../../src/components/FriendsSheet';
 import { FriendsBoardModal } from '../../src/components/FriendsBoardModal';
 import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
+import { useUserStore } from '../../src/stores/userStore';
 
 interface MatchHistoryItem {
   id: string;
@@ -41,11 +42,25 @@ export default function YouTab() {
   const insets = useSafeAreaInsets();
   const { formatDistance } = useUnits();
 
-  const [profile, setProfile] = useState<{ display_name: string; color: string } | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const storedProfile = useUserStore((s) => s.profile);
+  const [profile, setProfile] = useState<{ display_name: string; color: string } | null>(
+    () => (storedProfile ? { display_name: storedProfile.display_name, color: storedProfile.color } : null)
+  );
+  const [userId, setUserId] = useState<string | null>(() => storedProfile?.id || null);
   const [isEditing, setIsEditing] = useState(false);
-  const [draftName, setDraftName] = useState('');
-  const [draftColor, setDraftColor] = useState<string>(colors.palette[0]);
+  const [draftName, setDraftName] = useState(() => storedProfile?.display_name || '');
+  const [draftColor, setDraftColor] = useState<string>(() => storedProfile?.color || colors.palette[0]);
+
+  // Keep state synced with userStore
+  useEffect(() => {
+    if (storedProfile) {
+      setProfile({ display_name: storedProfile.display_name, color: storedProfile.color });
+      if (!isEditing) {
+        setDraftName(storedProfile.display_name);
+        setDraftColor(storedProfile.color);
+      }
+    }
+  }, [storedProfile, isEditing]);
   const [savingProfile, setSavingProfile] = useState(false);
   const [history, setHistory] = useState<MatchHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -109,7 +124,12 @@ export default function YouTab() {
         setProfile(profData);
         setDraftName(profData.display_name || '');
         setDraftColor(profData.color || colors.palette[0]);
-        await AsyncStorage.setItem('@ghostrun:profile', JSON.stringify(profData));
+        useUserStore.getState().setProfile({
+          id: authData.user.id,
+          display_name: profData.display_name,
+          color: profData.color,
+          email: authData.user.email,
+        });
       }
 
       // 3. Fetch match history
@@ -187,7 +207,7 @@ export default function YouTab() {
     try {
       const updated = { display_name: draftName.trim(), color: draftColor };
       await supabase.from('profiles').update(updated).eq('id', userId);
-      await AsyncStorage.setItem('@ghostrun:profile', JSON.stringify(updated));
+      useUserStore.getState().setProfile({ id: userId, ...updated });
       setProfile(updated);
       setIsEditing(false);
     } catch {

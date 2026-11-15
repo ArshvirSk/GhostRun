@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import QRCode from 'qrcode';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from '../ui/Text';
@@ -17,6 +16,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { triggerHaptic } from '../motion/haptics';
 import { buildInvitePayload, normalizeRoomCode } from '../lib/invite';
+import { getCachedQrUri, pregenerateQrUri } from '../lib/qrCache';
 
 interface LobbyInviteModalProps {
   visible: boolean;
@@ -37,9 +37,6 @@ export function LobbyInviteModal({
 }: LobbyInviteModalProps) {
   const { colors, spacing, radii } = useTheme();
   const cleanCode = normalizeRoomCode(code);
-  const [qrUri, setQrUri] = useState<string | null>(null);
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
 
   const payload = buildInvitePayload({
     code: cleanCode,
@@ -48,28 +45,32 @@ export function LobbyInviteModal({
     playerCount,
   });
 
+  // Pre-load from memory cache for 0ms instantaneous display
+  const [qrUri, setQrUri] = useState<string | null>(() => getCachedQrUri(payload.webLink));
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Eagerly pre-generate QR code as soon as component mounts or code is known (no waiting for modal visible)
   useEffect(() => {
     let active = true;
-    if (visible && cleanCode) {
-      QRCode.toDataURL(payload.webLink, {
-        margin: 1,
-        width: 220,
-        color: {
+    if (cleanCode && payload.webLink) {
+      const cached = getCachedQrUri(payload.webLink);
+      if (cached) {
+        setQrUri(cached);
+      } else {
+        pregenerateQrUri(payload.webLink, {
+          width: 220,
           dark: '#000000',
           light: '#FFFFFF',
-        },
-      })
-        .then((uri) => {
-          if (active) setQrUri(uri);
-        })
-        .catch(() => {
-          if (active) setQrUri(null);
+        }).then((uri) => {
+          if (active && uri) setQrUri(uri);
         });
+      }
     }
     return () => {
       active = false;
     };
-  }, [visible, cleanCode, payload.webLink]);
+  }, [cleanCode, payload.webLink]);
 
   async function handleShare() {
     triggerHaptic('buttonTap');

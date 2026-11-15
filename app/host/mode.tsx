@@ -14,6 +14,7 @@ import { RulesCard } from '../../src/ui/RulesCard';
 import { getAllBaseModes, getModeModule } from '../../src/modes/registry';
 import { useHostStore, LAST_LOCATION_KEY } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
+import { startLocationPrewarm, getInstantLocation, updateCachedLocation } from '../../src/lib/locationCache';
 
 export default function HostModeScreen() {
   const { colors, spacing } = useTheme();
@@ -30,6 +31,15 @@ export default function HostModeScreen() {
 
   // Background GPS pre-fetch as soon as host flow starts
   useEffect(() => {
+    // 0. Use instant location if already warm
+    const instant = getInstantLocation();
+    if (instant) {
+      useHostStore.getState().setCenter(instant, 'my_location');
+    }
+
+    // Start background prewarming watcher
+    void startLocationPrewarm();
+
     async function prefetchGps() {
       try {
         // 1. Try local cache first for 0ms availability
@@ -38,6 +48,7 @@ export default function HostModeScreen() {
           const parsed = JSON.parse(stored) as [number, number];
           if (Array.isArray(parsed) && parsed.length === 2) {
             useHostStore.getState().setCenter(parsed, 'my_location');
+            updateCachedLocation(parsed);
           }
         }
 
@@ -51,7 +62,7 @@ export default function HostModeScreen() {
           if (last?.coords?.longitude && last?.coords?.latitude) {
             const coords: [number, number] = [last.coords.longitude, last.coords.latitude];
             useHostStore.getState().setCenter(coords, 'my_location');
-            void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
+            updateCachedLocation(coords);
           }
 
           // 3. Refine with live GPS in background with 3.5s timeout
@@ -62,7 +73,7 @@ export default function HostModeScreen() {
             if (pos?.coords) {
               const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
               useHostStore.getState().setCenter(coords, 'my_location');
-              void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
+              updateCachedLocation(coords);
             }
           }).catch(() => {});
         }

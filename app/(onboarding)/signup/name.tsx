@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { isSupabaseConfigured, supabase } from '../../../src/lib/supabase';
 import { triggerHaptic } from '../../../src/motion/haptics';
 import { useSignupStore } from '../../../src/stores/signupStore';
+import { useUserStore } from '../../../src/stores/userStore';
 import { colors, radii, spacing } from '../../../src/theme/tokens';
 import { Button } from '../../../src/ui/Button';
 import { Card } from '../../../src/ui/Card';
@@ -62,6 +63,7 @@ export default function SignupNameScreen() {
     setError('');
     setName(trimmed);
     setColor(selectedColor);
+    useUserStore.getState().setProfile({ display_name: trimmed, color: selectedColor });
     triggerHaptic('buttonTap');
 
     // If operative is already authenticated (e.g. from Google Sign-In), skip account creation

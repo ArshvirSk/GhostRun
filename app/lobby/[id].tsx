@@ -27,6 +27,7 @@ import { supabase } from '../../src/lib/supabase';
 import { ReadyCheckModal } from '../../src/components/ReadyCheckModal';
 import { LobbyInviteModal } from '../../src/components/LobbyInviteModal';
 import { buildInvitePayload } from '../../src/lib/invite';
+import { pregenerateQrUri } from '../../src/lib/qrCache';
 import {
   runTrackingHealthDiagnostic,
   type TrackingHealthReport,
@@ -266,6 +267,21 @@ export default function LobbyScreen() {
     [state],
   );
 
+  const activeModule = getModeModule(state?.game.mode_id || 'classic_chase');
+
+  // Eagerly pregenerate QR Code in memory so modal opens with 0ms delay
+  useEffect(() => {
+    if (state?.game?.code) {
+      const payload = buildInvitePayload({
+        code: state.game.code,
+        modeId: state.game.mode_id,
+        modeName: activeModule?.name,
+        playerCount: activePlayers.length,
+      });
+      void pregenerateQrUri(payload.webLink);
+    }
+  }, [state?.game?.code, state?.game?.mode_id, activePlayers.length, activeModule?.name]);
+
   const isSoloMode = state?.game.mode_id === 'ghost_duel' || state?.game.mode_id === 'assassin_ring';
   const isJailbreak = state?.game.mode_id === 'jailbreak';
   const isRelayHeist = state?.game.mode_id === 'relay_heist';
@@ -285,8 +301,6 @@ export default function LobbyScreen() {
 
   const jailPlaced = Boolean(state?.game.jail);
   const canStart = hasBothTeams && everyoneAssigned && (!isJailbreak || jailPlaced);
-
-  const activeModule = getModeModule(state?.game.mode_id || 'classic_chase');
 
   // Ensure push notifications and location permissions are ready before match begins
   const ensureGamePermissions = useCallback(async () => {

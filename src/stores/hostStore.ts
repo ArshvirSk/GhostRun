@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getModeModule } from '../modes/registry';
 
+export const LAST_LOCATION_KEY = '@ghostrun:last_location_coords';
+
 export type PresetType = 'casual' | 'standard' | 'hardcore' | 'blackout' | 'custom';
 export type BoundaryPenalty = 'warn' | 'extra_ping' | 'reveal_live' | 'auto_tag';
 
@@ -106,7 +108,6 @@ export const PRESET_VALUES: Record<'casual' | 'standard' | 'hardcore' | 'blackou
   },
 };
 
-export const LAST_LOCATION_KEY = '@ghostrun:last_location_coords';
 const DEFAULT_CENTER: [number, number] = [77.2090, 28.6139];
 
 export const useHostStore = create<HostState>((set, get) => ({

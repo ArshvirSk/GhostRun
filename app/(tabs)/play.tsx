@@ -19,6 +19,8 @@ import { supabase } from '../../src/lib/supabase';
 import { fetchActiveSeasonAndBanners, ActiveSeasonData } from '../../src/lib/seasons';
 import { getFriendsHosting } from '../../src/lib/friends';
 import { HostPresence } from '../../src/lib/friendsCore';
+import { useUserStore } from '../../src/stores/userStore';
+import { startLocationPrewarm } from '../../src/lib/locationCache';
 
 const GHOSTRUN_MARK_MINT = require('../../assets/ghostrun-mark-mint.png');
 const GHOSTRUN_MARK_OLIVE = require('../../assets/ghostrun-mark-olive.png');
@@ -35,24 +37,32 @@ export default function PlayScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
 
-  const [displayName, setDisplayName] = useState<string>('Alphaop');
+  const storedProfile = useUserStore((s) => s.profile);
+  const [displayName, setDisplayName] = useState<string>(
+    () => storedProfile?.display_name || 'Operative'
+  );
   const [activeGame, setActiveGame] = useState<ActiveGamePill | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [seasonData, setSeasonData] = useState<ActiveSeasonData | null>(null);
   const [friendsHosting, setFriendsHosting] = useState<HostPresence[]>([]);
 
+  // Keep displayName synced instantly whenever userStore updates
+  useEffect(() => {
+    if (storedProfile?.display_name) {
+      setDisplayName(storedProfile.display_name);
+    }
+  }, [storedProfile?.display_name]);
+
+  // Pre-warm GPS coordinates in background as soon as user opens Play screen
+  useEffect(() => {
+    void startLocationPrewarm();
+  }, []);
+
   const loadProfileAndActiveGame = useCallback(async () => {
-    // 1. Try local cached profile first for instant rendering
-    try {
-      const cached = await AsyncStorage.getItem('@ghostrun:profile');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed.display_name) {
-          setDisplayName(parsed.display_name);
-        }
-      }
-    } catch {
-      // ignore
+    // 1. Instant rendering from userStore / local cache
+    const currentName = useUserStore.getState().profile?.display_name;
+    if (currentName) {
+      setDisplayName(currentName);
     }
 
     // 2. Fetch fresh profile & active games from Supabase
@@ -77,6 +87,12 @@ export default function PlayScreen() {
 
       if (profile?.display_name) {
         setDisplayName(profile.display_name);
+        useUserStore.getState().setProfile({
+          id: userData.user.id,
+          display_name: profile.display_name,
+          color: profile.color,
+          email: userData.user.email,
+        });
       }
 
       if (activePlayers && activePlayers.length > 0) {

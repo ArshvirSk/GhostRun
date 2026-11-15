@@ -15,6 +15,8 @@ import {
 
 import { PRIVACY_VERSION } from '../src/lib/privacy';
 import { isSupabaseConfigured, supabase } from '../src/lib/supabase';
+import { useUserStore } from '../src/stores/userStore';
+import { startLocationPrewarm } from '../src/lib/locationCache';
 
 const GHOSTRUN_LOGO = require('../assets/splash-mark.png');
 
@@ -43,12 +45,10 @@ export default function SplashScreen() {
     }
 
     try {
-      const minDisplayPromise = new Promise((resolve) => setTimeout(resolve, 350));
-      const sessionPromise = supabase.auth.getSession();
-
-      const [, sessionRes] = await Promise.all([
-        minDisplayPromise,
-        sessionPromise,
+      // Parallelize session check and cached onboarding check for instantaneous boot
+      const [sessionRes, onboardedVal] = await Promise.all([
+        supabase.auth.getSession(),
+        AsyncStorage.getItem('@ghostrun:onboarded'),
       ]);
 
       if (sessionRes.error) {
@@ -63,27 +63,41 @@ export default function SplashScreen() {
         return;
       }
 
-      // Check profile completion
-      setStatusMessage('Loading…');
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', sessionRes.data.session.user.id)
-        .maybeSingle();
+      const userId = sessionRes.data.session.user.id;
 
-      if (profileError) {
+      // Start background GPS pre-warming immediately so coordinates are hot for matches
+      void startLocationPrewarm();
+
+      // Parallelize profile verification and consents check
+      const [profileRes, consentsRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, display_name, color')
+          .eq('id', userId)
+          .maybeSingle(),
+        supabase.rpc('get_my_consents'),
+      ]);
+
+      if (profileRes.error) {
         setHasError(true);
-        setErrorMessage(`Could not load your profile: ${profileError.message}`);
+        setErrorMessage(`Could not load your profile: ${profileRes.error.message}`);
         return;
       }
 
-      if (!profile) {
+      if (!profileRes.data) {
         router.replace('/signup/name' as any);
         return;
       }
 
+      // Sync userStore immediately
+      useUserStore.getState().setProfile({
+        id: profileRes.data.id,
+        display_name: profileRes.data.display_name || 'Operative',
+        color: profileRes.data.color,
+        email: sessionRes.data.session.user.email,
+      });
+
       // If user hasn't completed safety & permissions onboarding, guide them there
-      const onboardedVal = await AsyncStorage.getItem('@ghostrun:onboarded');
       if (onboardedVal !== 'true') {
         router.replace('/signup/before-you-play' as any);
         return;
@@ -91,10 +105,8 @@ export default function SplashScreen() {
 
       // Existing players upgrade into the privacy gate: the policy must be
       // acknowledged for the current version before Home is reachable.
-      setStatusMessage('Checking permissions…');
-      const { data: consents } = await supabase.rpc('get_my_consents');
       const ack = (
-        consents as Record<
+        consentsRes.data as Record<
           string,
           { granted?: boolean; policy_version?: number } | undefined
         > | null

@@ -17,6 +17,8 @@ import { PRIVACY_SHORT_VERSION, PRIVACY_VERSION } from '../../../src/lib/privacy
 import { isSupabaseConfigured, supabase } from '../../../src/lib/supabase';
 import { triggerHaptic } from '../../../src/motion/haptics';
 import { useSignupStore } from '../../../src/stores/signupStore';
+import { useUserStore } from '../../../src/stores/userStore';
+import { startLocationPrewarm } from '../../../src/lib/locationCache';
 import { colors, radii, spacing } from '../../../src/theme/tokens';
 import { Button } from '../../../src/ui/Button';
 import { Card } from '../../../src/ui/Card';
@@ -130,10 +132,19 @@ export default function SignupBeforeYouPlayScreen() {
         }
 
         if (currentSession) {
+          const effectiveName = name.trim() || 'Operative';
+          const effectiveColor = color || colors.palette[0];
+
+          // Immediately save in local userStore and persistent storage
+          useUserStore.getState().setProfile({
+            id: currentSession.user.id,
+            display_name: effectiveName,
+            color: effectiveColor,
+            email: currentSession.user.email,
+          });
+
           // Upsert user profile if name is provided, or ensure default Operative profile exists
           if (name.trim()) {
-            const effectiveName = name.trim();
-            const effectiveColor = color || colors.palette[0];
             await client.rpc('upsert_profile', {
               name: effectiveName,
               color: effectiveColor,
@@ -148,7 +159,7 @@ export default function SignupBeforeYouPlayScreen() {
             if (!existingProfile) {
               await client.rpc('upsert_profile', {
                 name: 'Operative',
-                color: color || colors.palette[0],
+                color: effectiveColor,
               });
             }
           }
@@ -164,6 +175,9 @@ export default function SignupBeforeYouPlayScreen() {
 
       // Mark onboarding completed in AsyncStorage
       await AsyncStorage.setItem('@ghostrun:onboarded', 'true');
+
+      // Prewarm GPS coordinates immediately now that permissions are set
+      void startLocationPrewarm();
 
       triggerHaptic('roleReveal');
       setSubmitting(false);

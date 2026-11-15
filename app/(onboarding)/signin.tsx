@@ -20,6 +20,8 @@ import { PRIVACY_VERSION } from '../../src/lib/privacy';
 import { isSupabaseConfigured, supabase } from '../../src/lib/supabase';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { useSignupStore } from '../../src/stores/signupStore';
+import { useUserStore } from '../../src/stores/userStore';
+import { startLocationPrewarm } from '../../src/lib/locationCache';
 import { colors, radii, spacing } from '../../src/theme/tokens';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
@@ -44,7 +46,7 @@ export default function SigninScreen() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, display_name, color, created_at')
       .eq('id', userData.user.id)
       .maybeSingle();
 
@@ -67,6 +69,18 @@ export default function SigninScreen() {
       router.replace('/signup/name' as any);
       return;
     }
+
+    // Immediately cache user details in memory and storage so Play/You tabs have them instantly
+    useUserStore.getState().setProfile({
+      id: profile.id,
+      display_name: profile.display_name || 'Operative',
+      color: profile.color || colors.palette[0],
+      email: userData.user.email,
+      created_at: profile.created_at,
+    });
+
+    // Start GPS pre-warming immediately
+    void startLocationPrewarm();
 
     const { data: consents } = await supabase.rpc('get_my_consents');
     const ack = (
