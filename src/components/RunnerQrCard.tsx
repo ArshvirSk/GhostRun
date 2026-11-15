@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import QRCode from 'qrcode';
+import { generateQrBmpDataUrl } from '../lib/qrCache';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -45,13 +45,9 @@ export function RunnerQrCard({
       setToken(res.token);
       setErrorMsg('');
 
-      const uri = await QRCode.toDataURL(res.token, {
+      const uri = generateQrBmpDataUrl(res.token, {
         margin: 1,
-        width: 240,
-        color: {
-          dark: '#0F172A',
-          light: '#FFFFFF',
-        },
+        moduleScale: 6,
       });
       if (!mountedRef.current) return;
       setQrUri(uri);

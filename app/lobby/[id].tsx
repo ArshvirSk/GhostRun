@@ -844,12 +844,12 @@ export default function LobbyScreen() {
           </Card>
         )}
 
-        {/* Underline Tab Bar (ROSTER | RULES & INTEL | TACTICAL AREA) */}
+        {/* Underline Tab Bar (ROSTER | RULES | AREA) */}
         <View style={styles.underlineTabBar}>
           {[
             { id: 'roster', label: `ROSTER (${activePlayers.length})` },
-            { id: 'rules', label: 'RULES & INTEL' },
-            { id: 'map', label: 'TACTICAL AREA' },
+            { id: 'rules', label: 'RULES' },
+            { id: 'map', label: 'AREA' },
           ].map((tab) => {
             const isActive = activeSegment === tab.id;
             return (
@@ -859,6 +859,8 @@ export default function LobbyScreen() {
                 style={styles.underlineTabItem}
               >
                 <Text
+                  variant="label"
+                  weight="bold"
                   style={[
                     styles.underlineTabText,
                     { color: isActive ? colors.accent : colors.textMuted },
@@ -1106,7 +1108,7 @@ export default function LobbyScreen() {
                       </Text>
                     </View>
 
-                    <View style={{ gap: 6, marginTop: 4 }}>
+                    <View style={{ gap: 8, marginTop: 4 }}>
                       {unassigned.map((p) => {
                         const isSelf = p.id === state.my_player_id;
                         return (
@@ -1120,38 +1122,43 @@ export default function LobbyScreen() {
                               },
                             ]}
                           >
-                            <View style={styles.unassignedRowLeft}>
-                              <View style={[styles.avatarDotSmall, { backgroundColor: p.color || colors.primary }]} />
-                              <Text style={styles.unassignedRowName} numberOfLines={1}>
-                                {p.display_name} {isSelf ? '(YOU)' : ''}
-                              </Text>
-                              {p.user_id === state.game.host_id && (
-                                <MaterialCommunityIcons name="crown" size={14} color={colors.warning} style={{ marginLeft: 4 }} />
-                              )}
-                            </View>
-                            <View style={styles.unassignedRowRight}>
+                            <View style={styles.unassignedRowTop}>
+                              <View style={styles.unassignedRowLeft}>
+                                <View style={[styles.avatarDotSmall, { backgroundColor: p.color || colors.primary }]} />
+                                <Text style={styles.unassignedRowName} numberOfLines={1}>
+                                  {p.display_name} {isSelf ? '(YOU)' : ''}
+                                </Text>
+                                {p.user_id === state.game.host_id && (
+                                  <MaterialCommunityIcons name="crown" size={14} color={colors.warning} style={{ marginLeft: 4 }} />
+                                )}
+                              </View>
                               <Chip
                                 label={p.is_ready ? 'READY' : 'PREPARING'}
                                 variant={p.is_ready ? 'accent' : 'muted'}
                                 size="sm"
                               />
-                              {isSelf && (
-                                <View style={styles.quickJoinRow}>
-                                  <Pressable
-                                    onPress={() => void setTeam(ownPlayer!, 'runner')}
-                                    style={[styles.quickJoinBtn, { borderColor: colors.runner }]}
-                                  >
-                                    <Text style={[styles.quickJoinText, { color: colors.runner }]}>JOIN RUNNERS</Text>
-                                  </Pressable>
-                                  <Pressable
-                                    onPress={() => void setTeam(ownPlayer!, 'hunter')}
-                                    style={[styles.quickJoinBtn, { borderColor: colors.hunter }]}
-                                  >
-                                    <Text style={[styles.quickJoinText, { color: colors.hunter }]}>JOIN HUNTERS</Text>
-                                  </Pressable>
-                                </View>
-                              )}
                             </View>
+
+                            {isSelf && (
+                              <View style={styles.unassignedJoinButtonsRow}>
+                                <Pressable
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Join Runners"
+                                  onPress={() => void setTeam(ownPlayer!, 'runner')}
+                                  style={[styles.unassignedJoinBtn, { borderColor: colors.runner }]}
+                                >
+                                  <Text style={[styles.unassignedJoinText, { color: colors.runner }]}>JOIN RUNNERS</Text>
+                                </Pressable>
+                                <Pressable
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Join Hunters"
+                                  onPress={() => void setTeam(ownPlayer!, 'hunter')}
+                                  style={[styles.unassignedJoinBtn, { borderColor: colors.hunter }]}
+                                >
+                                  <Text style={[styles.unassignedJoinText, { color: colors.hunter }]}>JOIN HUNTERS</Text>
+                                </Pressable>
+                              </View>
+                            )}
                           </View>
                         );
                       })}
@@ -1440,18 +1447,6 @@ export default function LobbyScreen() {
                 </Text>
               </View>
 
-              <View style={styles.mapExtractionBadge}>
-                <View style={styles.mapExtractionDot} />
-                <Text style={styles.mapExtractionBadgeText}>EXTRACTION TARGET</Text>
-              </View>
-
-              <View style={styles.mapYouBadge}>
-                <View style={styles.mapYouAvatar}>
-                  <Ionicons name="person" size={10} color="#FFFFFF" />
-                </View>
-                <Text style={styles.mapYouBadgeText}>YOU</Text>
-              </View>
-
               {/* Map Zoom Controls (+ / -) */}
               <View style={styles.mapZoomControls}>
                 <Pressable
@@ -1613,65 +1608,65 @@ export default function LobbyScreen() {
         <View style={styles.dockPrimaryRow}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={ownPlayer?.is_ready ? 'Stand down' : 'Ready up'}
-            onPress={() => void toggleReady()}
-            style={[
-              styles.dockReadyBtn,
-              { backgroundColor: ownPlayer?.is_ready ? colors.surfaceElevated : '#CCFF00' },
-            ]}
-          >
-            <Text
-              style={[
-                styles.dockReadyBtnText,
-                { color: ownPlayer?.is_ready ? colors.accent : '#000000' },
-              ]}
-            >
-              {ownPlayer?.is_ready ? 'STAND DOWN' : 'READY UP'}
-            </Text>
-          </Pressable>
-
-          {isHost && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={state.game.mode === 'classic_chase' ? 'Select target' : 'Launch round'}
-              disabled={!canStart || !everyoneReady || busyAction !== ''}
-              onPress={() => {
+            accessibilityLabel={
+              canStart && everyoneReady && isHost
+                ? 'Launch mission'
+                : ownPlayer?.is_ready
+                ? 'Stand down'
+                : 'Ready up'
+            }
+            onPress={() => {
+              if (canStart && everyoneReady && isHost) {
                 if (state.game.mode === 'classic_chase') {
                   void continueLobby();
                 } else {
                   void startRound();
                 }
-              }}
+              } else {
+                void toggleReady();
+              }
+            }}
+            style={[
+              styles.dockReadyBtn,
+              {
+                backgroundColor:
+                  canStart && everyoneReady && isHost
+                    ? '#CCFF00'
+                    : ownPlayer?.is_ready
+                    ? colors.surfaceElevated
+                    : '#CCFF00',
+              },
+            ]}
+          >
+            <Text
               style={[
-                styles.dockLaunchBtn,
+                styles.dockReadyBtnText,
                 {
-                  backgroundColor: canStart && everyoneReady ? '#CCFF00' : '#1F1F28',
-                  borderColor: canStart && everyoneReady ? '#CCFF00' : '#2C2C38',
+                  color:
+                    canStart && everyoneReady && isHost
+                      ? '#000000'
+                      : ownPlayer?.is_ready
+                      ? colors.accent
+                      : '#000000',
                 },
               ]}
             >
-              <Text
-                style={[
-                  styles.dockLaunchBtnText,
-                  { color: canStart && everyoneReady ? '#000000' : '#6B7280' },
-                ]}
-              >
-                {state.game.mode === 'classic_chase' ? 'SELECT TARGET' : 'LAUNCH ROUND'}
-              </Text>
-              <Ionicons
-                name="sparkles"
-                size={14}
-                color={canStart && everyoneReady ? '#000000' : '#4B5563'}
-                style={{ marginLeft: 5 }}
-              />
-            </Pressable>
-          )}
+              {canStart && everyoneReady && isHost
+                ? 'LAUNCH MISSION'
+                : ownPlayer?.is_ready
+                ? 'STAND DOWN'
+                : 'READY UP'}
+            </Text>
+            {canStart && everyoneReady && isHost && (
+              <Ionicons name="rocket-outline" size={16} color="#000000" style={{ marginLeft: 6 }} />
+            )}
+          </Pressable>
         </View>
 
         <View style={styles.dockStatusRow}>
           <Text style={styles.dockStatusText}>
             {!everyoneReady
-              ? `${activePlayers.filter((p) => !p.is_ready).length} operative(s) awaiting ready status • ⚠ Requires 1 Runner & 1 Hunter`
+              ? `${activePlayers.filter((p) => !p.is_ready).length} operative(s) awaiting ready status`
               : 'ALL OPERATIVES READY • READY TO ENGAGE'}
           </Text>
         </View>
@@ -1927,9 +1922,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   underlineTabText: {
-    fontSize: 11,
+    fontSize: 12,
+    fontFamily: 'Archivo-Bold',
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 1.2,
+    textAlign: 'center',
   },
   activeUnderlineBar: {
     position: 'absolute',
@@ -2072,13 +2069,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   unassignedRow: {
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+  },
+  unassignedRowTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 6,
   },
   unassignedRowLeft: {
     flexDirection: 'row',
@@ -2086,29 +2085,29 @@ const styles = StyleSheet.create({
     gap: 6,
     flex: 1,
   },
-  unassignedRowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
   unassignedRowName: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
-  quickJoinRow: {
+  unassignedJoinButtonsRow: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 8,
+    marginTop: 4,
   },
-  quickJoinBtn: {
+  unassignedJoinBtn: {
+    flex: 1,
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    borderRadius: 8,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1A1A22',
   },
-  quickJoinText: {
-    fontSize: 9,
+  unassignedJoinText: {
+    fontSize: 11,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
   hostControlsCard: {
     padding: 12,
@@ -2236,55 +2235,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  mapExtractionBadge: {
-    position: 'absolute',
-    top: 75,
-    right: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(20, 20, 26, 0.85)',
-    borderWidth: 1,
-    borderColor: '#A3E635',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  mapExtractionDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#A3E635',
-  },
-  mapExtractionBadgeText: {
-    color: '#A3E635',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  mapYouBadge: {
-    position: 'absolute',
-    bottom: 55,
-    left: 80,
-    alignItems: 'center',
-  },
-  mapYouAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#8B5CF6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  mapYouBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
-    marginTop: 2,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowRadius: 3,
-  },
   mapZoomControls: {
     position: 'absolute',
     right: 12,
@@ -2377,24 +2327,11 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dockReadyBtnText: {
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  dockLaunchBtn: {
-    flex: 1.1,
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dockLaunchBtnText: {
+  dockReadyBtnText: {
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.5,

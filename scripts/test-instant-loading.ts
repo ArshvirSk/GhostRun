@@ -10,7 +10,7 @@ async function runTests() {
   assert.strictEqual(initialUri, null, 'Cache should be empty before generation');
 
   const generatedUri = await pregenerateQrUri(testUrl, { width: 220 });
-  assert.ok(generatedUri && generatedUri.startsWith('data:image/png;base64,'), 'QR data URL should be generated');
+  assert.ok(generatedUri && (generatedUri.startsWith('data:image/bmp;base64,') || generatedUri.startsWith('data:image/png;base64,')), 'QR data URL should be generated');
 
   // Synchronous 0ms retrieval from cache
   const instantQr = getCachedQrUri(testUrl);

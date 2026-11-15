@@ -16,7 +16,7 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { triggerHaptic } from '../motion/haptics';
 import { buildInvitePayload, normalizeRoomCode } from '../lib/invite';
-import { getCachedQrUri, pregenerateQrUri } from '../lib/qrCache';
+import { getCachedQrUri, getOrCreateQrUri, pregenerateQrUri } from '../lib/qrCache';
 
 interface LobbyInviteModalProps {
   visible: boolean;
@@ -45,31 +45,18 @@ export function LobbyInviteModal({
     playerCount,
   });
 
-  // Pre-load from memory cache for 0ms instantaneous display
-  const [qrUri, setQrUri] = useState<string | null>(() => getCachedQrUri(payload.webLink));
+  // Pre-load or synchronously generate QR code with 0ms delay (no waiting or spinner)
+  const [qrUri, setQrUri] = useState<string | null>(() => {
+    return cleanCode ? getOrCreateQrUri(payload.webLink) : null;
+  });
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Eagerly pre-generate QR code as soon as component mounts or code is known (no waiting for modal visible)
   useEffect(() => {
-    let active = true;
     if (cleanCode && payload.webLink) {
-      const cached = getCachedQrUri(payload.webLink);
-      if (cached) {
-        setQrUri(cached);
-      } else {
-        pregenerateQrUri(payload.webLink, {
-          width: 220,
-          dark: '#000000',
-          light: '#FFFFFF',
-        }).then((uri) => {
-          if (active && uri) setQrUri(uri);
-        });
-      }
+      const uri = getOrCreateQrUri(payload.webLink);
+      if (uri) setQrUri(uri);
     }
-    return () => {
-      active = false;
-    };
   }, [cleanCode, payload.webLink]);
 
   async function handleShare() {

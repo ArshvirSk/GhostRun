@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-15  
 **Artifact:** `release/GhostRun-v2.9.0.apk`  
-**Size:** 56,584,700 bytes (53.96 MB)  
-**SHA-256 Checksum:** `82672E0991B9EADD38647CDBA9288A9D9ABA9339E8C76BEA781DBC63447FACE7`  
+**Size:** 56,583,316 bytes (53.96 MB)  
+**SHA-256 Checksum:** `69E7E9059BD0F094E91A360404B64BF2E1CA82B6C5C27412F54F87EB7DAB836E`  
 **Version:** `2.9.0`  
 **VersionCode:** `15`  
 **Architecture:** `arm64-v8a`  
@@ -63,25 +63,33 @@ GhostRun **v2.9.0** introduces the game-changing **Extreme / Blackout** difficul
   - Adjusting any rule stepper (Head Start, Round Duration, Ping Cadence, Tag Radius, Boundary Excursion Penalty, or Mode Parameters) immediately unhighlights all presets and displays a tactical `CUSTOM` badge.
   - Verified with dedicated test suite `scripts/test-rules-presets.ts`.
 
-### 4. Mission Lobby 3-Tab UI Redesign (`app/lobby/[id].tsx`)
+### 4. Mission Lobby 3-Tab UI & Layout Optimization (`app/lobby/[id].tsx`)
 - **Single-Row Compact Code Bar:**
   - Elongated dark pill container with `CODE: {code}` (letterSpacing 2) alongside two 42x42 square icon buttons: `[ ⇪ ]` Share and `[ ☵ ]` QR code modal.
-- **Purple Underline Tab Navigation:**
-  - Modern horizontal tabs: `ROSTER (N)`, `RULES & INTEL`, and `TACTICAL AREA` with an active purple underline indicator bar.
+- **Fixed Tab Header Overlap & Display Typography:**
+  - Streamlined tab titles strictly to `ROSTER (N)`, `RULES`, and `AREA`.
+  - Configured with `Archivo-Bold` display font and tuned letter spacing (`1.2`), preventing text wrapping and tab label collisions on narrow Android screens.
 - **Roster Tab & Side-by-Side Squad Arena:**
   - Centered minimal quick status row: `🔒 Privacy: Keep Private • 📡 GPS Ready`.
   - Equal side-by-side columns: **RUNNERS** (lime green border & dot) vs **HUNTERS** (coral red border & dot), with individual operative cards, ready badges, and `[ Leave ]` / `[ JOIN ]` actions.
   - Automatically collapses the `UNASSIGNED OPERATIVES` card when all players are assigned.
   - Minimal `HOST CONTROLS` card with `[ ROTATE ROLES ]` and `[ SHUFFLE SQUADS ]`.
-- **Rules & Intel Tab:**
+- **Unassigned Operatives Two-Tier Responsive Card:**
+  - Separated operative identity and actions across two balanced rows.
+  - Row 1: Player dot + display name (with host crown) + ready status chip.
+  - Row 2: Full-width equal-sized `[ JOIN RUNNERS ]` and `[ JOIN HUNTERS ]` buttons, completely resolving previous button text clipping and horizontal overflow.
+- **Rules Tab:**
   - Dedicated `GAME MODE` card with mode icon, title, and descriptive tactical mission briefing.
   - `TACTICAL RULES` card with structured icon rows for Game Duration, Head Start, Radar Pings, and Victory Conditions.
   - Amber/Coral `⚠ SAFETY & FAIR PLAY` warning card.
 - **Tactical Area Tab:**
-  - Embedded interactive MapLibre map preview card (~280px) displaying purple boundary geofence circle (`PLAY AREA (500m)`), concentric neon-green extraction target rings (`EXTRACTION TARGET`), operative `YOU` marker pin, zoom `+`/`-` controls, and a floating `[ 🔍 RE-CENTER ]` pill button.
+  - Embedded interactive MapLibre map preview card (~280px) displaying purple boundary geofence circle (`PLAY AREA (500m)`), zoom `+`/`-` controls, and a floating `[ 🔍 RE-CENTER ]` pill button.
+  - Removed fixed `YOU` marker overlay badge and floating `EXTRACTION TARGET` label for an uncluttered, pure GeoJSON tactical map.
   - Area Details card with Pin icon, Area Radius, extraction status, out-of-bounds penalty grace period, and `[ 📍 CHANGE AREA ]` action.
-- **Fixed Bottom Action Dock:**
-  - High-contrast neon-lime `[ READY UP ]` (or `[ STAND DOWN ]`) and `[ SELECT TARGET ]` / `[ LAUNCH ROUND ]` action dock with live operative ready counter.
+- **Streamlined Single Action Dock:**
+  - Unified bottom action dock into a single responsive full-width action button: `READY UP` ➔ `STAND DOWN` ➔ `LAUNCH MISSION` (with rocket icon for host when all players are ready).
+  - Removed redundant `[ SELECT TARGET ]` button.
+  - Removed duplicate `• ⚠ Requires 1 Runner & 1 Hunter` text from bottom line; displays clean operative ready counter.
 
 ### 5. Movable 4-Corner Headstart Mini-Map
 - **Runner Headstart Contracting:**
@@ -106,9 +114,10 @@ GhostRun **v2.9.0** introduces the game-changing **Extreme / Blackout** difficul
   - Created a dedicated in-memory profile store that eagerly hydrates from `@ghostrun:profile` on boot.
   - Eliminated the initial hardcoded "Alphaop" fallback and loading spinners across Play and Profile tabs.
   - Profile details (`id`, `display_name`, `color`, `email`) are saved immediately on sign-in and sign-up so the very first render of Home or You tabs is instantaneous with zero pop-in.
-- **Pre-Generated QR Code Memory Cache (`src/lib/qrCache.ts`):**
-  - Pre-computes and caches QR Data URLs in memory the moment room code is established in the lobby.
-  - Tapping `[ QR ]` displays the invite QR code instantly (0ms) without showing "Generating QR Grid..." spinners.
+- **Instant QR Code Generation with Zero Canvas Dependencies (`src/lib/qrCache.ts`):**
+  - Implemented high-performance pure-JS 24-bit uncompressed BMP encoder (`generateQrBmpDataUrl`) executing in ~1.5ms.
+  - Eliminates DOM `document.createElement('canvas')` failures on React Native Android Hermes.
+  - Synchronous in-memory retrieval (`getOrCreateQrUri`) ensures the invite QR code renders with 0ms delay immediately upon opening the modal.
 - **0ms GPS Relocation & Pre-Warming (`src/lib/locationCache.ts`):**
   - Pre-warms GPS via continuous low-power subscription as soon as permissions exist.
   - `handleRecenterGps` immediately snaps the camera to cached coordinates (0ms) without locking the FAB with an `ActivityIndicator`.
