@@ -1,6 +1,6 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../lib/map';
+import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from '../lib/map';
 import { circleRing, type LngLat, type PointCollection } from '../lib/geo';
 import { useTheme } from '../theme/ThemeProvider';
 import type { GameArea, RoundPing, RoundPosition } from './types';
@@ -20,6 +20,8 @@ interface MapViewProps {
   ownFix: LngLat | null;
   modeLayers?: React.ReactNode;
   onPressMap?: () => void;
+  isMapLocked?: boolean;
+  userHeading?: number | null;
 }
 
 export const MapView = memo(function MapView({
@@ -32,8 +34,22 @@ export const MapView = memo(function MapView({
   ownFix,
   modeLayers,
   onPressMap,
+  isMapLocked = false,
+  userHeading = null,
 }: MapViewProps) {
   const { colors, isDark } = useTheme();
+  const cameraRef = useRef<CameraRef>(null);
+
+  // When map is locked in Tactical Compass mode, center camera on player and rotate with device heading
+  useEffect(() => {
+    if (!isMapLocked || !ownFix || !cameraRef.current) return;
+    cameraRef.current.easeTo({
+      center: [ownFix.longitude, ownFix.latitude],
+      bearing: userHeading !== null && userHeading !== undefined ? userHeading : 0,
+      zoom: 16.5,
+      duration: 300,
+    });
+  }, [isMapLocked, ownFix, userHeading]);
   // Memoized GeoJSON features
   const areaRing = useMemo(() => {
     return circleRing({ longitude: area.longitude, latitude: area.latitude }, area.radius_m);
@@ -121,14 +137,17 @@ export const MapView = memo(function MapView({
   }, [ownFix]);
 
   return (
-    <View style={StyleSheet.absoluteFill}>
+    <View style={StyleSheet.absoluteFill} pointerEvents={isMapLocked ? 'none' : 'auto'}>
       <MapLibreMap
-        attribution
+        attribution={false}
+        compass={false}
+        logo={false}
         mapStyle={isDark ? DARK_MAP_STYLE : DAY_MAP_STYLE}
-        onPress={onPressMap}
+        onPress={isMapLocked ? undefined : onPressMap}
         style={StyleSheet.absoluteFill}
       >
         <Camera
+          ref={cameraRef}
           initialViewState={{
             center: [area.longitude, area.latitude],
             zoom: 15,

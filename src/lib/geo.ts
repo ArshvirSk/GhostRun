@@ -31,6 +31,19 @@ export function distanceM(a: LngLat, b: LngLat): number {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+/** Forward azimuth bearing in degrees (0-360) from point A to point B. */
+export function bearingDeg(a: LngLat, b: LngLat): number {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const toDeg = (value: number) => (value * 180) / Math.PI;
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  const brng = toDeg(Math.atan2(y, x));
+  return (brng + 360) % 360;
+}
+
 /** A closed ring of coordinates approximating a circle of `radiusM` metres. */
 export function circleRing(center: LngLat, radiusM: number): CircleFeature {
   const steps = 96;

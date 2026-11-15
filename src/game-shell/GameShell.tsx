@@ -9,10 +9,20 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from '../ui/Text';
+import { Card } from '../ui/Card';
+import {
+  MovableCornerMiniMap,
+  STORAGE_KEY_MINIMAP_CORNER,
+  STORAGE_KEY_MINIMAP_ENABLED,
+  type MiniMapCorner,
+} from '../components/MovableCornerMiniMap';
 import type { LngLat } from '../lib/geo';
 import {
   openLocationSettings,
@@ -40,6 +50,7 @@ import {
   selectTeammates,
 } from './selectors';
 import { MapView } from './MapView';
+import { TacticalRadarCanvas } from './TacticalRadarCanvas';
 import { HudFrame } from './HudFrame';
 import { PhaseBanner } from './PhaseBanner';
 import { SosSheet } from './SosSheet';
@@ -61,6 +72,7 @@ interface GameShellProps {
 
 export function GameShell({ gameId }: GameShellProps) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { tokens, colors } = useTheme();
 
   const [state, setState] = useState<RoundState | null>(null);
@@ -68,6 +80,31 @@ export function GameShell({ gameId }: GameShellProps) {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [serverOffset, setServerOffset] = useState(0);
+
+  // Tactical Compass & Heading Tracking
+  const [userHeading, setUserHeading] = useState<number | null>(null);
+
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    let mounted = true;
+    (async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        sub = await Location.watchHeadingAsync((headingData) => {
+          if (!mounted) return;
+          const heading = headingData.trueHeading >= 0 ? headingData.trueHeading : headingData.magHeading;
+          setUserHeading(heading);
+        });
+      } catch {
+        // Heading may not be supported on emulators without compass
+      }
+    })();
+    return () => {
+      mounted = false;
+      sub?.remove();
+    };
+  }, []);
 
   // Shell controls
   const [isCompact, setIsCompact] = useState(false);
@@ -312,6 +349,67 @@ export function GameShell({ gameId }: GameShellProps) {
     ? Math.max(0, graceSecondsTotal - Math.floor((now - outOfBoundsSince) / 1000))
     : graceSecondsTotal;
 
+  const isMapLocked = useMemo(() => {
+    if (!state) return false;
+    const lockedParam = (state.game.mode_params as any)?.locked_map;
+    if (lockedParam !== undefined && lockedParam !== null) {
+      return Boolean(lockedParam);
+    }
+    const difficulty = (state.game as any).difficulty || 'standard';
+    return difficulty === 'standard' || difficulty === 'hardcore' || difficulty === 'blackout' || difficulty === 'extreme';
+  }, [state]);
+
+  const isBlackoutMode = useMemo(() => {
+    if (!state) return false;
+    const diff = (state.game as any).difficulty;
+    const params = (state.game.mode_params as any) || {};
+    return (
+      diff === 'blackout' ||
+      diff === 'extreme' ||
+      Boolean(params.blackout) ||
+      Boolean(params.radar_only)
+    );
+  }, [state]);
+
+  // User preference: headstart mini-map enabled & default corner
+  const [minimapEnabled, setMinimapEnabled] = useState(true);
+  const [defaultCorner, setDefaultCorner] = useState<MiniMapCorner>('top-right');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const [storedEnabled, storedCorner] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEY_MINIMAP_ENABLED),
+          AsyncStorage.getItem(STORAGE_KEY_MINIMAP_CORNER),
+        ]);
+        if (!mounted) return;
+        if (storedEnabled !== null) {
+          setMinimapEnabled(storedEnabled !== 'false');
+        }
+        if (
+          storedCorner &&
+          ['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(storedCorner)
+        ) {
+          setDefaultCorner(storedCorner as MiniMapCorner);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const isHeadStart = state?.game?.status === 'head_start';
+  const showHeadStartMiniMap = isHeadStart && myRole === 'runner' && minimapEnabled;
+
+  const headstartSecondsLeft = useMemo(() => {
+    if (!state || !isHeadStart || !state.game.live_at) return null;
+    return Math.max(0, Math.ceil((Date.parse(state.game.live_at) - serverNow) / 1000));
+  }, [state, isHeadStart, serverNow]);
+
   const widgetProps = useMemo(() => {
     if (!state) return null;
     return {
@@ -454,26 +552,169 @@ export function GameShell({ gameId }: GameShellProps) {
 
   return (
     <View style={[styles.screen, { backgroundColor: tokens.colors.background }]}>
-      {/* Background Interactive Map */}
-      <MapView
-        area={state.game.area}
-        modeLayers={mapLayerWidgets}
-        onPressMap={() => {
-          if (!isCompact) {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setIsCompact(true);
-          }
-        }}
-        ownFix={ownFix}
-        pings={pings}
-        tagRadiusM={state.game.tag_radius_m || 20}
-        target={target}
-        targetRadiusM={state.game.target_radius_m || 25}
-        teammates={teammates}
-      />
+      {/* Tactical Canvas: Blackout Radial Heatmap Radar OR MapView */}
+      {isBlackoutMode ? (
+        <TacticalRadarCanvas
+          area={state.game.area}
+          extraction={(state.game as any).extraction || (state as any).relay_heist?.extraction || null}
+          jail={state.game.jail}
+          myRole={myRole}
+          ownFix={ownFix}
+          pings={pings}
+          players={state.players}
+          safeZones={(state.game as any).safe_zones || []}
+          tagRadiusM={state.game.tag_radius_m || 20}
+          target={target}
+          teammates={teammates}
+          userHeading={userHeading}
+        />
+      ) : showHeadStartMiniMap ? (
+        <MovableCornerMiniMap
+          initialCorner={defaultCorner}
+          borderColor={colors.runner}
+          backgroundColor={colors.surface}
+          onCornerChange={(c) => setDefaultCorner(c)}
+        >
+          <MapView
+            area={state.game.area}
+            modeLayers={mapLayerWidgets}
+            onPressMap={undefined}
+            ownFix={ownFix}
+            pings={pings}
+            tagRadiusM={state.game.tag_radius_m || 20}
+            target={target}
+            targetRadiusM={state.game.target_radius_m || 25}
+            teammates={teammates}
+            isMapLocked={isMapLocked}
+            userHeading={userHeading}
+          />
+          <View style={[styles.miniMapBadge, { backgroundColor: colors.runner }]}>
+            <Text style={styles.miniMapBadgeText}>TACTICAL RADAR</Text>
+          </View>
+        </MovableCornerMiniMap>
+      ) : (
+        <MapView
+          area={state.game.area}
+          modeLayers={mapLayerWidgets}
+          onPressMap={() => {
+            if (!isCompact && !isMapLocked) {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setIsCompact(true);
+            }
+          }}
+          ownFix={ownFix}
+          pings={pings}
+          tagRadiusM={state.game.tag_radius_m || 20}
+          target={target}
+          targetRadiusM={state.game.target_radius_m || 25}
+          teammates={teammates}
+          isMapLocked={isMapLocked}
+          userHeading={userHeading}
+        />
+      )}
 
-      {/* Role-Specific Layout Or Sprint Mode */}
-      {sprintMode ? (
+      {/* Runner Headstart Directives Overlay Or Normal Role Layout */}
+      {showHeadStartMiniMap ? (
+        <View
+          style={[
+            styles.headstartScreen,
+            {
+              paddingTop: Math.max(insets.top, 16) + 20,
+              paddingBottom: Math.max(insets.bottom, 16) + 20,
+            },
+          ]}
+        >
+          {/* Top Info Bar */}
+          <View style={styles.headstartHeaderRow}>
+            <View
+              style={[
+                styles.headstartStatusPill,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.runner },
+              ]}
+            >
+              <Ionicons name="flash" size={14} color={colors.runner} />
+              <Text variant="caption" style={{ color: colors.runner, fontWeight: '800', marginLeft: 6 }}>
+                RUNNER HEADSTART
+              </Text>
+            </View>
+          </View>
+
+          {/* Central Countdown & Scatter Directives */}
+          <View style={styles.headstartCountdownCenter}>
+            <Text variant="caption" style={{ color: colors.textMuted, letterSpacing: 2, marginBottom: 8 }}>
+              HUNTER PURSUIT COMMENCES IN
+            </Text>
+            <Text
+              variant="display"
+              style={{
+                color: colors.runner,
+                fontSize: 76,
+                fontWeight: '900',
+                lineHeight: 80,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {headstartSecondsLeft !== null ? `${headstartSecondsLeft}s` : '--'}
+            </Text>
+            <Text
+              variant="title"
+              style={{
+                color: colors.text,
+                letterSpacing: 2,
+                fontSize: 18,
+                fontWeight: '800',
+                marginTop: 14,
+                textAlign: 'center',
+              }}
+            >
+              SCATTER & REACH COVER
+            </Text>
+            <Text
+              variant="body"
+              style={{
+                color: colors.textMuted,
+                textAlign: 'center',
+                marginTop: 10,
+                maxWidth: 320,
+                lineHeight: 20,
+                fontSize: 14,
+              }}
+            >
+              Hunters are held at spawn until timer expires. Break line of sight immediately and advance toward your mission objectives.
+            </Text>
+          </View>
+
+          {/* Bottom Directives & Radar Card */}
+          <View style={styles.headstartDirectivesCard}>
+            <Card
+              variant="elevated"
+              style={[
+                styles.directiveCard,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark },
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons
+                  name={isMapLocked ? 'compass-outline' : 'navigate-outline'}
+                  size={22}
+                  color={colors.primary}
+                  style={{ marginRight: 12 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text variant="label" style={{ color: colors.primary }}>
+                    {isMapLocked ? 'TACTICAL COMPASS LOCKED' : 'TACTICAL OVERVIEW'}
+                  </Text>
+                  <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                    {isMapLocked
+                      ? 'Operative locked to center; map auto-rotates with your phone.'
+                      : 'Corner radar active. Full tactical map restores upon launch.'}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          </View>
+        </View>
+      ) : sprintMode ? (
         <SprintLayout
           {...widgetProps!}
           onExitSprint={() => setSprintMode(false)}
@@ -614,5 +855,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
+  },
+  miniMapBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 3,
+    alignItems: 'center',
+  },
+  miniMapBadgeText: {
+    color: '#000',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  headstartScreen: {
+    flex: 1,
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+    zIndex: 30,
+  },
+  headstartHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headstartStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  headstartCountdownCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+  },
+  headstartDirectivesCard: {
+    width: '100%',
+  },
+  directiveCard: {
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
   },
 });
