@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-15  
 **Artifact:** `release/GhostRun-v2.9.0.apk`  
-**Size:** 56,561,664 bytes (53.94 MB)  
-**SHA-256 Checksum:** `2649B8B722522F0445D03FD66967D53220FF02ABFE1E581E9B5EAF2D137A2D16`  
+**Size:** 56,563,148 bytes (53.94 MB)  
+**SHA-256 Checksum:** `DD0F82523D3D47524F2CA3867B86CF71EC4830AF425277141F3773A9C9BBFBCD`  
 **Version:** `2.9.0`  
 **VersionCode:** `15`  
 **Architecture:** `arm64-v8a`  
@@ -59,10 +59,13 @@ GhostRun **v2.9.0** introduces the game-changing **Extreme / Blackout** difficul
 
 ### 4. Comprehensive Mission Lobby Overhaul (`app/lobby/[id].tsx`)
 - **Full Visibility for Unassigned & All Operatives:**
-  - Expanded ScrollView bottom clearance to `+ 190px` and slimmed the floating action dock down from ~210px to ~95px, completely eliminating any overlap so every operative card is 100% visible even at maximum scroll.
-- **Dedicated Team Roster Cards:**
+  - Expanded ScrollView bottom clearance to `+ 210px` and slimmed the floating action dock down from ~210px to ~85px, completely eliminating any overlap so every operative card is 100% visible even at maximum scroll.
+- **Dedicated Team Roster Cards & Inline Selection:**
   - Replaced scattered text rows with cohesive cards for **Runners** (cyan/teal), **Hunters** (orange/coral), and **Unassigned Operatives**.
-  - Integrated visual team count chips, `[YOUR SQUAD]` active indicators, and prominent `[JOIN RUNNERS]` / `[JOIN HUNTERS]` buttons.
+  - Unassigned card includes immediate inline `[JOIN RUNNERS]` and `[JOIN HUNTERS]` squad selection buttons.
+  - Integrated visual team count chips and `[YOUR SQUAD]` active indicators.
+- **Dismissible Replay Privacy Banner & Frictionless Ready:**
+  - Route privacy card is now compact and dismissible via close icon, defaulting cleanly to "Keep Private" without ever locking or disabling the `[READY UP]` button.
 - **Uncluttered Action Dock:**
   - Removed the cramped 3-button utility row that caused awkward line wrapping (`CANCEL MISSIO N`).
   - Moved **Rotate Roles** and **Shuffle Squads** into a clean **Host Roster Controls** card inside the Roster tab.
