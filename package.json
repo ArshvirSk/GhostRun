@@ -46,7 +46,7 @@
     "test:echo": "node --import tsx scripts/test-echo-engine.ts",
     "calibrate:echo": "node --import tsx scripts/calibrate-echo.ts",
     "test:board": "node --import tsx scripts/test-friends-board.ts",
-    "test:google": "node --import tsx scripts/test-google-auth.ts",
+    "test:google": "node --env-file=.env --import tsx scripts/test-google-auth.ts",
     "profile:hud": "node --env-file=.env --import tsx scripts/profile-hud-renders.ts",
     "sim": "node --env-file=.env --import tsx scripts/sim/index.ts",
     "rls": "node --env-file=.env --import tsx scripts/rls-check.ts"

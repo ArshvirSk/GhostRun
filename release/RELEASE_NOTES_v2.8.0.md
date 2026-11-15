@@ -2,25 +2,30 @@
 
 **Release Date:** 2026-11-15  
 **Artifact:** `release/GhostRun-v2.8.0.apk`  
-**Size:** 56,305,320 bytes (53.70 MB)  
-**SHA-256 Checksum:** `095C1912D207176FA8F34CEE8657794E958805F363E2B60AA8967A7B69CC153D`  
+**Size:** 56,499,532 bytes (53.88 MB)  
+**SHA-256 Checksum:** `F7E46C99F3E4337E94A6C093BD1680FFAB4C0495243DF7B382569CAF3BE1831D`  
 **Version:** `2.8.0`  
 **VersionCode:** `13`  
 **Architecture:** `arm64-v8a`  
 **Privacy Protocol:** `Version 3.0` (Consents C1–C9, 60-min anti-stalking delay)  
-**Keystore:** `android/app/debug.keystore` (preserves seamless in-place APK updates)  
+**Keystore:** `android/app/ghostrun.keystore` (SHA-1: `9A:D1:6B:4E:A1:D5:F2:0B:99:D8:01:30:CB:FE:2F:00:E0:E3:C9:A0`)  
 
 ---
 
 ## Overview
 
-GhostRun v2.8.0 is the definitive master milestone for the platform, bringing together all **6 Roadmap Waves** into a unified, battle-hardened real-world tactical GPS stealth chase experience.
+GhostRun v2.8.0 is the definitive master milestone for the platform, bringing together all **6 Roadmap Waves** and **Google Sign-In** into a unified, battle-hardened real-world tactical GPS stealth chase experience.
 
-This release introduces an operative network graph with unique `@handles`, friends presence indicators, a mathematically calibrated **Season Echo** scoring engine (ensuring sub-3.3% role disparity and anti-collusion protection), a privacy-first private friends board with a strict 60-minute anti-stalking delay, and completes the full suite of communication, safety, tournament, cross-platform, accessibility, and retention features.
+This release introduces native Google Sign-In with Play Services ID tokens and OAuth fallback, an operative network graph with unique `@handles`, friends presence indicators, a mathematically calibrated **Season Echo** scoring engine (ensuring sub-3.3% role disparity and anti-collusion protection), a privacy-first private friends board with a strict 60-minute anti-stalking delay, and completes the full suite of communication, safety, tournament, cross-platform, accessibility, and retention features.
 
 ---
 
 ## Key Highlights & Wave Deliverables
+
+### 0. Native Google Sign-In & Authentication
+- **Dual-Engine Google Auth:** Integrates native `@react-native-google-signin/google-signin` with `supabase.auth.signInWithIdToken` for seamless one-tap native account selection, backed by `expo-web-browser` OAuth fallback.
+- **Onboarding & Sign-In UI:** Added Afterimage-themed `Continue with Google` buttons to both the Sign-In screen (`app/(onboarding)/signin.tsx`) and registration step (`app/(onboarding)/signup/account.tsx`).
+- **Dedicated Security Keystore:** Transitioned Android signing to a dedicated `ghostrun.keystore` with a unique certificate SHA-1 (`9A:D1:6B:4E:A1:D5:F2:0B:99:D8:01:30:CB:FE:2F:00:E0:E3:C9:A0`).
 
 ### 1. Operative Network & Identity (Wave 6 / FL1)
 - **Global Unique Handles:** Clean `@handle` identity system with homoglyph/spoofing protection, 3–20 character limits, regex validation (`/^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$/`), and case-insensitive reservation safeguards.
