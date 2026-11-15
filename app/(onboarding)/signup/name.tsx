@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { isSupabaseConfigured, supabase } from '../../../src/lib/supabase';
 import { triggerHaptic } from '../../../src/motion/haptics';
 import { useSignupStore } from '../../../src/stores/signupStore';
 import { colors, radii, spacing } from '../../../src/theme/tokens';
@@ -29,11 +30,30 @@ export default function SignupNameScreen() {
   const [localName, setLocalName] = useState(storedName || '');
   const [selectedColor, setSelectedColor] = useState(storedColor || colors.palette[0]);
   const [error, setError] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setIsAuthenticated(true);
+        if (!localName) {
+          const meta = data.user.user_metadata || {};
+          const metaName = meta.full_name || meta.name || '';
+          if (metaName) {
+            const clean = metaName.slice(0, 20);
+            setLocalName(clean);
+            setName(clean);
+          }
+        }
+      }
+    });
+  }, []);
 
   const trimmed = localName.trim();
   const isValid = trimmed.length >= 1 && trimmed.length <= 20;
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!isValid) {
       setError('Codename must be between 1 and 20 characters.');
       triggerHaptic('error');
@@ -43,6 +63,16 @@ export default function SignupNameScreen() {
     setName(trimmed);
     setColor(selectedColor);
     triggerHaptic('buttonTap');
+
+    // If operative is already authenticated (e.g. from Google Sign-In), skip account creation
+    if (isSupabaseConfigured && supabase) {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        router.push('/signup/before-you-play' as any);
+        return;
+      }
+    }
+
     router.push('/signup/account' as any);
   };
 
@@ -67,7 +97,7 @@ export default function SignupNameScreen() {
           {/* Header & Step Tracker */}
           <View style={styles.header}>
             <Text style={styles.stepIndicator} variant="label">
-              STEP 1 OF 4 • IDENTITY
+              {isAuthenticated ? 'STEP 1 OF 2 • IDENTITY' : 'STEP 1 OF 4 • IDENTITY'}
             </Text>
             <Text style={styles.title} variant="headline">
               What should we call you?

@@ -1,7 +1,7 @@
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -46,6 +46,15 @@ export default function SignupAccountScreen() {
   const [localMarketing, setLocalMarketing] = useState(marketingConsent);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        router.replace('/signup/before-you-play' as any);
+      }
+    });
+  }, []);
 
   const cleanEmail = emailInput.trim().toLowerCase();
   const isValidEmail = cleanEmail.includes('@') && cleanEmail.includes('.');

@@ -19,6 +19,7 @@ import { signInWithGoogle } from '../../src/lib/googleAuth';
 import { PRIVACY_VERSION } from '../../src/lib/privacy';
 import { isSupabaseConfigured, supabase } from '../../src/lib/supabase';
 import { triggerHaptic } from '../../src/motion/haptics';
+import { useSignupStore } from '../../src/stores/signupStore';
 import { colors, radii, spacing } from '../../src/theme/tokens';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
@@ -55,6 +56,14 @@ export default function SigninScreen() {
 
     if (!profile) {
       setBusy(false);
+      const meta = userData.user.user_metadata || {};
+      const suggestedName = meta.full_name || meta.name || '';
+      if (suggestedName) {
+        useSignupStore.getState().setName(suggestedName.slice(0, 20));
+      }
+      if (userData.user.email) {
+        useSignupStore.getState().setEmail(userData.user.email);
+      }
       router.replace('/signup/name' as any);
       return;
     }
