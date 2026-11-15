@@ -13,8 +13,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 import { authErrorMessage } from '../../../src/lib/authErrors';
+import { signInWithGoogle } from '../../../src/lib/googleAuth';
 import { setResendCooldown } from '../../../src/lib/resendCooldown';
 import { isSupabaseConfigured, supabase } from '../../../src/lib/supabase';
 import { triggerHaptic } from '../../../src/motion/haptics';
@@ -148,6 +150,35 @@ export default function SignupAccountScreen() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Guest sign-in failed.');
+      triggerHaptic('error');
+      setBusy(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setBusy(true);
+    setError('');
+
+    try {
+      const result = await signInWithGoogle();
+      if (result.cancelled) {
+        setBusy(false);
+        return;
+      }
+
+      if (!result.success || result.error) {
+        setError(result.error || 'Google Sign-In failed.');
+        triggerHaptic('error');
+        setBusy(false);
+        return;
+      }
+
+      setIsGuest(false);
+      triggerHaptic('buttonTap');
+      setBusy(false);
+      router.push('/signup/before-you-play' as any);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google Sign-In failed.');
       triggerHaptic('error');
       setBusy(false);
     }
@@ -325,6 +356,23 @@ export default function SignupAccountScreen() {
                 variant="primary"
               />
 
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText} variant="caption">
+                  OR
+                </Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <Button
+                accessibilityHint="Sign in or register using your Google account"
+                icon={<Ionicons color={colors.textLight} name="logo-google" size={18} />}
+                onPress={handleGoogleSignUp}
+                size="lg"
+                title="Continue with Google"
+                variant="secondary"
+              />
+
               <Button
                 accessibilityHint="Signs in immediately as a guest player without credentials"
                 onPress={handleGuestSignIn}
@@ -478,6 +526,21 @@ const styles = StyleSheet.create({
   },
   loader: {
     paddingVertical: spacing.lg,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.borderDark,
+  },
+  dividerText: {
+    marginHorizontal: spacing.sm,
+    color: colors.textSubtle,
+    letterSpacing: 1,
   },
   signInLink: {
     alignItems: 'center',

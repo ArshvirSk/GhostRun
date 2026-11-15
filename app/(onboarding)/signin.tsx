@@ -12,8 +12,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 import { authErrorMessage } from '../../src/lib/authErrors';
+import { signInWithGoogle } from '../../src/lib/googleAuth';
 import { PRIVACY_VERSION } from '../../src/lib/privacy';
 import { isSupabaseConfigured, supabase } from '../../src/lib/supabase';
 import { triggerHaptic } from '../../src/motion/haptics';
@@ -144,6 +146,34 @@ export default function SigninScreen() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setBusy(true);
+    setErrorMessage('');
+
+    try {
+      const result = await signInWithGoogle();
+      if (result.cancelled) {
+        setBusy(false);
+        return;
+      }
+
+      if (!result.success || result.error) {
+        setErrorMessage(result.error || 'Google Sign-In failed.');
+        triggerHaptic('error');
+        setBusy(false);
+        return;
+      }
+
+      await routeAfterAuth();
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Google Sign-In failed.'
+      );
+      triggerHaptic('error');
+      setBusy(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
@@ -247,6 +277,23 @@ export default function SigninScreen() {
                 size="lg"
                 title="Sign In"
                 variant="primary"
+              />
+
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText} variant="caption">
+                  OR
+                </Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <Button
+                accessibilityHint="Sign in using your Google account"
+                icon={<Ionicons color={colors.textLight} name="logo-google" size={18} />}
+                onPress={handleGoogleSignIn}
+                size="lg"
+                title="Continue with Google"
+                variant="secondary"
               />
 
               <Button
@@ -354,6 +401,21 @@ const styles = StyleSheet.create({
   },
   loader: {
     paddingVertical: spacing.lg,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.borderDark,
+  },
+  dividerText: {
+    marginHorizontal: spacing.sm,
+    color: colors.textSubtle,
+    letterSpacing: 1,
   },
   signUpLink: {
     alignItems: 'center',

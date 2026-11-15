@@ -89,7 +89,9 @@
           "cameraPermission": "GhostRun needs camera access to scan runner QR codes for QR Tagging."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "@react-native-google-signin/google-signin",
+      "expo-web-browser"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
