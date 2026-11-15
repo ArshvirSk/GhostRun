@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { getModeModule } from '../modes/registry';
 
-export type PresetType = 'casual' | 'standard' | 'hardcore' | 'custom';
+export type PresetType = 'casual' | 'standard' | 'hardcore' | 'blackout' | 'custom';
 export type BoundaryPenalty = 'warn' | 'extra_ping' | 'reveal_live' | 'auto_tag';
 
 export interface HostRulesState {
@@ -66,7 +66,7 @@ export interface HostState {
   reset: () => void;
 }
 
-export const PRESET_VALUES: Record<'casual' | 'standard' | 'hardcore', HostRulesState> = {
+export const PRESET_VALUES: Record<'casual' | 'standard' | 'hardcore' | 'blackout', HostRulesState> = {
   casual: {
     headStartS: 240,
     durationS: 3600,
@@ -92,6 +92,15 @@ export const PRESET_VALUES: Record<'casual' | 'standard' | 'hardcore', HostRules
     tagRadiusM: 15,
     boundaryGraceS: 15,
     boundaryPenalty: 'extra_ping',
+    curfewMinutes: null,
+  },
+  blackout: {
+    headStartS: 60,
+    durationS: 1500,
+    pingIntervalS: 90,
+    tagRadiusM: 15,
+    boundaryGraceS: 15,
+    boundaryPenalty: 'reveal_live',
     curfewMinutes: null,
   },
 };
@@ -267,6 +276,15 @@ export const useHostStore = create<HostState>((set, get) => ({
         release_hold_s: 10,
         release_radius_m: 10,
       };
+    }
+
+    if (state.preset === 'blackout') {
+      modeParamsCombined.difficulty = 'blackout';
+      modeParamsCombined.blackout = true;
+      modeParamsCombined.radar_only = true;
+      modeParamsCombined.locked_map = true;
+    } else {
+      modeParamsCombined.difficulty = state.preset;
     }
 
     return {

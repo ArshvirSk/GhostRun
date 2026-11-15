@@ -880,7 +880,7 @@ export default function ReplayScreen() {
 
   return (
     <View style={styles.screen}>
-      <MapLibreMap attribution mapStyle={MAP_STYLE} style={StyleSheet.absoluteFill}>
+      <MapLibreMap attribution={false} compass={false} logo={false} mapStyle={MAP_STYLE} style={StyleSheet.absoluteFill}>
         <Camera
           initialViewState={{
             center: [game?.area.longitude ?? 0, game?.area.latitude ?? 0],

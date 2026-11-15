@@ -719,7 +719,7 @@ export default function ResultScreen() {
   return (
     <View style={styles.screen}>
       {/* Tactical Map Layer */}
-      <MapLibreMap attribution mapStyle={MAP_STYLE} style={StyleSheet.absoluteFill}>
+      <MapLibreMap attribution={false} compass={false} logo={false} mapStyle={MAP_STYLE} style={StyleSheet.absoluteFill}>
         <Camera
           initialViewState={{
             center: [game.area.longitude, game.area.latitude],

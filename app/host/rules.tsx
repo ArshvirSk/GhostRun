@@ -86,7 +86,7 @@ export default function HostRulesScreen() {
             DIFFICULTY & PACE PRESETS
           </Text>
           <View style={styles.presetsRow}>
-            {(['casual', 'standard', 'hardcore'] as PresetType[]).map((pKey) => {
+            {(['casual', 'standard', 'hardcore', 'blackout'] as PresetType[]).map((pKey) => {
               const isSelected = preset === pKey;
               return (
                 <Chip
@@ -108,6 +108,7 @@ export default function HostRulesScreen() {
             {preset === 'casual' && 'Generous head start (4 min), longer round (60 min), and frequent 90s radar pings.'}
             {preset === 'standard' && 'Balanced competitive defaults: 3 min head start, 45 min round, 150s ping interval.'}
             {preset === 'hardcore' && 'High pressure: 90s head start, 30 min duration, delayed 240s pings, extra ping penalty.'}
+            {preset === 'blackout' && 'Extreme zero-vis combat: Map tiles disabled in favor of a 360° radial sonar with operative fixed at center, thermal proximity heat signatures, and vector guide lines to objectives.'}
             {preset === 'custom' && 'Customized timing and boundary configuration applied.'}
           </Text>
         </Card>

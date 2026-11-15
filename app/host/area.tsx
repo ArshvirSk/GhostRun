@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +23,16 @@ const LAST_LOCATION_KEY = '@ghostrun:last_location_coords';
 
 const RADII = [300, 600, 1000, 1500];
 
+/**
+ * Calculates optimal camera zoom level to fit a zone of radiusM within screen bounds.
+ */
+export function getZoomForRadius(radiusM: number): number {
+  if (radiusM <= 350) return 15.2;
+  if (radiusM <= 650) return 14.3;
+  if (radiusM <= 1100) return 13.5;
+  return 12.8;
+}
+
 export default function HostAreaScreen() {
   const { colors, spacing, radii, isDark } = useTheme();
   const router = useRouter();
@@ -31,7 +41,6 @@ export default function HostAreaScreen() {
 
   const mode = useHostStore((s) => s.mode);
   const center = useHostStore((s) => s.center);
-  const centerMode = useHostStore((s) => s.centerMode);
   const radius = useHostStore((s) => s.radius);
   const placements = useHostStore((s) => s.placements);
   const setCenter = useHostStore((s) => s.setCenter);
@@ -40,35 +49,66 @@ export default function HostAreaScreen() {
 
   const [locating, setLocating] = useState(false);
   const [placementError, setPlacementError] = useState('');
+  const [placementMode, setPlacementMode] = useState<'zone' | 'target' | 'jail'>('zone');
+
+  // Smooth zoom in/out transition when zone size is changed
+  const prevRadiusRef = useRef(radius);
+  useEffect(() => {
+    if (prevRadiusRef.current !== radius) {
+      prevRadiusRef.current = radius;
+      const targetZoom = getZoomForRadius(radius);
+      cameraRef.current?.easeTo({
+        center,
+        zoom: targetZoom,
+        duration: 500,
+      });
+    }
+  }, [radius, center]);
 
   // Mode placement requirements
   const needsTarget = mode === 'classic_chase';
   const needsJail = mode === 'jailbreak';
 
-  // Request foreground location on mount if center is default
+  // Automatically request foreground GPS and center map on mount
   useEffect(() => {
     let active = true;
     async function initLocation() {
-      if (centerMode === 'custom') return;
       try {
+        setLocating(true);
+        // 1. Try cached recent location for immediate responsive camera
         const stored = await AsyncStorage.getItem(LAST_LOCATION_KEY);
         if (stored && active) {
           const parsed = JSON.parse(stored) as [number, number];
           setCenter(parsed, 'my_location');
+          cameraRef.current?.jumpTo({
+            center: parsed,
+            zoom: 14,
+          });
         }
 
-        // Check foreground location permission; if not granted, request automatically so map centers to user's real GPS
+        // 2. Request live GPS fix
         let perm = await Location.getForegroundPermissionsAsync();
         if (!perm.granted && perm.canAskAgain) {
           perm = await Location.requestForegroundPermissionsAsync();
         }
 
         if (perm.granted && active) {
-          setLocating(true);
           const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
           if (active) {
             const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
             setCenter(coords, 'my_location');
+            if (stored) {
+              cameraRef.current?.flyTo({
+                center: coords,
+                zoom: 14,
+                duration: 500,
+              });
+            } else {
+              cameraRef.current?.jumpTo({
+                center: coords,
+                zoom: 14,
+              });
+            }
             void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
           }
         }
@@ -82,69 +122,125 @@ export default function HostAreaScreen() {
     return () => {
       active = false;
     };
-  }, [centerMode, setCenter]);
+  }, [setCenter]);
 
-  // Set default target or jail if none exists
+  // Ensure default target or jail exists and stays inside the zone
   useEffect(() => {
     if (needsTarget && !placements.target) {
-      const offsetLng = center[0] + 0.002;
-      const offsetLat = center[1] + 0.002;
+      const offsetLng = center[0] + 0.0018;
+      const offsetLat = center[1] + 0.0018;
       setPlacement('target', [offsetLng, offsetLat]);
     }
     if (needsJail && !placements.jail) {
-      const offsetLat = center[1] + 0.002;
+      const offsetLat = center[1] + 0.0018;
       setPlacement('jail', [center[0], offsetLat]);
     }
   }, [needsTarget, needsJail, center, placements.target, placements.jail, setPlacement]);
 
+  // Handle map tap anywhere
   const handleMapPress = (event: any) => {
     const coords = event.nativeEvent.lngLat;
     if (!coords || !Array.isArray(coords)) return;
     const [tapLng, tapLat] = coords as [number, number];
 
+    // Case 1: Placing the Zone Center (User can tap ANYWHERE on the map!)
+    if (placementMode === 'zone' || (!needsTarget && !needsJail)) {
+      setCenter([tapLng, tapLat], 'custom');
+      cameraRef.current?.easeTo({
+        center: [tapLng, tapLat],
+        duration: 300,
+      });
+
+      // If target or jail exists, check if it falls outside new radius and adjust if needed
+      if (needsTarget && placements.target) {
+        const d = distanceM(
+          { longitude: tapLng, latitude: tapLat },
+          { longitude: placements.target[0], latitude: placements.target[1] }
+        );
+        if (d > radius * 0.85) {
+          // Keep target safely inside the new zone
+          setPlacement('target', [tapLng + 0.0015, tapLat + 0.0015]);
+        }
+      }
+
+      if (needsJail && placements.jail) {
+        const d = distanceM(
+          { longitude: tapLng, latitude: tapLat },
+          { longitude: placements.jail[0], latitude: placements.jail[1] }
+        );
+        if (d > radius * 0.85) {
+          setPlacement('jail', [tapLng, tapLat + 0.0015]);
+        }
+      }
+
+      setPlacementError('');
+      triggerHaptic('buttonTap');
+      return;
+    }
+
+    // Case 2: Placing Target or Jail (must fall within active zone boundary)
     const distFromCenter = distanceM(
       { longitude: center[0], latitude: center[1] },
       { longitude: tapLng, latitude: tapLat }
     );
 
     if (distFromCenter > radius) {
-      setPlacementError('Placements must fall within the active play area boundary.');
+      setPlacementError(
+        placementMode === 'target'
+          ? 'Extraction target must be inside the play area boundary.'
+          : 'Jail facility must be inside the play area boundary.'
+      );
       triggerHaptic('error');
       return;
     }
 
     setPlacementError('');
-    triggerHaptic('buttonTap');
+    triggerHaptic('tagConfirmed');
 
-    if (needsTarget) {
+    if (placementMode === 'target') {
       setPlacement('target', [tapLng, tapLat]);
-    } else if (needsJail) {
+    } else if (placementMode === 'jail') {
       setPlacement('jail', [tapLng, tapLat]);
-    } else {
-      setCenter([tapLng, tapLat], 'custom');
     }
   };
 
-  const handleUseMyLocation = async () => {
+  // Google Maps-style Recenter GPS Action
+  const handleRecenterGps = async () => {
     setLocating(true);
     setPlacementError('');
+    triggerHaptic('buttonTap');
     try {
       let perm = await Location.getForegroundPermissionsAsync();
       if (!perm.granted) {
         perm = await Location.requestForegroundPermissionsAsync();
       }
       if (!perm.granted) {
-        setPlacementError('Location permission is required to center on your current GPS.');
+        setPlacementError('Location permission required to recenter on GPS.');
         triggerHaptic('error');
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+
       setCenter(coords, 'my_location');
+      cameraRef.current?.flyTo({
+        center: coords,
+        zoom: 14,
+        duration: 600,
+      });
+
+      // Keep target/jail aligned with user location
+      if (needsTarget) {
+        setPlacement('target', [coords[0] + 0.0018, coords[1] + 0.0018]);
+      }
+      if (needsJail) {
+        setPlacement('jail', [coords[0], coords[1] + 0.0018]);
+      }
+
       void AsyncStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(coords));
-      triggerHaptic('buttonTap');
+      triggerHaptic('tagConfirmed');
     } catch (err: unknown) {
-      setPlacementError(err instanceof Error ? err.message : 'Could not get current location.');
+      setPlacementError(err instanceof Error ? err.message : 'Could not acquire GPS location.');
       triggerHaptic('error');
     } finally {
       setLocating(false);
@@ -153,9 +249,11 @@ export default function HostAreaScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* MapLibre Canvas */}
+      {/* MapLibre Canvas (no default compass on top right) */}
       <MapLibreMap
-        attribution
+        attribution={false}
+        compass={false}
+        logo={false}
         mapStyle={isDark ? DARK_MAP_STYLE : DAY_MAP_STYLE}
         onPress={handleMapPress}
         style={StyleSheet.absoluteFill}
@@ -175,11 +273,11 @@ export default function HostAreaScreen() {
           <Layer
             id="play-area-outline"
             type="line"
-            paint={{ 'line-color': colors.accent, 'line-width': 2, 'line-dasharray': [2, 2] }}
+            paint={{ 'line-color': colors.accent, 'line-width': 2.5, 'line-dasharray': [2, 2] }}
           />
         </GeoJSONSource>
 
-        {/* Center Point Marker */}
+        {/* Tactical Zone Center Pin */}
         <GeoJSONSource
           id="center-marker"
           data={{
@@ -194,13 +292,22 @@ export default function HostAreaScreen() {
           }}
         >
           <Layer
+            id="center-marker-halo"
+            type="circle"
+            paint={{
+              'circle-radius': 16,
+              'circle-color': colors.primary,
+              'circle-opacity': 0.25,
+            }}
+          />
+          <Layer
             id="center-marker-point"
             type="circle"
             paint={{
-              'circle-radius': 7,
-              'circle-color': colors.accent,
-              'circle-stroke-width': 2.5,
-              'circle-stroke-color': colors.background,
+              'circle-radius': 8,
+              'circle-color': colors.primary,
+              'circle-stroke-width': 3,
+              'circle-stroke-color': '#FFFFFF',
             }}
           />
         </GeoJSONSource>
@@ -221,13 +328,22 @@ export default function HostAreaScreen() {
             }}
           >
             <Layer
+              id="target-marker-halo"
+              type="circle"
+              paint={{
+                'circle-radius': 18,
+                'circle-color': colors.radarScan,
+                'circle-opacity': 0.3,
+              }}
+            />
+            <Layer
               id="target-marker-point"
               type="circle"
               paint={{
-                'circle-radius': 10,
+                'circle-radius': 9,
                 'circle-color': colors.radarScan,
                 'circle-stroke-width': 3,
-                'circle-stroke-color': colors.background,
+                'circle-stroke-color': '#FFFFFF',
               }}
             />
           </GeoJSONSource>
@@ -249,13 +365,22 @@ export default function HostAreaScreen() {
             }}
           >
             <Layer
+              id="jail-marker-halo"
+              type="circle"
+              paint={{
+                'circle-radius': 18,
+                'circle-color': colors.warning,
+                'circle-opacity': 0.3,
+              }}
+            />
+            <Layer
               id="jail-marker-point"
               type="circle"
               paint={{
-                'circle-radius': 10,
+                'circle-radius': 9,
                 'circle-color': colors.warning,
                 'circle-stroke-width': 3,
-                'circle-stroke-color': colors.background,
+                'circle-stroke-color': '#FFFFFF',
               }}
             />
           </GeoJSONSource>
@@ -282,15 +407,75 @@ export default function HostAreaScreen() {
             <View style={{ width: 36 }} />
           </View>
 
-          {/* Location Mode & Radius Chips */}
+          {/* Mode Selector (When mode has secondary targets like classic chase or jailbreak) */}
+          {(needsTarget || needsJail) && (
+            <View style={[styles.placementToggleRow, { marginTop: spacing.sm }]}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  setPlacementMode('zone');
+                }}
+                style={[
+                  styles.placementToggleBtn,
+                  placementMode === 'zone' && {
+                    backgroundColor: colors.primary,
+                    borderColor: colors.primary,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="navigate"
+                  size={14}
+                  color={placementMode === 'zone' ? colors.primaryText : colors.textMuted}
+                />
+                <Text
+                  variant="caption"
+                  style={{
+                    fontWeight: '700',
+                    marginLeft: 4,
+                    color: placementMode === 'zone' ? colors.primaryText : colors.textMuted,
+                  }}
+                >
+                  MOVE ZONE
+                </Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  setPlacementMode(needsTarget ? 'target' : 'jail');
+                }}
+                style={[
+                  styles.placementToggleBtn,
+                  placementMode !== 'zone' && {
+                    backgroundColor: needsTarget ? colors.radarScan : colors.warning,
+                    borderColor: needsTarget ? colors.radarScan : colors.warning,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={needsTarget ? 'flag' : 'shield'}
+                  size={14}
+                  color={placementMode !== 'zone' ? '#FFFFFF' : colors.textMuted}
+                />
+                <Text
+                  variant="caption"
+                  style={{
+                    fontWeight: '700',
+                    marginLeft: 4,
+                    color: placementMode !== 'zone' ? '#FFFFFF' : colors.textMuted,
+                  }}
+                >
+                  {needsTarget ? 'PLACE TARGET' : 'PLACE JAIL'}
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Radius Selection Chips (Clean and without MY GPS button) */}
           <View style={[styles.chipsRow, { marginTop: spacing.sm }]}>
-            <Chip
-              label={locating ? 'LOCATING…' : 'MY GPS'}
-              selected={centerMode === 'my_location'}
-              variant={centerMode === 'my_location' ? 'accent' : 'default'}
-              size="sm"
-              onPress={() => void handleUseMyLocation()}
-            />
             {RADII.map((r) => {
               const isSelected = radius === r;
               return (
@@ -303,6 +488,12 @@ export default function HostAreaScreen() {
                   onPress={() => {
                     triggerHaptic('buttonTap');
                     setRadius(r);
+                    const targetZoom = getZoomForRadius(r);
+                    cameraRef.current?.easeTo({
+                      center,
+                      zoom: targetZoom,
+                      duration: 500,
+                    });
                   }}
                 />
               );
@@ -312,16 +503,16 @@ export default function HostAreaScreen() {
           {/* Placement Guide Message */}
           <View style={[styles.guideRow, { marginTop: spacing.sm }]}>
             <Ionicons
-              name={needsTarget || needsJail ? 'flag-outline' : 'map-outline'}
+              name={placementMode === 'zone' ? 'location-outline' : 'flag-outline'}
               size={16}
-              color={needsTarget ? colors.radarScan : needsJail ? colors.warning : colors.accent}
+              color={placementMode === 'zone' ? colors.primary : colors.radarScan}
             />
             <Text variant="body" style={{ color: colors.textMuted, fontSize: 12, flex: 1 }}>
-              {needsTarget
-                ? 'Classic Chase: Tap on the map to place the runner extraction target.'
-                : needsJail
-                ? 'Jailbreak: Tap on the map to place the detention jail facility.'
-                : 'Tap map or use GPS to set the play area center.'}
+              {placementMode === 'zone'
+                ? 'Tap anywhere on the map to place the zone center.'
+                : needsTarget
+                ? 'Tap inside the boundary ring to place the extraction target.'
+                : 'Tap inside the boundary ring to place the jail facility.'}
             </Text>
           </View>
 
@@ -332,6 +523,29 @@ export default function HostAreaScreen() {
           )}
         </Card>
       </View>
+
+      {/* Floating Recenter GPS FAB (Google Maps style right above bottom dock) */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Recenter map to my GPS location"
+        onPress={() => void handleRecenterGps()}
+        style={({ pressed }) => [
+          styles.recenterFab,
+          {
+            bottom: Math.max(insets.bottom, 16) + 80,
+            right: spacing.lg,
+            backgroundColor: colors.surfaceElevated,
+            borderColor: colors.borderDark,
+          },
+          pressed && { opacity: 0.85, transform: [{ scale: 0.94 }] },
+        ]}
+      >
+        {locating ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Ionicons name="locate" size={24} color={colors.primary} />
+        )}
+      </Pressable>
 
       {/* Bottom Sticky Action Dock */}
       <View
@@ -380,16 +594,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  placementToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  placementToggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#393743',
+    backgroundColor: '#1B1A22',
+  },
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
     justifyContent: 'center',
   },
   guideRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  recenterFab: {
+    position: 'absolute',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    zIndex: 20,
   },
   bottomDock: {
     position: 'absolute',

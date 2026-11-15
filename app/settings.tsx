@@ -33,6 +33,11 @@ import { syncPushTokenWithServer } from '../src/lib/pushNotifications';
 import { FeedbackModal } from '../src/components/FeedbackModal';
 import { getAnalyticsOptIn, setAnalyticsOptIn } from '../src/lib/analytics';
 import { formatSupportEmailUrl, getPlayStoreReviewUrl, APP_VERSION } from '../src/lib/diagnostics';
+import {
+  STORAGE_KEY_MINIMAP_CORNER,
+  STORAGE_KEY_MINIMAP_ENABLED,
+  type MiniMapCorner,
+} from '../src/components/MovableCornerMiniMap';
 
 const DELETE_WORD = 'DELETE';
 
@@ -44,6 +49,8 @@ export default function SettingsScreen() {
 
   // Tactical display & calibration
   const [mapStyle, setMapStyle] = useState<'night' | 'standard'>('night');
+  const [headstartMinimap, setHeadstartMinimap] = useState(true);
+  const [minimapCorner, setMinimapCorner] = useState<MiniMapCorner>('top-right');
 
   // Audio & Telemetry
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -85,6 +92,8 @@ export default function SettingsScreen() {
           storedPresence,
           storedEcho,
           storedAnalytics,
+          storedMinimap,
+          storedMinimapCorner,
         ] = await Promise.all([
           AsyncStorage.getItem('@ghostrun:map_style'),
           AsyncStorage.getItem('@ghostrun:audio_enabled'),
@@ -97,10 +106,21 @@ export default function SettingsScreen() {
           AsyncStorage.getItem('@ghostrun:consent_presence'),
           AsyncStorage.getItem('@ghostrun:consent_echo'),
           getAnalyticsOptIn(),
+          AsyncStorage.getItem(STORAGE_KEY_MINIMAP_ENABLED),
+          AsyncStorage.getItem(STORAGE_KEY_MINIMAP_CORNER),
         ]);
 
         if (storedMap === 'standard' || storedMap === 'night') {
           setMapStyle(storedMap);
+        }
+        if (storedMinimap !== null) {
+          setHeadstartMinimap(storedMinimap !== 'false');
+        }
+        if (
+          storedMinimapCorner &&
+          ['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(storedMinimapCorner)
+        ) {
+          setMinimapCorner(storedMinimapCorner as MiniMapCorner);
         }
         if (storedAudio !== null) {
           const val = storedAudio !== 'false';
@@ -151,6 +171,18 @@ export default function SettingsScreen() {
     const next = val ? 'night' : 'standard';
     setMapStyle(next);
     await AsyncStorage.setItem('@ghostrun:map_style', next);
+  };
+
+  const toggleHeadstartMinimap = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setHeadstartMinimap(val);
+    await AsyncStorage.setItem(STORAGE_KEY_MINIMAP_ENABLED, String(val));
+  };
+
+  const handleSelectCorner = async (corner: MiniMapCorner) => {
+    triggerHaptic('buttonTap');
+    setMinimapCorner(corner);
+    await AsyncStorage.setItem(STORAGE_KEY_MINIMAP_CORNER, corner);
   };
 
   const toggleAudio = async (val: boolean) => {
@@ -510,6 +542,154 @@ export default function SettingsScreen() {
               thumbColor={colors.textLight}
             />
           </View>
+        </Card>
+
+        {/* Runner Headstart Corner Mini-Map Setting */}
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}>
+          <View style={styles.settingRow}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Runner Headstart Mini-Map
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2, lineHeight: 18 }}>
+                Shrinks the map into a sticky Picture-in-Picture corner view during the headstart phase while displaying scatter directives.
+              </Text>
+            </View>
+            <Switch
+              value={headstartMinimap}
+              onValueChange={toggleHeadstartMinimap}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          {headstartMinimap && (
+            <View style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }}>
+              <Text variant="label" style={{ color: colors.primary, marginBottom: spacing.xs, fontSize: 11 }}>
+                DEFAULT DOCK CORNER (DRAGGABLE DURING PLAY)
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginBottom: spacing.sm, fontSize: 12 }}>
+                During matches, you can freely drag the mini-map to stick to any of the 4 corners. Choose your starting position:
+              </Text>
+              <View style={styles.cornerGrid}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Top-Left Corner"
+                  onPress={() => void handleSelectCorner('top-left')}
+                  style={[
+                    styles.cornerBtn,
+                    {
+                      borderColor: minimapCorner === 'top-left' ? colors.primary : colors.borderDark,
+                      backgroundColor: minimapCorner === 'top-left' ? colors.surfaceElevated : colors.surface,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="arrow-up-outline"
+                    size={16}
+                    color={minimapCorner === 'top-left' ? colors.primary : colors.textMuted}
+                  />
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: minimapCorner === 'top-left' ? colors.text : colors.textMuted,
+                      fontWeight: '700',
+                      marginLeft: 6,
+                    }}
+                  >
+                    TOP-LEFT
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Top-Right Corner"
+                  onPress={() => void handleSelectCorner('top-right')}
+                  style={[
+                    styles.cornerBtn,
+                    {
+                      borderColor: minimapCorner === 'top-right' ? colors.primary : colors.borderDark,
+                      backgroundColor: minimapCorner === 'top-right' ? colors.surfaceElevated : colors.surface,
+                    },
+                  ]}
+                >
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: minimapCorner === 'top-right' ? colors.text : colors.textMuted,
+                      fontWeight: '700',
+                      marginRight: 6,
+                    }}
+                  >
+                    TOP-RIGHT
+                  </Text>
+                  <Ionicons
+                    name="arrow-forward-outline"
+                    size={16}
+                    color={minimapCorner === 'top-right' ? colors.primary : colors.textMuted}
+                  />
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Bottom-Left Corner"
+                  onPress={() => void handleSelectCorner('bottom-left')}
+                  style={[
+                    styles.cornerBtn,
+                    {
+                      borderColor: minimapCorner === 'bottom-left' ? colors.primary : colors.borderDark,
+                      backgroundColor: minimapCorner === 'bottom-left' ? colors.surfaceElevated : colors.surface,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="arrow-back-outline"
+                    size={16}
+                    color={minimapCorner === 'bottom-left' ? colors.primary : colors.textMuted}
+                  />
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: minimapCorner === 'bottom-left' ? colors.text : colors.textMuted,
+                      fontWeight: '700',
+                      marginLeft: 6,
+                    }}
+                  >
+                    BOTTOM-LEFT
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Bottom-Right Corner"
+                  onPress={() => void handleSelectCorner('bottom-right')}
+                  style={[
+                    styles.cornerBtn,
+                    {
+                      borderColor: minimapCorner === 'bottom-right' ? colors.primary : colors.borderDark,
+                      backgroundColor: minimapCorner === 'bottom-right' ? colors.surfaceElevated : colors.surface,
+                    },
+                  ]}
+                >
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: minimapCorner === 'bottom-right' ? colors.text : colors.textMuted,
+                      fontWeight: '700',
+                      marginRight: 6,
+                    }}
+                  >
+                    BOTTOM-RIGHT
+                  </Text>
+                  <Ionicons
+                    name="arrow-down-outline"
+                    size={16}
+                    color={minimapCorner === 'bottom-right' ? colors.primary : colors.textMuted}
+                  />
+                </Pressable>
+              </View>
+            </View>
+          )}
         </Card>
 
         {/* 2. Units System */}
@@ -1116,6 +1296,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 12,
+  },
+  cornerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  cornerBtn: {
+    flex: 1,
+    minWidth: '47%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
   },
   footer: {
     marginTop: 32,

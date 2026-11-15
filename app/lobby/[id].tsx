@@ -141,6 +141,8 @@ export default function LobbyScreen() {
   // Host draft modifiers/roles
   const [draftModifiers, setDraftModifiers] = useState<string[]>([]);
   const [draftRoles, setDraftRoles] = useState<string[]>([]);
+  const [draftLockedMap, setDraftLockedMap] = useState<boolean>(true);
+  const [draftBlackout, setDraftBlackout] = useState<boolean>(false);
   const [scrambleCharges, setScrambleCharges] = useState<number>(1);
   const draftTouchedRef = useRef(false);
   const [savingModes, setSavingModes] = useState(false);
@@ -170,6 +172,18 @@ export default function LobbyScreen() {
       if (!draftTouchedRef.current) {
         setDraftModifiers(loaded.game.modifiers ?? []);
         setDraftRoles(loaded.game.roles ?? []);
+        const currentLocked = (loaded.game.mode_params as any)?.locked_map;
+        if (currentLocked !== undefined && currentLocked !== null) {
+          setDraftLockedMap(Boolean(currentLocked));
+        } else {
+          setDraftLockedMap(true);
+        }
+        const isBlackout = Boolean(
+          (loaded.game.mode_params as any)?.blackout ||
+          (loaded.game.mode_params as any)?.radar_only ||
+          (loaded.game as any).difficulty === 'blackout'
+        );
+        setDraftBlackout(isBlackout);
         const daParams = loaded.game.mode_params?.double_agent as
           | { scramble_charges?: number }
           | undefined;
@@ -478,6 +492,10 @@ export default function LobbyScreen() {
     setModesMessage('');
     const modeParams: Record<string, unknown> = {
       ...(state?.game.mode_params ?? {}),
+      locked_map: draftLockedMap,
+      ...(draftBlackout
+        ? { blackout: true, radar_only: true, difficulty: 'blackout' }
+        : { blackout: false, radar_only: false }),
     };
     if (draftRoles.includes('double_agent')) {
       modeParams.double_agent = {
@@ -593,7 +611,7 @@ export default function LobbyScreen() {
           {
             paddingHorizontal: spacing.lg,
             paddingTop: Math.max(insets.top, 16) + 8,
-            paddingBottom: Math.max(insets.bottom, 16) + 40,
+            paddingBottom: Math.max(insets.bottom, 16) + 140,
           },
         ]}
       >
@@ -714,6 +732,57 @@ export default function LobbyScreen() {
         {/* ==================== SEGMENT 1: ROSTER ==================== */}
         {activeSegment === 'roster' && (
           <View style={{ marginTop: spacing.md }}>
+            {/* Quick Sensors & Ready Health Check Pill */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Check Sensors and GPS"
+              onPress={() => {
+                setReadyCheckVisible(true);
+                void handleRunDiagnostic();
+              }}
+              style={[
+                styles.sensorCheckPill,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor:
+                    healthReport?.overall === 'healthy'
+                      ? colors.accent
+                      : healthReport?.overall === 'warning'
+                      ? colors.warning
+                      : colors.borderDark,
+                },
+              ]}
+            >
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={16}
+                color={
+                  healthReport?.overall === 'healthy'
+                    ? colors.accent
+                    : healthReport?.overall === 'warning'
+                    ? colors.warning
+                    : colors.primary
+                }
+              />
+              <Text
+                variant="caption"
+                style={{
+                  color:
+                    healthReport?.overall === 'healthy'
+                      ? colors.accent
+                      : healthReport?.overall === 'warning'
+                      ? colors.warning
+                      : colors.text,
+                  fontWeight: '700',
+                  marginLeft: 8,
+                  flex: 1,
+                }}
+              >
+                {healthReport ? `HARDWARE: ${healthReport.summary.toUpperCase()}` : 'RUN SENSOR & GPS DIAGNOSTIC'}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+            </Pressable>
+
             {isSoloMode ? (
               <View>
                 <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
@@ -832,96 +901,6 @@ export default function LobbyScreen() {
                 )}
               </View>
             )}
-
-            {/* Ready & Host Action Controls */}
-            <View style={[styles.actionSection, { marginTop: spacing.xl }]}>
-              {!ownPlayer?.is_ready && (
-                <Button
-                  title={
-                    healthReport
-                      ? `SENSORS: ${healthReport.summary}`
-                      : 'CHECK SENSORS & GPS'
-                  }
-                  variant="ghost"
-                  size="sm"
-                  style={{ marginBottom: spacing.sm }}
-                  onPress={() => {
-                    setReadyCheckVisible(true);
-                    void handleRunDiagnostic();
-                  }}
-                />
-              )}
-
-              <Button
-                title={ownPlayer?.is_ready ? 'STAND DOWN' : 'READY UP'}
-                variant={ownPlayer?.is_ready ? 'secondary' : 'primary'}
-                size="lg"
-                disabled={shareChoice === null}
-                onPress={() => void toggleReady()}
-              />
-
-              {isHost && (
-                <View style={{ gap: 10, marginTop: spacing.md }}>
-                  {!isSoloMode && (
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                      <Button
-                        title="Rotate Roles"
-                        variant="secondary"
-                        size="sm"
-                        style={{ flex: 1 }}
-                        disabled={busyAction === 'rotate'}
-                        onPress={() => void rotateRoles()}
-                      />
-                      <Button
-                        title="Randomize"
-                        variant="ghost"
-                        size="sm"
-                        style={{ flex: 1 }}
-                        disabled={busyAction === 'randomize'}
-                        onPress={() => void randomizeTeams()}
-                      />
-                    </View>
-                  )}
-
-                  {state.game.mode === 'classic_chase' ? (
-                    <Button
-                      title="Begin Target Selection"
-                      variant="primary"
-                      size="lg"
-                      disabled={!canStart || !everyoneReady || busyAction !== ''}
-                      onPress={() => void continueLobby()}
-                    />
-                  ) : (
-                    <Button
-                      title="Launch Round"
-                      variant="primary"
-                      size="lg"
-                      disabled={!canStart || !everyoneReady || busyAction !== ''}
-                      onPress={() => void startRound()}
-                    />
-                  )}
-
-                  <Button
-                    title="Cancel Mission"
-                    variant="danger"
-                    size="sm"
-                    disabled={busyAction === 'cancel'}
-                    onPress={() => void cancelGame()}
-                  />
-                </View>
-              )}
-
-              {!isHost && (
-                <Button
-                  title="Abort & Leave Lobby"
-                  variant="ghost"
-                  size="sm"
-                  style={{ marginTop: spacing.md }}
-                  disabled={busyAction === 'leave'}
-                  onPress={() => void leaveLobby()}
-                />
-              )}
-            </View>
           </View>
         )}
 
@@ -998,6 +977,123 @@ export default function LobbyScreen() {
                     </Text>
                   )}
                 </View>
+              )}
+            </Card>
+
+            {/* Tactical Map Orientation & Heading Lock Setting */}
+            <Card
+              variant="default"
+              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+                <Ionicons name="compass-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
+                <Text variant="label" style={{ color: colors.primary }}>
+                  TACTICAL MAP INTERACTION & HEADING LOCK
+                </Text>
+              </View>
+              <Text variant="caption" style={{ color: colors.textMuted, marginBottom: spacing.sm, lineHeight: 18 }}>
+                Locks touch gestures during the round to prevent manual panning/zooming, keeping the operative centered and automatically rotating the map to your phone's physical compass heading.
+              </Text>
+              {isHost ? (
+                <View style={{ gap: 8 }}>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <Button
+                      title={draftLockedMap ? 'LOCKED (COMPASS) ✓' : 'LOCKED (COMPASS)'}
+                      variant={draftLockedMap ? 'primary' : 'secondary'}
+                      size="sm"
+                      style={{ flex: 1 }}
+                      onPress={() => {
+                        draftTouchedRef.current = true;
+                        setDraftLockedMap(true);
+                      }}
+                    />
+                    <Button
+                      title={!draftLockedMap ? 'FREE MAP ✓' : 'FREE MAP'}
+                      variant={!draftLockedMap ? 'primary' : 'secondary'}
+                      size="sm"
+                      style={{ flex: 1 }}
+                      onPress={() => {
+                        draftTouchedRef.current = true;
+                        setDraftLockedMap(false);
+                      }}
+                    />
+                  </View>
+                  <Button
+                    title={savingModes ? 'Saving...' : 'Save Map Orientation Setting'}
+                    variant="ghost"
+                    size="sm"
+                    disabled={savingModes}
+                    onPress={() => void saveModeConfig()}
+                  />
+                </View>
+              ) : (
+                <Chip
+                  label={draftLockedMap ? 'MAP LOCKED · COMPASS HEADING' : 'FREE INTERACTION MAP'}
+                  variant={draftLockedMap ? 'accent' : 'muted'}
+                  size="sm"
+                />
+              )}
+            </Card>
+
+            {/* Tactical Visibility & Blackout Radar Mode */}
+            <Card
+              variant="default"
+              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+                <Ionicons
+                  name="radio"
+                  size={18}
+                  color={draftBlackout ? colors.danger : colors.primary}
+                  style={{ marginRight: 8 }}
+                />
+                <Text variant="label" style={{ color: draftBlackout ? colors.danger : colors.primary }}>
+                  TACTICAL VISIBILITY & COMBAT DISPLAY
+                </Text>
+              </View>
+              <Text variant="caption" style={{ color: colors.textMuted, marginBottom: spacing.sm, lineHeight: 18 }}>
+                {draftBlackout
+                  ? 'Extreme Blackout Active: Street map tiles are removed. Operatives navigate via 360° radial sonar with operative fixed at center, thermal proximity heat signatures, and vector guide lines to objectives.'
+                  : 'Standard street map tiles active.'}
+              </Text>
+              {isHost ? (
+                <View style={{ gap: 8 }}>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <Button
+                      title={!draftBlackout ? 'STANDARD MAP ✓' : 'STANDARD MAP'}
+                      variant={!draftBlackout ? 'primary' : 'secondary'}
+                      size="sm"
+                      style={{ flex: 1 }}
+                      onPress={() => {
+                        draftTouchedRef.current = true;
+                        setDraftBlackout(false);
+                      }}
+                    />
+                    <Button
+                      title={draftBlackout ? 'BLACKOUT RADAR ✓' : 'BLACKOUT RADAR'}
+                      variant={draftBlackout ? 'danger' : 'secondary'}
+                      size="sm"
+                      style={{ flex: 1.1 }}
+                      onPress={() => {
+                        draftTouchedRef.current = true;
+                        setDraftBlackout(true);
+                      }}
+                    />
+                  </View>
+                  <Button
+                    title={savingModes ? 'Saving...' : 'Save Visibility Setting'}
+                    variant="ghost"
+                    size="sm"
+                    disabled={savingModes}
+                    onPress={() => void saveModeConfig()}
+                  />
+                </View>
+              ) : (
+                <Chip
+                  label={draftBlackout ? 'DIFFICULTY: EXTREME · BLACKOUT RADAR' : 'DIFFICULTY: STANDARD MAP'}
+                  variant={draftBlackout ? 'accent' : 'muted'}
+                  size="sm"
+                />
               )}
             </Card>
           </View>
@@ -1101,6 +1197,117 @@ export default function LobbyScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* ==================== FIXED BOTTOM ACTION DOCK ==================== */}
+      <View
+        style={[
+          styles.actionDock,
+          {
+            backgroundColor: colors.surfaceElevated,
+            borderTopColor: colors.borderDark,
+            paddingBottom: Math.max(insets.bottom, 14) + 6,
+            paddingTop: spacing.sm,
+            paddingHorizontal: spacing.lg,
+          },
+        ]}
+      >
+        {/* Host utility row: Rotate & Randomize & Cancel */}
+        {isHost && (
+          <View style={styles.dockHostRow}>
+            {!isSoloMode && (
+              <>
+                <Button
+                  title="Rotate Roles"
+                  variant="ghost"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  disabled={busyAction === 'rotate'}
+                  onPress={() => void rotateRoles()}
+                />
+                <Button
+                  title="Shuffle Squads"
+                  variant="ghost"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  disabled={busyAction === 'randomize'}
+                  onPress={() => void randomizeTeams()}
+                />
+              </>
+            )}
+            <Button
+              title="Cancel Mission"
+              variant="danger"
+              size="sm"
+              style={{ flex: isSoloMode ? 1 : 0.8 }}
+              disabled={busyAction === 'cancel'}
+              onPress={() => void cancelGame()}
+            />
+          </View>
+        )}
+
+        {/* Primary Action Buttons Row */}
+        <View style={styles.dockPrimaryRow}>
+          {!isHost && (
+            <Button
+              title="Leave"
+              variant="ghost"
+              size="md"
+              disabled={busyAction === 'leave'}
+              onPress={() => void leaveLobby()}
+            />
+          )}
+
+          <Button
+            title={ownPlayer?.is_ready ? 'STAND DOWN' : 'READY UP'}
+            variant={ownPlayer?.is_ready ? 'secondary' : 'primary'}
+            size="md"
+            style={{ flex: 1 }}
+            disabled={shareChoice === null}
+            onPress={() => void toggleReady()}
+          />
+
+          {isHost && (
+            state.game.mode === 'classic_chase' ? (
+              <Button
+                title={busyAction === 'start' ? 'Starting...' : 'Target Select'}
+                variant="primary"
+                size="md"
+                style={{ flex: 1.2 }}
+                disabled={!canStart || !everyoneReady || busyAction !== ''}
+                onPress={() => void continueLobby()}
+              />
+            ) : (
+              <Button
+                title={busyAction === 'start' ? 'Launching...' : 'Launch Round'}
+                variant="primary"
+                size="md"
+                style={{ flex: 1.2 }}
+                disabled={!canStart || !everyoneReady || busyAction !== ''}
+                onPress={() => void startRound()}
+              />
+            )
+          )}
+        </View>
+
+        {/* Status hint below dock buttons */}
+        <View style={styles.dockStatusRow}>
+          {!everyoneReady && (
+            <Text variant="caption" style={{ color: colors.textMuted, fontSize: 11 }}>
+              {activePlayers.filter((p) => !p.is_ready).length} operative(s) awaiting ready status
+            </Text>
+          )}
+          {everyoneReady && canStart && (
+            <Text variant="caption" style={{ color: colors.accent, fontSize: 11, fontWeight: '700' }}>
+              ALL OPERATIVES READY · READY TO ENGAGE
+            </Text>
+          )}
+          {!canStart && isHost && (
+            <Text variant="caption" style={{ color: colors.warning, fontSize: 11 }}>
+              {!hasBothTeams ? 'Teams require at least 1 Runner & 1 Hunter' : 'Deploy jail facility in Tactical Area'}
+            </Text>
+          )}
+        </View>
+      </View>
 
       <ReadyCheckModal
         visible={readyCheckVisible}
@@ -1339,5 +1546,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  actionDock: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopWidth: 1,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    zIndex: 100,
+  },
+  dockHostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  dockPrimaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dockStatusRow: {
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  sensorCheckPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 12,
   },
 });
