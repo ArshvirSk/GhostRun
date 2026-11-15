@@ -110,7 +110,7 @@ export function Button({
       case 'hunter':
         return colors.hunterText; // Dark text on amber
       case 'danger':
-        return colors.dangerText;
+        return (colors as any).dangerButtonText || colors.dangerText;
       case 'ghost':
         return colors.text;
       case 'secondary':

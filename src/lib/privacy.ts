@@ -6,7 +6,7 @@
  * below is a product draft, not a legally reviewed privacy policy.
  */
 
-export const PRIVACY_VERSION = 3;
+export const PRIVACY_VERSION = 4;
 
 export const PRIVACY_CONTACT_EMAIL = 'arshvirsk26@gmail.com';
 
@@ -23,6 +23,10 @@ export const PRIVACY_CHANGELOG: Record<number, string[]> = {
   3: [
     'Operative network & friends graph: presence visibility (Consent C8) and Echo score sharing (Consent C9) controls.',
     'Leaderboard privacy: 60-minute anti-stalking delay rule and zero continuous route exposure on private boards.',
+  ],
+  4: [
+    'Release v2.8.1: Granular operative settings for tactical silent channels, audio telemetry, push notifications, and dedicated squad & schedule coordination.',
+    'Enhanced dark mode accessibility and high-contrast data deletion protection.',
   ],
 };
 

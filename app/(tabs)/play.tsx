@@ -16,8 +16,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { supabase } from '../../src/lib/supabase';
-import { ScheduleGameModal } from '../../src/components/ScheduleGameModal';
-import { CrewManagementModal } from '../../src/components/CrewManagementModal';
 import { fetchActiveSeasonAndBanners, ActiveSeasonData } from '../../src/lib/seasons';
 import { getFriendsHosting } from '../../src/lib/friends';
 import { HostPresence } from '../../src/lib/friendsCore';
@@ -40,8 +38,6 @@ export default function PlayScreen() {
   const [displayName, setDisplayName] = useState<string>('Alphaop');
   const [activeGame, setActiveGame] = useState<ActiveGamePill | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
-  const [crewModalVisible, setCrewModalVisible] = useState(false);
   const [seasonData, setSeasonData] = useState<ActiveSeasonData | null>(null);
   const [friendsHosting, setFriendsHosting] = useState<HostPresence[]>([]);
 
@@ -389,7 +385,7 @@ export default function PlayScreen() {
               accessibilityLabel="Squads"
               onPress={() => {
                 triggerHaptic('buttonTap');
-                setCrewModalVisible(true);
+                router.push('/squads' as any);
               }}
               style={({ pressed }) => [
                 styles.secondaryActionBtn,
@@ -411,7 +407,7 @@ export default function PlayScreen() {
               accessibilityLabel="Schedule Match"
               onPress={() => {
                 triggerHaptic('buttonTap');
-                setScheduleModalVisible(true);
+                router.push('/schedule' as any);
               }}
               style={({ pressed }) => [
                 styles.secondaryActionBtn,
@@ -461,16 +457,6 @@ export default function PlayScreen() {
           </Pressable>
         </View>
       </ScrollView>
-
-      <CrewManagementModal
-        visible={crewModalVisible}
-        onClose={() => setCrewModalVisible(false)}
-      />
-
-      <ScheduleGameModal
-        visible={scheduleModalVisible}
-        onClose={() => setScheduleModalVisible(false)}
-      />
     </View>
   );
 }

@@ -49,6 +49,8 @@ const REQUIRED_ROUTES = [
   'app/how-to-play.tsx',
   'app/safety.tsx',
   'app/settings.tsx',
+  'app/schedule.tsx',
+  'app/squads.tsx',
   'app/privacy.tsx',
   'app/debug/hud-gallery.tsx',
 
@@ -58,6 +60,7 @@ const REQUIRED_ROUTES = [
   'app/target/[id].tsx',
   'app/auth.tsx',
   'app/onboarding.tsx',
+  'app/crews.tsx',
 ];
 
 const ROOT = path.resolve(__dirname, '..');
@@ -84,6 +87,7 @@ const REDIRECT_SHIMS = [
   { file: 'app/target/[id].tsx', target: '/lobby/[id]' },
   { file: 'app/auth.tsx', target: '/signin' },
   { file: 'app/onboarding.tsx', target: '/briefing' },
+  { file: 'app/crews.tsx', target: '/squads' },
 ];
 
 for (const shim of REDIRECT_SHIMS) {

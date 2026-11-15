@@ -93,6 +93,7 @@
 | 2026-11-15 | FL4 | Phase P3: Private Friends Board (docs/specs/FL-P3.md, migration 440, friendsBoardCore, FriendsBoardModal, 60m delay, test:board) | verified | pending |
 | 2026-11-15 | WAVE-6 | Wave 6: Friends, Moderation & Echo Leaderboards — All 4 phases implemented, calibrated and tested | verified | pending |
 | 2026-11-15 | RELEASE-v2.8.0 | Release v2.8.0 (versionCode 13) Master Waves 1-6 Release (Ready check, Comms, Crews, Web/iOS, Event mode, Handles, Friends Graph, Echo Engine & Board) | verified | approved |
+| 2026-11-15 | RELEASE-v2.8.1 | Release v2.8.1 (versionCode 14) Dedicated Screens & Settings Overhaul (Schedule & Squads standalone screens, horizontal theme selector, dark mode delete UI fix, comprehensive notifications & telemetry) | verified | approved |
 
 
 

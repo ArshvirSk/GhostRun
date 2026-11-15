@@ -14,21 +14,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../src/theme/ThemeProvider';
-import { radii, spacing } from '../src/theme/tokens';
 import { Text } from '../src/ui/Text';
 import { Card } from '../src/ui/Card';
-import { Chip } from '../src/ui/Chip';
 import { Button } from '../src/ui/Button';
 import { PRIVACY_CONTACT_EMAIL } from '../src/lib/privacy';
 import { supabase } from '../src/lib/supabase';
-import { triggerHaptic } from '../src/motion/haptics';
+import { triggerHaptic, setHapticsEnabled } from '../src/motion/haptics';
 import { useUnits } from '../src/utils/units';
+import { setAudioMuted } from '../src/lib/audio';
 import {
   initTacticalNotificationChannels,
   STORAGE_KEY_SILENT_ALERTS,
 } from '../src/lib/notifications';
+import { syncPushTokenWithServer } from '../src/lib/pushNotifications';
 import { FeedbackModal } from '../src/components/FeedbackModal';
 import { getAnalyticsOptIn, setAnalyticsOptIn } from '../src/lib/analytics';
 import { formatSupportEmailUrl, getPlayStoreReviewUrl, APP_VERSION } from '../src/lib/diagnostics';
@@ -41,16 +42,28 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { unitSystem, setUnitSystem } = useUnits();
 
-  // Settings State
+  // Tactical display & calibration
   const [mapStyle, setMapStyle] = useState<'night' | 'standard'>('night');
+
+  // Audio & Telemetry
   const [audioEnabled, setAudioEnabled] = useState(true);
-  const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [hapticsEnabledState, setHapticsEnabledState] = useState(true);
+
+  // Notifications & Alerts
+  const [pushEnabled, setPushEnabled] = useState(true);
   const [silentAlertsEnabled, setSilentAlertsEnabled] = useState(true);
+  const [proximityAlertsEnabled, setProximityAlertsEnabled] = useState(true);
+  const [safetyCheckinEnabled, setSafetyCheckinEnabled] = useState(true);
+
+  // Privacy Consents
+  const [presenceConsent, setPresenceConsent] = useState(true);
+  const [echoConsent, setEchoConsent] = useState(true);
   const [analyticsOptIn, setLocalAnalyticsOptIn] = useState(false);
+
+  // User session & UI state
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-
-  // Busy/Error states
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -60,57 +73,153 @@ export default function SettingsScreen() {
   useEffect(() => {
     async function loadPreferences() {
       try {
-        const [storedMap, storedAudio, storedHaptics, storedSilentAlerts, storedAnalytics] = await Promise.all([
+        const [
+          storedMap,
+          storedAudio,
+          storedTts,
+          storedHaptics,
+          storedPush,
+          storedSilentAlerts,
+          storedProximity,
+          storedSafety,
+          storedPresence,
+          storedEcho,
+          storedAnalytics,
+        ] = await Promise.all([
           AsyncStorage.getItem('@ghostrun:map_style'),
           AsyncStorage.getItem('@ghostrun:audio_enabled'),
+          AsyncStorage.getItem('@ghostrun:tts_narration_enabled'),
           AsyncStorage.getItem('@ghostrun:haptics_enabled'),
+          AsyncStorage.getItem('@ghostrun:push_notifications_enabled'),
           AsyncStorage.getItem(STORAGE_KEY_SILENT_ALERTS),
+          AsyncStorage.getItem('@ghostrun:proximity_alerts_enabled'),
+          AsyncStorage.getItem('@ghostrun:safety_checkin_enabled'),
+          AsyncStorage.getItem('@ghostrun:consent_presence'),
+          AsyncStorage.getItem('@ghostrun:consent_echo'),
           getAnalyticsOptIn(),
         ]);
 
         if (storedMap === 'standard' || storedMap === 'night') {
           setMapStyle(storedMap);
         }
-        if (storedAudio !== null) setAudioEnabled(storedAudio !== 'false');
-        if (storedHaptics !== null) setHapticsEnabled(storedHaptics !== 'false');
+        if (storedAudio !== null) {
+          const val = storedAudio !== 'false';
+          setAudioEnabled(val);
+          void setAudioMuted(!val);
+        }
+        if (storedTts !== null) setTtsEnabled(storedTts !== 'false');
+        if (storedHaptics !== null) {
+          const val = storedHaptics !== 'false';
+          setHapticsEnabledState(val);
+          setHapticsEnabled(val);
+        }
+        if (storedPush !== null) setPushEnabled(storedPush !== 'false');
         if (storedSilentAlerts !== null) {
           setSilentAlertsEnabled(storedSilentAlerts !== 'false');
         } else {
           setSilentAlertsEnabled(true);
         }
+        if (storedProximity !== null) setProximityAlertsEnabled(storedProximity !== 'false');
+        if (storedSafety !== null) setSafetyCheckinEnabled(storedSafety !== 'false');
+        if (storedPresence !== null) setPresenceConsent(storedPresence !== 'false');
+        if (storedEcho !== null) setEchoConsent(storedEcho !== 'false');
+
         setLocalAnalyticsOptIn(storedAnalytics);
 
         if (supabase) {
           const { data } = await supabase.auth.getUser();
           if (data.user?.email) setUserEmail(data.user.email);
+
+          // Sync server consents if available
+          const { data: serverConsents } = await supabase.rpc('get_my_consents');
+          if (serverConsents && typeof serverConsents === 'object') {
+            const sc = serverConsents as Record<string, { granted?: boolean }>;
+            if (sc.show_presence?.granted !== undefined) setPresenceConsent(sc.show_presence.granted);
+            if (sc.share_echo?.granted !== undefined) setEchoConsent(sc.share_echo.granted);
+            if (sc.diagnostics?.granted !== undefined) setLocalAnalyticsOptIn(sc.diagnostics.granted);
+          }
         }
       } catch {
-        // ignore
+        // ignore load errors
       }
     }
     void loadPreferences();
   }, []);
 
   const toggleMapStyle = async (val: boolean) => {
+    triggerHaptic('buttonTap');
     const next = val ? 'night' : 'standard';
     setMapStyle(next);
     await AsyncStorage.setItem('@ghostrun:map_style', next);
   };
 
   const toggleAudio = async (val: boolean) => {
+    triggerHaptic('buttonTap');
     setAudioEnabled(val);
+    await setAudioMuted(!val);
     await AsyncStorage.setItem('@ghostrun:audio_enabled', String(val));
   };
 
+  const toggleTts = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setTtsEnabled(val);
+    await AsyncStorage.setItem('@ghostrun:tts_narration_enabled', String(val));
+  };
+
   const toggleHaptics = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setHapticsEnabledState(val);
     setHapticsEnabled(val);
     await AsyncStorage.setItem('@ghostrun:haptics_enabled', String(val));
   };
 
+  const togglePush = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setPushEnabled(val);
+    await AsyncStorage.setItem('@ghostrun:push_notifications_enabled', String(val));
+    if (val) {
+      const { status } = await Notifications.requestPermissionsAsync().catch(() => ({ status: 'denied' }));
+      if (status === 'granted') {
+        void syncPushTokenWithServer();
+      }
+    }
+  };
+
   const toggleSilentAlerts = async (val: boolean) => {
+    triggerHaptic('buttonTap');
     setSilentAlertsEnabled(val);
     await AsyncStorage.setItem(STORAGE_KEY_SILENT_ALERTS, String(val));
     void initTacticalNotificationChannels(!val);
+  };
+
+  const toggleProximityAlerts = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setProximityAlertsEnabled(val);
+    await AsyncStorage.setItem('@ghostrun:proximity_alerts_enabled', String(val));
+  };
+
+  const toggleSafetyCheckin = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setSafetyCheckinEnabled(val);
+    await AsyncStorage.setItem('@ghostrun:safety_checkin_enabled', String(val));
+  };
+
+  const togglePresence = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setPresenceConsent(val);
+    await AsyncStorage.setItem('@ghostrun:consent_presence', String(val));
+    if (supabase) {
+      void supabase.rpc('set_consent', { consent_type: 'show_presence', granted: val });
+    }
+  };
+
+  const toggleEcho = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setEchoConsent(val);
+    await AsyncStorage.setItem('@ghostrun:consent_echo', String(val));
+    if (supabase) {
+      void supabase.rpc('set_consent', { consent_type: 'share_echo', granted: val });
+    }
   };
 
   const toggleAnalytics = async (val: boolean) => {
@@ -125,6 +234,7 @@ export default function SettingsScreen() {
   const handleSignOut = async () => {
     if (!supabase) return;
     setBusy('signout');
+    triggerHaptic('buttonTap');
     try {
       await supabase.auth.signOut();
       router.replace('/auth');
@@ -140,6 +250,7 @@ export default function SettingsScreen() {
     setBusy('export');
     setError('');
     setNotice('');
+    triggerHaptic('buttonTap');
     try {
       const { data, error: exportError } = await supabase.rpc('export_my_data');
       if (exportError) {
@@ -171,6 +282,7 @@ export default function SettingsScreen() {
     if (!supabase || deleteWord.trim().toUpperCase() !== DELETE_WORD) return;
     setBusy('delete');
     setError('');
+    triggerHaptic('buttonTap');
     try {
       const { data, error: deleteError } = await supabase.rpc('delete_my_data');
       if (deleteError) {
@@ -188,7 +300,7 @@ export default function SettingsScreen() {
       await supabase.auth.signOut();
       router.replace('/auth');
       if (!accountRemoved) {
-        setNotice('Your data is deleted. The sign-in record may need removing by support.');
+        setNotice('Your tactical data is purged. Sign-in record will expire cleanly.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Account deletion failed.');
@@ -203,19 +315,20 @@ export default function SettingsScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingHorizontal: spacing.lg,
             paddingTop: Math.max(insets.top, 16) + 8,
             paddingBottom: Math.max(insets.bottom, 16) + 32,
+            paddingHorizontal: spacing.lg,
           },
         ]}
       >
+        {/* Tactical Back Navigation */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
           onPress={() => router.back()}
           style={styles.backRow}
         >
-          <Ionicons name="arrow-back" size={22} color={colors.primary} />
+          <Ionicons name="arrow-back" size={20} color={colors.primary} />
           <Text variant="label" style={{ color: colors.primary, marginLeft: spacing.xs }}>
             BACK
           </Text>
@@ -225,16 +338,16 @@ export default function SettingsScreen() {
           SETTINGS
         </Text>
         <Text variant="body" style={{ color: colors.textMuted, marginTop: 4, marginBottom: spacing.lg }}>
-          Tactical display, unit calibration, audio telemetry, and operative data management.
+          Tactical display, unit calibration, audio telemetry, notifications, and operative privacy.
         </Text>
 
-        {/* Display & Map Style */}
+        {/* 1. Tactical Display */}
         <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
           TACTICAL DISPLAY
         </Text>
         <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginBottom: spacing.md }]}>
-          <View style={styles.settingRow}>
-            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+          <View style={styles.themeSection}>
+            <View style={{ marginBottom: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Interface Theme
               </Text>
@@ -242,28 +355,140 @@ export default function SettingsScreen() {
                 Calibrated for sunlight evasion (Light) and stealth night operations (Dark).
               </Text>
             </View>
-            <View style={styles.chipToggle}>
-              <Chip
-                label="SYSTEM"
-                variant={themeMode === 'system' ? 'accent' : 'muted'}
-                size="sm"
-                selected={themeMode === 'system'}
-                onPress={() => void setThemeMode('system')}
-              />
-              <Chip
-                label="LIGHT"
-                variant={themeMode === 'light' ? 'accent' : 'muted'}
-                size="sm"
-                selected={themeMode === 'light'}
-                onPress={() => void setThemeMode('light')}
-              />
-              <Chip
-                label="DARK"
-                variant={themeMode === 'dark' ? 'accent' : 'muted'}
-                size="sm"
-                selected={themeMode === 'dark'}
-                onPress={() => void setThemeMode('dark')}
-              />
+
+            {/* Full-width Horizontal Segmented Theme Bar */}
+            <View style={styles.themeToggleRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Set interface theme to System default"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  void setThemeMode('system');
+                }}
+                style={[
+                  styles.themeSegmentBtn,
+                  {
+                    borderColor: themeMode === 'system' ? colors.primary : colors.borderDark,
+                    backgroundColor: themeMode === 'system' ? colors.surfaceElevated : colors.surface,
+                    borderRadius: radii.md,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={themeMode === 'system' ? 'radio-button-on' : 'radio-button-off'}
+                  size={16}
+                  color={themeMode === 'system' ? colors.primary : colors.textMuted}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    variant="label"
+                    style={{
+                      color: themeMode === 'system' ? colors.text : colors.textMuted,
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    SYSTEM
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: themeMode === 'system' ? colors.primary : colors.textSubtle,
+                      fontSize: 10,
+                    }}
+                  >
+                    Auto (OS)
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Set interface theme to Light"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  void setThemeMode('light');
+                }}
+                style={[
+                  styles.themeSegmentBtn,
+                  {
+                    borderColor: themeMode === 'light' ? colors.primary : colors.borderDark,
+                    backgroundColor: themeMode === 'light' ? colors.surfaceElevated : colors.surface,
+                    borderRadius: radii.md,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={themeMode === 'light' ? 'radio-button-on' : 'radio-button-off'}
+                  size={16}
+                  color={themeMode === 'light' ? colors.primary : colors.textMuted}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    variant="label"
+                    style={{
+                      color: themeMode === 'light' ? colors.text : colors.textMuted,
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    LIGHT
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: themeMode === 'light' ? colors.primary : colors.textSubtle,
+                      fontSize: 10,
+                    }}
+                  >
+                    Sunlight
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Set interface theme to Dark"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  void setThemeMode('dark');
+                }}
+                style={[
+                  styles.themeSegmentBtn,
+                  {
+                    borderColor: themeMode === 'dark' ? colors.primary : colors.borderDark,
+                    backgroundColor: themeMode === 'dark' ? colors.surfaceElevated : colors.surface,
+                    borderRadius: radii.md,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={themeMode === 'dark' ? 'radio-button-on' : 'radio-button-off'}
+                  size={16}
+                  color={themeMode === 'dark' ? colors.primary : colors.textMuted}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    variant="label"
+                    style={{
+                      color: themeMode === 'dark' ? colors.text : colors.textMuted,
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    DARK
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: themeMode === 'dark' ? colors.primary : colors.textSubtle,
+                      fontSize: 10,
+                    }}
+                  >
+                    Night Ops
+                  </Text>
+                </View>
+              </Pressable>
             </View>
           </View>
         </Card>
@@ -275,7 +500,7 @@ export default function SettingsScreen() {
                 Night Radar Map Style
               </Text>
               <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Dark canvas is easier on the eyes and harder to spot in low-light operations.
+                High-contrast dark canvas for stealth operations and reduced screen glare.
               </Text>
             </View>
             <Switch
@@ -287,7 +512,7 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
-        {/* Units System */}
+        {/* 2. Units System */}
         <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
           MEASUREMENT UNITS
         </Text>
@@ -312,10 +537,10 @@ export default function SettingsScreen() {
                 }}
                 style={[
                   styles.unitSegmentBtn,
-                  unitSystem === 'metric' ? styles.unitSegmentBtnActive : styles.unitSegmentBtnInactive,
                   {
                     borderColor: unitSystem === 'metric' ? colors.primary : colors.borderDark,
                     backgroundColor: unitSystem === 'metric' ? colors.surfaceElevated : colors.surface,
+                    borderRadius: radii.md,
                   },
                 ]}
               >
@@ -327,10 +552,10 @@ export default function SettingsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text
                     variant="label"
-                    style={[
-                      styles.unitSegmentTitle,
-                      { color: unitSystem === 'metric' ? colors.text : colors.textMuted },
-                    ]}
+                    style={{
+                      color: unitSystem === 'metric' ? colors.text : colors.textMuted,
+                      fontWeight: '700',
+                    }}
                   >
                     METRIC
                   </Text>
@@ -352,10 +577,10 @@ export default function SettingsScreen() {
                 }}
                 style={[
                   styles.unitSegmentBtn,
-                  unitSystem === 'imperial' ? styles.unitSegmentBtnActive : styles.unitSegmentBtnInactive,
                   {
                     borderColor: unitSystem === 'imperial' ? colors.primary : colors.borderDark,
                     backgroundColor: unitSystem === 'imperial' ? colors.surfaceElevated : colors.surface,
+                    borderRadius: radii.md,
                   },
                 ]}
               >
@@ -367,10 +592,10 @@ export default function SettingsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text
                     variant="label"
-                    style={[
-                      styles.unitSegmentTitle,
-                      { color: unitSystem === 'imperial' ? colors.text : colors.textMuted },
-                    ]}
+                    style={{
+                      color: unitSystem === 'imperial' ? colors.text : colors.textMuted,
+                      fontWeight: '700',
+                    }}
                   >
                     IMPERIAL
                   </Text>
@@ -386,18 +611,18 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
-        {/* Audio & Haptics */}
+        {/* 3. Audio & Voice Narration Telemetry */}
         <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
-          TACTICAL TELEMETRY
+          AUDIO & VOICE TELEMETRY
         </Text>
         <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, padding: 0 }]}>
           <View style={[styles.settingRow, { padding: spacing.md }]}>
             <View style={{ flex: 1, paddingRight: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Audio Cues
+                Tactical Audio Cues
               </Text>
               <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Pings, countdown ticks, and warning alarms.
+                Pings, countdown ticks, and warning alarms during live rounds.
               </Text>
             </View>
             <Switch
@@ -411,15 +636,55 @@ export default function SettingsScreen() {
           <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
             <View style={{ flex: 1, paddingRight: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Haptic Feedback
+                AI Tactical Voice Narration
               </Text>
               <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Vibration pulses on proximity heat and radar arrivals.
+                Spoken voice telemetry for phase changes, hunter warnings, and time calls.
               </Text>
             </View>
             <Switch
-              value={hapticsEnabled}
+              value={ttsEnabled}
+              onValueChange={toggleTts}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Haptic Feedback
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Sensory vibration pulses on proximity heat, role reveals, and tags.
+              </Text>
+            </View>
+            <Switch
+              value={hapticsEnabledState}
               onValueChange={toggleHaptics}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+        </Card>
+
+        {/* 4. Notifications & Alerts */}
+        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
+          NOTIFICATIONS & ALERTS
+        </Text>
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, padding: 0 }]}>
+          <View style={[styles.settingRow, { padding: spacing.md }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Remote Push Notifications
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Receive squad lobby invites and match start countdowns when app is closed.
+              </Text>
+            </View>
+            <Switch
+              value={pushEnabled}
+              onValueChange={togglePush}
               trackColor={{ false: colors.borderDark, true: colors.primary }}
               thumbColor={colors.textLight}
             />
@@ -441,9 +706,137 @@ export default function SettingsScreen() {
               thumbColor={colors.textLight}
             />
           </View>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Radar Proximity Warnings
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Trigger sensory pulses when targets or hunters enter proximity envelope.
+              </Text>
+            </View>
+            <Switch
+              value={proximityAlertsEnabled}
+              onValueChange={toggleProximityAlerts}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Field Safety Check-Ins
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Periodic safety prompts during extended field operations.
+              </Text>
+            </View>
+            <Switch
+              value={safetyCheckinEnabled}
+              onValueChange={toggleSafetyCheckin}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
         </Card>
 
-        {/* Battery & Background Location Advice */}
+        {/* 5. Operative Privacy & Consents */}
+        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
+          OPERATIVE PRIVACY & DATA
+        </Text>
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, padding: 0 }]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/privacy' as any)}
+            style={[styles.settingRow, { padding: spacing.md }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Privacy Policy & Consent Matrix
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Review data collection guarantees, location retention, and ghost policies.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Squad Lobby Presence
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Allow mutual squadmates to see when you are active and ready in a lobby (Consent C8).
+              </Text>
+            </View>
+            <Switch
+              value={presenceConsent}
+              onValueChange={togglePresence}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Echo Rating Broadcast
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Share your season Echo rating on tactical squad leaderboards (Consent C9).
+              </Text>
+            </View>
+            <Switch
+              value={echoConsent}
+              onValueChange={toggleEcho}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Privacy-Safe Diagnostics
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Anonymous error and telemetry events. Zero coordinates or messages recorded (Consent C7).
+              </Text>
+            </View>
+            <Switch
+              value={analyticsOptIn}
+              onValueChange={(val) => void toggleAnalytics(val)}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy !== ''}
+            onPress={() => void exportData()}
+            style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Export My Tactical Data
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Export operative profile, route logs, and consent history as structured JSON.
+              </Text>
+            </View>
+            {busy === 'export' ? (
+              <ActivityIndicator color={colors.primary} size="small" />
+            ) : (
+              <MaterialCommunityIcons name="download-outline" size={20} color={colors.textMuted} />
+            )}
+          </Pressable>
+        </Card>
+
+        {/* 6. Battery & GPS Advice */}
         <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
           HARDWARE & BATTERY
         </Text>
@@ -459,67 +852,7 @@ export default function SettingsScreen() {
           </Text>
         </Card>
 
-        {/* Privacy & Account */}
-        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
-          PRIVACY & ACCOUNT
-        </Text>
-        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, padding: 0 }]}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/privacy' as any)}
-            style={[styles.settingRow, { padding: spacing.md }]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Privacy & Data Management
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Your choices, location retention, and ghost contributions.
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy !== ''}
-            onPress={() => void exportData()}
-            style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Export My Data
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Export profile, route logs, and consent history as JSON.
-              </Text>
-            </View>
-            {busy === 'export' ? (
-              <ActivityIndicator color={colors.primary} size="small" />
-            ) : (
-              <MaterialCommunityIcons name="download-outline" size={20} color={colors.textMuted} />
-            )}
-          </Pressable>
-
-          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
-            <View style={{ flex: 1, paddingRight: spacing.sm }}>
-              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Privacy-Safe Diagnostics
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Anonymous error and telemetry events. Zero coordinates, names, or messages recorded (Consent C7).
-              </Text>
-            </View>
-            <Switch
-              value={analyticsOptIn}
-              onValueChange={(val) => void toggleAnalytics(val)}
-              trackColor={{ false: colors.borderDark, true: colors.primary }}
-              thumbColor={colors.textLight}
-            />
-          </View>
-        </Card>
-
-        {/* Support & Community (NF-18 & NF-32) */}
+        {/* 7. Community & Support */}
         <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
           COMMUNITY & SUPPORT
         </Text>
@@ -566,14 +899,14 @@ export default function SettingsScreen() {
                 Contact Tactical Support
               </Text>
               <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Email our operations team with attached hardware diagnostics.
+                Email operations team with hardware diagnostics attached.
               </Text>
             </View>
             <Ionicons name="mail-outline" size={20} color={colors.primary} />
           </Pressable>
         </Card>
 
-        {/* Sign Out & Session */}
+        {/* 8. Session & Sign Out */}
         <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}>
           <View style={styles.settingRow}>
             <View style={{ flex: 1 }}>
@@ -593,32 +926,43 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
-        {/* Danger Zone */}
+        {/* 9. Danger Zone: Delete Account & Data */}
         <Card
           variant="elevated"
           style={[
             styles.card,
-            { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder, marginTop: spacing.xl },
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.dangerBorder,
+              borderWidth: 1.5,
+              marginTop: spacing.xl,
+            },
           ]}
         >
-          <Text variant="title" style={{ color: colors.dangerText, fontSize: 16 }}>
-            Delete Account and Data
-          </Text>
-          <Text variant="caption" style={{ color: colors.dangerText, marginTop: 4, lineHeight: 18 }}>
+          <View style={styles.alertHeader}>
+            <Ionicons name="warning-outline" size={20} color={colors.danger} />
+            <Text variant="title" style={{ color: colors.danger, marginLeft: spacing.xs, fontSize: 16 }}>
+              Delete Account & Tactical Data
+            </Text>
+          </View>
+          <Text variant="body" style={{ color: colors.textMuted, marginTop: 6, lineHeight: 18, fontSize: 13 }}>
             Permanently purges your operative profile, personal trail points, and anonymous ghost paths. This action cannot be undone.
           </Text>
 
           {!confirmingDelete ? (
             <Button
-              title="Delete Account"
+              title="Delete Account & Data"
               variant="danger"
               size="sm"
               style={{ marginTop: spacing.md }}
-              onPress={() => setConfirmingDelete(true)}
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                setConfirmingDelete(true);
+              }}
             />
           ) : (
             <View style={{ marginTop: spacing.md }}>
-              <Text variant="label" style={{ color: colors.dangerText }}>
+              <Text variant="label" style={{ color: colors.text }}>
                 Type {DELETE_WORD} to confirm permanent deletion:
               </Text>
               <TextInput
@@ -626,7 +970,7 @@ export default function SettingsScreen() {
                 onChangeText={setDeleteWord}
                 autoCapitalize="characters"
                 placeholder={DELETE_WORD}
-                placeholderTextColor={colors.dangerBorder}
+                placeholderTextColor={colors.textSubtle}
                 style={[
                   styles.confirmInput,
                   {
@@ -644,16 +988,17 @@ export default function SettingsScreen() {
                   size="sm"
                   style={{ flex: 1 }}
                   onPress={() => {
+                    triggerHaptic('buttonTap');
                     setConfirmingDelete(false);
                     setDeleteWord('');
                   }}
                 />
                 <Button
-                  title={busy === 'delete' ? 'Deleting...' : 'Delete Forever'}
+                  title={busy === 'delete' ? 'Purging...' : 'Confirm Delete'}
                   variant="danger"
                   size="sm"
+                  disabled={busy === 'delete' || deleteWord.trim().toUpperCase() !== DELETE_WORD}
                   style={{ flex: 1 }}
-                  disabled={deleteWord.trim().toUpperCase() !== DELETE_WORD || busy === 'delete'}
                   onPress={() => void deleteAccount()}
                 />
               </View>
@@ -661,6 +1006,7 @@ export default function SettingsScreen() {
           )}
         </Card>
 
+        {/* Notices and errors */}
         {notice !== '' && (
           <Text variant="body" style={{ color: colors.primary, marginTop: spacing.md, textAlign: 'center' }}>
             {notice}
@@ -711,15 +1057,30 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
     borderWidth: 1,
+    borderRadius: 8,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  chipToggle: {
+  themeSection: {
+    width: '100%',
+  },
+  themeToggleRow: {
     flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+    marginTop: 4,
+  },
+  themeSegmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderWidth: 1.5,
   },
   unitsSection: {
     width: '100%',
@@ -736,15 +1097,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: radii.md,
     borderWidth: 1.5,
-  },
-  unitSegmentBtnActive: {},
-  unitSegmentBtnInactive: {},
-  unitSegmentTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
   alertHeader: {
     flexDirection: 'row',
@@ -754,8 +1107,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    fontSize: 14,
     marginTop: 8,
-    fontSize: 15,
+    fontFamily: 'System',
+    letterSpacing: 2,
   },
   confirmRow: {
     flexDirection: 'row',
@@ -763,8 +1118,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   footer: {
-    alignItems: 'center',
     marginTop: 32,
-    paddingVertical: 12,
+    alignItems: 'center',
   },
 });

@@ -52,6 +52,9 @@ function RootNavigator() {
         <Stack.Screen name="auth" />
         <Stack.Screen name="privacy" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="schedule" />
+        <Stack.Screen name="squads" />
+        <Stack.Screen name="crews" />
         <Stack.Screen name="how-to-play" />
         <Stack.Screen name="safety" />
         <Stack.Screen name="modes/[id]" />
