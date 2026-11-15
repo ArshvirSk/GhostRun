@@ -94,6 +94,7 @@
 | 2026-11-15 | WAVE-6 | Wave 6: Friends, Moderation & Echo Leaderboards — All 4 phases implemented, calibrated and tested | verified | pending |
 | 2026-11-15 | RELEASE-v2.8.0 | Release v2.8.0 (versionCode 13) Master Waves 1-6 Release (Ready check, Comms, Crews, Web/iOS, Event mode, Handles, Friends Graph, Echo Engine & Board) | verified | approved |
 | 2026-11-15 | RELEASE-v2.8.1 | Release v2.8.1 (versionCode 14) Dedicated Screens & Settings Overhaul (Schedule & Squads standalone screens, horizontal theme selector, dark mode delete UI fix, comprehensive notifications & telemetry) | verified | approved |
+| 2026-11-15 | RELEASE-v2.9.0 | Release v2.9.0 (versionCode 15) Extreme Blackout Radar, Headstart Movable 4-Corner Mini-Map, Dynamic Zone Sizing Zoom, Non-Interactive Operative Heading Lock, and Privacy v2.9.0 Alignment | verified | approved |
 
 
 

@@ -23,6 +23,7 @@ import {
   PRIVACY_SHORT_VERSION,
   PRIVACY_VERSION,
 } from '../src/lib/privacy';
+import { APP_VERSION } from '../src/lib/diagnosticsCore';
 import { supabase } from '../src/lib/supabase';
 
 type ConsentState = {
@@ -204,7 +205,7 @@ export default function PrivacyScreen() {
           PRIVACY PROTOCOL
         </Text>
         <Text variant="caption" style={{ color: colors.textMuted, marginTop: 4 }}>
-          Version {PRIVACY_VERSION}.0 · Updated 2026-11-15
+          GhostRun v{APP_VERSION} · Updated 2026-11-15
         </Text>
 
         {needsAcknowledgement && (

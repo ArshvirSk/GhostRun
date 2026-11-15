@@ -25,8 +25,8 @@ export const PRIVACY_CHANGELOG: Record<number, string[]> = {
     'Leaderboard privacy: 60-minute anti-stalking delay rule and zero continuous route exposure on private boards.',
   ],
   4: [
-    'Release v2.8.1: Granular operative settings for tactical silent channels, audio telemetry, push notifications, and dedicated squad & schedule coordination.',
-    'Enhanced dark mode accessibility and high-contrast data deletion protection.',
+    'Release v2.9.0: Extreme Blackout radar mode with non-interactive operative heading lock, thermal proximity signatures, and inner zone vector telemetry.',
+    'Granular operative controls for headstart corner mini-map positioning, dedicated squad and mission scheduling, and dark mode accessibility.',
   ],
 };
 

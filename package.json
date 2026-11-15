@@ -1,6 +1,6 @@
 {
   "name": "ghostrun",
-  "version": "2.8.1",
+  "version": "2.9.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -47,6 +47,8 @@
     "calibrate:echo": "node --import tsx scripts/calibrate-echo.ts",
     "test:board": "node --import tsx scripts/test-friends-board.ts",
     "test:google": "node --env-file=.env --import tsx scripts/test-google-auth.ts",
+    "test:minimap": "node --import tsx scripts/test-minimap-corner.ts",
+    "test:blackout": "node --import tsx scripts/test-blackout-radar.ts",
     "profile:hud": "node --env-file=.env --import tsx scripts/profile-hud-renders.ts",
     "sim": "node --env-file=.env --import tsx scripts/sim/index.ts",
     "rls": "node --env-file=.env --import tsx scripts/rls-check.ts"
