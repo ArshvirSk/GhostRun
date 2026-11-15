@@ -204,7 +204,7 @@ export default function PrivacyScreen() {
           PRIVACY PROTOCOL
         </Text>
         <Text variant="caption" style={{ color: colors.textMuted, marginTop: 4 }}>
-          Version {PRIVACY_VERSION}.0 · Updated 2026-11-08
+          Version {PRIVACY_VERSION}.0 · Updated 2026-11-15
         </Text>
 
         {needsAcknowledgement && (

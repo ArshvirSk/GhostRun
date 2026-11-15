@@ -2,7 +2,7 @@
  * NF-18 & NF-32: Pure Diagnostics & Support Constants
  */
 
-export const APP_VERSION = '2.7.4';
+export const APP_VERSION = '2.8.0';
 export const SUPPORT_EMAIL = 'support@ghostrun.app';
 export const PLAY_STORE_URL =
   'https://play.google.com/store/apps/details?id=com.ghostrun.app';

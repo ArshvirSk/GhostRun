@@ -31,7 +31,7 @@ import {
 } from '../src/lib/notifications';
 import { FeedbackModal } from '../src/components/FeedbackModal';
 import { getAnalyticsOptIn, setAnalyticsOptIn } from '../src/lib/analytics';
-import { formatSupportEmailUrl, getPlayStoreReviewUrl } from '../src/lib/diagnostics';
+import { formatSupportEmailUrl, getPlayStoreReviewUrl, APP_VERSION } from '../src/lib/diagnostics';
 
 const DELETE_WORD = 'DELETE';
 
@@ -683,7 +683,7 @@ export default function SettingsScreen() {
             </Text>
           </Pressable>
           <Text variant="mono" style={{ color: colors.textSubtle, fontSize: 11 }}>
-            GhostRun v2.7.4 · Operative Release
+            GhostRun v{APP_VERSION} · Operative Release
           </Text>
         </View>
       </ScrollView>

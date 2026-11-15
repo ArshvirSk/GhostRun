@@ -6,7 +6,7 @@
  * below is a product draft, not a legally reviewed privacy policy.
  */
 
-export const PRIVACY_VERSION = 2;
+export const PRIVACY_VERSION = 3;
 
 export const PRIVACY_CONTACT_EMAIL = 'arshvirsk26@gmail.com';
 
@@ -20,6 +20,10 @@ export const PRIVACY_CHANGELOG: Record<number, string[]> = {
     'Age confirmation requirement clarified: 18 or older, or supervised by a guardian.',
     'Verified consent matrix enforcement and anonymous ghost purge on account deletion.',
   ],
+  3: [
+    'Operative network & friends graph: presence visibility (Consent C8) and Echo score sharing (Consent C9) controls.',
+    'Leaderboard privacy: 60-minute anti-stalking delay rule and zero continuous route exposure on private boards.',
+  ],
 };
 
 export const PRIVACY_SHORT_VERSION = [
@@ -28,10 +32,19 @@ export const PRIVACY_SHORT_VERSION = [
   'After a game, players can see routes only if you chose to share yours.',
   'Your routes are deleted after 30 days.',
   'Ghosts are optional and anonymous.',
+  'Friends presence and Echo score sharing can be toggled off at any time.',
+  'Private boards apply a 60-minute delay and zero raw location exposure.',
   'You can export or delete everything.',
 ] as const;
 
-export type ConsentType = 'location' | 'policy_ack' | 'ghost' | 'leaderboard_name' | 'diagnostics';
+export type ConsentType =
+  | 'location'
+  | 'policy_ack'
+  | 'ghost'
+  | 'leaderboard_name'
+  | 'diagnostics'
+  | 'show_presence'
+  | 'share_echo';
 
 export type PrivacySection = { title: string; body: string };
 
@@ -43,6 +56,10 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
   {
     title: 'Why we collect it',
     body: 'To run the game fairly, enforce rules such as boundaries, tags and arrivals, show the map, and produce replays you can watch. Ghost routes and leaderboards only if you opt in.',
+  },
+  {
+    title: 'Operative Network, Presence & Echo Sharing',
+    body: 'Your friends graph and handles are private to your mutual connections. Presence indicators (showing you are in a live lobby or ready for deployment) are governed by Consent C8. Season Echo rank sharing is governed by Consent C9. Private friends boards enforce a 60-minute anti-stalking privacy delay and never expose raw coordinates or movement paths.',
   },
   {
     title: 'Who can see what',

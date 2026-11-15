@@ -18,7 +18,7 @@ console.log('--- Testing NF-26: Admin Console & Remote Config Engine ---');
 
 // Test 2: isVersionSupported
 {
-  assert.strictEqual(isVersionSupported('2.7.4', '2.7.0'), true, 'Higher minor version must pass');
+  assert.strictEqual(isVersionSupported('2.8.0', '2.7.0'), true, 'Higher minor version must pass');
   assert.strictEqual(isVersionSupported('2.7.0', '2.7.0'), true, 'Exact version must pass');
   assert.strictEqual(isVersionSupported('2.6.9', '2.7.0'), false, 'Lower minor version must fail');
   assert.strictEqual(isVersionSupported('3.0.0', '2.8.5'), true, 'Higher major version must pass');

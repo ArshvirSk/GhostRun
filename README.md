@@ -4,8 +4,8 @@
 
 ![GhostRun](banner.png)
 
-[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.7.2)
-[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.7.2)
+[![GitHub Release](https://img.shields.io/github/v/release/ArshvirSk/GhostRun?color=38BDF8&label=Release)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.8.0)
+[![Platform](https://img.shields.io/badge/Platform-Android-34D399.svg)](https://github.com/ArshvirSk/GhostRun/releases/tag/v2.8.0)
 [![Expo SDK](https://img.shields.io/badge/Expo-v58.0-000000.svg)](https://expo.dev)
 [![React Native](https://img.shields.io/badge/React%20Native-0.88-61DAFB.svg)](https://reactnative.dev)
 [![Supabase](https://img.shields.io/badge/Backend-Supabase%20PostGIS-3ECF8E.svg)](https://supabase.com)
@@ -20,6 +20,8 @@
 ---
 
 ## 📑 Table of Contents
+
+- [🌐 Operative Network, Friends & Echo Engine (v2.8.0 / Waves 1–6)](#-operative-network-friends--echo-engine-v280--waves-16)
 
 - [📱 Navigation & Screen Restructure (v2.6.0)](#-navigation--screen-restructure-v260)
 
@@ -58,6 +60,55 @@
 - [🛡️ Safety & Fair Play](#%EF%B8%8F-safety--fair-play)
 
 - [📄 License & Contact](#-license)
+
+---
+
+## 🌐 Operative Network, Friends & Echo Engine (v2.8.0 / Waves 1–6)
+
+GhostRun **v2.8.0** represents the largest milestone in the platform's history, successfully implementing and integrating all **6 Master Roadmap Waves** across comms, safety, social graph, retention, scale, and competitive integrity:
+
+### 📡 Wave 1: Tactical Reliability & Pre-Game Flow
+- **Pre-Game Ready Check (NF-04):** Dual-phase readiness evaluation with real-time GPS precision gating, permission checks, and auto-abort timers.
+- **Tactical Silent Alerts (NF-05):** Android Notification Channels prioritizing stealth gameplay with customizable vibration-only alerts.
+- **Safety Check-In & Curfew (NF-06):** In-game automated safety pings, inactivity monitors, and night-time boundary warnings.
+- **Rematch & Role Rotation (NF-07):** One-tap post-game rematch voting with fair Hunter/Runner ratio guarantees and rotation memory.
+- **Universal Invites & QR Scanner (NF-02):** Deep-link routing via `ghostrun.app/join/:code`, in-app QR code generator, and camera scanner.
+
+### 🎙️ Wave 2: Comms, Safety & Progress
+- **Tactical Team Radio (NF-08):** Team-scoped tactical push-to-transmit audio and pre-canned tactical quick-chips with spam throttling.
+- **Moderation Foundations (NF-09):** In-game block and report pipelines with cryptographic tamper-evident moderation logs.
+- **Custom Play Areas & Out-of-Bounds (NF-10):** Polygon/circle custom geofences with customizable penalty rules (auto-tag, reveal, or buffer).
+- **Shareable Debrief Cards (NF-11):** High-res SVG round summary cards featuring automatic 150m home/work privacy trimming.
+- **Operative Medals & Achievements (NF-12):** 7 canonical achievement badges tracked dynamically in the operative dossier.
+
+### 🛡️ Wave 3: Retention, Schedules & Squads
+- **Push Notification Infrastructure (NF-13):** FCM and Expo push pipelines for match mobilization, ready alerts, and squad reminders.
+- **Scheduled Game Operations (NF-14):** RFC 5545 `.ics` calendar generation, operative RSVP tracking, and reminder triggers.
+- **Season Debrief ("Wrapped") (NF-15):** Monthly performance dossiers aggregating stealth time, hunter tags, and seasonal milestones.
+- **Persistent Tactical Crews (NF-16):** Squad creation, persistent roster management, and crew invite links.
+- **Seasonal Themes & Banners (NF-17/31):** Dynamic remote announcement banners, seasonal visual themes, and telemetry kill-switches.
+
+### 🌍 Wave 4: Cross-Platform & Accessibility
+- **Official Web Gateway (NF-19):** High-performance static web companion at `/join`, safety protocols, and Apple Universal Links.
+- **Tactical Internationalization (NF-20):** Full i18n localization engine supporting English, Spanish, German, French, and Japanese.
+- **iOS Enterprise Configuration (NF-21):** Complete iOS entitlements, background location capabilities, and app-site association.
+- **Discord Dispatch Webhooks (NF-22):** Location-safe match notifications, lobby mobilization, and round recaps sent directly to Discord channels.
+- **Universal Tactical Accessibility (NF-25):** Deuteranopia, Protanopia, and Tritanopia tactical color modes, scalable HUDs, and screen reader cues.
+- **Live Operations Admin Console (NF-26):** Role-based admin tools, dynamic mode disablement, and real-time backend telemetry.
+- **AI Game Master Spoken Audio (NF-33):** Screen-off tactical text-to-speech (TTS) voice announcements for radar pings and game events.
+
+### ⚡ Wave 5: Scale, Tournament & Wear OS
+- **Event Mode (NF-23):** Realtime multi-channel broadcast streaming, delayed spectator buffer, and referee controls for large matches.
+- **Wear OS Tactical Companion (NF-24):** Standalone watch HUD protocol with directional haptics, one-tap check-in, and emergency wrist SOS.
+- **Tactical Replay Video Export (NF-27):** Frame-by-frame replay renderer with animated ghost trails and privacy start/finish trimming.
+- **Operative Cosmetics & Pass (NF-28):** Free community tier with event passes and cosmetic title unlocks (monetization disabled by default).
+- **Community Rule Packs (NF-36):** Declarative, code-free rule presets with safety-checked parameters and instant shareability.
+
+### 🏆 Wave 6: Operative Network & Competitive Echo
+- **Global Unique Handles (FL1 / P0):** Clean `@handle` identity system with homoglyph protection, reservation lists, and profanity filtering.
+- **Mutual Friends Graph & Presence (FL2 / P1):** Mutual connection requests (`pending`, `accepted`, `blocked`), removal cascades, and opt-in host presence indicators (Consent C8).
+- **Season Echo Scoring Engine (FL3 / P2):** Mathematically calibrated ELO/skill rating with sub-3.3% Runner/Hunter disparity, anti-collusion diminishing returns on repeated opponents, daily scoring caps, and best-12 season rollups.
+- **Private Friends Board (FL4 / P3):** Privacy-first tactical leaderboard with strict 60-minute anti-stalking delays, Consent C9 sharing, and absolute zero continuous coordinate exposure.
 
 ---
 
@@ -580,7 +631,7 @@ npm run android
 
 ## 🧪 Testing & Verification
 
-GhostRun includes a comprehensive automated test, profiling, and verification suite:
+GhostRun includes a comprehensive automated test, profiling, and verification suite covering all 6 Waves:
 
 ```bash
 # 1. Strict TypeScript Compiler Verification (0 errors)
@@ -589,29 +640,49 @@ npm run typecheck
 # 2. ESLint Static Analysis & Imports Check (0 warnings, 0 errors)
 npm run lint
 
-# 3. Route Resolution, Deep Linking, Units & Accessibility Checks (57 assertions)
-npm run test:routes
+# 3. Wave 6: Operative Network, Handles, Friends & Echo Engine
+npm run test:handles     # FL-P0: Handles & moderation suite (16 tests)
+npm run test:friends     # FL-P1: Friends graph & presence suite (5 tests)
+npm run test:echo        # FL-P2: Echo scoring engine assertions (8 tests)
+npm run calibrate:echo   # FL-P2: 600-round balance & collusion calibration
+npm run test:board       # FL-P3: Private friends board & 60m delay (5 tests)
 
-# 4. Host Wizard 5-Step Payload Snapshot Test (16 assertions)
-npm run test:wizard
+# 4. Wave 1-5 Feature Test Suites
+npm run test:ready-check    # NF-04: Dual-phase ready check
+npm run test:notifications  # NF-05: Silent tactical channels
+npm run test:safety         # NF-06: Safety check-in
+npm run test:rotation       # NF-07: Rematch & role rotation
+npm run test:invite         # NF-02: Universal invites & QR
+npm run test:radio          # NF-08: Team radio & chat
+npm run test:boundary       # NF-10: Geofences & boundaries
+npm run test:card           # NF-11: 150m privacy card export
+npm run test:badges         # NF-12: Operative achievements
+npm run test:diagnostics    # NF-18/32: Diagnostics bundle
+npm run test:push           # NF-13: Push notifications
+npm run test:schedule       # NF-14: Calendar scheduling
+npm run test:recap          # NF-15: Season recap
+npm run test:crews          # NF-16: Crews & squads
+npm run test:seasons        # NF-17/31: Seasons & banners
+npm run test:web-ios        # NF-19/21: Web gateway & iOS
+npm run test:i18n           # NF-20: Internationalization
+npm run test:discord        # NF-22: Discord webhooks
+npm run test:a11y           # NF-25: Accessibility modes
+npm run test:admin          # NF-26: Admin remote config
+npm run test:tts            # NF-33: TTS voice narration
+npm run test:event          # NF-23: Event tournament mode
+npm run test:wear           # NF-24: Wear OS protocol
+npm run test:replay         # NF-27: Replay export
+npm run test:monetisation   # NF-28: Store & cosmetics
+npm run test:rules          # NF-36: Community rule packs
 
-# 5. Registry Drift Audit vs Server Catalogues (45 assertions)
-npm run test:registry
-
-# 6. Offline Briefing Tour Engine & 8-Beat Assertions
-npm run test:tour
-
-# 7. Authentication Resend Cooldown & Storage Pruning Tests
-npm run test:cooldown
-
-# 8. In-Game HUD Render Benchmark & Timer Isolation
-npm run profile:hud
-
-# 9. Automated RLS Secrecy & Access Policy Verification
-npm run rls
-
-# 10. End-to-End Multi-Agent Game Simulator
-npm run sim
+# 5. Core Platform, Navigation & Simulator
+npm run test:routes         # Route resolution, deep linking & units (57 tests)
+npm run test:wizard         # Host wizard payload snapshot test (16 tests)
+npm run test:registry       # Registry drift audit vs server catalogues
+npm run test:tour           # Offline briefing tour engine
+npm run test:cooldown       # Auth resend cooldown & storage pruning
+npm run profile:hud         # In-game HUD render benchmark & timer isolation
+npm run sim                 # End-to-end multi-agent game simulator
 ```
 
 ---
