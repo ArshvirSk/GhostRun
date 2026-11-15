@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-15  
 **Artifact:** `release/GhostRun-v2.9.0.apk`  
-**Size:** 56,570,512 bytes (53.95 MB)  
-**SHA-256 Checksum:** `1200F5D19209D6D4D538972A48E771DA8B2C8D00E00A6237DD5CAC0ACF376E1F`  
+**Size:** 56,579,584 bytes (53.96 MB)  
+**SHA-256 Checksum:** `725BF02F6861EE65C52F42BABB32A540F3D621FDCB50AEBDBB1A3871A308F890`  
 **Version:** `2.9.0`  
 **VersionCode:** `15`  
 **Architecture:** `arm64-v8a`  
@@ -107,14 +107,31 @@ GhostRun **v2.9.0** introduces the game-changing **Extreme / Blackout** difficul
 - **Unified Semantic Versioning:**
   - Synchronized `v2.9.0` (versionCode `15`) across `package.json`, `package-lock.json`, `app.json`, `android/app/build.gradle`, `diagnosticsCore.ts`, and test suites.
 
+### 7. Core Performance: Instant Loading & Zero-Delay Caching
+- **Instant User Profile & Identity (`src/stores/userStore.ts`):**
+  - Created a dedicated in-memory profile store that eagerly hydrates from `@ghostrun:profile` on boot.
+  - Eliminated the initial hardcoded "Alphaop" fallback and loading spinners across Play and Profile tabs.
+  - Profile details (`id`, `display_name`, `color`, `email`) are saved immediately on sign-in and sign-up so the very first render of Home or You tabs is instantaneous with zero pop-in.
+- **Pre-Generated QR Code Memory Cache (`src/lib/qrCache.ts`):**
+  - Pre-computes and caches QR Data URLs in memory the moment room code is established in the lobby.
+  - Tapping `[ QR ]` displays the invite QR code instantly (0ms) without showing "Generating QR Grid..." spinners.
+- **0ms GPS Relocation & Pre-Warming (`src/lib/locationCache.ts`):**
+  - Pre-warms GPS via continuous low-power subscription as soon as permissions exist.
+  - `handleRecenterGps` immediately snaps the camera to cached coordinates (0ms) without locking the FAB with an `ActivityIndicator`.
+  - Live GPS refinement runs silently in the background and smoothly eases the camera only if satellite drift exceeds 15m.
+- **Cold Boot Optimization (`app/index.tsx`):**
+  - Removed artificial 350ms splash display delay.
+  - Parallelized session verification, local onboarding check, and profile/consents retrieval.
+
 ---
 
 ## Verification & Test Results
+- **Instant Preloading & Caching:** 3/3 tests passed (`scripts/test-instant-loading.ts`).
 - **Blackout Radar & Bearing Engine:** 4/4 tests passed (`scripts/test-blackout-radar.ts`).
+- **Host Rules Preset Activation:** 7/7 tests passed (`scripts/test-rules-presets.ts`).
 - **Mini-Map Corner Physics:** 3/3 tests passed (`scripts/test-minimap-corner.ts`).
 - **Route Resolution & Shims:** 61/61 route checks passed.
 - **Diagnostics & App Version:** 17/17 tests passed verifying `APP_VERSION === '2.9.0'`.
-- **Community Rule Packs:** 4/4 tests passed.
 - **TypeScript Typecheck:** Clean exit with 0 errors (`tsc --noEmit`).
 
 ---
