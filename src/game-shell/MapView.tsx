@@ -1,9 +1,15 @@
 import React, { memo, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from '../lib/map';
+import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, Marker, type CameraRef } from '../lib/map';
 import { circleRing, type LngLat, type PointCollection } from '../lib/geo';
 import { useTheme } from '../theme/ThemeProvider';
-import type { GameArea, RoundPing, RoundPosition } from './types';
+import {
+  AnimatedExtractionTarget,
+  AnimatedPlayerPointer,
+  AnimatedRadarPing,
+  AnimatedTeammateMarker,
+} from '../components/map';
+import type { GameArea, Role, RoundPing, RoundPosition } from './types';
 
 const DAY_MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
@@ -22,6 +28,7 @@ interface MapViewProps {
   onPressMap?: () => void;
   isMapLocked?: boolean;
   userHeading?: number | null;
+  role?: Role;
 }
 
 export const MapView = memo(function MapView({
@@ -36,6 +43,7 @@ export const MapView = memo(function MapView({
   onPressMap,
   isMapLocked = false,
   userHeading = null,
+  role = 'runner',
 }: MapViewProps) {
   const { colors, isDark } = useTheme();
   const cameraRef = useRef<CameraRef>(null);
@@ -200,112 +208,42 @@ export const MapView = memo(function MapView({
           </GeoJSONSource>
         )}
 
-        {targetPoint && (
-          <GeoJSONSource id="target-point" data={targetPoint}>
-            <Layer
-              id="target-circle"
-              type="circle"
-              paint={{
-                'circle-radius': 9,
-                'circle-color': colors.ghostTrail,
-                'circle-stroke-width': 3,
-                'circle-stroke-color': colors.textLight,
-              }}
-            />
-          </GeoJSONSource>
+        {/* Animated Secret Target Beacon */}
+        {target && (
+          <Marker id="animated-target" lngLat={[target.longitude, target.latitude]}>
+            <AnimatedExtractionTarget size={52} />
+          </Marker>
         )}
 
-        {/* Teammates */}
-        {teammatesData.features.length > 0 && (
-          <GeoJSONSource id="teammates" data={teammatesData}>
-            <Layer
-              id="teammate-points"
-              type="circle"
-              paint={{
-                'circle-radius': 8,
-                'circle-color': ['get', 'color'],
-                'circle-stroke-width': 2,
-                'circle-stroke-color': colors.textLight,
-              }}
-            />
-          </GeoJSONSource>
+        {/* Animated Teammate Operatives */}
+        {teammates.map((m) => (
+          <Marker
+            key={`teammate-${m.player_id}`}
+            id={`teammate-${m.player_id}`}
+            lngLat={[m.longitude, m.latitude]}
+          >
+            <AnimatedTeammateMarker name={m.display_name} size={42} color={m.color} />
+          </Marker>
+        ))}
+
+        {/* Animated Delayed Radar Pings */}
+        {pings.map((p) =>
+          p.longitude !== null && p.latitude !== null ? (
+            <Marker key={`ping-${p.id}`} id={`ping-${p.id}`} lngLat={[p.longitude, p.latitude]}>
+              <AnimatedRadarPing size={44} />
+            </Marker>
+          ) : null
         )}
 
-        {/* Delayed Radar Pings */}
-        {pingsData.features.length > 0 && (
-          <GeoJSONSource id="pings" data={pingsData}>
-            <Layer
-              id="ping-halo"
-              type="circle"
-              paint={{
-                'circle-radius': 22,
-                'circle-color': [
-                  'case',
-                  ['==', ['get', 'reason'], 'boundary'],
-                  colors.warning,
-                  ['==', ['get', 'reason'], 'noise'],
-                  colors.danger,
-                  ['==', ['get', 'reason'], 'camping'],
-                  colors.hunter,
-                  ['==', ['get', 'reason'], 'item'],
-                  colors.ghostTrail,
-                  colors.ghostTrail,
-                ],
-                'circle-opacity': 0.25,
-                'circle-stroke-width': 2,
-                'circle-stroke-color': [
-                  'case',
-                  ['==', ['get', 'reason'], 'boundary'],
-                  colors.warning,
-                  ['==', ['get', 'reason'], 'noise'],
-                  colors.danger,
-                  ['==', ['get', 'reason'], 'camping'],
-                  colors.hunter,
-                  ['==', ['get', 'reason'], 'item'],
-                  colors.ghostTrail,
-                  colors.ghostTrail,
-                ],
-                'circle-stroke-opacity': 0.65,
-              }}
+        {/* Animated Own Player Heading Pointer */}
+        {ownFix && (
+          <Marker id="own-pointer" lngLat={[ownFix.longitude, ownFix.latitude]}>
+            <AnimatedPlayerPointer
+              role={role === 'hunter' ? 'hunter' : 'runner'}
+              heading={userHeading ?? 0}
+              size={52}
             />
-            <Layer
-              id="ping-points"
-              type="circle"
-              paint={{
-                'circle-radius': 9,
-                'circle-color': [
-                  'case',
-                  ['==', ['get', 'reason'], 'boundary'],
-                  colors.warning,
-                  ['==', ['get', 'reason'], 'noise'],
-                  colors.danger,
-                  ['==', ['get', 'reason'], 'camping'],
-                  colors.hunter,
-                  ['==', ['get', 'reason'], 'item'],
-                  colors.ghostTrail,
-                  colors.ghostTrail,
-                ],
-                'circle-stroke-width': 2.5,
-                'circle-stroke-color': colors.textLight,
-              }}
-            />
-          </GeoJSONSource>
-        )}
-
-        {/* Own Position */}
-        {ownData && (
-          <GeoJSONSource id="own-position" data={ownData}>
-            <Layer
-              id="own-point"
-              type="circle"
-              paint={{
-                'circle-radius': 9,
-                'circle-color': colors.heatCold,
-                'circle-stroke-width': 3,
-                'circle-stroke-color': colors.textLight,
-              }}
-            />
-          </GeoJSONSource>
+          </Marker>
         )}
 
         {/* Mode-Specific Vector Map Layers */}

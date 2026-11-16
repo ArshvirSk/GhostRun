@@ -587,6 +587,7 @@ export function GameShell({ gameId }: GameShellProps) {
             teammates={teammates}
             isMapLocked={isMapLocked}
             userHeading={userHeading}
+            role={myRole}
           />
           <View style={[styles.miniMapBadge, { backgroundColor: colors.runner }]}>
             <Text style={styles.miniMapBadgeText}>TACTICAL RADAR</Text>
@@ -610,6 +611,7 @@ export function GameShell({ gameId }: GameShellProps) {
           teammates={teammates}
           isMapLocked={isMapLocked}
           userHeading={userHeading}
+          role={myRole}
         />
       )}
 
