@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-17  
 **Artifact:** `release/GhostRun-v2.9.6.apk`  
-**Size:** 56,705,700 bytes (54.08 MB)  
-**SHA-256 Checksum:** `7498FA34D5AFCF37B8FF8F496BC012CE1847731527456D4D82168A0722B43B53`  
+**Size:** 56,701,096 bytes (54.07 MB)  
+**SHA-256 Checksum:** `8DCC6A5F8AB107CBE867E0AA09A771B3B2F2ED16E8411571250670B5437B59D0`  
 **Version:** `2.9.6`  
 **VersionCode:** `21`  
 **Architecture:** `arm64-v8a`  
@@ -42,9 +42,10 @@ GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements
 - **Zero Card Overflow**: Fixed the `[ OG ]` badge on the Featured Mode card so it never bleeds past card borders.
 - **Reduced Visual Clutter**: Stripped heavy bracket dividers across Play, Modes, and You tabs where clean section headers already speak for themselves.
 
-### 6. Sliding Pill Animation & Polished Navbar Pill (`app/(tabs)/_layout.tsx`)
-- **Silky Smooth Sliding Pill**: Native `tabBarBackground` implementation with spring-animated sliding pill (`friction: 8, tension: 75`) that glides across the floating navbar capsule when switching between **Play**, **Modes**, and **You** with 0 crashes.
-- **Icon-Centered Indicator Pill**: Polished the indicator pill to a 56×32 rounded capsule positioned cleanly behind only the active tab's icon (following modern Material 3 / iOS design). The text label sits unobtrusively below the pill with zero clipping or crowding.
+### 6. Correct Navbar Mapping & Zero-Opacity Ripple (`app/(tabs)/_layout.tsx`)
+- **Accurate Tab Mapping**: Fixed the route-to-tab index mapping so the sliding pill accurately aligns with the active route (`play` $\to 0$, `modes` $\to 1$, `you` $\to 2$) without relying on internal navigation state ordering that inverted Modes and You tabs.
+- **Removed Dark Tap Ripple**: Replaced `PlatformPressable` in `tabBarButton` with a clean `Pressable` with `{ color: 'transparent' }` android ripple, completely eliminating the low-opacity black tap effect.
+- **Icon-Centered Indicator Pill**: Polished the indicator pill to a 56×32 rounded capsule positioned cleanly behind only the active tab's icon with zero label clipping.
 
 ### 7. Swipeable Squads & Schedule Pagers (`app/squads.tsx` & `app/schedule.tsx`)
 - **Horizontal Swipe Pager on Squads**: Full-screen horizontal swipe paging (`ScrollView horizontal pagingEnabled`) across **Squads**, **Form Squad**, and **Join Squad** tabs with synchronized animated slider and haptic feedback.

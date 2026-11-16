@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
 import { Tabs, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -80,6 +80,7 @@ function SlidingTabBarBackground({ activeIndex }: { activeIndex: number }) {
   const { colors } = useTheme();
   const [containerWidth, setContainerWidth] = useState(0);
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const hasInitializedRef = useRef(false);
 
   // tabBarStyle paddingHorizontal is 16 on left and right
   const paddingH = 16;
@@ -90,12 +91,17 @@ function SlidingTabBarBackground({ activeIndex }: { activeIndex: number }) {
   useEffect(() => {
     if (tabWidth > 0) {
       const targetX = paddingH + activeIndex * tabWidth + (tabWidth - pillWidth) / 2;
-      Animated.spring(slideAnim, {
-        toValue: targetX,
-        friction: 8,
-        tension: 75,
-        useNativeDriver: true,
-      }).start();
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+        slideAnim.setValue(targetX);
+      } else {
+        Animated.spring(slideAnim, {
+          toValue: targetX,
+          friction: 8,
+          tension: 75,
+          useNativeDriver: true,
+        }).start();
+      }
     }
   }, [activeIndex, tabWidth, slideAnim]);
 
@@ -121,22 +127,42 @@ function SlidingTabBarBackground({ activeIndex }: { activeIndex: number }) {
   );
 }
 
+/**
+ * Maps the active route name or pathname to its exact visual slot index:
+ * 0 -> Play (left)
+ * 1 -> Modes (center)
+ * 2 -> You (right)
+ */
+function getVisualTabIndex(pathname: string, routeName?: string): number {
+  if (routeName === 'play') return 0;
+  if (routeName === 'modes') return 1;
+  if (routeName === 'you') return 2;
+  if (pathname.includes('/modes') || pathname.includes('modes')) return 1;
+  if (pathname.includes('/you') || pathname.includes('you')) return 2;
+  return 0;
+}
+
 export default function TabsLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
 
-  const initialIndex = pathname.includes('modes') ? 1 : pathname.includes('you') ? 2 : 0;
-  const [activeTabIndex, setActiveTabIndex] = useState(initialIndex);
+  const [activeTabIndex, setActiveTabIndex] = useState(() => getVisualTabIndex(pathname));
+
+  useEffect(() => {
+    setActiveTabIndex(getVisualTabIndex(pathname));
+  }, [pathname]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Tabs
         screenListeners={{
           state: (e: any) => {
+            const routes = e?.data?.state?.routes;
             const index = e?.data?.state?.index;
-            if (typeof index === 'number') {
-              setActiveTabIndex(index);
+            const routeName = routes?.[index]?.name;
+            if (routeName) {
+              setActiveTabIndex(getVisualTabIndex(pathname, routeName));
             }
           },
           tabPress: () => {
@@ -149,6 +175,16 @@ export default function TabsLayout() {
           tabBarInactiveTintColor: colors.textMuted,
           tabBarBackground: () => (
             <SlidingTabBarBackground activeIndex={activeTabIndex} />
+          ),
+          // Clean pressable without Android's default black ripple or opacity drop
+          tabBarButton: ({ ref: _ref, ...props }) => (
+            <Pressable
+              {...props}
+              android_ripple={{ color: 'transparent' }}
+              style={props.style}
+            >
+              {props.children}
+            </Pressable>
           ),
           tabBarStyle: {
             backgroundColor: isDark ? colors.surfaceElevated : '#FFFFFF',
