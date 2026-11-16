@@ -11,3 +11,5 @@ export { RulesCard, type RulesCardProps } from './RulesCard';
 export { ParamField, type ParamFieldProps } from './ParamField';
 export { MatchDurationTimeline, type MatchDurationTimelineProps } from './MatchDurationTimeline';
 export { AreaCompatibilityBadge, type AreaCompatibilityBadgeProps } from './AreaCompatibilityBadge';
+export { TacticalDivider, type TacticalDividerProps } from './TacticalDivider';
+export { TacticalMetricChip, type TacticalMetricChipProps, type MetricChipVariant, type MetricChipSize } from './TacticalMetricChip';

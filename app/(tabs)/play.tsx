@@ -21,6 +21,8 @@ import { getFriendsHosting } from '../../src/lib/friends';
 import { HostPresence } from '../../src/lib/friendsCore';
 import { useUserStore } from '../../src/stores/userStore';
 import { startLocationPrewarm } from '../../src/lib/locationCache';
+import { TacticalDivider } from '../../src/ui/TacticalDivider';
+import { TacticalMetricChip } from '../../src/ui/TacticalMetricChip';
 
 const GHOSTRUN_MARK_MINT = require('../../assets/ghostrun-mark-mint.png');
 const GHOSTRUN_MARK_OLIVE = require('../../assets/ghostrun-mark-olive.png');
@@ -307,6 +309,13 @@ export default function PlayScreen() {
           </View>
         )}
 
+        <TacticalDivider
+          label="FIELD INTEL"
+          sublabel="SIMULATIONS"
+          variant="dashed"
+          style={{ marginTop: 14, marginBottom: 10 }}
+        />
+
         {/* Middle Featured Mode Card */}
         <Pressable
           accessibilityRole="button"
@@ -323,21 +332,19 @@ export default function PlayScreen() {
             },
           ]}
         >
-          <Text style={[styles.promoHeader, { color: colors.accent }]}>
-            FEATURED · CLASSIC CHASE
-          </Text>
-          <View style={styles.promoContent}>
-            <View
-              style={[
-                styles.ogBadge,
-                {
-                  borderColor: colors.accent,
-                  backgroundColor: isDark ? 'rgba(184, 163, 255, 0.12)' : 'rgba(102, 80, 164, 0.1)',
-                },
-              ]}
-            >
-              <Text style={[styles.ogBadgeText, { color: colors.accent }]}>OG</Text>
-            </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={[styles.promoHeader, { color: colors.accent }]}>
+              FEATURED · CLASSIC CHASE
+            </Text>
+            <TacticalMetricChip
+              icon="trophy-outline"
+              value="OG"
+              label="ORIGINAL"
+              variant="accent"
+              size="sm"
+            />
+          </View>
+          <View style={[styles.promoContent, { marginTop: 8 }]}>
             <Text style={[styles.promoText, { color: colors.text }]} numberOfLines={2}>
               Outrun hunter radar pings and reach the secret extraction target.
             </Text>
@@ -348,6 +355,13 @@ export default function PlayScreen() {
             />
           </View>
         </Pressable>
+
+        <TacticalDivider
+          label="TACTICAL OPS"
+          sublabel="DIRECT ACTION"
+          variant="bracket"
+          style={{ marginTop: 16, marginBottom: 12 }}
+        />
 
         {/* Action Group */}
         <View style={styles.actionGroup}>

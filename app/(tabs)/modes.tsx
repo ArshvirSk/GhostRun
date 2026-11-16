@@ -9,6 +9,8 @@ import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
 import { Button } from '../../src/ui/Button';
 import { SegmentBar } from '../../src/ui/SegmentBar';
+import { TacticalDivider } from '../../src/ui/TacticalDivider';
+import { TacticalMetricChip } from '../../src/ui/TacticalMetricChip';
 import {
   getAllBaseModes,
   getAllModifiers,
@@ -103,6 +105,8 @@ export default function ModesTab() {
         {activeTab === 'modes' ? (
           <>
             {/* Squad Size & Complexity Filters */}
+            <TacticalDivider label="FILTERS & CALIBRATION" variant="dashed" />
+
             <View style={styles.filterSection}>
               <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
                 SQUAD SIZE
@@ -159,34 +163,76 @@ export default function ModesTab() {
               </ScrollView>
             </View>
 
+            {/* Tactical Divider between Filters & Modes */}
+            <TacticalDivider
+              label="TACTICAL SIMULATIONS"
+              sublabel={`${filteredModes.length} MODES`}
+              variant="bracket"
+              style={{ marginTop: 20, marginBottom: 12 }}
+            />
+
             {/* Mode Cards */}
-            <View style={{ marginTop: spacing.md }}>
+            <View style={{ marginTop: spacing.xs }}>
               {filteredModes.map((mode) => {
                 const stars = '★'.repeat(mode.difficulty) + '☆'.repeat(3 - mode.difficulty);
+                const diffLabel =
+                  mode.difficulty === 1 ? 'CASUAL' : mode.difficulty === 2 ? 'TACTICAL' : 'HARDCORE';
                 return (
                   <Card
                     key={mode.id}
-                    variant="default"
+                    variant="elevated"
                     style={[
                       styles.modeCard,
-                      { backgroundColor: colors.surface, borderColor: colors.borderDark, marginBottom: spacing.md },
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.borderDark,
+                        marginBottom: spacing.lg,
+                      },
                     ]}
                   >
                     <View style={styles.cardHeader}>
                       <View style={{ flex: 1, marginRight: spacing.sm }}>
-                        <Text variant="title" style={{ color: colors.text }}>
+                        <Text variant="title" style={{ color: colors.text, fontSize: 18 }}>
                           {mode.name}
                         </Text>
-                        <Text variant="body" numberOfLines={2} style={{ color: colors.textMuted, marginTop: 3, fontSize: 13, lineHeight: 18 }}>
+                        <Text
+                          variant="body"
+                          numberOfLines={2}
+                          style={{
+                            color: colors.textMuted,
+                            marginTop: 4,
+                            fontSize: 13,
+                            lineHeight: 18,
+                          }}
+                        >
                           {mode.tagline}
                         </Text>
                       </View>
-                      <Chip label={stars} variant="accent" size="sm" />
                     </View>
 
+                    {/* Chunky Squircle Tactical Metric Chips */}
                     <View style={styles.badgeRow}>
-                      <Chip label={`PLAYERS: ${mode.idealPlayers}`} variant="muted" size="sm" />
-                      <Chip label={mode.layer.toUpperCase()} variant="default" size="sm" />
+                      <TacticalMetricChip
+                        icon="people"
+                        value={mode.idealPlayers.replace(' players', '').replace(' player', '')}
+                        label="OPS"
+                        size="sm"
+                        variant="muted"
+                      />
+                      <TacticalMetricChip
+                        icon="flash-outline"
+                        value={stars}
+                        label={diffLabel}
+                        size="sm"
+                        variant="accent"
+                      />
+                      <TacticalMetricChip
+                        icon="compass-outline"
+                        value={mode.layer.toUpperCase()}
+                        label="LAYER"
+                        size="sm"
+                        variant="runner"
+                      />
                     </View>
 
                     <View style={styles.cardActions}>
@@ -194,7 +240,7 @@ export default function ModesTab() {
                         title="Details"
                         variant="secondary"
                         size="sm"
-                        style={{ flex: 1 }}
+                        style={{ flex: 1, borderRadius: 14 }}
                         onPress={() => router.push({ pathname: '/modes/[id]', params: { id: mode.id } } as any)}
                       />
                       <Button
@@ -202,7 +248,7 @@ export default function ModesTab() {
                         variant="primary"
                         size="sm"
                         icon={<Ionicons name="play" size={13} color={colors.primaryText} />}
-                        style={{ flex: 1 }}
+                        style={{ flex: 1, borderRadius: 14 }}
                         onPress={() => handleHost(mode.id)}
                       />
                     </View>
@@ -234,13 +280,15 @@ export default function ModesTab() {
           /* Modifiers & Roles Tab */
           <View style={styles.modifiersTabContainer}>
             {/* Section 1: Global Modifiers */}
-            <View style={styles.sectionHeaderWrap}>
-              <View style={[styles.sectionDot, { backgroundColor: colors.warning }]} />
-              <Text variant="label" style={{ color: colors.warning, fontSize: 12 }}>
-                GLOBAL MODIFIERS ({allModifiers.length})
-              </Text>
-            </View>
-            <Text variant="caption" style={{ color: colors.textMuted, marginBottom: spacing.sm }}>
+            <TacticalDivider
+              label="GLOBAL MUTATORS"
+              sublabel={`${allModifiers.length} ACTIVE`}
+              icon="hardware-chip-outline"
+              variant="bracket"
+              color={colors.warning}
+              style={{ marginBottom: 8 }}
+            />
+            <Text variant="caption" style={{ color: colors.textMuted, marginBottom: spacing.md, paddingHorizontal: 4 }}>
               Environmental conditions, mechanics, and hazards that affect every player.
             </Text>
 
@@ -256,7 +304,7 @@ export default function ModesTab() {
                 return (
                   <Card
                     key={mod.id}
-                    variant="default"
+                    variant="elevated"
                     style={[
                       styles.modifierCard,
                       { backgroundColor: colors.surface, borderColor: colors.borderDark },
@@ -267,16 +315,16 @@ export default function ModesTab() {
                         <Ionicons name={iconName} size={18} color={colors.warning} />
                       </View>
                       <View style={{ flex: 1, marginLeft: 10 }}>
-                        <Text variant="title" style={{ color: colors.text, fontSize: 15 }}>
+                        <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                           {mod.name}
                         </Text>
                         <Text variant="caption" numberOfLines={2} style={{ color: colors.textMuted, marginTop: 2, lineHeight: 16 }}>
                           {mod.tagline}
                         </Text>
                       </View>
-                      <Chip
-                        label={mod.complexity === 'high' ? 'ADVANCED' : 'MUTATOR'}
-                        variant="default"
+                      <TacticalMetricChip
+                        value={mod.complexity === 'high' ? 'ADVANCED' : 'MUTATOR'}
+                        variant={mod.complexity === 'high' ? 'warning' : 'muted'}
                         size="sm"
                       />
                     </View>
@@ -302,13 +350,15 @@ export default function ModesTab() {
             </View>
 
             {/* Section 2: Player Modifiers & Roles */}
-            <View style={[styles.sectionHeaderWrap, { marginTop: spacing.xl }]}>
-              <View style={[styles.sectionDot, { backgroundColor: colors.accent }]} />
-              <Text variant="label" style={{ color: colors.accent, fontSize: 12 }}>
-                PLAYER MODIFIERS & SPECIAL ROLES ({allRoles.length})
-              </Text>
-            </View>
-            <Text variant="caption" style={{ color: colors.textMuted, marginBottom: spacing.sm }}>
+            <TacticalDivider
+              label="OPERATIVE ROLES"
+              sublabel={`${allRoles.length} CLASSES`}
+              icon="finger-print-outline"
+              variant="bracket"
+              color={colors.accent}
+              style={{ marginTop: spacing.xl, marginBottom: 8 }}
+            />
+            <Text variant="caption" style={{ color: colors.textMuted, marginBottom: spacing.md, paddingHorizontal: 4 }}>
               Specialized operative classes and hidden assignments assigned to individual players.
             </Text>
 
@@ -395,8 +445,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   modeCard: {
-    padding: 16,
-    borderWidth: 1,
+    padding: 18,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -440,8 +491,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   modifierCard: {
-    padding: 14,
-    borderWidth: 1,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1.5,
   },
   modCardTop: {
     flexDirection: 'row',

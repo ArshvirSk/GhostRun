@@ -25,6 +25,8 @@ import { RulesCard } from '../../src/ui/RulesCard';
 import { RoleBriefingCard } from '../../src/ui/RoleBriefingCard';
 import { MatchDurationTimeline } from '../../src/ui/MatchDurationTimeline';
 import { AreaCompatibilityBadge } from '../../src/ui/AreaCompatibilityBadge';
+import { TacticalDivider } from '../../src/ui/TacticalDivider';
+import { TacticalMetricChip } from '../../src/ui/TacticalMetricChip';
 import { getModeModule } from '../../src/modes/registry';
 import { useUnits } from '../../src/utils/units';
 import { supabase } from '../../src/lib/supabase';
@@ -816,37 +818,45 @@ export default function LobbyScreen() {
           </View>
         </View>
 
-        {/* Mission Code Bar (Bold bare text without box + Share & QR Icon Buttons) */}
-        <View style={styles.compactCodeBar}>
+        {/* Mission Code Bar (Chunky Squircle Tactical Card with Breathing Room) */}
+        <View
+          style={[
+            styles.compactCodeBar,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.borderDark,
+            },
+          ]}
+        >
           <Pressable
             onPress={() => void shareCode()}
             style={styles.codeTextContainer}
             accessibilityRole="button"
             accessibilityLabel={`Room code ${state.game.code}`}
           >
-            <Text style={styles.codeLabelPrefix}>CODE: </Text>
-            <Text style={styles.codeValueBold}>{state.game.code}</Text>
+            <Text style={[styles.codeLabelPrefix, { color: colors.textMuted }]}>CODE: </Text>
+            <Text style={[styles.codeValueBold, { color: colors.text }]}>{state.game.code}</Text>
           </Pressable>
 
           <View style={styles.codeIconButtons}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Share invite code"
+            <TacticalMetricChip
+              icon="share-outline"
+              value="SHARE"
+              size="sm"
+              variant="muted"
               onPress={() => void shareCode()}
-              style={[styles.squareIconButton, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
-            >
-              <Ionicons name="share-outline" size={18} color={colors.text} />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Show QR code and invite link"
+            />
+            <TacticalMetricChip
+              icon="qr-code-outline"
+              value="QR"
+              size="sm"
+              variant="accent"
               onPress={() => setInviteModalVisible(true)}
-              style={[styles.squareIconButton, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
-            >
-              <Ionicons name="qr-code-outline" size={18} color={colors.text} />
-            </Pressable>
+            />
           </View>
         </View>
+
+        <TacticalDivider variant="dashed" style={{ marginVertical: 6 }} />
 
         {activePlayers.length < 2 && !isSoloMode && (
           <View style={styles.warningAlertRow}>
@@ -981,9 +991,12 @@ export default function LobbyScreen() {
 
             {isSoloMode ? (
               <View>
-                <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
-                  SOLO OPERATIVES ({activePlayers.length})
-                </Text>
+                <TacticalDivider
+                  label="SOLO ROSTER"
+                  sublabel={`${activePlayers.length} OPERATIVES`}
+                  variant="bracket"
+                  style={{ marginVertical: 8 }}
+                />
                 {activePlayers.map((player) => (
                   <PlayerRow
                     key={player.id}
@@ -1002,7 +1015,13 @@ export default function LobbyScreen() {
               </View>
             ) : (
               <View style={{ gap: 10 }}>
-                {/* Squad Arena: Side-by-Side Runners vs Hunters (Mockup 1) */}
+                {/* Squad Arena: Side-by-Side Runners vs Hunters */}
+                <TacticalDivider
+                  label="SQUAD ARENA"
+                  sublabel="PVP REAL-WORLD"
+                  variant="bracket"
+                  style={{ marginVertical: 8 }}
+                />
                 <View style={styles.squadArenaRow}>
                   {/* RUNNERS COLUMN */}
                   <View
@@ -1015,10 +1034,13 @@ export default function LobbyScreen() {
                     ]}
                   >
                     <View style={styles.squadColHeader}>
-                      <View style={[styles.squadColDot, { backgroundColor: colors.runner }]} />
-                      <Text style={[styles.squadColTitle, { color: colors.runner }]}>
-                        RUNNERS ({runners.length})
-                      </Text>
+                      <TacticalMetricChip
+                        icon="walk"
+                        value={runners.length}
+                        label="RUNNERS"
+                        variant="runner"
+                        size="sm"
+                      />
                     </View>
 
                     {runners.length === 0 ? (
@@ -1087,10 +1109,13 @@ export default function LobbyScreen() {
                     ]}
                   >
                     <View style={styles.squadColHeader}>
-                      <View style={[styles.squadColDot, { backgroundColor: colors.hunter }]} />
-                      <Text style={[styles.squadColTitle, { color: colors.hunter }]}>
-                        HUNTERS ({hunters.length})
-                      </Text>
+                      <TacticalMetricChip
+                        icon="skull-outline"
+                        value={hunters.length}
+                        label="HUNTERS"
+                        variant="hunter"
+                        size="sm"
+                      />
                     </View>
 
                     {hunters.length === 0 ? (
@@ -1891,9 +1916,9 @@ function PlayerRow({
               }}
             />
           )}
-          <Chip
-            label={player.is_ready ? 'READY' : 'PREPARING'}
-            variant={player.is_ready ? 'accent' : 'muted'}
+          <TacticalMetricChip
+            value={player.is_ready ? 'READY' : 'PREPARING'}
+            variant={player.is_ready ? 'success' : 'muted'}
             size="sm"
           />
         </View>
@@ -1976,8 +2001,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1.5,
     marginTop: 6,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   codeTextContainer: {
     flexDirection: 'row',
@@ -2101,10 +2130,10 @@ const styles = StyleSheet.create({
   },
   squadColumnCard: {
     flex: 1,
-    padding: 10,
-    borderWidth: 1,
-    borderRadius: 12,
-    minHeight: 120,
+    padding: 14,
+    borderWidth: 1.5,
+    borderRadius: 18,
+    minHeight: 140,
     justifyContent: 'space-between',
   },
   squadColHeader: {
@@ -2131,9 +2160,9 @@ const styles = StyleSheet.create({
     marginVertical: 14,
   },
   squadPlayerBox: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 8,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 10,
     marginBottom: 6,
     gap: 4,
   },
