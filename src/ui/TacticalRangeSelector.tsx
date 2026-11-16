@@ -1,6 +1,16 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, ViewStyle } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ViewStyle,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  LayoutChangeEvent,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import { triggerHaptic } from '../motion/haptics';
@@ -14,29 +24,34 @@ export interface TacticalRangeSelectorProps {
   style?: ViewStyle;
 }
 
-const DIAL_STEPS = [
-  200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400, 1600, 1800, 2000,
-];
+// 100m uniform steps from 200m to 2000m (strictly hard capped at 2.0km)
+const DIAL_STEPS = Array.from({ length: 19 }, (_, i) => 200 + i * 100);
 
-const PRESETS = [300, 600, 1000, 1500, 2000];
-
-const ITEM_WIDTH = 58;
+const ITEM_WIDTH = 68;
+const DIAL_HEIGHT = 42;
 
 export function TacticalRangeSelector({
   radiusM,
   minRadiusM = 200,
   maxRadiusM = 2000,
-  stepM = 100,
   onChange,
   style,
 }: TacticalRangeSelectorProps) {
   const { colors, isDark } = useTheme();
   const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
-
-  const accentBg = isDark ? 'rgba(184, 163, 255, 0.16)' : 'rgba(102, 80, 164, 0.12)';
+  const isDraggingRef = useRef(false);
+  const [windowWidth, setWindowWidth] = useState(0);
 
   const clampedRadius = Math.max(minRadiusM, Math.min(maxRadiusM, radiusM));
   const diameterM = clampedRadius * 2;
+
+  const currentIdx = DIAL_STEPS.findIndex((s) => s === clampedRadius);
+  const activeIndex = currentIdx !== -1 ? currentIdx : 4; // default to 600m
+  const lastSnappedIndexRef = useRef(activeIndex);
+
+  const accentBg = isDark ? 'rgba(184, 163, 255, 0.16)' : 'rgba(102, 80, 164, 0.12)';
+  const dialBg = isDark ? '#12141A' : '#ECEEF2';
+  const fadeEdgeColor = isDark ? '#12141A' : '#ECEEF2';
 
   const formatDistance = (m: number) => {
     if (m >= 1000) {
@@ -47,38 +62,71 @@ export function TacticalRangeSelector({
   };
 
   const handleDecrement = () => {
-    if (clampedRadius <= minRadiusM) return;
+    if (activeIndex <= 0) return;
     triggerHaptic('buttonTap');
-    const next = Math.max(minRadiusM, clampedRadius - stepM);
-    onChange(next);
+    const nextIdx = activeIndex - 1;
+    const nextVal = DIAL_STEPS[nextIdx];
+    lastSnappedIndexRef.current = nextIdx;
+    onChange(nextVal);
+    scrollRef.current?.scrollTo({ x: nextIdx * ITEM_WIDTH, animated: true });
   };
 
   const handleIncrement = () => {
-    if (clampedRadius >= maxRadiusM) return;
+    if (activeIndex >= DIAL_STEPS.length - 1) return;
     triggerHaptic('buttonTap');
-    const next = Math.min(maxRadiusM, clampedRadius + stepM);
-    onChange(next);
+    const nextIdx = activeIndex + 1;
+    const nextVal = DIAL_STEPS[nextIdx];
+    lastSnappedIndexRef.current = nextIdx;
+    onChange(nextVal);
+    scrollRef.current?.scrollTo({ x: nextIdx * ITEM_WIDTH, animated: true });
   };
 
-  const handleSelectRadius = (r: number) => {
-    if (r === clampedRadius) return;
-    triggerHaptic('buttonTap');
-    onChange(r);
+  const handleLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0 && w !== windowWidth) {
+      setWindowWidth(w);
+    }
   };
 
-  // Auto-scroll dial so the active value is centered
+  // Sync scroll position when clampedRadius changes externally (e.g. from state change or initial load)
   useEffect(() => {
-    const idx = DIAL_STEPS.findIndex((s) => s === clampedRadius);
-    if (idx !== -1 && scrollRef.current) {
+    if (isDraggingRef.current) return;
+    if (windowWidth > 0 && scrollRef.current) {
       scrollRef.current.scrollTo({
-        x: Math.max(0, idx * ITEM_WIDTH - 60),
+        x: activeIndex * ITEM_WIDTH,
         animated: true,
       });
+      lastSnappedIndexRef.current = activeIndex;
     }
-  }, [clampedRadius]);
+  }, [activeIndex, windowWidth]);
 
-  const canDecrement = clampedRadius > minRadiusM;
-  const canIncrement = clampedRadius < maxRadiusM;
+  // Stepped "tick-tick" friction scrolling
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const rawIdx = Math.round(offsetX / ITEM_WIDTH);
+    const targetIdx = Math.max(0, Math.min(DIAL_STEPS.length - 1, rawIdx));
+
+    if (targetIdx !== lastSnappedIndexRef.current) {
+      lastSnappedIndexRef.current = targetIdx;
+      triggerHaptic('buttonTap');
+      onChange(DIAL_STEPS[targetIdx]);
+    }
+  };
+
+  const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    isDraggingRef.current = false;
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const rawIdx = Math.round(offsetX / ITEM_WIDTH);
+    const targetIdx = Math.max(0, Math.min(DIAL_STEPS.length - 1, rawIdx));
+    scrollRef.current?.scrollTo({
+      x: targetIdx * ITEM_WIDTH,
+      animated: true,
+    });
+  };
+
+  const canDecrement = activeIndex > 0;
+  const canIncrement = activeIndex < DIAL_STEPS.length - 1;
+  const paddingHorizontal = windowWidth > 0 ? (windowWidth - ITEM_WIDTH) / 2 : 80;
 
   return (
     <View style={[styles.container, style]}>
@@ -114,9 +162,9 @@ export function TacticalRangeSelector({
         </View>
       </View>
 
-      {/* Stepper Controls & Center Dial Tape */}
+      {/* Stepper Controls & Stepped Tick-Tick Dial */}
       <View style={styles.stepperRow}>
-        {/* Decrement Button */}
+        {/* Decrement Button [-] */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Decrease zone radius"
@@ -133,43 +181,74 @@ export function TacticalRangeSelector({
         >
           <Ionicons
             name="remove"
-            size={16}
+            size={18}
             color={canDecrement ? colors.text : colors.textMuted}
           />
         </Pressable>
 
-        {/* Horizontal Dial Tape */}
+        {/* Dial Tape Window with Weight, Friction, Reticle & Gradient Edges */}
         <View
+          onLayout={handleLayout}
           style={[
             styles.dialWindow,
             {
-              backgroundColor: isDark ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.04)',
+              backgroundColor: dialBg,
               borderColor: colors.borderLight,
             },
           ]}
         >
+          {/* Centered Active Reticle Pill */}
+          {windowWidth > 0 && (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.reticle,
+                {
+                  left: (windowWidth - ITEM_WIDTH) / 2,
+                  width: ITEM_WIDTH,
+                  backgroundColor: accentBg,
+                  borderColor: colors.accent,
+                },
+              ]}
+            />
+          )}
+
+          {/* Stepped Swiping ScrollView with Friction & Momentum Snapping */}
           <ScrollView
             ref={scrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.dialScrollContent}
+            snapToInterval={ITEM_WIDTH}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            disableIntervalMomentum={true}
+            scrollEventThrottle={16}
+            onScrollBeginDrag={() => {
+              isDraggingRef.current = true;
+            }}
+            onScroll={handleScroll}
+            onScrollEndDrag={handleScrollEnd}
+            onMomentumScrollEnd={handleScrollEnd}
+            contentContainerStyle={[
+              styles.dialScrollContent,
+              { paddingHorizontal },
+            ]}
           >
-            {DIAL_STEPS.map((step) => {
-              const isActive = step === clampedRadius;
+            {DIAL_STEPS.map((step, idx) => {
+              const isActive = idx === activeIndex;
               return (
                 <Pressable
                   key={step}
-                  onPress={() => handleSelectRadius(step)}
-                  style={[
-                    styles.dialItem,
-                    isActive && [
-                      styles.dialItemActive,
-                      {
-                        backgroundColor: accentBg,
-                        borderColor: colors.accent,
-                      },
-                    ],
-                  ]}
+                  onPress={() => {
+                    triggerHaptic('buttonTap');
+                    lastSnappedIndexRef.current = idx;
+                    onChange(step);
+                    scrollRef.current?.scrollTo({
+                      x: idx * ITEM_WIDTH,
+                      animated: true,
+                    });
+                  }}
+                  style={styles.dialItem}
                 >
                   <Text
                     style={[
@@ -177,7 +256,7 @@ export function TacticalRangeSelector({
                       {
                         color: isActive ? colors.accent : colors.textMuted,
                         fontWeight: isActive ? '900' : '600',
-                        fontSize: isActive ? 13 : 11,
+                        fontSize: isActive ? 14 : 11,
                       },
                     ]}
                   >
@@ -187,9 +266,27 @@ export function TacticalRangeSelector({
               );
             })}
           </ScrollView>
+
+          {/* Left Gradient Edge (Fades toward [-] button) */}
+          <LinearGradient
+            colors={[fadeEdgeColor, 'transparent']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.fadeLeft}
+            pointerEvents="none"
+          />
+
+          {/* Right Gradient Edge (Fades toward [+] button) */}
+          <LinearGradient
+            colors={['transparent', fadeEdgeColor]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.fadeRight}
+            pointerEvents="none"
+          />
         </View>
 
-        {/* Increment Button */}
+        {/* Increment Button [+] */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Increase zone radius"
@@ -206,48 +303,10 @@ export function TacticalRangeSelector({
         >
           <Ionicons
             name="add"
-            size={16}
+            size={18}
             color={canIncrement ? colors.text : colors.textMuted}
           />
         </Pressable>
-      </View>
-
-      {/* Quick Jump Snap Chips */}
-      <View style={styles.presetsRow}>
-        {PRESETS.map((p) => {
-          const isSelected = clampedRadius === p;
-          const label = p === 2000 ? '2.0KM MAX' : formatDistance(p).toUpperCase();
-          return (
-            <Pressable
-              key={p}
-              accessibilityRole="button"
-              onPress={() => handleSelectRadius(p)}
-              style={[
-                styles.presetChip,
-                {
-                  backgroundColor: isSelected
-                    ? accentBg
-                    : isDark
-                    ? colors.surfaceElevated
-                    : colors.surface,
-                  borderColor: isSelected ? colors.accent : colors.border,
-                },
-              ]}
-            >
-              <Text
-                style={{
-                  fontFamily: 'Archivo-Bold',
-                  fontSize: 10,
-                  fontWeight: '800',
-                  color: isSelected ? colors.accent : colors.textMuted,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
       </View>
     </View>
   );
@@ -286,11 +345,11 @@ const styles = StyleSheet.create({
   stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   stepButton: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
@@ -298,44 +357,50 @@ const styles = StyleSheet.create({
   },
   dialWindow: {
     flex: 1,
-    height: 36,
-    borderRadius: 18,
+    height: DIAL_HEIGHT,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  reticle: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    zIndex: 1,
   },
   dialScrollContent: {
     alignItems: 'center',
-    paddingHorizontal: 6,
-    gap: 4,
+    height: DIAL_HEIGHT,
   },
   dialItem: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    width: ITEM_WIDTH,
+    height: DIAL_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  dialItemActive: {
-    borderWidth: 1,
+    zIndex: 2,
   },
   dialItemText: {
     fontFamily: 'Archivo-Bold',
+    textAlign: 'center',
   },
-  presetsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 4,
-    marginTop: 6,
+  fadeLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 32,
+    zIndex: 3,
   },
-  presetChip: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
+  fadeRight: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 32,
+    zIndex: 3,
   },
 });

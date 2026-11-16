@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-17  
 **Artifact:** `release/GhostRun-v2.9.6.apk`  
-**Size:** 56,703,000 bytes (54.08 MB)  
-**SHA-256 Checksum:** `34391C35D1B0A58FA8A57765C6301A0431A378A66EBDC15DD4CD454287FA31FE`  
+**Size:** 56,705,700 bytes (54.08 MB)  
+**SHA-256 Checksum:** `7498FA34D5AFCF37B8FF8F496BC012CE1847731527456D4D82168A0722B43B53`  
 **Version:** `2.9.6`  
 **VersionCode:** `21`  
 **Architecture:** `arm64-v8a`  
@@ -13,28 +13,24 @@
 
 ## Overview
 
-GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements across core screens. This release introduces the new military-grade **Tactical Rangefinder Zone Selector** with a 2.0 km hard cap and continuous glitch-free camera zooming, silky-smooth sliding pills on both the main floating navbar and sub-tab bars, a horizontal swipe pager on the Modes tab, and calibrated map camera viewport padding.
+GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements across core screens. This release introduces the new military-grade **Tactical Rangefinder Zone Selector** with physical stepped friction, haptic tick feedback, left/right edge gradients, and glitch-free camera zooming, silky-smooth sliding pills on both the main floating navbar and sub-tab bars, a horizontal swipe pager on Modes, Squads, and Schedule tabs, and streamlined card layouts.
 
 ---
 
 ## Key Highlights & Changes
 
-### 1. Tactical Rangefinder Zone Selector & 2km Hard Cap (`src/ui/TacticalRangeSelector.tsx`)
-- **New UI Form Inspired by PlayCulture**: Replaced the static chips with a compact tactical rangefinder selector:
-  - **Live Readout Header**: Displays current radius (`600M`) and total diameter (`Ø 1.2 KM`) in high-contrast accent typography.
-  - **Tactile Steppers**: Squircle `[ - ]` and `[ + ]` buttons nudge the arena radius in 100m steps with crisp haptics (`triggerHaptic('buttonTap')`).
-  - **Horizontal Range Dial**: Scrolling range track (`200m` to `2000m`) with auto-centering on active selection.
-  - **Quick-Jump Snap Pills**: Direct one-tap jump buttons for standard perimeters (`[ 300M ]`, `[ 600M ]`, `[ 1.0KM ]`, `[ 1.5KM ]`, `[ 2.0KM MAX ]`).
-- **2.0 km Hard Cap**: Strictly enforced a maximum 2000m (2.0 km) perimeter across all modes in both UI and `hostStore`.
+### 1. Weighted Stepped Dial Zone Selector & 2km Hard Cap (`src/ui/TacticalRangeSelector.tsx`)
+- **Weighted Physical Friction**: Implemented `snapToInterval`, `snapToAlignment="start"`, `decelerationRate="fast"`, and `disableIntervalMomentum={true}` so the dial stops with tactile weight and friction on each 100m step instead of spinning loosely.
+- **Haptic Tick Feedback**: Crisp haptic pulse (`triggerHaptic('buttonTap')`) fires on every single step transition as you swipe or tap.
+- **Edge Fades**: Dual `<LinearGradient>` overlays smoothly fade numbers towards the `[-]` and `[+]` stepper buttons.
+- **Centered Indicator Reticle**: Active selection is framed inside an accent-highlighted reticle pill.
+- **Eliminated Presets Row**: Stripped the redundant row of preset buttons for a clean, focused UI.
+- **2.0 km Hard Cap**: Strictly enforced a maximum 2000m (2.0 km) perimeter across all modes.
 
-### 2. Glitch-Free & Continuous Camera Zooming (`app/host/area.tsx`)
-- **Eliminated Animation Conflict**: Resolved camera glitches caused by duplicate simultaneous `easeTo` calls from button `onPress` and `useEffect`.
-- **Continuous Logarithmic Scaling**: Replaced discrete stair-step zoom thresholds with a smooth continuous curve ($z = 14.8 - \log_2(r / 300)$), ensuring consistent proportional framing across all radii (200m to 2000m).
-- **Debounced Camera Controller**: Added a 40ms debounce to camera updates so rapid stepper nudges or dial adjustments glide smoothly to the target zoom without native cancellation twitching or "zoom out then in" artifacts.
-
-### 3. Viewport-Calibrated Map Centering (`app/host/area.tsx`)
-- **Compensated Camera Viewport**: Configured `AREA_MAP_PADDING = { top: 220, bottom: 85, left: 16, right: 16 }` across camera initialization, GPS recentering, map clicks, and animated radius adjustments.
-- **Dead-Centered Arena**: The boundary zone is framed dead-center in the visible, uncovered canvas on any phone.
+### 2. Glitch-Free Camera Zooming & Screen Real Estate (`app/host/area.tsx`)
+- **Zero Coordinate Twitch or Jumps**: Replaced `easeTo` (which re-calculated padded coordinates and triggered double-padding shifts in MapLibre Android) with `cameraRef.current.zoomTo(...)` with 80ms debounce. Zoom transitions now glide smoothly without momentary zoom-out/in or coordinate glitching.
+- **Removed Compatibility Badge**: Removed the `✓ ARENA & DURATION COMPATIBLE` badge, freeing up screen space so the map canvas and boundary ring have maximum breathing room.
+- **Calibrated Viewport Padding**: Adjusted `AREA_MAP_PADDING = { top: 160, bottom: 85, left: 16, right: 16 }` for dead-center boundary framing.
 
 ### 4. Swipeable Modes Pager & Animated Slider (`app/(tabs)/modes.tsx` & `src/ui/SegmentBar.tsx`)
 - **Horizontal Swipe Pager**: Wrapped game modes and field mutators in a full-screen horizontal paging container (`ScrollView horizontal pagingEnabled`). Users can now swipe left/right naturally to switch between **Modes** and **Modifiers**.

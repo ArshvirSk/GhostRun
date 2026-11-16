@@ -12,7 +12,6 @@ import { Text } from '../../src/ui/Text';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
-import { AreaCompatibilityBadge } from '../../src/ui/AreaCompatibilityBadge';
 import { TacticalRangeSelector } from '../../src/ui/TacticalRangeSelector';
 import { useHostStore, LAST_LOCATION_KEY } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
@@ -29,7 +28,7 @@ const DARK_MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
 
 
-const AREA_MAP_PADDING = { top: 220, bottom: 85, left: 16, right: 16 };
+const AREA_MAP_PADDING = { top: 160, bottom: 85, left: 16, right: 16 };
 
 /**
  * Calculates optimal camera zoom level to fit a zone of radiusM within screen bounds.
@@ -89,15 +88,12 @@ export default function HostAreaScreen() {
     zoomDebounceRef.current = setTimeout(() => {
       if (!mapLoadedRef.current || !cameraRef.current) return;
       const targetZoom = getZoomForRadius(radius);
-      const currentCenter = useHostStore.getState().center;
-      cameraRef.current.easeTo({
-        center: currentCenter,
-        zoom: targetZoom,
-        duration: 350,
-        padding: AREA_MAP_PADDING,
+      // Use zoomTo directly: avoids MapLibre Android padding re-projection / jump twitch
+      cameraRef.current.zoomTo(targetZoom, {
+        duration: 260,
         easing: 'ease',
       });
-    }, 40);
+    }, 80);
 
     return () => {
       if (zoomDebounceRef.current) {
@@ -618,14 +614,6 @@ export default function HostAreaScreen() {
                 : 'Tap inside the boundary ring to place the jail facility.'}
             </Text>
           </View>
-
-          {/* Area & Duration Compatibility Badge */}
-          <AreaCompatibilityBadge
-            radiusM={radius}
-            durationMinutes={Math.round((rules?.durationS || 900) / 60)}
-            showDetail={false}
-            style={{ marginTop: spacing.xs }}
-          />
 
           {placementError !== '' && (
             <Text variant="body" style={{ color: colors.danger, fontSize: 12, marginTop: 4 }}>
