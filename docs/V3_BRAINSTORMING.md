@@ -93,30 +93,35 @@ Because indoor GPS drifts horizontally ($\pm 15\text{m} - 35\text{m}$), relying 
 
 ---
 
-### Pillar 2: Sensory Immersion & Tactical Audio Engine ("The Ear HUD")
+### Pillar 2: Tactical Audio & Speaker FX (Loudspeaker Cues & Outdoor Safety)
 
-Currently, GhostRun relies on screen visuals and haptic buzzes. In physical running and outdoor hide-and-seek, constantly looking down at a screen is dangerous and immersion-breaking. Introducing a dedicated **Tactical Audio Engine** allows operatives to run with their phone in a pocket or armband while wearing earbuds.
+Audio cues provide essential situational awareness during physical sprinting, but **safety in the real world comes first**.
 
-#### Key Mechanics:
-1. **Radar Sonar Ping:** A crisp, submarine-style delayed audio ping whenever a location pulse fires over the network.
-2. **Proximity Heartbeat Pulse:**
-   - When an opposing operative enters proximity ($<50\text{m}$), a subtle, low-frequency heartbeat begins.
-   - At $<25\text{m}$, the heartbeat quickens and intensifies.
-   - At $<10\text{m}$ (danger/tag zone), a high-tension auditory/haptic drone triggers.
-3. **Vertical Audio Cues (Paired with Pillar 1):**
-   - Target on higher floor: higher-pitch sonar harmonic chirp.
-   - Target on lower floor: deep sub-bass acoustic pulse.
-   - Same floor: urgent rhythmic heartbeat!
-4. **Headstart Countdown & Release Sirens:**
-   - 90-second runner headstart audio countdown with tactical radio static.
-   - High-energy airhorn/siren when hunters are officially released.
-5. **Tactical Capture Alarm:** Instant sound effect when a tag is registered or when an operative is eliminated.
-6. **AI GM Radio Comms (TTS Narration):**
-   - *"Warning: Hunter approaching Sector South."*
-   - *"All runners: 3 minutes remaining on extraction window."*
+> [!CAUTION]
+> **Pedestrian Audio Safety Mandate:**
+> Wearing noise-isolating in-ear earbuds while sprinting in outdoor, park, or urban environments is a dangerous hazard that blocks real-world sounds (approaching cars, bicycles, sirens, horns, and warning shouts). GhostRun explicitly **does not require or recommend wearing in-ear headphones** during outdoor play.
+>
+> Instead, all tactical audio effects are engineered specifically for the **phone's built-in loudspeaker**. This keeps the operative's ears 100% open to ambient traffic and pedestrian hazards while delivering loud, punchy, unmistakable audio feedback.
 
-* **Player Impact:** Massive. Transforms the app from a digital map into an immersive sensory stealth radar.
-* **Effort:** Low-to-Medium (utilizes `expo-audio`, plays in background with screen off).
+#### Key Mechanics (Engineered for Phone Loudspeaker):
+1. **Radar Sonar Ping:** A sharp, resonant sonar pulse through the loudspeaker whenever a network location ping is broadcast.
+2. **Escalating Proximity Heartbeat:**
+   - When an opposing operative enters proximity ($<50\text{m}$), a deep, rhythmic heartbeat begins thumping through the speaker paired with synchronized haptics.
+   - At $<25\text{m}$, the heartbeat quickens in tempo.
+   - At $<10\text{m}$ (danger/tag zone), a high-tension acoustic alarm fires.
+3. **Headstart Sirens & Release Horns:**
+   - 90-second runner headstart countdown audio with tactical radio static.
+   - High-energy airhorn/siren blast when hunters are released into the grid.
+4. **Tactical Tag Confirmation Chime:** Instant, crisp acoustic confirmation when a tag is registered or an operative is captured.
+5. **Vertical Audio Cues (Paired with Pillar 1):**
+   - Higher floor: High-pitched sonar harmonic chirp.
+   - Lower floor: Deep sub-bass pulse.
+   - Same floor: Urgent rhythmic double-chirp.
+6. **Optional Open-Ear / Bone Conduction Setting:**
+   - For players who prefer personal audio, the app includes a dedicated setting that recommends **open-ear or bone-conduction headsets** with transparency mode enabled, preserving environmental hearing.
+
+* **Player Impact:** High immersion without isolating players from their surroundings.
+* **Effort:** Low-to-Medium (utilizes `expo-audio` optimized for mobile loudspeaker dynamics).
 
 ---
 
