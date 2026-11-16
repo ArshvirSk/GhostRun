@@ -85,11 +85,13 @@ function SlidingTabBarBackground({ activeIndex }: { activeIndex: number }) {
   const paddingH = 16;
   const usableWidth = containerWidth > paddingH * 2 ? containerWidth - paddingH * 2 : 0;
   const tabWidth = usableWidth > 0 ? usableWidth / 3 : 0;
+  const pillWidth = 56;
 
   useEffect(() => {
     if (tabWidth > 0) {
+      const targetX = paddingH + activeIndex * tabWidth + (tabWidth - pillWidth) / 2;
       Animated.spring(slideAnim, {
-        toValue: paddingH + activeIndex * tabWidth + 2,
+        toValue: targetX,
         friction: 8,
         tension: 75,
         useNativeDriver: true,
@@ -108,9 +110,8 @@ function SlidingTabBarBackground({ activeIndex }: { activeIndex: number }) {
           style={[
             styles.sliderPill,
             {
-              width: tabWidth - 4,
+              width: pillWidth,
               backgroundColor: colors.primaryLight,
-              borderColor: colors.primary,
               transform: [{ translateX: slideAnim }],
             },
           ]}
@@ -232,11 +233,10 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   sliderPill: {
     position: 'absolute',
-    top: 6,
-    bottom: 6,
+    top: 7,
+    height: 32,
     left: 0,
-    borderRadius: 24,
-    borderWidth: 1,
+    borderRadius: 16,
     zIndex: 1,
   },
 });

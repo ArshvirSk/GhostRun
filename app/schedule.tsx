@@ -1,12 +1,15 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -16,6 +19,8 @@ import { useTheme } from '../src/theme/ThemeProvider';
 import { Text } from '../src/ui/Text';
 import { Card } from '../src/ui/Card';
 import { Button } from '../src/ui/Button';
+import { Chip } from '../src/ui/Chip';
+import { SegmentBar } from '../src/ui/SegmentBar';
 import { triggerHaptic } from '../src/motion/haptics';
 import {
   ScheduledGame,
@@ -47,14 +52,19 @@ const MODES = [
   { id: 'jailbreak', name: 'Jailbreak' },
 ];
 
+type TabKey = 'upcoming' | 'create';
+
 export default function ScheduleScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors, spacing, radii } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const { colors, spacing, radii, isDark } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'create'>('upcoming');
+  const [activeTab, setActiveTab] = useState<TabKey>('upcoming');
   const [upcomingGames, setUpcomingGames] = useState<ScheduledGame[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const pagerRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   // Form State
   const [title, setTitle] = useState('');
@@ -111,6 +121,25 @@ export default function ScheduleScreen() {
 
     return new Date(now.getTime() + 2 * 60 * 60 * 1000);
   }
+
+  const handleTabChange = (id: string) => {
+    const tabKey = id as TabKey;
+    setActiveTab(tabKey);
+    setErrorMessage('');
+    const pageIndex = tabKey === 'upcoming' ? 0 : 1;
+    pagerRef.current?.scrollTo({ x: pageIndex * screenWidth, animated: true });
+  };
+
+  const handlePagerScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const pageIndex = Math.round(offsetX / screenWidth);
+    const newTab: TabKey = pageIndex === 0 ? 'upcoming' : 'create';
+    if (newTab !== activeTab) {
+      triggerHaptic('buttonTap');
+      setActiveTab(newTab);
+      setErrorMessage('');
+    }
+  };
 
   async function handleSchedule() {
     if (submitting) return;
@@ -175,7 +204,7 @@ export default function ScheduleScreen() {
     setNotes('');
     setCreatedGame(null);
     setErrorMessage('');
-    setActiveTab('upcoming');
+    handleTabChange('upcoming');
   }
 
   return (
@@ -183,17 +212,16 @@ export default function ScheduleScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
+      {/* Sticky Top Header Area */}
+      <View
+        style={[
+          styles.headerArea,
           {
-            paddingTop: Math.max(insets.top, 16) + 8,
-            paddingBottom: Math.max(insets.bottom, 16) + 32,
+            paddingTop: Math.max(insets.top, 16) + 4,
             paddingHorizontal: spacing.lg,
           },
         ]}
       >
-        {/* Tactical Back Navigation */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
@@ -206,318 +234,354 @@ export default function ScheduleScreen() {
           </Text>
         </Pressable>
 
-        {/* Screen Title */}
-        <Text variant="display" style={{ color: colors.text, marginTop: spacing.md }}>
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs }}>
           SCHEDULE
         </Text>
-        <Text variant="body" style={{ color: colors.textMuted, marginTop: 4, marginBottom: spacing.lg }}>
-          Plan upcoming tactical operations, RSVP with your squad, and export calendar reminders.
+        <Text variant="body" style={{ color: colors.textMuted, marginTop: 2, marginBottom: spacing.sm }}>
+          Plan upcoming operations, RSVP with your squad, and export calendars.
         </Text>
 
-        {/* Nav Tabs */}
-        <View style={[styles.tabBar, { borderColor: colors.borderDark, backgroundColor: colors.surface }]}>
-          <Pressable
-            accessibilityRole="tab"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              setActiveTab('upcoming');
-              setErrorMessage('');
-            }}
+        {/* 2-Tab Segment Bar with Animated Slider */}
+        <SegmentBar
+          items={[
+            { id: 'upcoming', label: `UPCOMING (${upcomingGames.length})` },
+            { id: 'create', label: 'SCHEDULE NEW' },
+          ]}
+          activeId={activeTab}
+          onChange={handleTabChange}
+          style={{ marginBottom: 4 }}
+        />
+
+        {/* Global Error Banner */}
+        {errorMessage ? (
+          <View
             style={[
-              styles.tabBtn,
-              activeTab === 'upcoming' && {
-                backgroundColor: colors.surfaceElevated,
-                borderBottomColor: colors.primary,
-                borderBottomWidth: 2,
-              },
+              styles.errorBanner,
+              { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder, marginTop: 6 },
             ]}
           >
-            <Ionicons
-              name="calendar-outline"
-              size={16}
-              color={activeTab === 'upcoming' ? colors.primary : colors.textMuted}
-            />
-            <Text
-              variant="label"
-              style={{
-                color: activeTab === 'upcoming' ? colors.text : colors.textMuted,
-                marginLeft: 6,
-              }}
-            >
-              UPCOMING ({upcomingGames.length})
+            <Ionicons name="alert-circle-outline" size={16} color={colors.dangerText} />
+            <Text variant="caption" style={{ color: colors.dangerText, marginLeft: 8, flex: 1 }}>
+              {errorMessage}
             </Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="tab"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              setActiveTab('create');
-              setErrorMessage('');
-            }}
-            style={[
-              styles.tabBtn,
-              activeTab === 'create' && {
-                backgroundColor: colors.surfaceElevated,
-                borderBottomColor: colors.primary,
-                borderBottomWidth: 2,
-              },
-            ]}
-          >
-            <Ionicons
-              name="add-circle-outline"
-              size={16}
-              color={activeTab === 'create' ? colors.primary : colors.textMuted}
-            />
-            <Text
-              variant="label"
-              style={{
-                color: activeTab === 'create' ? colors.text : colors.textMuted,
-                marginLeft: 6,
-              }}
-            >
-              SCHEDULE NEW
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* TAB 1: UPCOMING GAMES */}
-        {activeTab === 'upcoming' && (
-          <View style={{ marginTop: spacing.md }}>
-            {loading ? (
-              <View style={styles.centerBox}>
-                <ActivityIndicator color={colors.primary} size="large" />
-                <Text variant="caption" style={{ color: colors.textMuted, marginTop: spacing.sm }}>
-                  Scanning tactical calendar...
-                </Text>
-              </View>
-            ) : upcomingGames.length === 0 ? (
-              <Card
-                variant="elevated"
-                style={[styles.emptyCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-              >
-                <Ionicons name="calendar-outline" size={40} color={colors.textSubtle} />
-                <Text variant="title" style={{ color: colors.text, marginTop: spacing.sm }}>
-                  No Upcoming Missions
-                </Text>
-                <Text variant="caption" style={{ color: colors.textMuted, textAlign: 'center', marginTop: 4, marginBottom: spacing.md }}>
-                  No operations currently scheduled. Deploy a new scheduled mission to alert your squad!
-                </Text>
-                <Button
-                  title="Schedule New Mission"
-                  variant="primary"
-                  size="sm"
-                  onPress={() => setActiveTab('create')}
-                />
-              </Card>
-            ) : (
-              upcomingGames.map((game) => {
-                const dateObj = new Date(game.scheduled_at);
-                const dateStr = dateObj.toLocaleDateString([], {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                });
-                const timeStr = dateObj.toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
-
-                return (
-                  <Card
-                    key={game.id}
-                    variant="elevated"
-                    style={[styles.gameCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
-                  >
-                    <View style={styles.gameCardHeader}>
-                      <View style={{ flex: 1 }}>
-                        <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                          {game.title}
-                        </Text>
-                        <Text variant="caption" style={{ color: colors.primary, marginTop: 2 }}>
-                          {game.mode_id.toUpperCase().replace('_', ' ')} · {dateStr} at {timeStr}
-                        </Text>
-                        {game.area_name ? (
-                          <View style={styles.inlineRow}>
-                            <Ionicons name="location-outline" size={13} color={colors.textMuted} />
-                            <Text variant="caption" style={{ color: colors.textMuted, marginLeft: 4 }}>
-                              {game.area_name}
-                            </Text>
-                          </View>
-                        ) : null}
-                        {game.notes ? (
-                          <Text variant="caption" style={{ color: colors.textSubtle, marginTop: 4, fontStyle: 'italic' }}>
-                            "{game.notes}"
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Share Calendar Invite"
-                        onPress={() => void handleExportCalendar(game)}
-                        style={[styles.iconBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-                      >
-                        <Ionicons name="share-social-outline" size={18} color={colors.text} />
-                      </Pressable>
-                    </View>
-
-                    {/* RSVP Action Bar */}
-                    <View style={[styles.rsvpBar, { borderTopColor: colors.borderLight }]}>
-                      <Text variant="label" style={{ color: colors.textMuted, fontSize: 11 }}>
-                        RSVP:
-                      </Text>
-                      <View style={styles.rsvpBtnRow}>
-                        <Pressable
-                          onPress={() => void handleRsvp(game.id, 'attending')}
-                          style={[styles.rsvpChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-                        >
-                          <Ionicons name="checkmark-circle" size={14} color={colors.runner} />
-                          <Text variant="caption" style={{ color: colors.text, marginLeft: 4, fontSize: 11 }}>
-                            Going
-                          </Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => void handleRsvp(game.id, 'tentative')}
-                          style={[styles.rsvpChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-                        >
-                          <Ionicons name="help-circle" size={14} color={colors.warning} />
-                          <Text variant="caption" style={{ color: colors.text, marginLeft: 4, fontSize: 11 }}>
-                            Maybe
-                          </Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => void handleRsvp(game.id, 'declined')}
-                          style={[styles.rsvpChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-                        >
-                          <Ionicons name="close-circle" size={14} color={colors.danger} />
-                          <Text variant="caption" style={{ color: colors.text, marginLeft: 4, fontSize: 11 }}>
-                            Pass
-                          </Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  </Card>
-                );
-              })
-            )}
           </View>
-        )}
+        ) : null}
+      </View>
 
-        {/* TAB 2: SCHEDULE NEW OPERATION */}
-        {activeTab === 'create' && (
-          <View style={{ marginTop: spacing.md }}>
-            {createdGame ? (
-              <Card
-                variant="elevated"
-                style={[styles.successCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.primary }]}
+      {/* Horizontal Swipeable Pager */}
+      <ScrollView
+        ref={pagerRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handlePagerScrollEnd}
+        scrollEventThrottle={16}
+        style={{ flex: 1 }}
+      >
+        {/* PAGE 1: UPCOMING MISSIONS */}
+        <ScrollView
+          style={{ width: screenWidth }}
+          contentContainerStyle={[
+            styles.pageContent,
+            {
+              paddingHorizontal: spacing.lg,
+              paddingBottom: Math.max(insets.bottom, 16) + 32,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          {loading ? (
+            <View style={styles.centerBox}>
+              <ActivityIndicator color={colors.primary} size="large" />
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: spacing.sm }}>
+                Scanning tactical calendar...
+              </Text>
+            </View>
+          ) : upcomingGames.length === 0 ? (
+            <Card
+              variant="elevated"
+              style={[
+                styles.emptyCard,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark },
+              ]}
+            >
+              <Ionicons name="calendar-outline" size={38} color={colors.textSubtle} />
+              <Text variant="title" style={{ color: colors.text, marginTop: spacing.sm }}>
+                No Upcoming Missions
+              </Text>
+              <Text
+                variant="caption"
+                style={{
+                  color: colors.textMuted,
+                  textAlign: 'center',
+                  marginTop: 4,
+                  marginBottom: spacing.md,
+                }}
               >
-                <Ionicons name="checkmark-circle-outline" size={48} color={colors.primary} />
-                <Text variant="title" style={{ color: colors.text, marginTop: spacing.sm, textAlign: 'center' }}>
-                  Operation Scheduled!
-                </Text>
-                <Text variant="body" style={{ color: colors.textMuted, textAlign: 'center', marginTop: 4 }}>
-                  "{createdGame.title}" set for{' '}
-                  {new Date(createdGame.scheduled_at).toLocaleString([], {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
-                <View style={{ marginTop: spacing.lg, width: '100%', gap: spacing.sm }}>
-                  <Button
-                    title="Export / Share .ICS Calendar"
-                    onPress={() => void handleExportCalendar(createdGame)}
-                    variant="primary"
-                  />
-                  <Button
-                    title="Back to Scheduled Missions"
-                    onPress={handleResetForm}
-                    variant="ghost"
-                  />
-                </View>
-              </Card>
-            ) : (
-              <Card
-                variant="default"
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
-              >
-                {errorMessage ? (
-                  <View style={[styles.errorBox, { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder }]}>
-                    <Ionicons name="alert-circle" size={16} color={colors.dangerText} />
-                    <Text variant="caption" style={{ color: colors.dangerText, marginLeft: 6, flex: 1 }}>
-                      {errorMessage}
-                    </Text>
-                  </View>
-                ) : null}
+                No operations currently scheduled. Deploy a new scheduled mission to alert your squad!
+              </Text>
+              <Button
+                title="Schedule New Mission"
+                variant="primary"
+                size="sm"
+                onPress={() => handleTabChange('create')}
+              />
+            </Card>
+          ) : (
+            upcomingGames.map((game) => {
+              const dateObj = new Date(game.scheduled_at);
+              const dateStr = dateObj.toLocaleDateString([], {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              });
+              const timeStr = dateObj.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              });
 
-                {/* Operation Title */}
-                <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
-                  OPERATION TITLE *
-                </Text>
-                <TextInput
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder="e.g. Sector 7 Midnight Chase"
-                  placeholderTextColor={colors.textSubtle}
+              return (
+                <Card
+                  key={game.id}
+                  variant="elevated"
                   style={[
-                    styles.input,
-                    {
-                      borderColor: colors.borderDark,
-                      backgroundColor: colors.surfaceElevated,
-                      color: colors.text,
-                      borderRadius: radii.sm,
-                    },
+                    styles.gameCard,
+                    { backgroundColor: colors.surface, borderColor: colors.borderDark },
                   ]}
-                  maxLength={60}
-                />
+                >
+                  <View style={styles.gameCardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                        {game.title}
+                      </Text>
+                      <Text variant="caption" style={{ color: colors.primary, marginTop: 2 }}>
+                        {game.mode_id.toUpperCase().replace('_', ' ')} · {dateStr} at {timeStr}
+                      </Text>
+                      {game.area_name ? (
+                        <View style={styles.inlineRow}>
+                          <Ionicons name="location-outline" size={13} color={colors.textMuted} />
+                          <Text variant="caption" style={{ color: colors.textMuted, marginLeft: 4 }}>
+                            {game.area_name}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {game.notes ? (
+                        <Text
+                          variant="caption"
+                          style={{
+                            color: colors.textSubtle,
+                            marginTop: 4,
+                            fontStyle: 'italic',
+                          }}
+                        >
+                          "{game.notes}"
+                        </Text>
+                      ) : null}
+                    </View>
 
-                {/* Tactical Mode Selector */}
-                <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.xs }}>
-                  TACTICAL MODE
-                </Text>
-                <View style={styles.modeRow}>
-                  {MODES.map((mode) => (
                     <Pressable
-                      key={mode.id}
-                      onPress={() => {
-                        triggerHaptic('buttonTap');
-                        setSelectedMode(mode.id);
-                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Export to Calendar"
+                      onPress={() => void handleExportCalendar(game)}
                       style={[
-                        styles.modeChip,
+                        styles.iconBtn,
                         {
-                          borderColor: selectedMode === mode.id ? colors.primary : colors.borderDark,
-                          backgroundColor: selectedMode === mode.id ? colors.surfaceElevated : colors.surface,
+                          backgroundColor: colors.surfaceElevated,
+                          borderColor: colors.borderDark,
                         },
                       ]}
                     >
-                      <Ionicons
-                        name={selectedMode === mode.id ? 'radio-button-on' : 'radio-button-off'}
-                        size={14}
-                        color={selectedMode === mode.id ? colors.primary : colors.textMuted}
-                      />
-                      <Text
-                        variant="caption"
-                        style={{
-                          fontWeight: '700',
-                          marginLeft: 6,
-                          color: selectedMode === mode.id ? colors.text : colors.textMuted,
-                        }}
-                      >
-                        {mode.name}
-                      </Text>
+                      <Ionicons name="calendar-outline" size={18} color={colors.text} />
                     </Pressable>
-                  ))}
-                </View>
+                  </View>
 
-                {/* Rendezvous Time Presets */}
-                <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.xs }}>
-                  RENDEZVOUS TIME
-                </Text>
-                <View style={styles.presetsGrid}>
-                  {PRESET_TIMES.map((preset, idx) => (
+                  {/* RSVP Action Bar */}
+                  <View style={[styles.rsvpRow, { borderTopColor: colors.borderLight }]}>
+                    <Text variant="label" style={{ color: colors.textMuted, fontSize: 11 }}>
+                      RSVP:
+                    </Text>
+                    <View style={styles.rsvpButtons}>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={rsvpLoading === game.id}
+                        onPress={() => void handleRsvp(game.id, 'attending')}
+                        style={[
+                          styles.rsvpBtn,
+                          {
+                            backgroundColor: colors.surfaceElevated,
+                            borderColor: colors.borderDark,
+                          },
+                        ]}
+                      >
+                        <Ionicons name="checkmark-circle" size={14} color={colors.runner} />
+                        <Text variant="caption" style={{ color: colors.text, marginLeft: 4, fontSize: 11 }}>
+                          Going
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={rsvpLoading === game.id}
+                        onPress={() => void handleRsvp(game.id, 'tentative')}
+                        style={[
+                          styles.rsvpBtn,
+                          {
+                            backgroundColor: colors.surfaceElevated,
+                            borderColor: colors.borderDark,
+                          },
+                        ]}
+                      >
+                        <Ionicons name="help-circle" size={14} color={colors.warning} />
+                        <Text variant="caption" style={{ color: colors.text, marginLeft: 4, fontSize: 11 }}>
+                          Maybe
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={rsvpLoading === game.id}
+                        onPress={() => void handleRsvp(game.id, 'declined')}
+                        style={[
+                          styles.rsvpBtn,
+                          {
+                            backgroundColor: colors.surfaceElevated,
+                            borderColor: colors.borderDark,
+                          },
+                        ]}
+                      >
+                        <Ionicons name="close-circle" size={14} color={colors.danger} />
+                        <Text variant="caption" style={{ color: colors.text, marginLeft: 4, fontSize: 11 }}>
+                          Pass
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </Card>
+              );
+            })
+          )}
+        </ScrollView>
+
+        {/* PAGE 2: SCHEDULE NEW MISSION */}
+        <ScrollView
+          style={{ width: screenWidth }}
+          contentContainerStyle={[
+            styles.pageContent,
+            {
+              paddingHorizontal: spacing.lg,
+              paddingBottom: Math.max(insets.bottom, 16) + 32,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          {createdGame ? (
+            <Card
+              variant="elevated"
+              style={[
+                styles.successCard,
+                { backgroundColor: colors.surface, borderColor: colors.primary },
+              ]}
+            >
+              <Ionicons name="checkmark-circle" size={44} color={colors.primary} />
+              <Text variant="title" style={{ color: colors.text, marginTop: spacing.sm }}>
+                Operation Scheduled!
+              </Text>
+              <Text
+                variant="body"
+                style={{
+                  color: colors.textMuted,
+                  textAlign: 'center',
+                  marginTop: 4,
+                  marginBottom: spacing.md,
+                }}
+              >
+                "{createdGame.title}" has been saved. Export it to your device calendar or deploy
+                directly with your squad.
+              </Text>
+
+              <View style={styles.successBtnRow}>
+                <Button
+                  title="Export to Calendar"
+                  variant="primary"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  onPress={() => void handleExportCalendar(createdGame)}
+                />
+                <Button
+                  title="Done"
+                  variant="secondary"
+                  size="sm"
+                  style={{ flex: 0.8 }}
+                  onPress={handleResetForm}
+                />
+              </View>
+            </Card>
+          ) : (
+            <Card
+              variant="default"
+              style={[
+                styles.card,
+                { backgroundColor: colors.surface, borderColor: colors.borderDark },
+              ]}
+            >
+              <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
+                OPERATION TITLE *
+              </Text>
+              <TextInput
+                value={title}
+                onChangeText={setTitle}
+                placeholder="e.g. Midnight Sector Extraction"
+                placeholderTextColor={colors.textSubtle}
+                style={[
+                  styles.input,
+                  {
+                    borderColor: colors.borderDark,
+                    backgroundColor: colors.surfaceElevated,
+                    color: colors.text,
+                    borderRadius: radii.sm,
+                  },
+                ]}
+                maxLength={50}
+              />
+
+              {/* Game Mode Selector */}
+              <Text
+                variant="label"
+                style={{
+                  color: colors.textMuted,
+                  marginTop: spacing.md,
+                  marginBottom: spacing.xs,
+                }}
+              >
+                GAME MODE
+              </Text>
+              <View style={styles.modeChipsRow}>
+                {MODES.map((m) => (
+                  <Chip
+                    key={m.id}
+                    label={m.name}
+                    variant={selectedMode === m.id ? 'accent' : 'muted'}
+                    size="sm"
+                    onPress={() => setSelectedMode(m.id)}
+                  />
+                ))}
+              </View>
+
+              {/* Rendezvous Time Presets */}
+              <Text
+                variant="label"
+                style={{
+                  color: colors.textMuted,
+                  marginTop: spacing.md,
+                  marginBottom: spacing.xs,
+                }}
+              >
+                RENDEZVOUS TIME
+              </Text>
+              <View style={styles.presetsGrid}>
+                {PRESET_TIMES.map((preset, idx) => {
+                  const isSelected = selectedPresetIndex === idx;
+                  return (
                     <Pressable
                       key={preset.label}
                       onPress={() => {
@@ -527,103 +591,127 @@ export default function ScheduleScreen() {
                       style={[
                         styles.presetChip,
                         {
-                          borderColor: selectedPresetIndex === idx ? colors.primary : colors.borderDark,
-                          backgroundColor: selectedPresetIndex === idx ? colors.surfaceElevated : colors.surface,
+                          borderColor: isSelected ? colors.primary : colors.borderDark,
+                          backgroundColor: isSelected
+                            ? colors.surfaceElevated
+                            : colors.surface,
                         },
                       ]}
                     >
                       <Ionicons
                         name="time-outline"
-                        size={14}
-                        color={selectedPresetIndex === idx ? colors.primary : colors.textMuted}
+                        size={13}
+                        color={isSelected ? colors.primary : colors.textMuted}
                       />
                       <Text
                         variant="caption"
                         style={{
-                          fontWeight: selectedPresetIndex === idx ? '700' : '400',
-                          marginLeft: 6,
-                          color: selectedPresetIndex === idx ? colors.text : colors.textMuted,
+                          fontWeight: isSelected ? '700' : '400',
+                          marginLeft: 5,
+                          color: isSelected ? colors.text : colors.textMuted,
                         }}
                       >
                         {preset.label}
                       </Text>
                     </Pressable>
-                  ))}
-                </View>
+                  );
+                })}
+              </View>
 
-                {/* Target Time Confirmation Display */}
-                <View style={[styles.timePreview, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderLight }]}>
-                  <Ionicons name="calendar" size={16} color={colors.primary} />
-                  <Text variant="caption" style={{ color: colors.text, marginLeft: 8 }}>
-                    Scheduled for:{' '}
-                    <Text variant="caption" style={{ color: colors.primary, fontWeight: '700' }}>
-                      {calculateTargetDate(selectedPresetIndex).toLocaleString([], {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
+              {/* Target Time Confirmation Display */}
+              <View
+                style={[
+                  styles.timePreview,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.borderLight,
+                  },
+                ]}
+              >
+                <Ionicons name="calendar" size={15} color={colors.primary} />
+                <Text variant="caption" style={{ color: colors.text, marginLeft: 8 }}>
+                  Scheduled for:{' '}
+                  <Text variant="caption" style={{ color: colors.primary, fontWeight: '700' }}>
+                    {calculateTargetDate(selectedPresetIndex).toLocaleString([], {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </Text>
-                </View>
-
-                {/* Tactical Area / Rendezvous Zone */}
-                <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.xs }}>
-                  RENDEZVOUS LOCATION (OPTIONAL)
                 </Text>
-                <TextInput
-                  value={areaName}
-                  onChangeText={setAreaName}
-                  placeholder="e.g. Central Plaza Fountain"
-                  placeholderTextColor={colors.textSubtle}
-                  style={[
-                    styles.input,
-                    {
-                      borderColor: colors.borderDark,
-                      backgroundColor: colors.surfaceElevated,
-                      color: colors.text,
-                      borderRadius: radii.sm,
-                    },
-                  ]}
-                  maxLength={60}
-                />
+              </View>
 
-                {/* Field Notes */}
-                <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.xs }}>
-                  OPERATIONAL NOTES (OPTIONAL)
-                </Text>
-                <TextInput
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Tactical rules, gear requirements, or squad details..."
-                  placeholderTextColor={colors.textSubtle}
-                  multiline
-                  numberOfLines={3}
-                  style={[
-                    styles.input,
-                    styles.textArea,
-                    {
-                      borderColor: colors.borderDark,
-                      backgroundColor: colors.surfaceElevated,
-                      color: colors.text,
-                      borderRadius: radii.sm,
-                    },
-                  ]}
-                  maxLength={200}
-                />
+              {/* Tactical Area / Rendezvous Zone */}
+              <Text
+                variant="label"
+                style={{
+                  color: colors.textMuted,
+                  marginTop: spacing.md,
+                  marginBottom: spacing.xs,
+                }}
+              >
+                RENDEZVOUS LOCATION (OPTIONAL)
+              </Text>
+              <TextInput
+                value={areaName}
+                onChangeText={setAreaName}
+                placeholder="e.g. Central Plaza Fountain"
+                placeholderTextColor={colors.textSubtle}
+                style={[
+                  styles.input,
+                  {
+                    borderColor: colors.borderDark,
+                    backgroundColor: colors.surfaceElevated,
+                    color: colors.text,
+                    borderRadius: radii.sm,
+                  },
+                ]}
+                maxLength={60}
+              />
 
-                <Button
-                  title={submitting ? 'Transmitting Schedule...' : 'Schedule Operation'}
-                  disabled={submitting || !title.trim()}
-                  variant="primary"
-                  style={{ marginTop: spacing.lg }}
-                  onPress={() => void handleSchedule()}
-                />
-              </Card>
-            )}
-          </View>
-        )}
+              {/* Field Notes */}
+              <Text
+                variant="label"
+                style={{
+                  color: colors.textMuted,
+                  marginTop: spacing.md,
+                  marginBottom: spacing.xs,
+                }}
+              >
+                OPERATIONAL NOTES (OPTIONAL)
+              </Text>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Tactical rules, gear requirements, or squad details..."
+                placeholderTextColor={colors.textSubtle}
+                multiline
+                numberOfLines={3}
+                style={[
+                  styles.input,
+                  styles.textArea,
+                  {
+                    borderColor: colors.borderDark,
+                    backgroundColor: colors.surfaceElevated,
+                    color: colors.text,
+                    borderRadius: radii.sm,
+                  },
+                ]}
+                maxLength={200}
+              />
+
+              <Button
+                title={submitting ? 'Transmitting Schedule...' : 'Schedule Operation'}
+                disabled={submitting || !title.trim()}
+                variant="primary"
+                style={{ marginTop: spacing.lg }}
+                onPress={() => void handleSchedule()}
+              />
+            </Card>
+          )}
+        </ScrollView>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -633,26 +721,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    flexGrow: 1,
+  headerArea: {
+    paddingBottom: 4,
+  },
+  pageContent: {
+    paddingTop: 12,
   },
   backRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
-  tabBar: {
-    flexDirection: 'row',
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  tabBtn: {
-    flex: 1,
+  errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
   },
   centerBox: {
     padding: 32,
@@ -662,19 +747,25 @@ const styles = StyleSheet.create({
   emptyCard: {
     padding: 24,
     borderWidth: 1,
-    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
   },
-  gameCard: {
+  card: {
     padding: 16,
     borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 12,
+    borderRadius: 16,
+  },
+  gameCard: {
+    padding: 14,
+    borderWidth: 1,
+    borderRadius: 14,
+    marginBottom: 10,
   },
   gameCardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
   inlineRow: {
     flexDirection: 'row',
@@ -682,77 +773,53 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
+    width: 34,
+    height: 34,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
   },
-  rsvpBar: {
+  rsvpRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderTopWidth: 1,
     marginTop: 12,
     paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
   },
-  rsvpBtnRow: {
+  rsvpStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rsvpButtons: {
     flexDirection: 'row',
     gap: 6,
   },
-  rsvpChip: {
+  rsvpBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  card: {
-    padding: 16,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  successCard: {
-    padding: 24,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
+    paddingVertical: 5,
     borderRadius: 6,
     borderWidth: 1,
-    marginBottom: 12,
   },
   input: {
+    height: 46,
     borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 10,
     fontSize: 14,
-    fontFamily: 'System',
   },
   textArea: {
-    minHeight: 64,
+    height: 70,
     textAlignVertical: 'top',
+    paddingTop: 10,
   },
-  modeRow: {
+  modeChipsRow: {
     flexDirection: 'row',
     gap: 8,
-  },
-  modeChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1.5,
   },
   presetsGrid: {
     flexDirection: 'row',
@@ -762,17 +829,28 @@ const styles = StyleSheet.create({
   presetChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 10,
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
   },
   timePreview: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    marginTop: 12,
+    marginTop: 10,
+  },
+  successCard: {
+    padding: 24,
+    borderWidth: 1,
+    alignItems: 'center',
+    borderRadius: 16,
+  },
+  successBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
   },
 });

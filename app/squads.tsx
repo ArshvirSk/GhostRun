@@ -1,22 +1,26 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { Text } from '../src/ui/Text';
 import { Card } from '../src/ui/Card';
 import { Button } from '../src/ui/Button';
+import { SegmentBar } from '../src/ui/SegmentBar';
 import { triggerHaptic } from '../src/motion/haptics';
 import {
   Crew,
@@ -27,14 +31,19 @@ import {
   shareCrewInvite,
 } from '../src/lib/crews';
 
+type TabKey = 'my_crews' | 'create' | 'join';
+
 export default function SquadsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const { colors, spacing, radii } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<'my_crews' | 'create' | 'join'>('my_crews');
+  const [activeTab, setActiveTab] = useState<TabKey>('my_crews');
   const [crews, setCrews] = useState<Crew[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const pagerRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   // Form states
   const [createName, setCreateName] = useState('');
@@ -59,6 +68,25 @@ export default function SquadsScreen() {
     void loadCrews();
   }, [loadCrews]);
 
+  const handleTabChange = (id: string) => {
+    const tabKey = id as TabKey;
+    setActiveTab(tabKey);
+    setErrorMessage('');
+    const pageIndex = tabKey === 'my_crews' ? 0 : tabKey === 'create' ? 1 : 2;
+    pagerRef.current?.scrollTo({ x: pageIndex * screenWidth, animated: true });
+  };
+
+  const handlePagerScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const pageIndex = Math.round(offsetX / screenWidth);
+    const newTab: TabKey = pageIndex === 0 ? 'my_crews' : pageIndex === 1 ? 'create' : 'join';
+    if (newTab !== activeTab) {
+      triggerHaptic('buttonTap');
+      setActiveTab(newTab);
+      setErrorMessage('');
+    }
+  };
+
   async function handleCreate() {
     if (creating) return;
     setErrorMessage('');
@@ -77,7 +105,7 @@ export default function SquadsScreen() {
     triggerHaptic('tagConfirmed');
     setCreateName('');
     setCreateCode('');
-    setActiveTab('my_crews');
+    handleTabChange('my_crews');
     void loadCrews();
   }
 
@@ -98,7 +126,7 @@ export default function SquadsScreen() {
 
     triggerHaptic('tagConfirmed');
     setJoinCode('');
-    setActiveTab('my_crews');
+    handleTabChange('my_crews');
     void loadCrews();
   }
 
@@ -136,17 +164,16 @@ export default function SquadsScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
+      {/* Sticky Header Area */}
+      <View
+        style={[
+          styles.headerArea,
           {
-            paddingTop: Math.max(insets.top, 16) + 8,
-            paddingBottom: Math.max(insets.bottom, 16) + 32,
+            paddingTop: Math.max(insets.top, 16) + 4,
             paddingHorizontal: spacing.lg,
           },
         ]}
       >
-        {/* Tactical Back Navigation */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
@@ -159,357 +186,319 @@ export default function SquadsScreen() {
           </Text>
         </Pressable>
 
-        {/* Screen Title */}
-        <Text variant="display" style={{ color: colors.text, marginTop: spacing.md }}>
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs }}>
           SQUADS
         </Text>
-        <Text variant="body" style={{ color: colors.textMuted, marginTop: 4, marginBottom: spacing.lg }}>
-          Form persistent squads, recruit operatives with tactical invite codes, and deploy together.
+        <Text variant="body" style={{ color: colors.textMuted, marginTop: 2, marginBottom: spacing.sm }}>
+          Form persistent squads, recruit allies, and deploy together.
         </Text>
 
-        {/* Nav Tabs */}
-        <View style={[styles.tabBar, { borderColor: colors.borderDark, backgroundColor: colors.surface }]}>
-          <Pressable
-            accessibilityRole="tab"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              setActiveTab('my_crews');
-              setErrorMessage('');
-            }}
-            style={[
-              styles.tabBtn,
-              activeTab === 'my_crews' && {
-                backgroundColor: colors.surfaceElevated,
-                borderBottomColor: colors.primary,
-                borderBottomWidth: 2,
-              },
-            ]}
-          >
-            <Ionicons
-              name="people-outline"
-              size={16}
-              color={activeTab === 'my_crews' ? colors.primary : colors.textMuted}
-            />
-            <Text
-              variant="label"
-              style={{
-                color: activeTab === 'my_crews' ? colors.text : colors.textMuted,
-                marginLeft: 6,
-              }}
-            >
-              MY SQUADS ({crews.length})
-            </Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="tab"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              setActiveTab('create');
-              setErrorMessage('');
-            }}
-            style={[
-              styles.tabBtn,
-              activeTab === 'create' && {
-                backgroundColor: colors.surfaceElevated,
-                borderBottomColor: colors.primary,
-                borderBottomWidth: 2,
-              },
-            ]}
-          >
-            <Ionicons
-              name="add-outline"
-              size={16}
-              color={activeTab === 'create' ? colors.primary : colors.textMuted}
-            />
-            <Text
-              variant="label"
-              style={{
-                color: activeTab === 'create' ? colors.text : colors.textMuted,
-                marginLeft: 6,
-              }}
-            >
-              FORM SQUAD
-            </Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="tab"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              setActiveTab('join');
-              setErrorMessage('');
-            }}
-            style={[
-              styles.tabBtn,
-              activeTab === 'join' && {
-                backgroundColor: colors.surfaceElevated,
-                borderBottomColor: colors.primary,
-                borderBottomWidth: 2,
-              },
-            ]}
-          >
-            <Ionicons
-              name="enter-outline"
-              size={16}
-              color={activeTab === 'join' ? colors.primary : colors.textMuted}
-            />
-            <Text
-              variant="label"
-              style={{
-                color: activeTab === 'join' ? colors.text : colors.textMuted,
-                marginLeft: 6,
-              }}
-            >
-              JOIN SQUAD
-            </Text>
-          </Pressable>
-        </View>
+        {/* 3-Tab Segment Bar with Animated Slider (Labels fit all screen widths cleanly) */}
+        <SegmentBar
+          items={[
+            { id: 'my_crews', label: `SQUADS (${crews.length})` },
+            { id: 'create', label: 'FORM SQUAD' },
+            { id: 'join', label: 'JOIN' },
+          ]}
+          activeId={activeTab}
+          onChange={handleTabChange}
+          style={{ marginBottom: 4 }}
+        />
 
         {/* Global Error Banner */}
         {errorMessage ? (
           <View
             style={[
               styles.errorBanner,
-              { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder, marginTop: spacing.md },
+              { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder, marginTop: 6 },
             ]}
           >
-            <Ionicons name="alert-circle-outline" size={18} color={colors.dangerText} />
+            <Ionicons name="alert-circle-outline" size={16} color={colors.dangerText} />
             <Text variant="caption" style={{ color: colors.dangerText, marginLeft: 8, flex: 1 }}>
               {errorMessage}
             </Text>
           </View>
         ) : null}
+      </View>
 
-        {/* TAB 1: MY SQUADS */}
-        {activeTab === 'my_crews' && (
-          <View style={{ marginTop: spacing.md }}>
-            {loading ? (
-              <View style={styles.centerBox}>
-                <ActivityIndicator color={colors.primary} size="large" />
-                <Text variant="caption" style={{ color: colors.textMuted, marginTop: spacing.sm }}>
-                  Scanning tactical squads...
-                </Text>
-              </View>
-            ) : crews.length === 0 ? (
-              <Card
-                variant="elevated"
-                style={[styles.emptyCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
+      {/* Horizontal Swipeable Pager */}
+      <ScrollView
+        ref={pagerRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handlePagerScrollEnd}
+        scrollEventThrottle={16}
+        style={{ flex: 1 }}
+      >
+        {/* PAGE 1: MY SQUADS */}
+        <ScrollView
+          style={{ width: screenWidth }}
+          contentContainerStyle={[
+            styles.pageContent,
+            {
+              paddingHorizontal: spacing.lg,
+              paddingBottom: Math.max(insets.bottom, 16) + 32,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          {loading ? (
+            <View style={styles.centerBox}>
+              <ActivityIndicator color={colors.primary} size="large" />
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: spacing.sm }}>
+                Scanning tactical squads...
+              </Text>
+            </View>
+          ) : crews.length === 0 ? (
+            <Card
+              variant="elevated"
+              style={[
+                styles.emptyCard,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark },
+              ]}
+            >
+              <Ionicons name="people-outline" size={38} color={colors.textSubtle} />
+              <Text variant="title" style={{ color: colors.text, marginTop: spacing.sm }}>
+                No Active Squads
+              </Text>
+              <Text
+                variant="caption"
+                style={{
+                  color: colors.textMuted,
+                  textAlign: 'center',
+                  marginTop: 4,
+                  marginBottom: spacing.md,
+                }}
               >
-                <Ionicons name="people-outline" size={40} color={colors.textSubtle} />
-                <Text variant="title" style={{ color: colors.text, marginTop: spacing.sm }}>
-                  No Active Squads
-                </Text>
-                <Text
-                  variant="caption"
-                  style={{ color: colors.textMuted, textAlign: 'center', marginTop: 4, marginBottom: spacing.md }}
-                >
-                  You are not currently enrolled in any persistent tactical squad. Form a squad or enter an invite code to recruit allies!
-                </Text>
-                <View style={styles.emptyActionRow}>
-                  <Button
-                    title="Form Squad"
-                    variant="primary"
-                    size="sm"
-                    onPress={() => setActiveTab('create')}
-                  />
-                  <Button
-                    title="Join with Code"
-                    variant="secondary"
-                    size="sm"
-                    onPress={() => setActiveTab('join')}
-                  />
-                </View>
-              </Card>
-            ) : (
-              crews.map((crew) => (
-                <Card
-                  key={crew.id}
-                  variant="elevated"
-                  style={[styles.crewCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
-                >
-                  <View style={styles.crewHeader}>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text variant="title" style={{ color: colors.text, fontSize: 17, fontWeight: '700' }}>
-                          {crew.name}
-                        </Text>
-                        <View
-                          style={[
-                            styles.leaderBadge,
-                            {
-                              backgroundColor:
-                                crew.my_role === 'captain' ? colors.primary : colors.surfaceElevated,
-                              borderColor:
-                                crew.my_role === 'captain' ? colors.primary : colors.borderDark,
-                            },
-                          ]}
-                        >
-                          <Text
-                            variant="caption"
-                            style={{
-                              color:
-                                crew.my_role === 'captain' ? '#101014' : colors.textMuted,
-                              fontSize: 10,
-                              fontWeight: '700',
-                            }}
-                          >
-                            {crew.my_role === 'captain' ? 'CAPTAIN' : 'MEMBER'}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.codeRow}>
-                        <Text variant="caption" style={{ color: colors.textMuted }}>
-                          CODE:
-                        </Text>
+                You are not currently enrolled in any persistent tactical squad. Form a squad or enter an invite code to recruit allies!
+              </Text>
+              <View style={styles.emptyActionRow}>
+                <Button
+                  title="Form Squad"
+                  variant="primary"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  onPress={() => handleTabChange('create')}
+                />
+                <Button
+                  title="Join with Code"
+                  variant="secondary"
+                  size="sm"
+                  style={{ flex: 1 }}
+                  onPress={() => handleTabChange('join')}
+                />
+              </View>
+            </Card>
+          ) : (
+            crews.map((crew) => (
+              <Card
+                key={crew.id}
+                variant="elevated"
+                style={[
+                  styles.crewCard,
+                  { backgroundColor: colors.surface, borderColor: colors.borderDark },
+                ]}
+              >
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                        {crew.name}
+                      </Text>
+                      <View
+                        style={[
+                          styles.roleBadge,
+                          {
+                            backgroundColor:
+                              crew.my_role === 'captain' ? colors.primary : colors.surfaceElevated,
+                            borderColor:
+                              crew.my_role === 'captain' ? colors.primary : colors.borderLight,
+                          },
+                        ]}
+                      >
                         <Text
-                          variant="caption"
                           style={{
-                            color: colors.primary,
+                            color:
+                              crew.my_role === 'captain' ? '#101014' : colors.textMuted,
+                            fontSize: 10,
                             fontWeight: '700',
-                            letterSpacing: 1.5,
-                            marginLeft: 4,
                           }}
                         >
-                          {crew.code}
-                        </Text>
-                        <Text variant="caption" style={{ color: colors.textSubtle, marginLeft: 10 }}>
-                          · {crew.member_count || 1} Operative{(crew.member_count || 1) === 1 ? '' : 's'}
+                          {crew.my_role === 'captain' ? 'CAPTAIN' : 'MEMBER'}
                         </Text>
                       </View>
                     </View>
-
-                    <View style={styles.headerBtnRow}>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Share Squad Invite"
-                        onPress={() => void handleShare(crew)}
-                        style={[
-                          styles.iconBtn,
-                          { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark },
-                        ]}
+                    <View style={styles.codeRow}>
+                      <Text variant="caption" style={{ color: colors.textMuted }}>
+                        CODE:
+                      </Text>
+                      <Text
+                        variant="caption"
+                        style={{
+                          color: colors.primary,
+                          fontWeight: '700',
+                          letterSpacing: 1.5,
+                          marginLeft: 4,
+                        }}
                       >
-                        <Ionicons name="share-social-outline" size={18} color={colors.text} />
-                      </Pressable>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Leave Squad"
-                        onPress={() => void handleLeave(crew.id, crew.name)}
-                        style={[
-                          styles.iconBtn,
-                          { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder },
-                        ]}
-                      >
-                        <Ionicons name="log-out-outline" size={18} color={colors.dangerText} />
-                      </Pressable>
+                        {crew.code}
+                      </Text>
+                      <Text variant="caption" style={{ color: colors.textSubtle, marginLeft: 10 }}>
+                        · {crew.member_count || 1} Operative{(crew.member_count || 1) === 1 ? '' : 's'}
+                      </Text>
                     </View>
                   </View>
-                </Card>
-              ))
-            )}
-          </View>
-        )}
 
-        {/* TAB 2: FORM SQUAD */}
-        {activeTab === 'create' && (
-          <View style={{ marginTop: spacing.md }}>
-            <Card
-              variant="default"
-              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
+                  <View style={styles.headerBtnRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Share Squad Invite"
+                      onPress={() => void handleShare(crew)}
+                      style={[
+                        styles.iconBtn,
+                        { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark },
+                      ]}
+                    >
+                      <Ionicons name="share-social-outline" size={17} color={colors.text} />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Leave Squad"
+                      onPress={() => void handleLeave(crew.id, crew.name)}
+                      style={[
+                        styles.iconBtn,
+                        { backgroundColor: colors.dangerSurface, borderColor: colors.dangerBorder },
+                      ]}
+                    >
+                      <Ionicons name="log-out-outline" size={17} color={colors.dangerText} />
+                    </Pressable>
+                  </View>
+                </View>
+              </Card>
+            ))
+          )}
+        </ScrollView>
+
+        {/* PAGE 2: FORM SQUAD */}
+        <ScrollView
+          style={{ width: screenWidth }}
+          contentContainerStyle={[
+            styles.pageContent,
+            {
+              paddingHorizontal: spacing.lg,
+              paddingBottom: Math.max(insets.bottom, 16) + 32,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Card
+            variant="default"
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
+          >
+            <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
+              SQUAD CODENAME *
+            </Text>
+            <TextInput
+              value={createName}
+              onChangeText={setCreateName}
+              placeholder="e.g. Night Stalkers"
+              placeholderTextColor={colors.textSubtle}
+              style={[
+                styles.input,
+                {
+                  borderColor: colors.borderDark,
+                  backgroundColor: colors.surfaceElevated,
+                  color: colors.text,
+                  borderRadius: radii.sm,
+                },
+              ]}
+              maxLength={40}
+            />
+
+            <Text
+              variant="label"
+              style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.xs }}
             >
-              <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
-                SQUAD CODENAME *
-              </Text>
-              <TextInput
-                value={createName}
-                onChangeText={setCreateName}
-                placeholder="e.g. Night Stalkers"
-                placeholderTextColor={colors.textSubtle}
-                style={[
-                  styles.input,
-                  {
-                    borderColor: colors.borderDark,
-                    backgroundColor: colors.surfaceElevated,
-                    color: colors.text,
-                    borderRadius: radii.sm,
-                  },
-                ]}
-                maxLength={40}
-              />
+              CUSTOM SQUAD CODE (OPTIONAL)
+            </Text>
+            <TextInput
+              value={createCode}
+              onChangeText={(val) => setCreateCode(val.toUpperCase())}
+              placeholder="e.g. ALPHA9 (Auto-generated if empty)"
+              placeholderTextColor={colors.textSubtle}
+              autoCapitalize="characters"
+              style={[
+                styles.input,
+                {
+                  borderColor: colors.borderDark,
+                  backgroundColor: colors.surfaceElevated,
+                  color: colors.text,
+                  borderRadius: radii.sm,
+                },
+              ]}
+              maxLength={10}
+            />
 
-              <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.xs }}>
-                CUSTOM SQUAD CODE (OPTIONAL)
-              </Text>
-              <TextInput
-                value={createCode}
-                onChangeText={(val) => setCreateCode(val.toUpperCase())}
-                placeholder="e.g. ALPHA9 (Auto-generated if empty)"
-                placeholderTextColor={colors.textSubtle}
-                autoCapitalize="characters"
-                style={[
-                  styles.input,
-                  {
-                    borderColor: colors.borderDark,
-                    backgroundColor: colors.surfaceElevated,
-                    color: colors.text,
-                    borderRadius: radii.sm,
-                  },
-                ]}
-                maxLength={10}
-              />
+            <Button
+              title={creating ? 'Forming Squad...' : 'Form Squad'}
+              disabled={creating || !createName.trim()}
+              variant="primary"
+              style={{ marginTop: spacing.lg }}
+              onPress={() => void handleCreate()}
+            />
+          </Card>
+        </ScrollView>
 
-              <Button
-                title={creating ? 'Forming Squad...' : 'Form Squad'}
-                disabled={creating || !createName.trim()}
-                variant="primary"
-                style={{ marginTop: spacing.lg }}
-                onPress={() => void handleCreate()}
-              />
-            </Card>
-          </View>
-        )}
+        {/* PAGE 3: JOIN SQUAD */}
+        <ScrollView
+          style={{ width: screenWidth }}
+          contentContainerStyle={[
+            styles.pageContent,
+            {
+              paddingHorizontal: spacing.lg,
+              paddingBottom: Math.max(insets.bottom, 16) + 32,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Card
+            variant="default"
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
+          >
+            <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
+              SQUAD INVITE CODE *
+            </Text>
+            <TextInput
+              value={joinCode}
+              onChangeText={(val) => setJoinCode(val.toUpperCase())}
+              placeholder="Enter squad code..."
+              placeholderTextColor={colors.textSubtle}
+              autoCapitalize="characters"
+              style={[
+                styles.input,
+                {
+                  borderColor: colors.borderDark,
+                  backgroundColor: colors.surfaceElevated,
+                  color: colors.text,
+                  borderRadius: radii.sm,
+                  fontSize: 16,
+                  letterSpacing: 2,
+                  textAlign: 'center',
+                },
+              ]}
+              maxLength={12}
+            />
 
-        {/* TAB 3: JOIN SQUAD */}
-        {activeTab === 'join' && (
-          <View style={{ marginTop: spacing.md }}>
-            <Card
-              variant="default"
-              style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}
-            >
-              <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
-                SQUAD INVITE CODE *
-              </Text>
-              <TextInput
-                value={joinCode}
-                onChangeText={(val) => setJoinCode(val.toUpperCase())}
-                placeholder="Enter squad code..."
-                placeholderTextColor={colors.textSubtle}
-                autoCapitalize="characters"
-                style={[
-                  styles.input,
-                  {
-                    borderColor: colors.borderDark,
-                    backgroundColor: colors.surfaceElevated,
-                    color: colors.text,
-                    borderRadius: radii.sm,
-                    fontSize: 16,
-                    letterSpacing: 2,
-                    textAlign: 'center',
-                  },
-                ]}
-                maxLength={12}
-              />
-
-              <Button
-                title={joining ? 'Joining...' : 'Join Squad'}
-                disabled={joining || !joinCode.trim()}
-                variant="primary"
-                style={{ marginTop: spacing.lg }}
-                onPress={() => void handleJoin()}
-              />
-            </Card>
-          </View>
-        )}
+            <Button
+              title={joining ? 'Joining...' : 'Join Squad'}
+              disabled={joining || !joinCode.trim()}
+              variant="primary"
+              style={{ marginTop: spacing.lg }}
+              onPress={() => void handleJoin()}
+            />
+          </Card>
+        </ScrollView>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -519,26 +508,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    flexGrow: 1,
+  headerArea: {
+    paddingBottom: 4,
+  },
+  pageContent: {
+    paddingTop: 12,
   },
   backRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
-  tabBar: {
-    flexDirection: 'row',
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  tabBtn: {
-    flex: 1,
+  errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
   },
   centerBox: {
     padding: 32,
@@ -548,23 +534,38 @@ const styles = StyleSheet.create({
   emptyCard: {
     padding: 24,
     borderWidth: 1,
-    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
   },
   emptyActionRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
+    width: '100%',
+    marginTop: 4,
   },
-  crewCard: {
+  card: {
     padding: 16,
     borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 12,
+    borderRadius: 16,
   },
-  crewHeader: {
+  crewCard: {
+    padding: 14,
+    borderWidth: 1,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+  cardHeaderRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  },
+  roleBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+    marginLeft: 8,
   },
   codeRow: {
     flexDirection: 'row',
@@ -573,54 +574,21 @@ const styles = StyleSheet.create({
   },
   headerBtnRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
+    width: 34,
+    height: 34,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rosterSection: {
-    borderTopWidth: 1,
-    marginTop: 12,
-    paddingTop: 10,
-  },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  memberInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  leaderBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  card: {
-    padding: 16,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
   input: {
+    height: 46,
     borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 10,
     fontSize: 14,
-    fontFamily: 'System',
   },
 });

@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-17  
 **Artifact:** `release/GhostRun-v2.9.6.apk`  
-**Size:** 56,704,104 bytes (54.08 MB)  
-**SHA-256 Checksum:** `D0CB0BD95106D1A94AC78015D066DB34E43428A413D15213DED634BA499DA3ED`  
+**Size:** 56,703,000 bytes (54.08 MB)  
+**SHA-256 Checksum:** `34391C35D1B0A58FA8A57765C6301A0431A378A66EBDC15DD4CD454287FA31FE`  
 **Version:** `2.9.6`  
 **VersionCode:** `21`  
 **Architecture:** `arm64-v8a`  
@@ -46,5 +46,11 @@ GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements
 - **Zero Card Overflow**: Fixed the `[ OG ]` badge on the Featured Mode card so it never bleeds past card borders.
 - **Reduced Visual Clutter**: Stripped heavy bracket dividers across Play, Modes, and You tabs where clean section headers already speak for themselves.
 
-### 6. Sliding Pill Animation on Main Navbar (`app/(tabs)/_layout.tsx`)
+### 6. Sliding Pill Animation & Polished Navbar Pill (`app/(tabs)/_layout.tsx`)
 - **Silky Smooth Sliding Pill**: Native `tabBarBackground` implementation with spring-animated sliding pill (`friction: 8, tension: 75`) that glides across the floating navbar capsule when switching between **Play**, **Modes**, and **You** with 0 crashes.
+- **Icon-Centered Indicator Pill**: Polished the indicator pill to a 56×32 rounded capsule positioned cleanly behind only the active tab's icon (following modern Material 3 / iOS design). The text label sits unobtrusively below the pill with zero clipping or crowding.
+
+### 7. Swipeable Squads & Schedule Pagers (`app/squads.tsx` & `app/schedule.tsx`)
+- **Horizontal Swipe Pager on Squads**: Full-screen horizontal swipe paging (`ScrollView horizontal pagingEnabled`) across **Squads**, **Form Squad**, and **Join Squad** tabs with synchronized animated slider and haptic feedback.
+- **Fixed Tab Overflow & Layout**: Replaced cramped custom tab buttons with standard `SegmentBar`, fixing text cutoff on small displays and eliminating icon collisions. Refined squad card layouts and empty states.
+- **Horizontal Swipe Pager on Schedule**: Full-screen horizontal swipe paging across **Upcoming** and **Schedule New** tabs. Refined card spacing, RSVP buttons, and bottom inset clearance.
