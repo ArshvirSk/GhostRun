@@ -6,7 +6,7 @@ export const vipRole: ModeModule = {
   name: 'VIP Escort',
   tagline: 'Protect the high-value asset. Tagging bodyguards triggers temporary freeze.',
   minPlayers: 4,
-  idealPlayers: '6–16 players',
+  idealPlayers: '6–20 players',
   difficulty: 2,
   complexity: 'high',
   safetyNotes: [

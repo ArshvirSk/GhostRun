@@ -6,7 +6,7 @@ export const relayHeistMode: ModeModule = {
   name: 'Relay Heist',
   tagline: 'Carry and pass contraband between runners to reach extraction before hunters intercept.',
   minPlayers: 3,
-  idealPlayers: '6–14 players',
+  idealPlayers: '6–20 players',
   difficulty: 2,
   complexity: 'high',
   safetyNotes: [

@@ -6,7 +6,7 @@ export const doubleAgentRole: ModeModule = {
   name: 'Double Agent',
   tagline: 'A secret saboteur in the hunter squad working to assist runners.',
   minPlayers: 4,
-  idealPlayers: '6–16 players',
+  idealPlayers: '6–20 players',
   difficulty: 3,
   complexity: 'high',
   safetyNotes: [

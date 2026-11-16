@@ -6,7 +6,7 @@ export const jailbreakMode: ModeModule = {
   name: 'Jailbreak',
   tagline: 'Tagged runners are locked in jail. Infiltrate and execute a stealth rescue.',
   minPlayers: 5,
-  idealPlayers: '6–16 players',
+  idealPlayers: '6–20 players',
   difficulty: 2,
   complexity: 'high',
   safetyNotes: [

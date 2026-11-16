@@ -6,7 +6,7 @@ export const tagHuntMode: ModeModule = {
   name: 'Tag Hunt',
   tagline: 'Pure survival pursuit with no extraction target. Outlast the clock.',
   minPlayers: 2,
-  idealPlayers: '4–16 players',
+  idealPlayers: '4–20 players',
   difficulty: 1,
   complexity: 'low',
   safetyNotes: [

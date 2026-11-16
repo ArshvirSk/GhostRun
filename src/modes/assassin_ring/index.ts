@@ -6,7 +6,7 @@ export const assassinRingMode: ModeModule = {
   name: 'Assassin Ring',
   tagline: 'Solo contract hunt. Every agent hunts their target while evading an unknown pursuer.',
   minPlayers: 3,
-  idealPlayers: '6–16 players',
+  idealPlayers: '6–20 players',
   difficulty: 3,
   complexity: 'high',
   safetyNotes: [

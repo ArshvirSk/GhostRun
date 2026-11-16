@@ -6,7 +6,7 @@ export const classicChaseMode: ModeModule = {
   name: 'Classic Chase',
   tagline: 'Outrun delayed radar pings and reach the secret extraction target.',
   minPlayers: 2,
-  idealPlayers: '4–12 players',
+  idealPlayers: '4–20 players',
   difficulty: 1,
   complexity: 'low',
   safetyNotes: [

@@ -6,7 +6,7 @@ export const operatorRole: ModeModule = {
   name: 'Operator',
   tagline: 'Remote tactical coordinator guiding squad field operatives from desktop or home.',
   minPlayers: 3,
-  idealPlayers: '6–18 players',
+  idealPlayers: '6–20 players',
   difficulty: 2,
   complexity: 'high',
   safetyNotes: [

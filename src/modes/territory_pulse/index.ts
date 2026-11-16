@@ -6,7 +6,7 @@ export const territoryPulseMode: ModeModule = {
   name: 'Territory Pulse',
   tagline: 'Control 7 radial sectors across synchronous pulse ticks. Dominance or points victory.',
   minPlayers: 2,
-  idealPlayers: '6–18 players',
+  idealPlayers: '6–20 players',
   difficulty: 3,
   complexity: 'high',
   safetyNotes: [
