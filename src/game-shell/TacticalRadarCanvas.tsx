@@ -14,7 +14,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { useUnits } from '../utils/units';
 import { Text } from '../ui/Text';
 import { triggerHaptic } from '../motion/haptics';
-import { ProximityRadialBloom } from '../components/map';
+import { TacticalContactCard, TacticalSonarArc } from '../components/map';
 import type { GameArea, GamePlayer, Role, RoundPing, RoundPosition } from './types';
 
 interface TacticalRadarCanvasProps {
@@ -109,7 +109,7 @@ export function TacticalRadarCanvas({
     const px = cx + r * Math.sin(thetaRad);
     const py = cy - r * Math.cos(thetaRad);
 
-    return { px, py, distM, relBearing, isClamped };
+    return { px, py, r, distM, relBearing, isClamped };
   };
 
   // Compile list of inner zones (Target, Jail, Extraction, Safe Zones)
@@ -173,6 +173,8 @@ export function TacticalRadarCanvas({
       id: string;
       px: number;
       py: number;
+      r: number;
+      relBearing: number;
       distM: number;
       isHunter: boolean;
       label: string;
@@ -189,6 +191,8 @@ export function TacticalRadarCanvas({
         id: `ping-${p.id}`,
         px: proj.px,
         py: proj.py,
+        r: proj.r,
+        relBearing: proj.relBearing,
         distM: proj.distM,
         isHunter,
         label: isHunter ? 'HUNTER' : 'SEEKER',
@@ -202,6 +206,8 @@ export function TacticalRadarCanvas({
         id: `tm-${tm.player_id}`,
         px: proj.px,
         py: proj.py,
+        r: proj.r,
+        relBearing: proj.relBearing,
         distM: proj.distM,
         isHunter: tm.team === 'hunter',
         label: tm.display_name || tm.team.toUpperCase(),
@@ -215,7 +221,7 @@ export function TacticalRadarCanvas({
   const rangeRingFractions = [0.25, 0.5, 0.75, 1];
 
   return (
-    <View style={[styles.canvas, { backgroundColor: '#070A10' }]}>
+    <View style={[styles.canvas, { backgroundColor: '#140818' }]}>
       {/* Top Tactical Telemetry Bar */}
       <View
         style={[
@@ -274,7 +280,7 @@ export function TacticalRadarCanvas({
 
       {/* ==================== RADAR CIRCULAR CANVAS ==================== */}
       <View style={styles.radarWrapper} pointerEvents="none">
-        {/* Outer Bearing Compass Dial Ring */}
+        {/* Outer Bearing Compass Dial Ring (PlayCulture-style dashed tactical perimeter) */}
         <View
           style={[
             styles.outerDialRing,
@@ -283,7 +289,8 @@ export function TacticalRadarCanvas({
               height: radarRadius * 2,
               left: cx - radarRadius,
               top: cy - radarRadius,
-              borderColor: 'rgba(0, 240, 255, 0.35)',
+              borderColor: 'rgba(168, 85, 247, 0.45)',
+              borderStyle: 'dashed',
             },
           ]}
         />
@@ -302,7 +309,7 @@ export function TacticalRadarCanvas({
                   height: ringR * 2,
                   left: cx - ringR,
                   top: cy - ringR,
-                  borderColor: frac === 1 ? 'rgba(0, 240, 255, 0.45)' : 'rgba(0, 240, 255, 0.15)',
+                  borderColor: frac === 1 ? 'rgba(168, 85, 247, 0.35)' : 'rgba(168, 85, 247, 0.12)',
                 },
               ]}
             >
@@ -398,78 +405,74 @@ export function TacticalRadarCanvas({
           );
         })}
 
-        {/* ==================== CONTACTS & RADIAL HEATMAP ==================== */}
+        {/* ==================== PLAYCULTURE DIRECTIONAL THREAT ARCS ==================== */}
         {projectedContacts.map((c) => {
-          const contactColor = c.isHunter ? colors.danger : colors.runner;
+          const arcColor = c.isHunter ? '#FF2A55' : '#2DD4BF';
+          const arcRadius = Math.max(34, Math.min(radarRadius - 10, c.r));
+          return (
+            <TacticalSonarArc
+              key={`arc-${c.id}`}
+              radius={arcRadius}
+              bearingDeg={c.relBearing}
+              color={arcColor}
+              strokeWidth={c.distM <= tagRadiusM * 2 ? 12 : 8}
+              opacity={c.distM <= tagRadiusM * 2 ? 0.8 : 0.45}
+              style={{ left: cx - arcRadius, top: cy - arcRadius }}
+            />
+          );
+        })}
 
+        {/* ==================== PLAYCULTURE TACTICAL CONTACT RETICLE BADGES ==================== */}
+        {projectedContacts.map((c) => {
           return (
             <View
               key={c.id}
               style={[
                 styles.contactWrapper,
                 {
-                  left: c.px - 60,
-                  top: c.py - 60,
-                  width: 120,
-                  height: 120,
+                  left: c.px - 18,
+                  top: c.py - 24,
+                  width: 36,
+                  height: 48,
                 },
               ]}
             >
-              {/* PlayCulture-Inspired Smooth Two-Color Radiant Proximity Bloom (Red/Blue) */}
-              <ProximityRadialBloom
-                isHunter={c.isHunter}
+              <TacticalContactCard
                 distanceM={c.distM}
-                dangerThresholdM={tagRadiusM * 1.5}
-                maxRangeM={maxRangeM}
-                minSize={30}
-                maxSize={104}
+                isHunter={c.isHunter}
+                tagRadiusM={tagRadiusM}
+                roleLabel={c.label}
               />
-
-              {/* Hot Core Blip */}
-              <View
-                style={[
-                  styles.heatCore,
-                  {
-                    backgroundColor: contactColor,
-                    shadowColor: contactColor,
-                  },
-                ]}
-              />
-
-              {/* Proximity Distance Tag */}
-              <View
-                style={[
-                  styles.contactTag,
-                  {
-                    borderColor: contactColor,
-                    bottom: 12,
-                  },
-                ]}
-              >
-                <Text style={[styles.contactTagText, { color: contactColor }]}>
-                  {formatDistance(c.distM)}
-                </Text>
-              </View>
             </View>
           );
         })}
 
-        {/* ==================== USER CENTERED OPERATIVE ==================== */}
+        {/* ==================== USER CENTERED OPERATIVE & SONAR EMISSION ==================== */}
+        {/* Forward Sonar Arc Waves propagating from center user */}
+        <TacticalSonarArc
+          radius={28}
+          bearingDeg={0}
+          color="#2DD4BF"
+          strokeWidth={6}
+          opacity={0.7}
+          style={{ left: cx - 28, top: cy - 28 }}
+        />
+        <TacticalSonarArc
+          radius={50}
+          bearingDeg={0}
+          color="#2DD4BF"
+          strokeWidth={7}
+          opacity={0.45}
+          style={{ left: cx - 50, top: cy - 50 }}
+        />
+
         <View style={[styles.operativeCenter, { left: cx - 24, top: cy - 24 }]}>
-          <View style={[styles.operativeHalo, { borderColor: colors.primary }]} />
-          <View
-            style={[
-              styles.operativeIconBg,
-              {
-                backgroundColor: colors.primary,
-                transform: [{ rotate: `${Math.round(heading)}deg` }],
-              },
-            ]}
-          >
-            <Ionicons name="navigate" size={16} color="#000000" />
+          <View style={styles.purpleOperativeHalo} />
+          <View style={styles.purpleOperativeDot}>
+            <View style={styles.purpleOperativeCore} />
           </View>
-          <View style={[styles.operativeZeroBadge, { backgroundColor: '#070A10', borderColor: colors.primary }]}>
-            <Text style={[styles.operativeZeroBadgeText, { color: colors.primary }]}>0m · YOU</Text>
+          <View style={[styles.operativeZeroBadge, { backgroundColor: '#180B1E', borderColor: '#A855F7' }]}>
+            <Text style={[styles.operativeZeroBadgeText, { color: '#C084FC' }]}>0m · YOU</Text>
           </View>
         </View>
       </View>
@@ -683,23 +686,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 50,
   },
-  operativeHalo: {
+  purpleOperativeHalo: {
     position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    opacity: 0.5,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#C084FC',
+    opacity: 0.6,
   },
-  operativeIconBg: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+  purpleOperativeDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#9333EA',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#00F0FF',
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
+    shadowColor: '#A855F7',
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  purpleOperativeCore: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
   },
   operativeZeroBadge: {
     position: 'absolute',

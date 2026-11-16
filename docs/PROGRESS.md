@@ -97,6 +97,7 @@
 | 2026-11-15 | RELEASE-v2.9.0 | Release v2.9.0 (versionCode 15) Extreme Blackout Radar, Headstart Movable 4-Corner Mini-Map, Dynamic Zone Sizing Zoom, Non-Interactive Operative Heading Lock, and Privacy v2.9.0 Alignment | verified | approved |
 | 2026-11-16 | RELEASE-v2.9.1 | Release v2.9.1 (versionCode 16) Tactical Map Assets & Polish (GPU-accelerated animated pointers, 3-phase match timeline formula, area & duration compatibility validator, 0m center radar badge) | verified | approved |
 | 2026-11-16 | RELEASE-v2.9.2 | Release v2.9.2 (versionCode 17) Two-Color Radiant Proximity Blooms (PlayCulture-style discrete Red/Blue radial gradient auras in both Extreme Radar and Centered Street Map) | verified | approved |
+| 2026-11-16 | RELEASE-v2.9.3 | Release v2.9.3 (versionCode 18) Dynamic Tactical Radar & Reticle Badges (PlayCulture-style dynamic sonar arc waves, vertical targeting reticle cards with distance readout & status gauges, purple operative center with forward sonar arcs) | verified | approved |
 
 
 

@@ -3,3 +3,5 @@ export { AnimatedExtractionTarget, type AnimatedExtractionTargetProps } from './
 export { AnimatedPlayerPointer, type AnimatedPlayerPointerProps } from './AnimatedPlayerPointer';
 export { AnimatedTeammateMarker, type AnimatedTeammateMarkerProps } from './AnimatedTeammateMarker';
 export { ProximityRadialBloom, type ProximityRadialBloomProps } from './ProximityRadialBloom';
+export { TacticalContactCard, type TacticalContactCardProps } from './TacticalContactCard';
+export { TacticalSonarArc, type TacticalSonarArcProps } from './TacticalSonarArc';
