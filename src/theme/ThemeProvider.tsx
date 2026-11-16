@@ -13,10 +13,12 @@ import {
   getThemeTokens,
   tokens as defaultTokens,
 } from './tokens';
+import { getTintedDarkColors, getTintedLightColors } from './colorTint';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
 export const THEME_STORAGE_KEY = '@ghostrun:theme_preference';
+export const ACCENT_COLOR_STORAGE_KEY = '@ghostrun:theme_accent_color';
 
 interface ThemeContextValue {
   tokens: ThemeTokens;
@@ -28,6 +30,8 @@ interface ThemeContextValue {
   isDark: boolean;
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
+  accentColor: string | null;
+  setAccentColor: (color: string | null) => Promise<void>;
 }
 
 const defaultContextValue: ThemeContextValue = {
@@ -40,6 +44,8 @@ const defaultContextValue: ThemeContextValue = {
   isDark: true,
   themeMode: 'system',
   setThemeMode: async () => {},
+  accentColor: null,
+  setAccentColor: async () => {},
 };
 
 const ThemeContext = createContext<ThemeContextValue>(defaultContextValue);
@@ -48,15 +54,18 @@ export interface ThemeProviderProps {
   children: React.ReactNode;
   overrideTokens?: Partial<ThemeTokens>;
   initialMode?: ThemeMode;
+  initialAccentColor?: string | null;
 }
 
 export function ThemeProvider({
   children,
   overrideTokens,
   initialMode,
+  initialAccentColor,
 }: ThemeProviderProps) {
   const systemScheme = useColorScheme();
   const [themeMode, setThemeModeState] = useState<ThemeMode>(initialMode || 'system');
+  const [accentColor, setAccentColorState] = useState<string | null>(initialAccentColor || null);
 
   useEffect(() => {
     let isMounted = true;
@@ -65,6 +74,24 @@ export function ThemeProvider({
         const stored = await AsyncStorage.getItem(THEME_STORAGE_KEY);
         if (stored && isMounted && (stored === 'system' || stored === 'light' || stored === 'dark')) {
           setThemeModeState(stored as ThemeMode);
+        }
+
+        const storedAccent = await AsyncStorage.getItem(ACCENT_COLOR_STORAGE_KEY);
+        if (storedAccent && isMounted) {
+          setAccentColorState(storedAccent);
+        } else {
+          // Fallback: check profile color if no dedicated accent is saved yet
+          const profileRaw = await AsyncStorage.getItem('@ghostrun:profile');
+          if (profileRaw && isMounted) {
+            try {
+              const parsed = JSON.parse(profileRaw);
+              if (parsed?.color) {
+                setAccentColorState(parsed.color);
+              }
+            } catch {
+              // ignore
+            }
+          }
         }
       } catch {
         // Fall back to system
@@ -84,6 +111,19 @@ export function ThemeProvider({
     }
   }, []);
 
+  const setAccentColor = useCallback(async (color: string | null) => {
+    setAccentColorState(color);
+    try {
+      if (color) {
+        await AsyncStorage.setItem(ACCENT_COLOR_STORAGE_KEY, color);
+      } else {
+        await AsyncStorage.removeItem(ACCENT_COLOR_STORAGE_KEY);
+      }
+    } catch {
+      // Storage failure swallowed
+    }
+  }, []);
+
   const isDark = useMemo(() => {
     if (themeMode === 'light') return false;
     if (themeMode === 'dark') return true;
@@ -91,17 +131,30 @@ export function ThemeProvider({
   }, [themeMode, systemScheme]);
 
   const activeTokens = useMemo<ThemeTokens>(() => {
-    const base = getThemeTokens(isDark ? 'dark' : 'light');
-    if (!overrideTokens) return base;
+    const baseMode = isDark ? 'dark' : 'light';
+    const base = getThemeTokens(baseMode);
+
+    let colors = base.colors;
+    if (accentColor) {
+      colors = isDark ? getTintedDarkColors(accentColor) : getTintedLightColors(accentColor);
+    }
+
+    if (!overrideTokens) {
+      return {
+        ...base,
+        colors,
+      };
+    }
+
     return {
       ...base,
       ...overrideTokens,
       colors: {
-        ...base.colors,
+        ...colors,
         ...(overrideTokens.colors || {}),
       },
     };
-  }, [isDark, overrideTokens]);
+  }, [isDark, accentColor, overrideTokens]);
 
   const contextValue = useMemo<ThemeContextValue>(
     () => ({
@@ -114,8 +167,10 @@ export function ThemeProvider({
       isDark,
       themeMode,
       setThemeMode,
+      accentColor,
+      setAccentColor,
     }),
-    [activeTokens, isDark, themeMode, setThemeMode]
+    [activeTokens, isDark, themeMode, setThemeMode, accentColor, setAccentColor]
   );
 
   return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;

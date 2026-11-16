@@ -37,7 +37,7 @@ interface MatchHistoryItem {
 }
 
 export default function YouTab() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, setAccentColor } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { formatDistance } = useUnits();
@@ -102,7 +102,9 @@ export default function YouTab() {
           const parsed = JSON.parse(localProfileRaw);
           setProfile(parsed);
           setDraftName(parsed.display_name || '');
-          setDraftColor(parsed.color || colors.palette[0]);
+          const c = parsed.color || colors.palette[0];
+          setDraftColor(c);
+          void setAccentColor(c);
         } catch {
           // ignore
         }
@@ -123,7 +125,9 @@ export default function YouTab() {
       if (profData) {
         setProfile(profData);
         setDraftName(profData.display_name || '');
-        setDraftColor(profData.color || colors.palette[0]);
+        const c = profData.color || colors.palette[0];
+        setDraftColor(c);
+        void setAccentColor(c);
         useUserStore.getState().setProfile({
           id: authData.user.id,
           display_name: profData.display_name,
@@ -200,6 +204,28 @@ export default function YouTab() {
     return () => clearTimeout(timer);
   }, [loadProfileAndHistory]);
 
+  const handleSelectColor = async (c: string) => {
+    triggerHaptic('buttonTap');
+    setDraftColor(c);
+    void setAccentColor(c);
+    const currentName = draftName || profile?.display_name || 'Operative';
+    const updated = { display_name: currentName, color: c };
+    setProfile(updated);
+    try {
+      await AsyncStorage.setItem('@ghostrun:profile', JSON.stringify(updated));
+      if (userId && supabase) {
+        await supabase.from('profiles').update({ color: c }).eq('id', userId);
+      }
+      useUserStore.getState().setProfile({
+        id: userId || '',
+        display_name: updated.display_name,
+        color: c,
+      });
+    } catch {
+      // non-blocking
+    }
+  };
+
   const saveProfile = async () => {
     if (!draftName.trim() || !userId || !supabase) return;
     setSavingProfile(true);
@@ -207,6 +233,8 @@ export default function YouTab() {
     try {
       const updated = { display_name: draftName.trim(), color: draftColor };
       await supabase.from('profiles').update(updated).eq('id', userId);
+      await AsyncStorage.setItem('@ghostrun:profile', JSON.stringify(updated));
+      await setAccentColor(draftColor);
       useUserStore.getState().setProfile({ id: userId, ...updated });
       setProfile(updated);
       setIsEditing(false);
@@ -317,6 +345,45 @@ export default function YouTab() {
             </View>
           </View>
 
+          {/* Quick Monochromatic Theme & Palette Selector */}
+          <View
+            style={[
+              styles.quickThemeBar,
+              { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' },
+            ]}
+          >
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickPaletteContent}
+            >
+              {colors.palette.map((c) => {
+                const isSelected = (profile?.color || colors.primary).toLowerCase() === c.toLowerCase();
+                return (
+                  <Pressable
+                    key={`quick-${c}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Select theme color ${c}`}
+                    onPress={() => void handleSelectColor(c)}
+                    style={[
+                      styles.paletteSwatch,
+                      { backgroundColor: c },
+                      isSelected && {
+                        borderWidth: 2,
+                        borderColor: '#FFFFFF',
+                        transform: [{ scale: 1.12 }],
+                      },
+                    ]}
+                  >
+                    {isSelected && (
+                      <Ionicons name="checkmark-sharp" size={16} color="#000000" />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
           {/* Edit Callsign & Signature Trigger */}
           <Pressable
             accessibilityRole="button"
@@ -380,20 +447,21 @@ export default function YouTab() {
                   return (
                     <Pressable
                       key={c}
-                      onPress={() => {
-                        triggerHaptic('buttonTap');
-                        setDraftColor(c);
-                      }}
+                      onPress={() => void handleSelectColor(c)}
                       style={[
                         styles.paletteSwatch,
                         { backgroundColor: c },
                         isSelected && {
-                          borderWidth: 3,
-                          borderColor: colors.text,
+                          borderWidth: 2,
+                          borderColor: '#FFFFFF',
                           transform: [{ scale: 1.15 }],
                         },
                       ]}
-                    />
+                    >
+                      {isSelected && (
+                        <Ionicons name="checkmark-sharp" size={16} color="#000000" />
+                      )}
+                    </Pressable>
                   );
                 })}
               </View>
@@ -1001,6 +1069,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  quickThemeBar: {
+    marginTop: 14,
+    marginBottom: 4,
+    paddingTop: 10,
+    borderTopWidth: 1,
+  },
+  quickPaletteContent: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
   paletteRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1010,7 +1091,9 @@ const styles = StyleSheet.create({
   paletteSwatch: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionHeading: {
     fontFamily: 'Archivo-SemiBold',

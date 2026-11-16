@@ -42,7 +42,7 @@ import {
 const DELETE_WORD = 'DELETE';
 
 export default function SettingsScreen() {
-  const { colors, spacing, radii, themeMode, setThemeMode } = useTheme();
+  const { colors, spacing, radii, themeMode, setThemeMode, accentColor, setAccentColor } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { unitSystem, setUnitSystem } = useUnits();
@@ -521,6 +521,66 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
               </Pressable>
+            </View>
+
+            {/* Tactical Theme Accent Tint */}
+            <View
+              style={{
+                marginTop: 14,
+                paddingTop: 12,
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+              }}
+            >
+              <Text
+                variant="label"
+                style={{
+                  color: colors.textMuted,
+                  fontSize: 11,
+                  fontWeight: '800',
+                  letterSpacing: 0.8,
+                  marginBottom: 8,
+                }}
+              >
+                THEME ACCENT TINT
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ flexDirection: 'row', gap: 10, paddingVertical: 4 }}
+              >
+                {colors.palette.map((c) => {
+                  const isSelected = (accentColor || colors.primary).toLowerCase() === c.toLowerCase();
+                  return (
+                    <Pressable
+                      key={`settings-color-${c}`}
+                      onPress={() => {
+                        triggerHaptic('buttonTap');
+                        void setAccentColor(c);
+                      }}
+                      style={[
+                        {
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          backgroundColor: c,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        },
+                        isSelected && {
+                          borderWidth: 2,
+                          borderColor: '#FFFFFF',
+                          transform: [{ scale: 1.12 }],
+                        },
+                      ]}
+                    >
+                      {isSelected && (
+                        <Ionicons name="checkmark-sharp" size={16} color="#000000" />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
           </View>
         </Card>

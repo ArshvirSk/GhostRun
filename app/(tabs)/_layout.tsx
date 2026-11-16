@@ -62,7 +62,7 @@ function TabIconWrapper({
   focused: boolean;
   children: React.ReactNode;
 }) {
-  const { isDark } = useTheme();
+  const { colors, isDark } = useTheme();
   return (
     <View
       style={{
@@ -70,9 +70,7 @@ function TabIconWrapper({
         height: 28,
         borderRadius: 14,
         backgroundColor: focused
-          ? isDark
-            ? 'rgba(199, 243, 107, 0.16)'
-            : 'rgba(85, 122, 34, 0.14)'
+          ? colors.primaryLight
           : 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
@@ -88,91 +86,93 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
 
   return (
-    <Tabs
-      screenListeners={{
-        tabPress: () => {
-          triggerHaptic('buttonTap');
-        },
-      }}
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: isDark ? '#1C1D24' : '#FFFFFF',
-          borderColor: isDark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.12)',
-          borderWidth: 1.5,
-          height: 66,
-          paddingBottom: 6,
-          paddingTop: 6,
-          paddingHorizontal: 16,
-          position: 'absolute',
-          bottom: Math.max(insets.bottom, 16) + 10,
-          left: 24,
-          right: 24,
-          start: 24,
-          end: 24,
-          borderRadius: 36,
-          elevation: 24,
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 10 },
-          shadowOpacity: isDark ? 0.65 : 0.20,
-          shadowRadius: 20,
-        },
-        tabBarItemStyle: {
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        tabBarLabelStyle: {
-          fontFamily: 'Archivo-Bold',
-          fontSize: 10,
-          fontWeight: '800',
-          letterSpacing: 0.5,
-          marginTop: 2,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="play"
-        options={{
-          title: 'Play',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIconWrapper focused={focused}>
-              <Ionicons
-                name={focused ? 'map' : 'map-outline'}
-                size={19}
-                color={color as string}
-              />
-            </TabIconWrapper>
-          ),
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Tabs
+        screenListeners={{
+          tabPress: () => {
+            triggerHaptic('buttonTap');
+          },
         }}
-      />
-      <Tabs.Screen
-        name="modes"
-        options={{
-          title: 'Modes',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIconWrapper focused={focused}>
-              <Ionicons
-                name={focused ? 'trophy' : 'trophy-outline'}
-                size={19}
-                color={color as string}
-              />
-            </TabIconWrapper>
-          ),
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.textMuted,
+          tabBarStyle: {
+            backgroundColor: isDark ? colors.surfaceElevated : '#FFFFFF',
+            borderColor: isDark ? colors.border : 'rgba(0, 0, 0, 0.12)',
+            borderWidth: 1.5,
+            height: 66,
+            paddingBottom: 6,
+            paddingTop: 6,
+            paddingHorizontal: 16,
+            position: 'absolute',
+            bottom: Math.max(insets.bottom, 16) + 10,
+            left: 24,
+            right: 24,
+            start: 24,
+            end: 24,
+            borderRadius: 36,
+            elevation: 24,
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: isDark ? 0.65 : 0.20,
+            shadowRadius: 20,
+          },
+          tabBarItemStyle: {
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+          tabBarLabelStyle: {
+            fontFamily: 'Archivo-Bold',
+            fontSize: 10,
+            fontWeight: '800',
+            letterSpacing: 0.5,
+            marginTop: 2,
+          },
         }}
-      />
-      <Tabs.Screen
-        name="you"
-        options={{
-          title: 'You',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIconWrapper focused={focused}>
-              <YouTabIcon color={color as string} focused={focused} />
-            </TabIconWrapper>
-          ),
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="play"
+          options={{
+            title: 'Play',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIconWrapper focused={focused}>
+                <Ionicons
+                  name={focused ? 'map' : 'map-outline'}
+                  size={19}
+                  color={color as string}
+                />
+              </TabIconWrapper>
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="modes"
+          options={{
+            title: 'Modes',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIconWrapper focused={focused}>
+                <Ionicons
+                  name={focused ? 'trophy' : 'trophy-outline'}
+                  size={19}
+                  color={color as string}
+                />
+              </TabIconWrapper>
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="you"
+          options={{
+            title: 'You',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIconWrapper focused={focused}>
+                <YouTabIcon color={color as string} focused={focused} />
+              </TabIconWrapper>
+            ),
+          }}
+        />
+      </Tabs>
+    </View>
   );
 }

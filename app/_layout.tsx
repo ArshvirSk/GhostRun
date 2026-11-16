@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -38,12 +39,19 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
-  const { isDark } = useTheme();
+  const { colors, isDark } = useTheme();
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+          animation: 'fade',
+          animationDuration: 220,
+        }}
+      >
         <Stack.Screen name="index" />
         <Stack.Screen name="(onboarding)" />
         <Stack.Screen name="(tabs)" />
@@ -68,6 +76,6 @@ function RootNavigator() {
         <Stack.Screen name="result/[id]" />
         <Stack.Screen name="replay/[id]" />
       </Stack>
-    </>
+    </View>
   );
 }
