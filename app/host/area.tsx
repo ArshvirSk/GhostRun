@@ -88,12 +88,15 @@ export default function HostAreaScreen() {
     zoomDebounceRef.current = setTimeout(() => {
       if (!mapLoadedRef.current || !cameraRef.current) return;
       const targetZoom = getZoomForRadius(radius);
-      // Use zoomTo directly: avoids MapLibre Android padding re-projection / jump twitch
-      cameraRef.current.zoomTo(targetZoom, {
-        duration: 260,
+      const currentCenter = useHostStore.getState().center;
+      cameraRef.current.easeTo({
+        center: currentCenter,
+        zoom: targetZoom,
+        duration: 350,
+        padding: AREA_MAP_PADDING,
         easing: 'ease',
       });
-    }, 80);
+    }, 280);
 
     return () => {
       if (zoomDebounceRef.current) {

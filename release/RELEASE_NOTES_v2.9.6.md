@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-17  
 **Artifact:** `release/GhostRun-v2.9.6.apk`  
-**Size:** 56,701,096 bytes (54.07 MB)  
-**SHA-256 Checksum:** `8DCC6A5F8AB107CBE867E0AA09A771B3B2F2ED16E8411571250670B5437B59D0`  
+**Size:** 56,707,360 bytes (54.08 MB)  
+**SHA-256 Checksum:** `E34FB31F44CA21B888F6598687A833D967915709BC794DF23066242637B479FA`  
 **Version:** `2.9.6`  
 **VersionCode:** `21`  
 **Architecture:** `arm64-v8a`  
@@ -13,14 +13,16 @@
 
 ## Overview
 
-GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements across core screens. This release introduces the new military-grade **Tactical Rangefinder Zone Selector** with physical stepped friction, haptic tick feedback, left/right edge gradients, and glitch-free camera zooming, silky-smooth sliding pills on both the main floating navbar and sub-tab bars, a horizontal swipe pager on Modes, Squads, and Schedule tabs, and streamlined card layouts.
+GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements across core screens. This release introduces the new military-grade **Tactical Rangefinder Zone Selector** with physical stepped friction, auto-snapping to the closest option, haptic tick feedback, left/right edge gradients, and glitch-free camera zooming, silky-smooth sliding pills on both the main floating navbar and sub-tab bars, a horizontal swipe pager on Modes, Squads, and Schedule tabs, and streamlined card layouts.
 
 ---
 
 ## Key Highlights & Changes
 
-### 1. Weighted Stepped Dial Zone Selector & 2km Hard Cap (`src/ui/TacticalRangeSelector.tsx`)
-- **Weighted Physical Friction**: Implemented `snapToInterval`, `snapToAlignment="start"`, `decelerationRate="fast"`, and `disableIntervalMomentum={true}` so the dial stops with tactile weight and friction on each 100m step instead of spinning loosely.
+### 1. Auto-Snapping Stepped Dial Zone Selector & 2km Hard Cap (`src/ui/TacticalRangeSelector.tsx`)
+- **Zero-Lag Architecture**: Decoupled active drag scrolling from parent state re-renders so the dial tracks your finger with silky 120fps responsiveness without freezing or lagging.
+- **Auto-Snap to Closest Option**: When released anywhere between two sizes, `snapToClosest` computes the exact nearest step by distance (`Math.round(offsetX / ITEM_WIDTH)`) and snaps the dial directly into the reticle. Never gets stuck between numbers.
+- **Discrete Snap Offsets**: Configured `snapToOffsets` array mapping every 100m interval with `decelerationRate="fast"` and `disableIntervalMomentum={true}` for solid physical weight and friction.
 - **Haptic Tick Feedback**: Crisp haptic pulse (`triggerHaptic('buttonTap')`) fires on every single step transition as you swipe or tap.
 - **Edge Fades**: Dual `<LinearGradient>` overlays smoothly fade numbers towards the `[-]` and `[+]` stepper buttons.
 - **Centered Indicator Reticle**: Active selection is framed inside an accent-highlighted reticle pill.
@@ -28,7 +30,7 @@ GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements
 - **2.0 km Hard Cap**: Strictly enforced a maximum 2000m (2.0 km) perimeter across all modes.
 
 ### 2. Glitch-Free Camera Zooming & Screen Real Estate (`app/host/area.tsx`)
-- **Zero Coordinate Twitch or Jumps**: Replaced `easeTo` (which re-calculated padded coordinates and triggered double-padding shifts in MapLibre Android) with `cameraRef.current.zoomTo(...)` with 80ms debounce. Zoom transitions now glide smoothly without momentary zoom-out/in or coordinate glitching.
+- **Root Cause of Zoom Glitch Resolved**: MapLibre Android's native render engine would twitch when rapid intermediate step changes dispatched conflicting camera animations while GeoJSON layers updated simultaneously. By debouncing camera framing to 280ms, the boundary ring resizes instantly at 120fps while you swipe or tap, and the camera executes a single, buttery-smooth transition once you settle on a size.
 - **Removed Compatibility Badge**: Removed the `✓ ARENA & DURATION COMPATIBLE` badge, freeing up screen space so the map canvas and boundary ring have maximum breathing room.
 - **Calibrated Viewport Padding**: Adjusted `AREA_MAP_PADDING = { top: 160, bottom: 85, left: 16, right: 16 }` for dead-center boundary framing.
 

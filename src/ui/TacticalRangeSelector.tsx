@@ -24,11 +24,11 @@ export interface TacticalRangeSelectorProps {
   style?: ViewStyle;
 }
 
-// 100m uniform steps from 200m to 2000m (strictly hard capped at 2.0km)
+// 100m uniform steps from 200m to 2000m (strictly hard-capped at 2.0km)
 const DIAL_STEPS = Array.from({ length: 19 }, (_, i) => 200 + i * 100);
-
-const ITEM_WIDTH = 68;
-const DIAL_HEIGHT = 42;
+const ITEM_WIDTH = 72;
+const DIAL_HEIGHT = 44;
+const SNAP_OFFSETS = DIAL_STEPS.map((_, i) => i * ITEM_WIDTH);
 
 export function TacticalRangeSelector({
   radiusM,
@@ -39,19 +39,21 @@ export function TacticalRangeSelector({
 }: TacticalRangeSelectorProps) {
   const { colors, isDark } = useTheme();
   const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
-  const isDraggingRef = useRef(false);
+  const isInteractingRef = useRef(false);
   const [windowWidth, setWindowWidth] = useState(0);
 
   const clampedRadius = Math.max(minRadiusM, Math.min(maxRadiusM, radiusM));
   const diameterM = clampedRadius * 2;
 
-  const currentIdx = DIAL_STEPS.findIndex((s) => s === clampedRadius);
-  const activeIndex = currentIdx !== -1 ? currentIdx : 4; // default to 600m
-  const lastSnappedIndexRef = useRef(activeIndex);
+  // Local index state for 120fps instant visual feedback without choking parent
+  const initialIdx = DIAL_STEPS.findIndex((s) => s === clampedRadius);
+  const [localIndex, setLocalIndex] = useState(initialIdx !== -1 ? initialIdx : 4);
+  const localIndexRef = useRef(localIndex);
+  localIndexRef.current = localIndex;
 
-  const accentBg = isDark ? 'rgba(184, 163, 255, 0.16)' : 'rgba(102, 80, 164, 0.12)';
-  const dialBg = isDark ? '#12141A' : '#ECEEF2';
-  const fadeEdgeColor = isDark ? '#12141A' : '#ECEEF2';
+  const accentBg = isDark ? 'rgba(184, 163, 255, 0.18)' : 'rgba(102, 80, 164, 0.14)';
+  const dialBg = isDark ? '#111318' : '#EAEDF2';
+  const fadeEdgeColor = isDark ? '#111318' : '#EAEDF2';
 
   const formatDistance = (m: number) => {
     if (m >= 1000) {
@@ -61,26 +63,6 @@ export function TacticalRangeSelector({
     return `${m}m`;
   };
 
-  const handleDecrement = () => {
-    if (activeIndex <= 0) return;
-    triggerHaptic('buttonTap');
-    const nextIdx = activeIndex - 1;
-    const nextVal = DIAL_STEPS[nextIdx];
-    lastSnappedIndexRef.current = nextIdx;
-    onChange(nextVal);
-    scrollRef.current?.scrollTo({ x: nextIdx * ITEM_WIDTH, animated: true });
-  };
-
-  const handleIncrement = () => {
-    if (activeIndex >= DIAL_STEPS.length - 1) return;
-    triggerHaptic('buttonTap');
-    const nextIdx = activeIndex + 1;
-    const nextVal = DIAL_STEPS[nextIdx];
-    lastSnappedIndexRef.current = nextIdx;
-    onChange(nextVal);
-    scrollRef.current?.scrollTo({ x: nextIdx * ITEM_WIDTH, animated: true });
-  };
-
   const handleLayout = (e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
     if (w > 0 && w !== windowWidth) {
@@ -88,45 +70,96 @@ export function TacticalRangeSelector({
     }
   };
 
-  // Sync scroll position when clampedRadius changes externally (e.g. from state change or initial load)
+  // Sync scroll position when clampedRadius changes externally (and user is not dragging)
   useEffect(() => {
-    if (isDraggingRef.current) return;
-    if (windowWidth > 0 && scrollRef.current) {
-      scrollRef.current.scrollTo({
-        x: activeIndex * ITEM_WIDTH,
-        animated: true,
-      });
-      lastSnappedIndexRef.current = activeIndex;
+    if (isInteractingRef.current) return;
+    const idx = DIAL_STEPS.findIndex((s) => s === clampedRadius);
+    if (idx !== -1 && idx !== localIndexRef.current) {
+      setLocalIndex(idx);
+      if (windowWidth > 0) {
+        scrollRef.current?.scrollTo({ x: idx * ITEM_WIDTH, animated: true });
+      }
     }
-  }, [activeIndex, windowWidth]);
+  }, [clampedRadius, windowWidth]);
 
-  // Stepped "tick-tick" friction scrolling
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetX = e.nativeEvent.contentOffset.x;
+  // Initial center alignment when layout width is first known
+  useEffect(() => {
+    if (windowWidth > 0 && scrollRef.current) {
+      scrollRef.current.scrollTo({ x: localIndexRef.current * ITEM_WIDTH, animated: false });
+    }
+  }, [windowWidth]);
+
+  // Snaps to the closest option based on distance and notifies parent
+  const snapToClosest = (offsetX: number) => {
     const rawIdx = Math.round(offsetX / ITEM_WIDTH);
     const targetIdx = Math.max(0, Math.min(DIAL_STEPS.length - 1, rawIdx));
 
-    if (targetIdx !== lastSnappedIndexRef.current) {
-      lastSnappedIndexRef.current = targetIdx;
+    setLocalIndex(targetIdx);
+    scrollRef.current?.scrollTo({ x: targetIdx * ITEM_WIDTH, animated: true });
+
+    if (DIAL_STEPS[targetIdx] !== clampedRadius) {
       triggerHaptic('buttonTap');
       onChange(DIAL_STEPS[targetIdx]);
     }
   };
 
-  const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    isDraggingRef.current = false;
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
     const rawIdx = Math.round(offsetX / ITEM_WIDTH);
     const targetIdx = Math.max(0, Math.min(DIAL_STEPS.length - 1, rawIdx));
-    scrollRef.current?.scrollTo({
-      x: targetIdx * ITEM_WIDTH,
-      animated: true,
-    });
+
+    if (targetIdx !== localIndexRef.current) {
+      setLocalIndex(targetIdx);
+      triggerHaptic('buttonTap');
+    }
   };
 
-  const canDecrement = activeIndex > 0;
-  const canIncrement = activeIndex < DIAL_STEPS.length - 1;
-  const paddingHorizontal = windowWidth > 0 ? (windowWidth - ITEM_WIDTH) / 2 : 80;
+  const handleScrollBeginDrag = () => {
+    isInteractingRef.current = true;
+  };
+
+  const handleScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    // If low velocity or finger released gently, snap directly to closest
+    const velocity = Math.abs(e.nativeEvent.velocity?.x ?? 0);
+    if (velocity < 0.15) {
+      isInteractingRef.current = false;
+      snapToClosest(e.nativeEvent.contentOffset.x);
+    }
+  };
+
+  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    isInteractingRef.current = false;
+    snapToClosest(e.nativeEvent.contentOffset.x);
+  };
+
+  const handleDecrement = () => {
+    if (localIndex <= 0) return;
+    triggerHaptic('buttonTap');
+    const nextIdx = localIndex - 1;
+    setLocalIndex(nextIdx);
+    scrollRef.current?.scrollTo({ x: nextIdx * ITEM_WIDTH, animated: true });
+    onChange(DIAL_STEPS[nextIdx]);
+  };
+
+  const handleIncrement = () => {
+    if (localIndex >= DIAL_STEPS.length - 1) return;
+    triggerHaptic('buttonTap');
+    const nextIdx = localIndex + 1;
+    setLocalIndex(nextIdx);
+    scrollRef.current?.scrollTo({ x: nextIdx * ITEM_WIDTH, animated: true });
+    onChange(DIAL_STEPS[nextIdx]);
+  };
+
+  const handleItemPress = (idx: number) => {
+    triggerHaptic('buttonTap');
+    setLocalIndex(idx);
+    scrollRef.current?.scrollTo({ x: idx * ITEM_WIDTH, animated: true });
+    onChange(DIAL_STEPS[idx]);
+  };
+
+  const canDecrement = localIndex > 0;
+  const canIncrement = localIndex < DIAL_STEPS.length - 1;
+  const paddingHorizontal = windowWidth > 0 ? (windowWidth - ITEM_WIDTH) / 2 : 100;
 
   return (
     <View style={[styles.container, style]}>
@@ -154,10 +187,10 @@ export function TacticalRangeSelector({
               { color: colors.accent },
             ]}
           >
-            {formatDistance(clampedRadius)}
+            {formatDistance(DIAL_STEPS[localIndex] || clampedRadius)}
           </Text>
           <Text style={[styles.readoutDiameter, { color: colors.textMuted }]}>
-            {`Ø ${formatDistance(diameterM)}`}
+            {`Ø ${formatDistance((DIAL_STEPS[localIndex] || clampedRadius) * 2)}`}
           </Text>
         </View>
       </View>
@@ -186,7 +219,7 @@ export function TacticalRangeSelector({
           />
         </Pressable>
 
-        {/* Dial Tape Window with Weight, Friction, Reticle & Gradient Edges */}
+        {/* Dial Tape Window with Reticle & Gradient Edge Fades */}
         <View
           onLayout={handleLayout}
           style={[
@@ -213,41 +246,30 @@ export function TacticalRangeSelector({
             />
           )}
 
-          {/* Stepped Swiping ScrollView with Friction & Momentum Snapping */}
+          {/* Stepped Swiping ScrollView with Fixed Snap Offsets & Momentum Snapping */}
           <ScrollView
             ref={scrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
-            snapToInterval={ITEM_WIDTH}
-            snapToAlignment="start"
+            snapToOffsets={SNAP_OFFSETS}
             decelerationRate="fast"
             disableIntervalMomentum={true}
             scrollEventThrottle={16}
-            onScrollBeginDrag={() => {
-              isDraggingRef.current = true;
-            }}
+            onScrollBeginDrag={handleScrollBeginDrag}
             onScroll={handleScroll}
-            onScrollEndDrag={handleScrollEnd}
-            onMomentumScrollEnd={handleScrollEnd}
+            onScrollEndDrag={handleScrollEndDrag}
+            onMomentumScrollEnd={handleMomentumScrollEnd}
             contentContainerStyle={[
               styles.dialScrollContent,
               { paddingHorizontal },
             ]}
           >
             {DIAL_STEPS.map((step, idx) => {
-              const isActive = idx === activeIndex;
+              const isActive = idx === localIndex;
               return (
                 <Pressable
                   key={step}
-                  onPress={() => {
-                    triggerHaptic('buttonTap');
-                    lastSnappedIndexRef.current = idx;
-                    onChange(step);
-                    scrollRef.current?.scrollTo({
-                      x: idx * ITEM_WIDTH,
-                      animated: true,
-                    });
-                  }}
+                  onPress={() => handleItemPress(idx)}
                   style={styles.dialItem}
                 >
                   <Text
@@ -256,7 +278,7 @@ export function TacticalRangeSelector({
                       {
                         color: isActive ? colors.accent : colors.textMuted,
                         fontWeight: isActive ? '900' : '600',
-                        fontSize: isActive ? 14 : 11,
+                        fontSize: isActive ? 14 : 12,
                       },
                     ]}
                   >
@@ -392,7 +414,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 32,
+    width: 34,
     zIndex: 3,
   },
   fadeRight: {
@@ -400,7 +422,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    width: 32,
+    width: 34,
     zIndex: 3,
   },
 });
