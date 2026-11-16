@@ -23,6 +23,8 @@ import { Button } from '../../src/ui/Button';
 import { SegmentBar } from '../../src/ui/SegmentBar';
 import { RulesCard } from '../../src/ui/RulesCard';
 import { RoleBriefingCard } from '../../src/ui/RoleBriefingCard';
+import { MatchDurationTimeline } from '../../src/ui/MatchDurationTimeline';
+import { AreaCompatibilityBadge } from '../../src/ui/AreaCompatibilityBadge';
 import { getModeModule } from '../../src/modes/registry';
 import { useUnits } from '../../src/utils/units';
 import { supabase } from '../../src/lib/supabase';
@@ -1297,6 +1299,21 @@ export default function LobbyScreen() {
             {/* TACTICAL RULES CARD */}
             <View style={[styles.rulesSectionCard, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
               <Text style={styles.rulesCardCaption}>TACTICAL RULES</Text>
+
+              {/* 3-Segment Timeline Formula (Start > Play > End) */}
+              <MatchDurationTimeline
+                headStartS={((state.game.mode_params as any)?.head_start_seconds || 90)}
+                durationMinutes={((state.game.mode_params as any)?.time_limit_minutes || 15)}
+                regroupMinutes={2}
+              />
+
+              {/* Area & Duration Compatibility Badge */}
+              <AreaCompatibilityBadge
+                radiusM={state.game.area_radius_m || 500}
+                durationMinutes={((state.game.mode_params as any)?.time_limit_minutes || 15)}
+                showDetail
+              />
+
               <View style={styles.tacticalRulesList}>
                 {/* Game Duration */}
                 <View style={styles.tacticalRuleRow}>
@@ -1600,6 +1617,14 @@ export default function LobbyScreen() {
                 <Text style={styles.areaDetailLabel}>out of bounds</Text>
                 <Text style={styles.areaDetailValue}>Stealth penalty triggers after 30s exiting geofence</Text>
               </View>
+
+              {/* Traversal Compatibility Badge */}
+              <AreaCompatibilityBadge
+                radiusM={state.game.area_radius_m || 500}
+                durationMinutes={((state.game.mode_params as any)?.time_limit_minutes || 15)}
+                showDetail
+                style={{ marginTop: 8 }}
+              />
 
               {isHost && (
                 <Button

@@ -465,10 +465,21 @@ export function TacticalRadarCanvas({
         })}
 
         {/* ==================== USER CENTERED OPERATIVE ==================== */}
-        <View style={[styles.operativeCenter, { left: cx - 18, top: cy - 18 }]}>
+        <View style={[styles.operativeCenter, { left: cx - 24, top: cy - 24 }]}>
           <View style={[styles.operativeHalo, { borderColor: colors.primary }]} />
-          <View style={[styles.operativeIconBg, { backgroundColor: colors.primary }]}>
+          <View
+            style={[
+              styles.operativeIconBg,
+              {
+                backgroundColor: colors.primary,
+                transform: [{ rotate: `${Math.round(heading)}deg` }],
+              },
+            ]}
+          >
             <Ionicons name="navigate" size={16} color="#000000" />
+          </View>
+          <View style={[styles.operativeZeroBadge, { backgroundColor: '#070A10', borderColor: colors.primary }]}>
+            <Text style={[styles.operativeZeroBadgeText, { color: colors.primary }]}>0m · YOU</Text>
           </View>
         </View>
       </View>
@@ -676,29 +687,42 @@ const styles = StyleSheet.create({
   },
   operativeCenter: {
     position: 'absolute',
-    width: 36,
-    height: 36,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 50,
   },
   operativeHalo: {
     position: 'absolute',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 1,
     opacity: 0.5,
   },
   operativeIconBg: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#00F0FF',
     shadowOpacity: 0.8,
     shadowRadius: 6,
+  },
+  operativeZeroBadge: {
+    position: 'absolute',
+    bottom: -10,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    borderWidth: 0.8,
+  },
+  operativeZeroBadgeText: {
+    fontSize: 7.5,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   rangeControls: {
     position: 'absolute',

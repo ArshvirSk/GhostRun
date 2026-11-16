@@ -8,6 +8,8 @@ import { Text } from '../../src/ui/Text';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
+import { MatchDurationTimeline } from '../../src/ui/MatchDurationTimeline';
+import { AreaCompatibilityBadge } from '../../src/ui/AreaCompatibilityBadge';
 import { getModeModule } from '../../src/modes/registry';
 import { useHostStore } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
@@ -160,6 +162,22 @@ export default function HostReviewScreen() {
             </View>
           </View>
         </Card>
+
+        {/* 3-Phase Match Timeline (Start > Play > End) */}
+        <MatchDurationTimeline
+          headStartS={rules.headStartS}
+          durationMinutes={Math.round(rules.durationS / 60)}
+          regroupMinutes={2}
+          style={{ marginBottom: spacing.sm }}
+        />
+
+        {/* Area & Duration Compatibility Validator */}
+        <AreaCompatibilityBadge
+          radiusM={radius}
+          durationMinutes={Math.round(rules.durationS / 60)}
+          showDetail
+          style={{ marginBottom: spacing.md }}
+        />
 
         {/* Roles & Modifiers Active */}
         {(selectedRoles.length > 0 || selectedModifiers.length > 0) && (

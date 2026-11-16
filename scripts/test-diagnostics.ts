@@ -24,7 +24,7 @@ function assert(condition: boolean, message: string) {
 console.log('--- NF-17, NF-18 & NF-32 Diagnostics & Analytics Unit Tests ---');
 
 // Test 1: App Version & URLs
-assert(APP_VERSION === '2.9.0', 'Diagnostic app version matches project release version');
+assert(APP_VERSION === '2.9.1', 'Diagnostic app version matches project release version');
 assert(SUPPORT_EMAIL.includes('@ghostrun.app'), 'Support email uses official domain');
 assert(getPlayStoreReviewUrl().includes('com.ghostrun.app'), 'Review URL points to Google Play store package');
 

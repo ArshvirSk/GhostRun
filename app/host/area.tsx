@@ -12,6 +12,7 @@ import { Text } from '../../src/ui/Text';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
+import { AreaCompatibilityBadge } from '../../src/ui/AreaCompatibilityBadge';
 import { useHostStore, LAST_LOCATION_KEY } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
 import {
@@ -50,6 +51,7 @@ export default function HostAreaScreen() {
   const mode = useHostStore((s) => s.mode);
   const center = useHostStore((s) => s.center);
   const radius = useHostStore((s) => s.radius);
+  const rules = useHostStore((s) => s.rules);
   const placements = useHostStore((s) => s.placements);
   const setCenter = useHostStore((s) => s.setCenter);
   const setRadius = useHostStore((s) => s.setRadius);
@@ -592,6 +594,14 @@ export default function HostAreaScreen() {
                 : 'Tap inside the boundary ring to place the jail facility.'}
             </Text>
           </View>
+
+          {/* Area & Duration Compatibility Badge */}
+          <AreaCompatibilityBadge
+            radiusM={radius}
+            durationMinutes={Math.round((rules?.durationS || 900) / 60)}
+            showDetail={false}
+            style={{ marginTop: spacing.xs }}
+          />
 
           {placementError !== '' && (
             <Text variant="body" style={{ color: colors.danger, fontSize: 12, marginTop: 4 }}>
