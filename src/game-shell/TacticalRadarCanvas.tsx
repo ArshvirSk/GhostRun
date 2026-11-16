@@ -14,6 +14,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { useUnits } from '../utils/units';
 import { Text } from '../ui/Text';
 import { triggerHaptic } from '../motion/haptics';
+import { ProximityRadialBloom } from '../components/map';
 import type { GameArea, GamePlayer, Role, RoundPing, RoundPosition } from './types';
 
 interface TacticalRadarCanvasProps {
@@ -399,9 +400,6 @@ export function TacticalRadarCanvas({
 
         {/* ==================== CONTACTS & RADIAL HEATMAP ==================== */}
         {projectedContacts.map((c) => {
-          // Heat intensity scales with proximity: closer contacts produce larger, hotter blooms
-          const isHot = c.distM < tagRadiusM * 2;
-          const auraSize = isHot ? 46 : c.distM < 80 ? 34 : 22;
           const contactColor = c.isHunter ? colors.danger : colors.runner;
 
           return (
@@ -410,28 +408,21 @@ export function TacticalRadarCanvas({
               style={[
                 styles.contactWrapper,
                 {
-                  left: c.px - auraSize / 2,
-                  top: c.py - auraSize / 2,
-                  width: auraSize,
-                  height: auraSize,
+                  left: c.px - 60,
+                  top: c.py - 60,
+                  width: 120,
+                  height: 120,
                 },
               ]}
             >
-              {/* Thermal Heat Wave / Glow Halo */}
-              <View
-                style={[
-                  styles.heatAura,
-                  {
-                    width: auraSize,
-                    height: auraSize,
-                    borderRadius: auraSize / 2,
-                    backgroundColor: c.isHunter
-                      ? isHot
-                        ? 'rgba(255, 42, 85, 0.38)'
-                        : 'rgba(255, 42, 85, 0.2)'
-                      : 'rgba(0, 240, 255, 0.22)',
-                  },
-                ]}
+              {/* PlayCulture-Inspired Smooth Two-Color Radiant Proximity Bloom (Red/Blue) */}
+              <ProximityRadialBloom
+                isHunter={c.isHunter}
+                distanceM={c.distM}
+                dangerThresholdM={tagRadiusM * 1.5}
+                maxRangeM={maxRangeM}
+                minSize={30}
+                maxSize={104}
               />
 
               {/* Hot Core Blip */}
@@ -451,8 +442,7 @@ export function TacticalRadarCanvas({
                   styles.contactTag,
                   {
                     borderColor: contactColor,
-                    top: auraSize + 2,
-                    left: -12,
+                    bottom: 12,
                   },
                 ]}
               >

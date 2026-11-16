@@ -1,13 +1,14 @@
 import React, { memo, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, Marker, type CameraRef } from '../lib/map';
-import { circleRing, type LngLat, type PointCollection } from '../lib/geo';
+import { circleRing, distanceM, type LngLat, type PointCollection } from '../lib/geo';
 import { useTheme } from '../theme/ThemeProvider';
 import {
   AnimatedExtractionTarget,
   AnimatedPlayerPointer,
   AnimatedRadarPing,
   AnimatedTeammateMarker,
+  ProximityRadialBloom,
 } from '../components/map';
 import type { GameArea, Role, RoundPing, RoundPosition } from './types';
 
@@ -207,6 +208,55 @@ export const MapView = memo(function MapView({
             />
           </GeoJSONSource>
         )}
+
+        {/* PlayCulture Two-Color Radiant Proximity Blooms (Underlay beneath markers) */}
+        {/* 1. Teammates / Seekers Radiant Blooms (Blue) */}
+        {teammates.map((m) => {
+          const distM = ownFix
+            ? distanceM(ownFix, { latitude: m.latitude, longitude: m.longitude })
+            : 100;
+          return (
+            <Marker
+              key={`bloom-teammate-${m.player_id}`}
+              id={`bloom-teammate-${m.player_id}`}
+              lngLat={[m.longitude, m.latitude]}
+            >
+              <ProximityRadialBloom
+                isHunter={m.team === 'hunter'}
+                distanceM={distM}
+                dangerThresholdM={tagRadiusM || 20}
+                maxRangeM={180}
+                minSize={36}
+                maxSize={120}
+              />
+            </Marker>
+          );
+        })}
+
+        {/* 2. Radar Ping Contacts Radiant Blooms (Red for Hunters/Zombies, Blue for Runners) */}
+        {pings.map((p) => {
+          if (p.longitude === null || p.latitude === null) return null;
+          const distM = ownFix
+            ? distanceM(ownFix, { latitude: p.latitude, longitude: p.longitude })
+            : 100;
+          const isEnemyHunter = role !== 'hunter';
+          return (
+            <Marker
+              key={`bloom-ping-${p.id}`}
+              id={`bloom-ping-${p.id}`}
+              lngLat={[p.longitude, p.latitude]}
+            >
+              <ProximityRadialBloom
+                isHunter={isEnemyHunter}
+                distanceM={distM}
+                dangerThresholdM={tagRadiusM || 20}
+                maxRangeM={180}
+                minSize={36}
+                maxSize={120}
+              />
+            </Marker>
+          );
+        })}
 
         {/* Animated Secret Target Beacon */}
         {target && (

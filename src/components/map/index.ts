@@ -2,3 +2,4 @@ export { AnimatedRadarPing, type AnimatedRadarPingProps } from './AnimatedRadarP
 export { AnimatedExtractionTarget, type AnimatedExtractionTargetProps } from './AnimatedExtractionTarget';
 export { AnimatedPlayerPointer, type AnimatedPlayerPointerProps } from './AnimatedPlayerPointer';
 export { AnimatedTeammateMarker, type AnimatedTeammateMarkerProps } from './AnimatedTeammateMarker';
+export { ProximityRadialBloom, type ProximityRadialBloomProps } from './ProximityRadialBloom';

@@ -96,6 +96,7 @@
 | 2026-11-15 | RELEASE-v2.8.1 | Release v2.8.1 (versionCode 14) Dedicated Screens & Settings Overhaul (Schedule & Squads standalone screens, horizontal theme selector, dark mode delete UI fix, comprehensive notifications & telemetry) | verified | approved |
 | 2026-11-15 | RELEASE-v2.9.0 | Release v2.9.0 (versionCode 15) Extreme Blackout Radar, Headstart Movable 4-Corner Mini-Map, Dynamic Zone Sizing Zoom, Non-Interactive Operative Heading Lock, and Privacy v2.9.0 Alignment | verified | approved |
 | 2026-11-16 | RELEASE-v2.9.1 | Release v2.9.1 (versionCode 16) Tactical Map Assets & Polish (GPU-accelerated animated pointers, 3-phase match timeline formula, area & duration compatibility validator, 0m center radar badge) | verified | approved |
+| 2026-11-16 | RELEASE-v2.9.2 | Release v2.9.2 (versionCode 17) Two-Color Radiant Proximity Blooms (PlayCulture-style discrete Red/Blue radial gradient auras in both Extreme Radar and Centered Street Map) | verified | approved |
 
 
 
