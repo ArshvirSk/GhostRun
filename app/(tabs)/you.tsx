@@ -16,7 +16,6 @@ import { Text } from '../../src/ui/Text';
 import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
 import { Button } from '../../src/ui/Button';
-import { TacticalDivider } from '../../src/ui/TacticalDivider';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { supabase } from '../../src/lib/supabase';
 import { useUnits } from '../../src/utils/units';
@@ -480,13 +479,6 @@ export default function YouTab() {
         </Card>
 
         {/* Section: Performance Stats */}
-        <TacticalDivider
-          label="CAREER TELEMETRY"
-          sublabel="METRICS // OPS"
-          variant="bracket"
-          style={{ marginTop: 22, marginBottom: 6 }}
-        />
-
         <View style={styles.sectionHeaderRow}>
           <Text style={[styles.sectionHeading, { color: colors.textMuted, marginBottom: 0 }]}>
             CAREER STATS
@@ -654,13 +646,6 @@ export default function YouTab() {
         </View>
 
         {/* Section: Tactical Badges & Achievements (NF-11) */}
-        <TacticalDivider
-          label="OPERATIVE ACCOLADES"
-          sublabel={`${earnedBadges.size}/${BADGE_CATALOG.length} UNLOCKED`}
-          variant="bracket"
-          style={{ marginTop: 24, marginBottom: 8 }}
-        />
-
         <View style={styles.sectionHeaderRow}>
           <Text style={[styles.sectionHeading, { color: colors.textMuted, marginBottom: 0 }]}>
             TACTICAL BADGES
@@ -728,13 +713,6 @@ export default function YouTab() {
         </ScrollView>
 
         {/* Section: Mission Log */}
-        <TacticalDivider
-          label="COMBAT ARCHIVES"
-          sublabel={`${history.length} MISSIONS`}
-          variant="dashed"
-          style={{ marginTop: 24, marginBottom: 8 }}
-        />
-
         <View style={styles.sectionHeaderRow}>
           <Text style={[styles.sectionHeading, { color: colors.textMuted, marginBottom: 0 }]}>
             MATCH HISTORY

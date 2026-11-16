@@ -29,15 +29,16 @@ const DARK_MAP_STYLE =
 
 const RADII = [300, 600, 1000, 1500];
 
+const AREA_MAP_PADDING = { top: 220, bottom: 85, left: 16, right: 16 };
 
 /**
  * Calculates optimal camera zoom level to fit a zone of radiusM within screen bounds.
  */
 export function getZoomForRadius(radiusM: number): number {
-  if (radiusM <= 350) return 15.2;
-  if (radiusM <= 650) return 14.3;
-  if (radiusM <= 1100) return 13.5;
-  return 12.8;
+  if (radiusM <= 350) return 14.8;
+  if (radiusM <= 650) return 13.8;
+  if (radiusM <= 1100) return 13.0;
+  return 12.3;
 }
 
 export default function HostAreaScreen() {
@@ -63,14 +64,15 @@ export default function HostAreaScreen() {
 
   const applyCameraCenter = useCallback((coords: [number, number], animate = false) => {
     pendingCameraTargetRef.current = coords;
+    const targetZoom = getZoomForRadius(radius);
     if (mapLoadedRef.current && cameraRef.current) {
       if (animate) {
-        cameraRef.current.easeTo({ center: coords, zoom: 14, duration: 400 });
+        cameraRef.current.easeTo({ center: coords, zoom: targetZoom, duration: 400, padding: AREA_MAP_PADDING });
       } else {
-        cameraRef.current.jumpTo({ center: coords, zoom: 14 });
+        cameraRef.current.jumpTo({ center: coords, zoom: targetZoom, padding: AREA_MAP_PADDING });
       }
     }
-  }, []);
+  }, [radius]);
 
   // Smooth zoom in/out transition when zone size is changed
   const prevRadiusRef = useRef(radius);
@@ -82,6 +84,7 @@ export default function HostAreaScreen() {
         center,
         zoom: targetZoom,
         duration: 500,
+        padding: AREA_MAP_PADDING,
       });
     }
   }, [radius, center]);
@@ -238,7 +241,12 @@ export default function HostAreaScreen() {
     if (instant) {
       snapped = true;
       setCenter(instant, 'my_location');
-      cameraRef.current?.easeTo({ center: instant, zoom: 14, duration: 250 });
+      cameraRef.current?.easeTo({
+        center: instant,
+        zoom: getZoomForRadius(radius),
+        duration: 250,
+        padding: AREA_MAP_PADDING,
+      });
       if (needsTarget) {
         setPlacement('target', [instant[0] + 0.0018, instant[1] + 0.0018]);
       }
@@ -254,7 +262,12 @@ export default function HostAreaScreen() {
       if (fastCoords) {
         snapped = true;
         setCenter(fastCoords, 'my_location');
-        cameraRef.current?.easeTo({ center: fastCoords, zoom: 14, duration: 250 });
+        cameraRef.current?.easeTo({
+          center: fastCoords,
+          zoom: getZoomForRadius(radius),
+          duration: 250,
+          padding: AREA_MAP_PADDING,
+        });
         if (needsTarget) {
           setPlacement('target', [fastCoords[0] + 0.0018, fastCoords[1] + 0.0018]);
         }
@@ -329,7 +342,8 @@ export default function HostAreaScreen() {
           if (pendingCameraTargetRef.current && cameraRef.current) {
             cameraRef.current.jumpTo({
               center: pendingCameraTargetRef.current,
-              zoom: 14,
+              zoom: getZoomForRadius(radius),
+              padding: AREA_MAP_PADDING,
             });
             pendingCameraTargetRef.current = null;
           }
@@ -337,7 +351,14 @@ export default function HostAreaScreen() {
         onPress={handleMapPress}
         style={StyleSheet.absoluteFill}
       >
-        <Camera ref={cameraRef} initialViewState={{ center, zoom: 14 }} />
+        <Camera
+          ref={cameraRef}
+          initialViewState={{
+            center,
+            zoom: getZoomForRadius(radius),
+            padding: AREA_MAP_PADDING,
+          }}
+        />
 
         {/* Boundary Area Ring */}
         <GeoJSONSource
@@ -572,6 +593,7 @@ export default function HostAreaScreen() {
                       center,
                       zoom: targetZoom,
                       duration: 500,
+                      padding: AREA_MAP_PADDING,
                     });
                   }}
                 />

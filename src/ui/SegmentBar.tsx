@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, StyleSheet, View, ViewStyle } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, View, ViewStyle } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import { triggerHaptic } from '../motion/haptics';
@@ -30,6 +30,27 @@ export function SegmentBar({
   const { colors, radii } = useTheme();
   const currentSelected = activeId ?? selectedId ?? items[0]?.id;
 
+  const [containerWidth, setContainerWidth] = useState(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const selectedIndex = Math.max(
+    0,
+    items.findIndex((item) => item.id === currentSelected)
+  );
+
+  const itemWidth = containerWidth > 8 ? (containerWidth - 8) / items.length : 0;
+
+  useEffect(() => {
+    if (itemWidth > 0) {
+      Animated.spring(slideAnim, {
+        toValue: selectedIndex * itemWidth + 4,
+        friction: 8,
+        tension: 75,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [selectedIndex, itemWidth, slideAnim]);
+
   const handleSelect = (id: string) => {
     onSelect?.(id);
     onChange?.(id);
@@ -38,6 +59,7 @@ export function SegmentBar({
   return (
     <View
       accessibilityRole="tablist"
+      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
       style={[
         styles.container,
         {
@@ -48,6 +70,22 @@ export function SegmentBar({
         style,
       ]}
     >
+      {/* Sliding Active Pill Background */}
+      {itemWidth > 0 && (
+        <Animated.View
+          style={[
+            styles.sliderPill,
+            {
+              width: itemWidth,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderRadius: radii.pill,
+              transform: [{ translateX: slideAnim }],
+            },
+          ]}
+        />
+      )}
+
       {items.map((item) => {
         const isSelected = item.id === currentSelected;
 
@@ -62,15 +100,7 @@ export function SegmentBar({
                 handleSelect(item.id);
               }
             }}
-            style={[
-              styles.segment,
-              {
-                backgroundColor: isSelected ? colors.surface : 'transparent',
-                borderRadius: radii.pill,
-                borderColor: isSelected ? colors.border : 'transparent',
-                borderWidth: isSelected ? 1 : 0,
-              },
-            ]}
+            style={[styles.segment, { zIndex: 2 }]}
           >
             <Text
               variant="label"
@@ -100,7 +130,7 @@ export function SegmentBar({
                     fontWeight: '900',
                   }}
                 >
-                  {String(item.badge)}
+                  {item.badge}
                 </Text>
               </View>
             )}
@@ -114,25 +144,35 @@ export function SegmentBar({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    alignItems: 'center',
     padding: 4,
     borderWidth: 1,
-    gap: 4,
+    position: 'relative',
+    height: 48,
+    alignItems: 'center',
+  },
+  sliderPill: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    borderWidth: 1,
+    elevation: 3,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   segment: {
     flex: 1,
+    height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    minHeight: 38,
+    paddingHorizontal: 8,
+    backgroundColor: 'transparent',
   },
   badge: {
     paddingHorizontal: 6,
     paddingVertical: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginLeft: 6,
   },
 });

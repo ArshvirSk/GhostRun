@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -55,124 +55,210 @@ function YouTabIcon({ focused }: { color: string; focused: boolean }) {
   );
 }
 
-function TabIconWrapper({
-  focused,
-  children,
-}: {
-  focused: boolean;
-  children: React.ReactNode;
-}) {
+function SlidingTabBar({ state, descriptors, navigation }: any) {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [barWidth, setBarWidth] = useState(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const routes = state.routes;
+  const numTabs = routes.length;
+  // Padding inside container is 8px left/right
+  const tabWidth = barWidth > 16 && numTabs > 0 ? (barWidth - 16) / numTabs : 0;
+
+  useEffect(() => {
+    if (tabWidth > 0) {
+      Animated.spring(slideAnim, {
+        toValue: 8 + state.index * tabWidth + 2,
+        friction: 8,
+        tension: 75,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [state.index, tabWidth, slideAnim]);
+
   return (
     <View
-      style={{
-        width: 50,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: focused
-          ? colors.primaryLight
-          : 'transparent',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
+      style={[
+        styles.tabBarContainer,
+        {
+          backgroundColor: isDark ? colors.surfaceElevated : '#FFFFFF',
+          borderColor: isDark ? colors.border : 'rgba(0, 0, 0, 0.12)',
+          bottom: Math.max(insets.bottom, 16) + 10,
+          shadowOpacity: isDark ? 0.65 : 0.2,
+        },
+      ]}
     >
-      {children}
+      {/* Sliding Active Indicator Pill */}
+      {tabWidth > 0 && (
+        <Animated.View
+          style={[
+            styles.sliderPill,
+            {
+              width: tabWidth - 4,
+              backgroundColor: colors.primaryLight,
+              borderColor: colors.primary,
+              transform: [{ translateX: slideAnim }],
+            },
+          ]}
+        />
+      )}
+
+      {routes.map((route: any, index: number) => {
+        const { options } = descriptors[route.key];
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          triggerHaptic('buttonTap');
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        const renderIcon = () => {
+          const iconColor = isFocused ? colors.primary : colors.textMuted;
+          if (route.name === 'play') {
+            return (
+              <Ionicons
+                name={isFocused ? 'map' : 'map-outline'}
+                size={19}
+                color={iconColor}
+              />
+            );
+          }
+          if (route.name === 'modes') {
+            return (
+              <Ionicons
+                name={isFocused ? 'trophy' : 'trophy-outline'}
+                size={19}
+                color={iconColor}
+              />
+            );
+          }
+          if (route.name === 'you') {
+            return <YouTabIcon color={iconColor} focused={isFocused} />;
+          }
+          return null;
+        };
+
+        const label =
+          options.tabBarLabel !== undefined
+            ? options.tabBarLabel
+            : options.title !== undefined
+            ? options.title
+            : route.name;
+
+        return (
+          <Pressable
+            key={route.key}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={options.tabBarAccessibilityLabel}
+            testID={options.tabBarTestID}
+            onPress={onPress}
+            style={styles.tabItem}
+          >
+            <View style={styles.iconWrap}>{renderIcon()}</View>
+            <Text
+              style={[
+                styles.tabLabel,
+                {
+                  color: isFocused ? colors.primary : colors.textMuted,
+                },
+              ]}
+            >
+              {typeof label === 'string' ? label : route.name}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
 
 export default function TabsLayout() {
-  const { colors, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Tabs
-        screenListeners={{
-          tabPress: () => {
-            triggerHaptic('buttonTap');
-          },
-        }}
+        tabBar={(props) => <SlidingTabBar {...props} />}
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.textMuted,
-          tabBarStyle: {
-            backgroundColor: isDark ? colors.surfaceElevated : '#FFFFFF',
-            borderColor: isDark ? colors.border : 'rgba(0, 0, 0, 0.12)',
-            borderWidth: 1.5,
-            height: 66,
-            paddingBottom: 6,
-            paddingTop: 6,
-            paddingHorizontal: 16,
-            position: 'absolute',
-            bottom: Math.max(insets.bottom, 16) + 10,
-            left: 24,
-            right: 24,
-            start: 24,
-            end: 24,
-            borderRadius: 36,
-            elevation: 24,
-            shadowColor: '#000000',
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: isDark ? 0.65 : 0.20,
-            shadowRadius: 20,
-          },
-          tabBarItemStyle: {
-            alignItems: 'center',
-            justifyContent: 'center',
-          },
-          tabBarLabelStyle: {
-            fontFamily: 'Archivo-Bold',
-            fontSize: 10,
-            fontWeight: '800',
-            letterSpacing: 0.5,
-            marginTop: 2,
-          },
         }}
       >
         <Tabs.Screen
           name="play"
           options={{
             title: 'Play',
-            tabBarIcon: ({ color, focused }) => (
-              <TabIconWrapper focused={focused}>
-                <Ionicons
-                  name={focused ? 'map' : 'map-outline'}
-                  size={19}
-                  color={color as string}
-                />
-              </TabIconWrapper>
-            ),
           }}
         />
         <Tabs.Screen
           name="modes"
           options={{
             title: 'Modes',
-            tabBarIcon: ({ color, focused }) => (
-              <TabIconWrapper focused={focused}>
-                <Ionicons
-                  name={focused ? 'trophy' : 'trophy-outline'}
-                  size={19}
-                  color={color as string}
-                />
-              </TabIconWrapper>
-            ),
           }}
         />
         <Tabs.Screen
           name="you"
           options={{
             title: 'You',
-            tabBarIcon: ({ color, focused }) => (
-              <TabIconWrapper focused={focused}>
-                <YouTabIcon color={color as string} focused={focused} />
-              </TabIconWrapper>
-            ),
           }}
         />
       </Tabs>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBarContainer: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    height: 64,
+    borderRadius: 34,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    elevation: 24,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 20,
+    zIndex: 100,
+  },
+  sliderPill: {
+    position: 'absolute',
+    top: 6,
+    bottom: 6,
+    borderRadius: 26,
+    borderWidth: 1,
+    zIndex: 1,
+  },
+  tabItem: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  iconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 24,
+  },
+  tabLabel: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+});
