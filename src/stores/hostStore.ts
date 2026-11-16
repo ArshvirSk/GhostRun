@@ -231,7 +231,8 @@ export const useHostStore = create<HostState>((set, get) => ({
   },
 
   setRadius: (radius: number) => {
-    set({ radius });
+    const clamped = Math.min(2000, Math.max(100, Math.round(radius)));
+    set({ radius: clamped });
   },
 
   setPlacement: (kind: string, coords: [number, number]) => {

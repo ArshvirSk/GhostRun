@@ -13,6 +13,7 @@ import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
 import { AreaCompatibilityBadge } from '../../src/ui/AreaCompatibilityBadge';
+import { TacticalRangeSelector } from '../../src/ui/TacticalRangeSelector';
 import { useHostStore, LAST_LOCATION_KEY } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
 import {
@@ -27,18 +28,17 @@ const DAY_MAP_STYLE =
 const DARK_MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
 
-const RADII = [300, 600, 1000, 1500];
 
 const AREA_MAP_PADDING = { top: 220, bottom: 85, left: 16, right: 16 };
 
 /**
  * Calculates optimal camera zoom level to fit a zone of radiusM within screen bounds.
+ * Continuous logarithmic scaling ensures smooth, non-glitching transitions across 200m - 2000m.
  */
 export function getZoomForRadius(radiusM: number): number {
-  if (radiusM <= 350) return 14.8;
-  if (radiusM <= 650) return 13.8;
-  if (radiusM <= 1100) return 13.0;
-  return 12.3;
+  const safeR = Math.max(100, Math.min(2000, radiusM));
+  const zoom = 14.8 - Math.log2(safeR / 300);
+  return Math.round(zoom * 10) / 10;
 }
 
 export default function HostAreaScreen() {
@@ -74,20 +74,37 @@ export default function HostAreaScreen() {
     }
   }, [radius]);
 
-  // Smooth zoom in/out transition when zone size is changed
-  const prevRadiusRef = useRef(radius);
+  // Smooth, glitch-free camera zoom adjustment when radius changes
+  const lastAnimatedRadiusRef = useRef(radius);
+  const zoomDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    if (prevRadiusRef.current !== radius) {
-      prevRadiusRef.current = radius;
-      const targetZoom = getZoomForRadius(radius);
-      cameraRef.current?.easeTo({
-        center,
-        zoom: targetZoom,
-        duration: 500,
-        padding: AREA_MAP_PADDING,
-      });
+    if (lastAnimatedRadiusRef.current === radius) return;
+    lastAnimatedRadiusRef.current = radius;
+
+    if (zoomDebounceRef.current) {
+      clearTimeout(zoomDebounceRef.current);
     }
-  }, [radius, center]);
+
+    zoomDebounceRef.current = setTimeout(() => {
+      if (!mapLoadedRef.current || !cameraRef.current) return;
+      const targetZoom = getZoomForRadius(radius);
+      const currentCenter = useHostStore.getState().center;
+      cameraRef.current.easeTo({
+        center: currentCenter,
+        zoom: targetZoom,
+        duration: 350,
+        padding: AREA_MAP_PADDING,
+        easing: 'ease',
+      });
+    }, 40);
+
+    return () => {
+      if (zoomDebounceRef.current) {
+        clearTimeout(zoomDebounceRef.current);
+      }
+    };
+  }, [radius]);
 
   // Mode placement requirements
   const needsTarget = mode === 'classic_chase';
@@ -574,32 +591,17 @@ export default function HostAreaScreen() {
             </View>
           )}
 
-          {/* Radius Selection Chips (Clean and without MY GPS button) */}
-          <View style={[styles.chipsRow, { marginTop: spacing.sm }]}>
-            {RADII.map((r) => {
-              const isSelected = radius === r;
-              return (
-                <Chip
-                  key={r}
-                  label={`${r}m`}
-                  selected={isSelected}
-                  variant={isSelected ? 'accent' : 'default'}
-                  size="sm"
-                  onPress={() => {
-                    triggerHaptic('buttonTap');
-                    setRadius(r);
-                    const targetZoom = getZoomForRadius(r);
-                    cameraRef.current?.easeTo({
-                      center,
-                      zoom: targetZoom,
-                      duration: 500,
-                      padding: AREA_MAP_PADDING,
-                    });
-                  }}
-                />
-              );
-            })}
-          </View>
+          {/* Tactical Rangefinder Zone Selector (With 2.0km Hard Cap) */}
+          <TacticalRangeSelector
+            radiusM={radius}
+            minRadiusM={200}
+            maxRadiusM={2000}
+            stepM={100}
+            onChange={(newRadius) => {
+              setRadius(newRadius);
+            }}
+            style={{ marginTop: spacing.xs }}
+          />
 
           {/* Placement Guide Message */}
           <View style={[styles.guideRow, { marginTop: spacing.sm }]}>
