@@ -44,7 +44,8 @@ A game is: **one base mode + zero or more role add-ons + zero or more modifiers*
 | 6   | Assassin Ring                   | Base mode                                               | 6 / 8–16              | M      | Prey ring, proximity pulse                            | Med         |
 | 7   | VIP Escort                      | Role add-on                                             | 6 / 8+                | M      | Hidden VIP, swap mechanic                             | Low         |
 | 8   | Operator (remote role)          | Role add-on                                             | 4 / 6+                | M      | Remote players, team scan                             | Low         |
-| 9   | Horde (co-op vs AI)             | Base mode                                               | 1 / 3–8               | M–L    | NPC simulation engine                                 | Med         |
+| 9   | Outbreak (PvP Swarm Tag) [v3.0] | Base mode                                               | 4 / 8–30+             | M      | 100% human PvP infection conversion, dynamic zones, health-as-time | Low–Med     |
+| -   | AI Horde (Co-op vs NPC bots)    | Future Scope                                            | 1–4                   | L      | DEFERRED TO FUTURE: Server-simulated bot horde       | High        |
 | 10  | Haunted Map and Ghost Hunters   | Modifier and NPC                                        | 2 / 3+                | M      | Ghost library, replay NPCs                            | Low         |
 | 11  | Ghost Duels (async solo)        | Solo mode                                               | 1 / 1                 | M      | Ghost library, scoring                                | Low         |
 | 12  | Relay Heist                     | Base mode                                               | 5 / 8+                | M      | Item carry/handoff, drop                              | Low–Med     |
@@ -447,9 +448,9 @@ create table heat_presses (
 
 ---
 
-### 4.4 Horde (co-op versus server-controlled enemies) — ⏸️ FUTURE SCOPE (Deferred)
+### 4.4 AI Bot Horde (Co-op versus Simulated Server NPCs) — ⏸️ DEFERRED TO FUTURE SCOPE
 
-> **Status:** Deferred to future scope / post-v2 release. Milestone B7 skipped in favor of multi-team competitive territory control.
+> **Status:** Completely removed from current and v3 scope. Deferred to future backlog. GhostRun v3 Outbreak Mode (see `docs/specs/HORDE_OUTBREAK_MODE_SPEC.md`) is strictly 100% real-world physical PvP infection tag between human players. No virtual AI bots or server NPC pathfinding will be built for v3.
 
 **Pitch.** Everyone is on the same side. Zombies simulated by the server advance across the map. Players must complete objectives together while avoiding them. It makes the game playable with 1 to 3 people.
 

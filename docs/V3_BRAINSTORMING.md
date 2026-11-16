@@ -124,6 +124,10 @@ Currently, GhostRun relies on screen visuals and haptic buzzes. In physical runn
 
 The single most requested real-world group game mode worldwide, supercharged with **dynamic procedural zones, ticking biological infection decay, and health-as-currency tactical abilities** inspired by urban stealth games like PlayCulture and SCRAM.
 
+> [!IMPORTANT]
+> **Strictly Real-World PvP (Human vs Human) — Zero AI Bots:**
+> Outbreak Horde Mode is 100% human-driven multiplayer infection tag (1 real human Patient Zero vs N real human Survivors). There are **no AI bots, no simulated NPC zombies, and no automated bot pathfinding**. Every zombie chasing you is a real friend running in the physical world with their phone. The legacy concept of "co-op vs AI simulated horde" has been completely removed from v3 scope and deferred to future post-v3 backlog.
+
 #### 1. Core Asymmetric Rules & The Swarm Ratio
 - **Starting Ratio:** Starts with 1 designated **Patient Zero (Alpha Zombie/Hunter)** and all remaining players as **Runners (Survivors)**.
 - **Conversion on Tag:** When a Runner is tagged (via proximity radius, QR scan, or tap confirmation), they instantly flip to the Zombie swarm with a severe haptic jolt, auditory scream cue, and red HUD transition.

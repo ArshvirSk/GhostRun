@@ -12,6 +12,10 @@
 
 Outbreak Horde Mode transforms real-world outdoor stealth into an adrenaline-fueled urban survival thriller. Inspired by field-proven mechanics from PlayCulture ("Zombies") and SCRAM, Outbreak combines **asymmetric swarm infection** with **a ticking biological health clock (health-as-time)**, **tactical ability purchases (time-as-currency)**, and **dynamically shifting, shrinking, and drifting supply zones**.
 
+> [!IMPORTANT]
+> **Strictly Real-World PvP (Human vs Human) — Zero AI Bots:**
+> Outbreak Horde Mode is 100% human-driven multiplayer infection tag (1 real human Patient Zero vs N real human Survivors). There are **no AI bots, no simulated NPC zombies, and no automated bot pathfinding**. Every zombie chasing you is a real friend running in the physical world with their phone. The legacy concept of "co-op vs AI simulated horde" has been completely removed from v3 scope and deferred to future post-v3 backlog.
+
 ```mermaid
 flowchart TD
     subgraph Match["Match Initialization"]
@@ -55,8 +59,9 @@ flowchart TD
 ## 2. Core Game Rules & The Swarm Ratio
 
 ### 2.1 Starting Team Distribution
-- **The Alpha Zombie (Patient Zero):** 1 player randomly selected (or host-designated) as the initial Alpha Zombie.
+- **The Alpha Zombie (Patient Zero):** 1 real human player randomly selected (or host-designated) as the initial Alpha Zombie.
 - **The Survivors:** All remaining players ($N-1$, scalable from 3 up to 50+ participants) start as uninfected Survivors.
+- **Pure Physical PvP (No Bots):** Both Patient Zero and all converted Zombies are live human players. GhostRun relies entirely on real-world human foot pursuit; no virtual NPC bot zombies exist in this mode.
 - **Head Start Phase:** Survivors receive a 60–90 second head start to scatter into the arena before Patient Zero is released into the grid.
 
 ### 2.2 Asymmetric Victory Conditions
