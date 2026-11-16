@@ -120,22 +120,50 @@ Currently, GhostRun relies on screen visuals and haptic buzzes. In physical runn
 
 ---
 
-### Pillar 3: Flagship Game Mode — Horde Mode ("Infection / Swarm Tag")
+### Pillar 3: Flagship Game Mode — Outbreak Horde Mode ("Zombies / Infection Swarm")
 
-The single most requested real-world group game mode worldwide: **Infection Tag**.
+The single most requested real-world group game mode worldwide, supercharged with **dynamic procedural zones, ticking biological infection decay, and health-as-currency tactical abilities** inspired by urban stealth games like PlayCulture and SCRAM.
 
-#### Rules & Mechanics:
-- **Starting Ratio:** Starts with 1 designated Alpha Hunter and all remaining players as Runners.
-- **Conversion on Tag:** When a Runner is tagged (via proximity radius, QR scan, or tap confirmation), they instantly flip to the Hunter team with a haptic jolt and red HUD transition.
+#### 1. Core Asymmetric Rules & The Swarm Ratio
+- **Starting Ratio:** Starts with 1 designated **Patient Zero (Alpha Zombie/Hunter)** and all remaining players as **Runners (Survivors)**.
+- **Conversion on Tag:** When a Runner is tagged (via proximity radius, QR scan, or tap confirmation), they instantly flip to the Zombie swarm with a severe haptic jolt, auditory scream cue, and red HUD transition.
 - **Victory Conditions:**
-  - **Hunters Win:** If all Runners are infected before the match clock expires.
-  - **Runners Win:** The sole surviving Runner who survives the timer is crowned the Lone Survivor.
-- **Swarm Radar Dynamics:**
-  - As more Hunters join the swarm, the radar map turns into a sea of red pursuit vectors.
-  - Creates incredible cinematic tension for the final 1 or 2 surviving Runners.
+  - **Zombies Win:** If all Survivors are infected or succumb to biological decay before the match clock expires.
+  - **Survivors Win:** Any surviving Runner who outlasts the match clock is extracted and crowned **Lone Survivor**.
 
-* **Player Impact:** Highest group replay value for 4 to 20+ operatives in public parks, school grounds, and urban centers.
-* **Effort:** Medium (builds on existing role assignment and team swap logic; zero new physical hardware required).
+#### 2. The Ticking Infection Health Pool & Time-As-Currency Engine
+- **Infection Timer (Bio-Lifespan):**
+  - Every Survivor starts with a ticking biological health pool (default: **300 to 360 HP**, exactly 5 to 6 minutes of life).
+  - Health continuously depletes at **-1 HP per second**.
+  - If HP reaches 0, the Survivor succumbs to the pathogen and converts into a Zombie automatically.
+- **Health as Tactical Currency:**
+  - Survivors' health pool doubles as **Bio-Energy** to purchase high-impact tactical survival abilities:
+    - **Cloak (Cost: 35 HP / 35s of life):** Completely hides the Survivor from Zombie radar and proximity heatmaps for 20 seconds.
+    - **Cloak+ (Cost: 65 HP / 65s of life):** 30 seconds of full radar invisibility plus immunity from proximity infection alerts.
+    - **Haste (Cost: 25 HP / 25s of life):** Grants tactical sprint burst indicator and temporarily extends tag evasion grace buffer.
+  - *The Core Psychological Dilemma:* Spending precious life seconds to evade a nearby Zombie swarm increases immediate survival odds but drastically accelerates death if no Antidote Healing Zone is reached in time.
+
+#### 3. Dynamic Procedural Zones (Healing Stations & Ability Depots)
+Rather than static objectives, the arena features dynamic procedural zones plotted randomly across the play boundary:
+- **Antidote / Healing Zones (Green Reticle):**
+  - Entering the decontamination geofence immediately injects **+50 to +75 HP** (restoring 50–75 seconds of life and bio-currency).
+  - Emits soothing decontamination audio in earbuds and green radial pulse on radar.
+- **Ability Drop Pods (Cyan/Amber Reticle):**
+  - Tactical supply caches where Survivors can spend Bio-Currency to unlock Cloak, Cloak+, and Haste charges.
+
+#### 4. Procedural Zone Lifecycles & Drifting Physics (Host Configurable)
+Hosts can customize how zones behave across the match:
+- **Static Timed Nodes:** Spawns at a random safe coordinate, active for $T$ seconds (e.g., 90s) before despawning and relocating elsewhere.
+- **Shrinking Nodes:** Starts at a generous radius (e.g., $35\text{m}$) and continuously contracts down to $0\text{m}$, forcing players to hurry before it disappears.
+- **Dynamic Drifting Nodes:** Zone centroids actively move and glide across park pathways and street grids at pedestrian walking speeds ($0.5 - 1.2\text{ m/s}$), optionally shrinking as they travel.
+
+#### 5. Zombie Counterplay & Ambush Strategy
+- **Antidote Ambush Dynamics:** Because Survivors *must* visit Healing Zones to prevent death, Zombies can strategically patrol, flank, and ambush the perimeter of active Antidote stations.
+- **Swarm Radar & Scent Tracking:** As the Zombie swarm expands, their collective radar pings create red directional threat wavefronts, while dying Survivors (<60 HP) begin emitting weak distress pings detectable by nearby Zombies.
+
+* **Player Impact:** Unmatched adrenaline and high-stakes decision-making for groups of 4 to 30+ players.
+* **Effort:** Medium-High (extends existing role assignment, timer loops, and dynamic GeoJSON zone layers).
+* **Detailed Specification:** See companion document [docs/specs/HORDE_OUTBREAK_MODE_SPEC.md](file:///c:/ASK_Main/ASK/Projects/GhostRun/docs/specs/HORDE_OUTBREAK_MODE_SPEC.md).
 
 ---
 
