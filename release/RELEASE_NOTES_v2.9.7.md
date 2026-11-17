@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-17  
 **Artifact:** `release/GhostRun-v2.9.7.apk`  
-**Size:** 56,714,520 bytes (54.09 MB)  
-**SHA-256 Checksum:** `149E9DA81BEFD16510CB93A6A5B4542EFD155CA20515FDB2C9292D7372E76237`  
+**Size:** 56,714,348 bytes (54.09 MB)  
+**SHA-256 Checksum:** `0841DBD97870A8EA5178CB092CA980FBE74F762C92D3D24D9F89BBD161080A73`  
 **Version:** `2.9.7`  
 **VersionCode:** `22`  
 **Architecture:** `arm64-v8a`  

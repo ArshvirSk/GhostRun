@@ -142,7 +142,7 @@ export default function ModesTab() {
           ]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Filter Chips - Single row, 100% visible, no horizontal scroll conflict */}
+          {/* Filter Chips - Sleek minimal single row, no text except ALL */}
           <View style={styles.filterSection}>
             <Text variant="label" style={{ color: colors.textMuted, marginBottom: 8, fontSize: 11, letterSpacing: 0.8 }}>
               SQUAD SIZE
@@ -151,9 +151,9 @@ export default function ModesTab() {
               {(
                 [
                   { id: 'all', label: 'ALL' },
-                  { id: 'solo', label: 'SOLO (1)' },
-                  { id: 'squad', label: 'SQUAD (2–4)' },
-                  { id: 'massive', label: '5+ MASSIVE' },
+                  { id: 'solo', label: '1' },
+                  { id: 'squad', label: '2–4' },
+                  { id: 'massive', label: '5+' },
                 ] as const
               ).map((opt) => (
                 <Chip
@@ -174,9 +174,9 @@ export default function ModesTab() {
               {(
                 [
                   { id: 'all', label: 'ALL' },
-                  { id: '1', label: 'CASUAL ★' },
-                  { id: '2', label: 'TACTICAL ★★' },
-                  { id: '3', label: 'HARDCORE ★★★' },
+                  { id: '1', label: '★' },
+                  { id: '2', label: '★★' },
+                  { id: '3', label: '★★★' },
                 ] as const
               ).map((opt) => (
                 <Chip
@@ -194,8 +194,10 @@ export default function ModesTab() {
           {/* Mode Cards List */}
           <View style={styles.cardList}>
             {filteredModes.map((mode) => {
-              const diffLabel =
-                mode.difficulty === 1 ? 'CASUAL' : mode.difficulty === 2 ? 'TACTICAL' : 'HARDCORE';
+              const playerNumbers = mode.idealPlayers
+                .replace(/\s*players?/i, '')
+                .replace(/All player counts/i, 'ALL')
+                .trim();
 
               return (
                 <Card
@@ -228,28 +230,28 @@ export default function ModesTab() {
                     {mode.tagline}
                   </Text>
 
-                  {/* Compact, clean horizontal chips - guaranteed single line */}
+                  {/* Compact, clean horizontal chips - numbers and stars only */}
                   <View style={styles.badgeRow}>
                     <Chip
                       icon={<Ionicons name="people-outline" size={12} color={colors.textMuted} />}
-                      label={mode.idealPlayers}
+                      label={playerNumbers}
                       variant="muted"
                       size="sm"
-                      style={{ flexShrink: 1, paddingHorizontal: 6 }}
+                      style={{ paddingHorizontal: 8 }}
                     />
                     <Chip
                       icon={<Ionicons name="flash-outline" size={12} color={colors.accent} />}
-                      label={`${'★'.repeat(mode.difficulty)} ${diffLabel}`}
+                      label={'★'.repeat(mode.difficulty)}
                       variant="accent"
                       size="sm"
-                      style={{ flexShrink: 1, paddingHorizontal: 6 }}
+                      style={{ paddingHorizontal: 8 }}
                     />
                     <Chip
                       icon={<Ionicons name="compass-outline" size={12} color={colors.primary} />}
                       label={mode.layer.toUpperCase()}
                       variant="default"
                       size="sm"
-                      style={{ flexShrink: 0, paddingHorizontal: 6 }}
+                      style={{ paddingHorizontal: 8 }}
                     />
                   </View>
 
