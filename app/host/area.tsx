@@ -28,7 +28,7 @@ const DARK_MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
 
 
-const AREA_MAP_PADDING = { top: 160, bottom: 85, left: 16, right: 16 };
+const AREA_MAP_PADDING = { top: 275, bottom: 120, left: 24, right: 24 };
 
 /**
  * Calculates optimal camera zoom level to fit a zone of radiusM within screen bounds.
@@ -36,7 +36,7 @@ const AREA_MAP_PADDING = { top: 160, bottom: 85, left: 16, right: 16 };
  */
 export function getZoomForRadius(radiusM: number): number {
   const safeR = Math.max(100, Math.min(2000, radiusM));
-  const zoom = 14.8 - Math.log2(safeR / 300);
+  const zoom = 14.6 - Math.log2(safeR / 300);
   return Math.round(zoom * 10) / 10;
 }
 
@@ -94,6 +94,7 @@ export default function HostAreaScreen() {
         center: currentCenter,
         zoom: targetZoom,
         duration: 320,
+        padding: AREA_MAP_PADDING,
         easing: 'ease',
       });
     }, 250);
@@ -190,6 +191,7 @@ export default function HostAreaScreen() {
       cameraRef.current?.easeTo({
         center: [tapLng, tapLat],
         duration: 300,
+        padding: AREA_MAP_PADDING,
       });
 
       // If target or jail exists, check if it falls outside new radius and adjust if needed
@@ -327,7 +329,13 @@ export default function HostAreaScreen() {
 
           if (!snapped || distDrift > 15) {
             setCenter(coords, 'my_location');
-            cameraRef.current?.easeTo({ center: coords, zoom: 14, duration: 300 });
+            const currentR = useHostStore.getState().radius;
+            cameraRef.current?.easeTo({
+              center: coords,
+              zoom: getZoomForRadius(currentR),
+              duration: 300,
+              padding: AREA_MAP_PADDING,
+            });
             if (needsTarget) {
               setPlacement('target', [coords[0] + 0.0018, coords[1] + 0.0018]);
             }
