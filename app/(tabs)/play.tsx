@@ -91,12 +91,18 @@ export function PlayContent() {
 
       if (profile?.display_name) {
         setDisplayName(profile.display_name);
-        useUserStore.getState().setProfile({
-          id: userData.user.id,
-          display_name: profile.display_name,
-          color: profile.color,
-          email: userData.user.email,
-        });
+        const currentProfile = useUserStore.getState().profile;
+        if (
+          currentProfile?.display_name !== profile.display_name ||
+          currentProfile?.color !== profile.color
+        ) {
+          useUserStore.getState().setProfile({
+            id: userData.user.id,
+            display_name: profile.display_name,
+            color: profile.color,
+            email: userData.user.email,
+          });
+        }
       }
 
       if (activePlayers && activePlayers.length > 0) {
@@ -143,11 +149,11 @@ export function PlayContent() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([
-      loadProfileAndActiveGame(),
-      new Promise((resolve) => setTimeout(resolve, 750)),
-    ]);
-    setRefreshing(false);
+    try {
+      await loadProfileAndActiveGame();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const formattedName = displayName.endsWith('.') ? displayName : `${displayName}.`;
@@ -552,6 +558,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 22,
     justifyContent: 'space-between',
+    flexGrow: 1,
   },
   headerRow: {
     flexDirection: 'row',

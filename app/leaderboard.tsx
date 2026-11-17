@@ -83,10 +83,7 @@ export default function LeaderboardScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        loadBoard(activeTab),
-        new Promise((resolve) => setTimeout(resolve, 750)),
-      ]);
+      await loadBoard(activeTab);
     } finally {
       setRefreshing(false);
     }

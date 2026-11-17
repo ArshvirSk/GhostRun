@@ -96,10 +96,7 @@ export default function FriendsScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        loadData(),
-        new Promise((resolve) => setTimeout(resolve, 750)),
-      ]);
+      await loadData();
     } finally {
       setRefreshing(false);
     }

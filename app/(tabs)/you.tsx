@@ -223,10 +223,7 @@ export function YouContent() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        loadProfileAndHistory(),
-        new Promise((resolve) => setTimeout(resolve, 750)),
-      ]);
+      await loadProfileAndHistory();
     } finally {
       setRefreshing(false);
     }

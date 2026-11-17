@@ -1,19 +1,15 @@
 import React, {
   forwardRef,
-  useCallback,
-  useEffect,
   useImperativeHandle,
   useRef,
   useState,
 } from 'react';
 import {
   Animated,
-  Easing,
   Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   PanResponder,
-  RefreshControl,
   ScrollView,
   ScrollViewProps,
   StyleSheet,
@@ -22,30 +18,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
 import { triggerHaptic } from '../motion/haptics';
-import { Text } from '../ui/Text';
 
 const GHOST_PEEK_DARK = require('../../assets/ghost-peek-dark.png');
 const GHOST_PEEK_LIGHT = require('../../assets/ghost-peek-light.png');
-
-const BASE_THRESHOLD = 76;
-const BASE_RESTING = 70;
-
-function isLightColor(hex: string): boolean {
-  if (!hex || typeof hex !== 'string') return false;
-  const clean = hex.replace('#', '');
-  if (clean.length === 3) {
-    const r = parseInt(clean[0] + clean[0], 16);
-    const g = parseInt(clean[1] + clean[1], 16);
-    const b = parseInt(clean[2] + clean[2], 16);
-    return (r * 299 + g * 587 + b * 114) / 1000 > 155;
-  }
-  const num = parseInt(clean, 16);
-  if (isNaN(num)) return false;
-  const r = (num >> 16) & 255;
-  const g = (num >> 8) & 255;
-  const b = num & 255;
-  return (r * 299 + g * 587 + b * 114) / 1000 > 155;
-}
 
 export interface TacticalPullRefreshScrollViewProps extends ScrollViewProps {
   refreshing: boolean;
@@ -72,186 +47,126 @@ export const TacticalPullRefreshScrollView = forwardRef<
 ) {
   const insets = useSafeAreaInsets();
   const topInset = Math.max(insets?.top || 0, 24);
-  const restingHeight = topInset + 92;
-  const thresholdHeight = topInset + 104;
-  const maxPullHeight = topInset + 175;
+  const restingHeight = topInset + 72;
+  const thresholdHeight = topInset + 88;
+  const maxPullHeight = topInset + 160;
 
   const { colors, isDark } = useTheme();
   const primaryColor = tintColor || colors.primary;
-  const isLightAccent = isLightColor(primaryColor);
-  const textColor = isLightAccent ? '#0A0A0E' : '#FFFFFF';
 
   const internalScrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   useImperativeHandle(ref, () => internalScrollRef.current as React.ElementRef<typeof ScrollView>);
 
   const scrollYRef = useRef(0);
-  const isRefreshingRef = useRef(refreshing);
-  isRefreshingRef.current = refreshing;
+  const isRefreshingRef = useRef(false);
 
   const pullAnim = useRef(new Animated.Value(0)).current;
-  const wobbleAnim = useRef(new Animated.Value(0)).current;
-  const bobAnim = useRef(new Animated.Value(0)).current;
-  const radarAnim = useRef(new Animated.Value(0)).current;
-
   const currentPullRef = useRef(0);
   const isDraggingPull = useRef(false);
   const hasTriggeredHaptic = useRef(false);
-  const [pullState, setPullState] = useState<'idle' | 'pulling' | 'threshold' | 'refreshing'>('idle');
+  const pullPhaseRef = useRef<'idle' | 'pulling' | 'threshold' | 'refreshing'>('idle');
 
-  // Looping playful animations while refreshing
-  const startRefreshingAnimations = useCallback(() => {
-    // Wobble loop
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(wobbleAnim, {
-          toValue: 1,
-          duration: 220,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: false,
-        }),
-        Animated.timing(wobbleAnim, {
-          toValue: -1,
-          duration: 440,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: false,
-        }),
-        Animated.timing(wobbleAnim, {
-          toValue: 0,
-          duration: 220,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: false,
-        }),
-      ])
-    ).start();
+  // Single guarded refresh trigger — prevents double-reboot
+  const executeRefresh = async () => {
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
+    pullPhaseRef.current = 'refreshing';
 
-    // Bob loop
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(bobAnim, {
-          toValue: -5,
-          duration: 280,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: false,
-        }),
-        Animated.timing(bobAnim, {
-          toValue: 0,
-          duration: 280,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: false,
-        }),
-      ])
-    ).start();
+    // Hold at resting height while async onRefresh runs
+    Animated.spring(pullAnim, {
+      toValue: restingHeight,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 40,
+    }).start();
 
-    // Radar scan wave loop
-    Animated.loop(
-      Animated.timing(radarAnim, {
-        toValue: 1,
-        duration: 900,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: false,
-      })
-    ).start();
-  }, [wobbleAnim, bobAnim, radarAnim]);
-
-  const stopRefreshingAnimations = useCallback(() => {
-    wobbleAnim.stopAnimation();
-    bobAnim.stopAnimation();
-    radarAnim.stopAnimation();
-    wobbleAnim.setValue(0);
-    bobAnim.setValue(0);
-    radarAnim.setValue(0);
-  }, [wobbleAnim, bobAnim, radarAnim]);
-
-  // Synchronize with external refreshing prop
-  useEffect(() => {
-    if (refreshing) {
-      setPullState('refreshing');
-      Animated.spring(pullAnim, {
-        toValue: restingHeight,
-        useNativeDriver: false,
-        friction: 7,
-        tension: 40,
-      }).start();
-      startRefreshingAnimations();
-    } else {
-      stopRefreshingAnimations();
-      setPullState('idle');
-      hasTriggeredHaptic.current = false;
+    try {
+      await Promise.all([
+        Promise.resolve(onRefresh()),
+        new Promise((resolve) => setTimeout(resolve, 800)),
+      ]);
+    } finally {
+      isRefreshingRef.current = false;
       currentPullRef.current = 0;
-      isDraggingPull.current = false;
+      pullPhaseRef.current = 'idle';
       Animated.spring(pullAnim, {
         toValue: 0,
         useNativeDriver: false,
-        friction: 8,
+        friction: 9,
         tension: 50,
       }).start();
     }
-  }, [refreshing, pullAnim, restingHeight, startRefreshingAnimations, stopRefreshingAnimations]);
+  };
 
-  // Robust PanResponder that captures pull gesture at scrollY <= 2
+  // PanResponder strictly for deliberate vertical downward pull at scrollY <= 0
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
+
       onMoveShouldSetPanResponder: (_, gestureState) => {
         if (isRefreshingRef.current) return false;
-        if (scrollYRef.current > 2) return false;
-        return gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.1;
+        if (scrollYRef.current > 1) return false;
+        return (
+          gestureState.dy > 12 &&
+          gestureState.dy > Math.abs(gestureState.dx) * 1.8
+        );
       },
+
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
         if (isRefreshingRef.current) return false;
-        if (scrollYRef.current > 2) return false;
-        return gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.1;
+        if (scrollYRef.current > 1) return false;
+        return (
+          gestureState.dy > 12 &&
+          gestureState.dy > Math.abs(gestureState.dx) * 1.8
+        );
       },
+
       onPanResponderGrant: () => {
         isDraggingPull.current = true;
         hasTriggeredHaptic.current = false;
-        setPullState('pulling');
+        pullPhaseRef.current = 'pulling';
       },
-      onPanResponderTerminationRequest: () => false,
+
+      onPanResponderTerminationRequest: () => !isDraggingPull.current,
+
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy <= 0) {
           pullAnim.setValue(0);
           currentPullRef.current = 0;
-          setPullState('idle');
+          pullPhaseRef.current = 'idle';
           return;
         }
+
         const dy = Math.max(0, gestureState.dy);
-        const pull = Math.min(maxPullHeight, Math.pow(dy, 0.82) * 2.2);
+        // Elastic rubber-band resistance curve
+        const pull = Math.min(maxPullHeight, Math.pow(dy, 0.82) * 2.0);
         currentPullRef.current = pull;
         pullAnim.setValue(pull);
 
         if (pull >= thresholdHeight) {
-          setPullState('threshold');
+          pullPhaseRef.current = 'threshold';
           if (!hasTriggeredHaptic.current) {
             hasTriggeredHaptic.current = true;
             triggerHaptic('buttonTap');
           }
         } else {
-          setPullState('pulling');
+          pullPhaseRef.current = 'pulling';
           if (hasTriggeredHaptic.current) {
             hasTriggeredHaptic.current = false;
           }
         }
       },
-      onPanResponderRelease: (_, gestureState) => {
-        isDraggingPull.current = false;
-        const dy = Math.max(0, gestureState.dy);
-        const pull = Math.min(maxPullHeight, Math.pow(dy, 0.82) * 2.2);
 
-        if (pull >= thresholdHeight && !isRefreshingRef.current) {
-          setPullState('refreshing');
+      onPanResponderRelease: () => {
+        isDraggingPull.current = false;
+        const finalPull = currentPullRef.current;
+
+        if (finalPull >= thresholdHeight && !isRefreshingRef.current) {
           triggerHaptic('tagConfirmed');
-          Animated.spring(pullAnim, {
-            toValue: restingHeight,
-            useNativeDriver: false,
-            friction: 7,
-            tension: 40,
-          }).start();
-          startRefreshingAnimations();
-          void onRefresh();
-        } else {
-          setPullState('idle');
+          void executeRefresh();
+        } else if (!isRefreshingRef.current) {
+          pullPhaseRef.current = 'idle';
           currentPullRef.current = 0;
           Animated.spring(pullAnim, {
             toValue: 0,
@@ -261,17 +176,19 @@ export const TacticalPullRefreshScrollView = forwardRef<
           }).start();
         }
       },
+
       onPanResponderTerminate: () => {
         isDraggingPull.current = false;
-        if (isRefreshingRef.current) return;
-        setPullState('idle');
-        currentPullRef.current = 0;
-        Animated.spring(pullAnim, {
-          toValue: 0,
-          useNativeDriver: false,
-          friction: 8,
-          tension: 50,
-        }).start();
+        if (!isRefreshingRef.current) {
+          pullPhaseRef.current = 'idle';
+          currentPullRef.current = 0;
+          Animated.spring(pullAnim, {
+            toValue: 0,
+            useNativeDriver: false,
+            friction: 8,
+            tension: 50,
+          }).start();
+        }
       },
     })
   ).current;
@@ -281,110 +198,28 @@ export const TacticalPullRefreshScrollView = forwardRef<
     onScroll?.(e);
   };
 
-  // Interpolations
-  const mascotTranslateY = pullAnim.interpolate({
-    inputRange: [0, 40, thresholdHeight],
-    outputRange: [24, 12, 0],
-    extrapolate: 'clamp',
-  });
-
-  const mascotScale = pullAnim.interpolate({
-    inputRange: [0, 40, thresholdHeight, maxPullHeight],
-    outputRange: [0.7, 0.85, 1.0, 1.08],
-    extrapolate: 'clamp',
-  });
-
-  const mascotOpacity = pullAnim.interpolate({
-    inputRange: [0, 15, 45],
-    outputRange: [0, 0.5, 1],
-    extrapolate: 'clamp',
-  });
-
-  const wobbleRotation = wobbleAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ['-4deg', '0deg', '4deg'],
-  });
-
-  const radarScale = radarAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.8, 2.2],
-  });
-
-  const radarOpacity = radarAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.45, 0.25, 0],
-  });
-
-  const isPullActive = pullState !== 'idle';
-
   return (
     <View style={[styles.rootContainer, style]} {...panResponder.panHandlers}>
-      {/* Snapchat-Style Pull Down Curtain */}
+      {/* Snapchat-Style Pull Down Curtain — strictly NO border, zero thin line at rest */}
       <Animated.View
+        pointerEvents="none"
         style={[
           styles.curtainContainer,
           {
             height: pullAnim,
             backgroundColor: primaryColor,
-            borderBottomColor: isDark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.15)',
           },
         ]}
       >
-        {/* Pulsing radar waves behind the mascot during refresh */}
-        {pullState === 'refreshing' && (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.radarRing,
-              {
-                borderColor: isLightAccent ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.45)',
-                transform: [{ scale: radarScale }],
-                opacity: radarOpacity,
-              },
-            ]}
-          />
-        )}
-
-        {/* Tactical Status Tag */}
-        <Animated.View
-          style={[
-            styles.statusBadge,
-            {
-              top: topInset + 4,
-              opacity: mascotOpacity,
-            },
-          ]}
-        >
-          <Text style={[styles.statusText, { color: textColor }]}>
-            {pullState === 'threshold'
-              ? 'RELEASE TO SCAN'
-              : pullState === 'refreshing'
-              ? 'SCANNING HUD...'
-              : 'PULL TO SYNC'}
-          </Text>
-        </Animated.View>
-
-        {/* Ghost Mascot Peeking over the divider ledge */}
-        <Animated.View
-          style={[
-            styles.mascotAnchor,
-            {
-              opacity: mascotOpacity,
-              transform: [
-                { translateY: Animated.add(mascotTranslateY, bobAnim) },
-                { scale: mascotScale },
-                { rotate: wobbleRotation },
-              ],
-            },
-          ]}
-        >
+        {/* Ghost Mascot stuck directly to the bottom ledge of the pulled curtain */}
+        <View style={styles.mascotAnchor}>
           <Image
             source={isDark ? GHOST_PEEK_DARK : GHOST_PEEK_LIGHT}
             style={styles.mascotImage}
             resizeMode="contain"
             accessibilityLabel="GhostRun Mascot"
           />
-        </Animated.View>
+        </View>
       </Animated.View>
 
       {/* Main Screen Content ScrollView */}
@@ -394,18 +229,8 @@ export const TacticalPullRefreshScrollView = forwardRef<
         scrollEventThrottle={16}
         overScrollMode="never"
         bounces={false}
-        scrollEnabled={!isPullActive}
+        nestedScrollEnabled={true}
         contentContainerStyle={contentContainerStyle}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['transparent']}
-            tintColor="transparent"
-            progressBackgroundColor="transparent"
-            progressViewOffset={-1000}
-          />
-        }
         {...restProps}
       >
         {children}
@@ -425,41 +250,17 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    borderBottomWidth: 2,
-  },
-  statusBadge: {
-    position: 'absolute',
-    alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-  },
-  statusText: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textAlign: 'center',
+    borderBottomWidth: 0, // NO border line — zero thin line when closed
   },
   mascotAnchor: {
-    width: 98,
-    height: 66,
+    width: 96,
+    height: 65,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginBottom: -1, // Sits precisely flush with the bottom ledge line
+    marginBottom: -1, // Sits precisely flush with the bottom ledge of the pulled curtain
   },
   mascotImage: {
-    width: 98,
-    height: 66,
-  },
-  radarRing: {
-    position: 'absolute',
-    bottom: 12,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    alignSelf: 'center',
+    width: 96,
+    height: 65,
   },
 });
