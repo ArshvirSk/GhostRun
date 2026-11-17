@@ -231,6 +231,7 @@ export default function TabsLayout() {
         ref={pagerRef}
         horizontal
         pagingEnabled
+        nestedScrollEnabled={true}
         showsHorizontalScrollIndicator={false}
         bounces={false}
         scrollEventThrottle={16}

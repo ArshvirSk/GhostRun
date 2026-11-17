@@ -402,6 +402,7 @@ export function YouContent() {
           >
             <ScrollView
               horizontal
+              nestedScrollEnabled={true}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.quickPaletteContent}
             >
@@ -817,6 +818,7 @@ export function YouContent() {
 
         <ScrollView
           horizontal
+          nestedScrollEnabled={true}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 10, paddingVertical: 8, paddingBottom: 16 }}
         >
@@ -1267,6 +1269,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 4,
     paddingHorizontal: 2,
+    paddingRight: 16,
   },
   paletteRow: {
     flexDirection: 'row',
