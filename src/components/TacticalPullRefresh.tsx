@@ -17,7 +17,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
-import { triggerHaptic } from '../motion/haptics';
 
 const GHOST_PEEK_DARK = require('../../assets/ghost-peek-dark.png');
 const GHOST_PEEK_LIGHT = require('../../assets/ghost-peek-light.png');
@@ -88,7 +87,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
     }
     refreshStatusRef.current = 'refreshing';
 
-    // Smoothly snap to resting height while data syncs
+    // Smoothly snap to resting height while data syncs (natural bounce is fine here)
     Animated.spring(pullAnim, {
       toValue: restingHeight,
       useNativeDriver: false,
@@ -110,7 +109,9 @@ export const TacticalPullRefreshScrollView = forwardRef<
         useNativeDriver: false,
         friction: 9,
         tension: 52,
+        overshootClamping: true, // never cross 0, so the curtain can't bounce back open
       }).start(() => {
+        pullAnim.setValue(0); // guarantee a clean final state
         refreshStatusRef.current = 'idle';
         currentPullRef.current = 0;
         hasTriggeredHaptic.current = false;
@@ -168,7 +169,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
         if (pull >= thresholdHeight) {
           if (!hasTriggeredHaptic.current) {
             hasTriggeredHaptic.current = true;
-            triggerHaptic('buttonTap');
+            // triggerHaptic('buttonTap'); // <-- this fires when you cross the threshold
           }
         } else {
           if (hasTriggeredHaptic.current) {
@@ -182,7 +183,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
 
         const finalPull = currentPullRef.current;
         if (finalPull >= thresholdHeight) {
-          triggerHaptic('tagConfirmed');
+          // triggerHaptic('tagConfirmed');
           void executeRefresh();
         } else {
           // User let go before threshold — snap back smoothly like Snapchat
@@ -192,7 +193,9 @@ export const TacticalPullRefreshScrollView = forwardRef<
             useNativeDriver: false,
             friction: 8,
             tension: 50,
+            overshootClamping: true,
           }).start(() => {
+            pullAnim.setValue(0);
             refreshStatusRef.current = 'idle';
             currentPullRef.current = 0;
             hasTriggeredHaptic.current = false;
@@ -209,7 +212,9 @@ export const TacticalPullRefreshScrollView = forwardRef<
             useNativeDriver: false,
             friction: 8,
             tension: 50,
+            overshootClamping: true,
           }).start(() => {
+            pullAnim.setValue(0);
             refreshStatusRef.current = 'idle';
             currentPullRef.current = 0;
             hasTriggeredHaptic.current = false;
