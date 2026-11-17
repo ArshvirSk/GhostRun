@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-17  
 **Artifact:** `release/GhostRun-v2.9.6.apk`  
-**Size:** 56,707,360 bytes (54.08 MB)  
-**SHA-256 Checksum:** `E34FB31F44CA21B888F6598687A833D967915709BC794DF23066242637B479FA`  
+**Size:** 56,707,560 bytes (54.08 MB)  
+**SHA-256 Checksum:** `C5BD3140FA4C9C909CD805DDA3230FC146AA62C34A8C269BE2B40A1A8CF76552`  
 **Version:** `2.9.6`  
 **VersionCode:** `21`  
 **Architecture:** `arm64-v8a`  
@@ -13,24 +13,25 @@
 
 ## Overview
 
-GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements across core screens. This release introduces the new military-grade **Tactical Rangefinder Zone Selector** with physical stepped friction, auto-snapping to the closest option, haptic tick feedback, left/right edge gradients, and glitch-free camera zooming, silky-smooth sliding pills on both the main floating navbar and sub-tab bars, a horizontal swipe pager on Modes, Squads, and Schedule tabs, and streamlined card layouts.
+GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements across core screens. This release introduces the new military-grade **Tactical Rangefinder Zone Selector** engineered with a native `PanResponder` and `Animated.spring` gesture engine that guarantees 100% dead-center auto-snapping, direct finger tracking, physical friction, haptic tick feedback, left/right edge gradients, and glitch-free camera zooming, silky-smooth sliding pills on both the main floating navbar and sub-tab bars, a horizontal swipe pager on Modes, Squads, and Schedule tabs, and streamlined card layouts.
 
 ---
 
 ## Key Highlights & Changes
 
-### 1. Auto-Snapping Stepped Dial Zone Selector & 2km Hard Cap (`src/ui/TacticalRangeSelector.tsx`)
-- **Zero-Lag Architecture**: Decoupled active drag scrolling from parent state re-renders so the dial tracks your finger with silky 120fps responsiveness without freezing or lagging.
-- **Auto-Snap to Closest Option**: When released anywhere between two sizes, `snapToClosest` computes the exact nearest step by distance (`Math.round(offsetX / ITEM_WIDTH)`) and snaps the dial directly into the reticle. Never gets stuck between numbers.
-- **Discrete Snap Offsets**: Configured `snapToOffsets` array mapping every 100m interval with `decelerationRate="fast"` and `disableIntervalMomentum={true}` for solid physical weight and friction.
+### 1. PanResponder Spring Dial Zone Selector & 2km Hard Cap (`src/ui/TacticalRangeSelector.tsx`)
+- **Native PanResponder Architecture**: Completely replaced native Android `ScrollView` with a `PanResponder` and `Animated.spring` gesture engine. Avoids Android's `disableIntervalMomentum` trap that caused intermediate drag freezing.
+- **100% Dead-Center Auto-Snapping**: On finger release anywhere between two sizes, `targetIdx` calculates `Math.round((centerPadding - projectedOffset) / ITEM_WIDTH)` and animates directly to `(windowWidth - ITEM_WIDTH)/2 - clampedIdx * ITEM_WIDTH`. Impossible to get stuck midway between numbers.
+- **Direct 1:1 Finger Tracking**: Dial tracks touch gestures with instant 120fps responsiveness and subtle over-scroll resistance at boundary limits (200m and 2000m).
+- **Tap-to-Select & Stepper Buttons**: Tap any visible number directly on the dial tape or tap `[-]` and `[+]` buttons to step through 100m increments.
 - **Haptic Tick Feedback**: Crisp haptic pulse (`triggerHaptic('buttonTap')`) fires on every single step transition as you swipe or tap.
-- **Edge Fades**: Dual `<LinearGradient>` overlays smoothly fade numbers towards the `[-]` and `[+]` stepper buttons.
+- **Edge Fades**: Dual `<LinearGradient>` overlays smoothly fade numbers towards the `[-]` and `[+]` stepper buttons with `pointerEvents="none"`.
 - **Centered Indicator Reticle**: Active selection is framed inside an accent-highlighted reticle pill.
 - **Eliminated Presets Row**: Stripped the redundant row of preset buttons for a clean, focused UI.
 - **2.0 km Hard Cap**: Strictly enforced a maximum 2000m (2.0 km) perimeter across all modes.
 
 ### 2. Glitch-Free Camera Zooming & Screen Real Estate (`app/host/area.tsx`)
-- **Root Cause of Zoom Glitch Resolved**: MapLibre Android's native render engine would twitch when rapid intermediate step changes dispatched conflicting camera animations while GeoJSON layers updated simultaneously. By debouncing camera framing to 280ms, the boundary ring resizes instantly at 120fps while you swipe or tap, and the camera executes a single, buttery-smooth transition once you settle on a size.
+- **Root Cause of Zoom Glitch & In-Out Jump Resolved**: In previous builds, the mount `useEffect` for GPS initialization included `applyCameraCenter` in its dependencies, which had `radius` in its dependency array. Every time the user adjusted the zone radius, the entire mount effect re-triggered from scratch, dispatching an immediate `jumpTo` camera command that collided with MapLibre's in-flight `easeTo` animation. Decoupling `initLocation` to run strictly once on mount and debouncing camera zoom transitions to 250ms completely eliminates all camera twitches, jitters, and in-and-out jumping.
 - **Removed Compatibility Badge**: Removed the `✓ ARENA & DURATION COMPATIBLE` badge, freeing up screen space so the map canvas and boundary ring have maximum breathing room.
 - **Calibrated Viewport Padding**: Adjusted `AREA_MAP_PADDING = { top: 160, bottom: 85, left: 16, right: 16 }` for dead-center boundary framing.
 

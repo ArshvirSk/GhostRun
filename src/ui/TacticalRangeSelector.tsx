@@ -1,12 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   Pressable,
-  ScrollView,
+  Animated,
+  PanResponder,
   ViewStyle,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
   LayoutChangeEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,9 +25,8 @@ export interface TacticalRangeSelectorProps {
 
 // 100m uniform steps from 200m to 2000m (strictly hard-capped at 2.0km)
 const DIAL_STEPS = Array.from({ length: 19 }, (_, i) => 200 + i * 100);
-const ITEM_WIDTH = 72;
+const ITEM_WIDTH = 76;
 const DIAL_HEIGHT = 44;
-const SNAP_OFFSETS = DIAL_STEPS.map((_, i) => i * ITEM_WIDTH);
 
 export function TacticalRangeSelector({
   radiusM,
@@ -38,20 +36,21 @@ export function TacticalRangeSelector({
   style,
 }: TacticalRangeSelectorProps) {
   const { colors, isDark } = useTheme();
-  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
-  const isInteractingRef = useRef(false);
   const [windowWidth, setWindowWidth] = useState(0);
 
   const clampedRadius = Math.max(minRadiusM, Math.min(maxRadiusM, radiusM));
-  const diameterM = clampedRadius * 2;
-
-  // Local index state for 120fps instant visual feedback without choking parent
   const initialIdx = DIAL_STEPS.findIndex((s) => s === clampedRadius);
-  const [localIndex, setLocalIndex] = useState(initialIdx !== -1 ? initialIdx : 4);
-  const localIndexRef = useRef(localIndex);
-  localIndexRef.current = localIndex;
+  const safeInitialIdx = initialIdx !== -1 ? initialIdx : 4; // default to 600m
 
-  const accentBg = isDark ? 'rgba(184, 163, 255, 0.18)' : 'rgba(102, 80, 164, 0.14)';
+  const currentIndexRef = useRef(safeInitialIdx);
+  const [displayIndex, setDisplayIndex] = useState(safeInitialIdx);
+
+  const animX = useRef(new Animated.Value(0)).current;
+  const isDraggingRef = useRef(false);
+  const dragStartOffsetRef = useRef(0);
+  const windowWidthRef = useRef(0);
+
+  const accentBg = isDark ? 'rgba(184, 163, 255, 0.20)' : 'rgba(102, 80, 164, 0.16)';
   const dialBg = isDark ? '#111318' : '#EAEDF2';
   const fadeEdgeColor = isDark ? '#111318' : '#EAEDF2';
 
@@ -63,103 +62,140 @@ export function TacticalRangeSelector({
     return `${m}m`;
   };
 
+  // Calculates exact translateX so item at index `idx` is dead-center in the window
+  const getOffsetForIndex = useCallback(
+    (idx: number, w: number = windowWidthRef.current) => {
+      if (w <= 0) return 0;
+      const centerPadding = (w - ITEM_WIDTH) / 2;
+      return centerPadding - idx * ITEM_WIDTH;
+    },
+    []
+  );
+
+  // Smoothly spring to a target index with tactile feedback
+  const snapToIndex = useCallback(
+    (idx: number, notify = true, animated = true) => {
+      const clamped = Math.max(0, Math.min(DIAL_STEPS.length - 1, idx));
+      currentIndexRef.current = clamped;
+      setDisplayIndex(clamped);
+
+      const targetX = getOffsetForIndex(clamped);
+      if (animated) {
+        Animated.spring(animX, {
+          toValue: targetX,
+          friction: 9,
+          tension: 85,
+          useNativeDriver: true,
+        }).start();
+      } else {
+        animX.setValue(targetX);
+      }
+
+      if (notify && DIAL_STEPS[clamped] !== clampedRadius) {
+        triggerHaptic('buttonTap');
+        onChange(DIAL_STEPS[clamped]);
+      }
+    },
+    [animX, clampedRadius, getOffsetForIndex, onChange]
+  );
+
+  const snapToIndexRef = useRef(snapToIndex);
+  snapToIndexRef.current = snapToIndex;
+
   const handleLayout = (e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
-    if (w > 0 && w !== windowWidth) {
-      setWindowWidth(w);
-    }
-  };
-
-  // Sync scroll position when clampedRadius changes externally (and user is not dragging)
-  useEffect(() => {
-    if (isInteractingRef.current) return;
-    const idx = DIAL_STEPS.findIndex((s) => s === clampedRadius);
-    if (idx !== -1 && idx !== localIndexRef.current) {
-      setLocalIndex(idx);
-      if (windowWidth > 0) {
-        scrollRef.current?.scrollTo({ x: idx * ITEM_WIDTH, animated: true });
+    if (w > 0) {
+      windowWidthRef.current = w;
+      if (w !== windowWidth) {
+        setWindowWidth(w);
+        const targetX = (w - ITEM_WIDTH) / 2 - currentIndexRef.current * ITEM_WIDTH;
+        animX.setValue(targetX);
       }
     }
-  }, [clampedRadius, windowWidth]);
+  };
 
-  // Initial center alignment when layout width is first known
+  // Sync with external radius changes (when not dragging)
   useEffect(() => {
-    if (windowWidth > 0 && scrollRef.current) {
-      scrollRef.current.scrollTo({ x: localIndexRef.current * ITEM_WIDTH, animated: false });
+    if (isDraggingRef.current) return;
+    const idx = DIAL_STEPS.findIndex((s) => s === clampedRadius);
+    if (idx !== -1 && idx !== currentIndexRef.current) {
+      snapToIndex(idx, false, true);
     }
-  }, [windowWidth]);
+  }, [clampedRadius, snapToIndex]);
 
-  // Snaps to the closest option based on distance and notifies parent
-  const snapToClosest = (offsetX: number) => {
-    const rawIdx = Math.round(offsetX / ITEM_WIDTH);
-    const targetIdx = Math.max(0, Math.min(DIAL_STEPS.length - 1, rawIdx));
+  // PanResponder for 120fps direct finger tracking, auto-snapping & anti-stuck physics
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 4,
+      onPanResponderGrant: () => {
+        isDraggingRef.current = true;
+        animX.stopAnimation((currentVal) => {
+          dragStartOffsetRef.current = currentVal;
+        });
+      },
+      onPanResponderMove: (_, gesture) => {
+        const w = windowWidthRef.current;
+        if (w <= 0) return;
+        const centerPadding = (w - ITEM_WIDTH) / 2;
+        let newOffset = dragStartOffsetRef.current + gesture.dx;
 
-    setLocalIndex(targetIdx);
-    scrollRef.current?.scrollTo({ x: targetIdx * ITEM_WIDTH, animated: true });
+        // Over-scroll boundary resistance
+        const minOffset = centerPadding - (DIAL_STEPS.length - 1) * ITEM_WIDTH;
+        const maxOffset = centerPadding;
+        if (newOffset > maxOffset) {
+          newOffset = maxOffset + (newOffset - maxOffset) * 0.25;
+        } else if (newOffset < minOffset) {
+          newOffset = minOffset + (newOffset - minOffset) * 0.25;
+        }
 
-    if (DIAL_STEPS[targetIdx] !== clampedRadius) {
-      triggerHaptic('buttonTap');
-      onChange(DIAL_STEPS[targetIdx]);
-    }
-  };
+        animX.setValue(newOffset);
 
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetX = e.nativeEvent.contentOffset.x;
-    const rawIdx = Math.round(offsetX / ITEM_WIDTH);
-    const targetIdx = Math.max(0, Math.min(DIAL_STEPS.length - 1, rawIdx));
+        // Calculate current closest index for header & haptic ticks
+        const rawIdx = Math.round((centerPadding - newOffset) / ITEM_WIDTH);
+        const clamped = Math.max(0, Math.min(DIAL_STEPS.length - 1, rawIdx));
+        if (clamped !== currentIndexRef.current) {
+          currentIndexRef.current = clamped;
+          setDisplayIndex(clamped);
+          triggerHaptic('buttonTap');
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        isDraggingRef.current = false;
+        const w = windowWidthRef.current;
+        if (w <= 0) return;
 
-    if (targetIdx !== localIndexRef.current) {
-      setLocalIndex(targetIdx);
-      triggerHaptic('buttonTap');
-    }
-  };
+        const centerPadding = (w - ITEM_WIDTH) / 2;
+        // Include flick velocity to feel natural and weighted
+        const projectedOffset =
+          dragStartOffsetRef.current + gesture.dx + gesture.vx * 30;
 
-  const handleScrollBeginDrag = () => {
-    isInteractingRef.current = true;
-  };
+        // Snaps to the closest size based on distance
+        const targetIdx = Math.round((centerPadding - projectedOffset) / ITEM_WIDTH);
+        const finalIdx = Math.max(0, Math.min(DIAL_STEPS.length - 1, targetIdx));
 
-  const handleScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    // If low velocity or finger released gently, snap directly to closest
-    const velocity = Math.abs(e.nativeEvent.velocity?.x ?? 0);
-    if (velocity < 0.15) {
-      isInteractingRef.current = false;
-      snapToClosest(e.nativeEvent.contentOffset.x);
-    }
-  };
-
-  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    isInteractingRef.current = false;
-    snapToClosest(e.nativeEvent.contentOffset.x);
-  };
+        snapToIndexRef.current(finalIdx, true, true);
+      },
+      onPanResponderTerminate: () => {
+        isDraggingRef.current = false;
+        snapToIndexRef.current(currentIndexRef.current, true, true);
+      },
+    })
+  ).current;
 
   const handleDecrement = () => {
-    if (localIndex <= 0) return;
-    triggerHaptic('buttonTap');
-    const nextIdx = localIndex - 1;
-    setLocalIndex(nextIdx);
-    scrollRef.current?.scrollTo({ x: nextIdx * ITEM_WIDTH, animated: true });
-    onChange(DIAL_STEPS[nextIdx]);
+    if (currentIndexRef.current <= 0) return;
+    snapToIndex(currentIndexRef.current - 1, true, true);
   };
 
   const handleIncrement = () => {
-    if (localIndex >= DIAL_STEPS.length - 1) return;
-    triggerHaptic('buttonTap');
-    const nextIdx = localIndex + 1;
-    setLocalIndex(nextIdx);
-    scrollRef.current?.scrollTo({ x: nextIdx * ITEM_WIDTH, animated: true });
-    onChange(DIAL_STEPS[nextIdx]);
+    if (currentIndexRef.current >= DIAL_STEPS.length - 1) return;
+    snapToIndex(currentIndexRef.current + 1, true, true);
   };
 
-  const handleItemPress = (idx: number) => {
-    triggerHaptic('buttonTap');
-    setLocalIndex(idx);
-    scrollRef.current?.scrollTo({ x: idx * ITEM_WIDTH, animated: true });
-    onChange(DIAL_STEPS[idx]);
-  };
-
-  const canDecrement = localIndex > 0;
-  const canIncrement = localIndex < DIAL_STEPS.length - 1;
-  const paddingHorizontal = windowWidth > 0 ? (windowWidth - ITEM_WIDTH) / 2 : 100;
+  const canDecrement = displayIndex > 0;
+  const canIncrement = displayIndex < DIAL_STEPS.length - 1;
+  const currentRadius = DIAL_STEPS[displayIndex] || clampedRadius;
 
   return (
     <View style={[styles.container, style]}>
@@ -187,15 +223,15 @@ export function TacticalRangeSelector({
               { color: colors.accent },
             ]}
           >
-            {formatDistance(DIAL_STEPS[localIndex] || clampedRadius)}
+            {formatDistance(currentRadius)}
           </Text>
           <Text style={[styles.readoutDiameter, { color: colors.textMuted }]}>
-            {`Ø ${formatDistance((DIAL_STEPS[localIndex] || clampedRadius) * 2)}`}
+            {`Ø ${formatDistance(currentRadius * 2)}`}
           </Text>
         </View>
       </View>
 
-      {/* Stepper Controls & Stepped Tick-Tick Dial */}
+      {/* Stepper Controls & Continuous Spring Dial Tape */}
       <View style={styles.stepperRow}>
         {/* Decrement Button [-] */}
         <Pressable
@@ -219,7 +255,7 @@ export function TacticalRangeSelector({
           />
         </Pressable>
 
-        {/* Dial Tape Window with Reticle & Gradient Edge Fades */}
+        {/* Dial Tape Window with Reticle, Gradients & Direct Finger Tracking */}
         <View
           onLayout={handleLayout}
           style={[
@@ -229,6 +265,7 @@ export function TacticalRangeSelector({
               borderColor: colors.borderLight,
             },
           ]}
+          {...panResponder.panHandlers}
         >
           {/* Centered Active Reticle Pill */}
           {windowWidth > 0 && (
@@ -246,31 +283,23 @@ export function TacticalRangeSelector({
             />
           )}
 
-          {/* Stepped Swiping ScrollView with Fixed Snap Offsets & Momentum Snapping */}
-          <ScrollView
-            ref={scrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToOffsets={SNAP_OFFSETS}
-            decelerationRate="fast"
-            disableIntervalMomentum={true}
-            scrollEventThrottle={16}
-            onScrollBeginDrag={handleScrollBeginDrag}
-            onScroll={handleScroll}
-            onScrollEndDrag={handleScrollEndDrag}
-            onMomentumScrollEnd={handleMomentumScrollEnd}
-            contentContainerStyle={[
-              styles.dialScrollContent,
-              { paddingHorizontal },
+          {/* Stepped Track with 120fps Native Spring Translation */}
+          <Animated.View
+            style={[
+              styles.dialTrack,
+              {
+                transform: [{ translateX: animX }],
+              },
             ]}
           >
             {DIAL_STEPS.map((step, idx) => {
-              const isActive = idx === localIndex;
+              const isActive = idx === displayIndex;
               return (
                 <Pressable
                   key={step}
-                  onPress={() => handleItemPress(idx)}
+                  onPress={() => snapToIndex(idx, true, true)}
                   style={styles.dialItem}
+                  hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
                 >
                   <Text
                     style={[
@@ -287,7 +316,7 @@ export function TacticalRangeSelector({
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </Animated.View>
 
           {/* Left Gradient Edge (Fades toward [-] button) */}
           <LinearGradient
@@ -394,7 +423,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     zIndex: 1,
   },
-  dialScrollContent: {
+  dialTrack: {
+    flexDirection: 'row',
     alignItems: 'center',
     height: DIAL_HEIGHT,
   },
@@ -414,7 +444,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 34,
+    width: 36,
     zIndex: 3,
   },
   fadeRight: {
@@ -422,7 +452,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    width: 34,
+    width: 36,
     zIndex: 3,
   },
 });

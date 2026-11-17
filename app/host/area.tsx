@@ -63,7 +63,8 @@ export default function HostAreaScreen() {
 
   const applyCameraCenter = useCallback((coords: [number, number], animate = false) => {
     pendingCameraTargetRef.current = coords;
-    const targetZoom = getZoomForRadius(radius);
+    const currentRadius = useHostStore.getState().radius;
+    const targetZoom = getZoomForRadius(currentRadius);
     if (mapLoadedRef.current && cameraRef.current) {
       if (animate) {
         cameraRef.current.easeTo({ center: coords, zoom: targetZoom, duration: 400, padding: AREA_MAP_PADDING });
@@ -71,7 +72,7 @@ export default function HostAreaScreen() {
         cameraRef.current.jumpTo({ center: coords, zoom: targetZoom, padding: AREA_MAP_PADDING });
       }
     }
-  }, [radius]);
+  }, []);
 
   // Smooth, glitch-free camera zoom adjustment when radius changes
   const lastAnimatedRadiusRef = useRef(radius);
@@ -92,11 +93,10 @@ export default function HostAreaScreen() {
       cameraRef.current.easeTo({
         center: currentCenter,
         zoom: targetZoom,
-        duration: 350,
-        padding: AREA_MAP_PADDING,
+        duration: 320,
         easing: 'ease',
       });
-    }, 280);
+    }, 250);
 
     return () => {
       if (zoomDebounceRef.current) {
