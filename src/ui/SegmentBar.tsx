@@ -42,14 +42,20 @@ export function SegmentBar({
   const itemWidth =
     containerWidth > paddingInset * 2 ? (containerWidth - paddingInset * 2) / items.length : 0;
 
+  const isFirstMount = useRef(true);
   useEffect(() => {
     if (itemWidth > 0) {
-      Animated.spring(slideAnim, {
-        toValue: selectedIndex * itemWidth + paddingInset,
-        friction: 8,
-        tension: 75,
-        useNativeDriver: true,
-      }).start();
+      if (isFirstMount.current) {
+        slideAnim.setValue(selectedIndex * itemWidth);
+        isFirstMount.current = false;
+      } else {
+        Animated.spring(slideAnim, {
+          toValue: selectedIndex * itemWidth,
+          friction: 8,
+          tension: 75,
+          useNativeDriver: true,
+        }).start();
+      }
     }
   }, [selectedIndex, itemWidth, slideAnim]);
 
@@ -100,79 +106,80 @@ export function SegmentBar({
         />
       )}
 
-      {items.map((item) => {
-        const isSelected = item.id === currentSelected;
+      <View style={styles.segmentsRow}>
+        {items.map((item) => {
+          const isSelected = item.id === currentSelected;
 
-        return (
-          <Pressable
-            key={item.id}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: isSelected }}
-            onPress={() => {
-              if (item.id !== currentSelected) {
-                triggerHaptic('buttonTap');
-                handleSelect(item.id);
-              }
-            }}
-            style={[styles.segment, { zIndex: 2 }]}
-          >
-            <Text
-              variant="label"
-              numberOfLines={1}
-              adjustsFontSizeToFit={true}
-              minimumFontScale={0.75}
-              style={{
-                color: isSelected ? colors.accent : colors.textMuted,
-                fontWeight: isSelected ? '800' : '600',
-                fontSize: getFontSize(),
-                letterSpacing: getLetterSpacing(),
-                textAlign: 'center',
-                flexShrink: 1,
+          return (
+            <Pressable
+              key={item.id}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isSelected }}
+              onPress={() => {
+                if (item.id !== currentSelected) {
+                  triggerHaptic('buttonTap');
+                  handleSelect(item.id);
+                }
               }}
+              style={[styles.segment, { zIndex: 2 }]}
             >
-              {item.label}
-            </Text>
-            {item.badge !== undefined && (
-              <View
-                style={[
-                  styles.badge,
-                  {
-                    backgroundColor: isSelected ? colors.accent : colors.surfaceMuted,
-                    borderRadius: radii.full,
-                  },
-                ]}
+              <Text
+                variant="label"
+                numberOfLines={1}
+                adjustsFontSizeToFit={true}
+                minimumFontScale={0.75}
+                style={{
+                  color: isSelected ? colors.accent : colors.textMuted,
+                  fontWeight: isSelected ? '800' : '600',
+                  fontSize: getFontSize(),
+                  letterSpacing: getLetterSpacing(),
+                  textAlign: 'center',
+                  flexShrink: 1,
+                }}
               >
-                <Text
-                  variant="caption"
-                  style={{
-                    color: isSelected ? colors.successText : colors.textMuted,
-                    fontSize: 9,
-                    fontWeight: '900',
-                  }}
+                {item.label}
+              </Text>
+              {item.badge !== undefined && (
+                <View
+                  style={[
+                    styles.badge,
+                    {
+                      backgroundColor: isSelected ? colors.accent : colors.surfaceMuted,
+                      borderRadius: radii.full,
+                    },
+                  ]}
                 >
-                  {item.badge}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-        );
-      })}
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: isSelected ? colors.successText : colors.textMuted,
+                      fontSize: 9,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {item.badge}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    padding: 3,
+    padding: 0,
     borderWidth: 1,
     position: 'relative',
     height: 46,
-    alignItems: 'center',
+    justifyContent: 'center',
   },
   sliderPill: {
     position: 'absolute',
-    left: 0,
+    left: 3,
     top: 3,
     bottom: 3,
     borderWidth: 1,
@@ -181,6 +188,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+  },
+  segmentsRow: {
+    flex: 1,
+    flexDirection: 'row',
+    margin: 3,
+    alignItems: 'center',
   },
   segment: {
     flex: 1,

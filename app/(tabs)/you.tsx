@@ -393,19 +393,14 @@ export function YouContent() {
             </View>
           </View>
 
-          {/* Quick Monochromatic Theme & Palette Selector */}
+          {/* Quick Monochromatic Theme & Palette Selector (2 Rows of 8, Fully Visible) */}
           <View
             style={[
               styles.quickThemeBar,
               { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' },
             ]}
           >
-            <ScrollView
-              horizontal
-              nestedScrollEnabled={true}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.quickPaletteContent}
-            >
+            <View style={styles.quickPaletteGrid}>
               {colors.palette.map((c) => {
                 const isSelected = (profile?.color || colors.primary).toLowerCase() === c.toLowerCase();
                 return (
@@ -430,7 +425,7 @@ export function YouContent() {
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </View>
           </View>
 
           {/* Edit Callsign & Signature Trigger */}
@@ -1263,13 +1258,13 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
   },
-  quickPaletteContent: {
+  quickPaletteGrid: {
     flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-    paddingVertical: 4,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+    paddingVertical: 6,
     paddingHorizontal: 2,
-    paddingRight: 16,
   },
   paletteRow: {
     flexDirection: 'row',

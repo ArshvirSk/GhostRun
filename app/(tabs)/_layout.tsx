@@ -92,25 +92,26 @@ function TabIconWrapper({
 }
 
 /**
- * Maps the active route name or pathname to its exact visual slot index:
+ * Maps the active route pathname to its exact visual slot index if it is a tab route:
  * 0 -> Play (left)
  * 1 -> Modes (center)
  * 2 -> You (right)
+ * Returns null if the pathname belongs to a sub-screen (e.g. /friends, /leaderboard, /settings)
  */
-function getVisualTabIndex(pathname: string): number {
-  if (pathname.includes('/modes') || pathname.includes('modes')) return 1;
-  if (pathname.includes('/you') || pathname.includes('you')) return 2;
-  return 0;
+function getTabIndexFromPathname(pathname: string): number | null {
+  if (pathname === '/play' || pathname === '/(tabs)/play' || pathname === '/') return 0;
+  if (pathname === '/modes' || pathname === '/(tabs)/modes') return 1;
+  if (pathname === '/you' || pathname === '/(tabs)/you') return 2;
+  return null;
 }
 
 export default function TabsLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
-  const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
 
-  const [activeTabIndex, setActiveTabIndex] = useState(() => getVisualTabIndex(pathname));
+  const [activeTabIndex, setActiveTabIndex] = useState(() => getTabIndexFromPathname(pathname) ?? 0);
   const activeTabIndexRef = useRef(activeTabIndex);
   const isDraggingRef = useRef(false);
 
@@ -135,10 +136,10 @@ export default function TabsLayout() {
     extrapolate: 'clamp',
   });
 
-  // Keep activeTabIndex in sync when pathname changes externally
+  // Keep activeTabIndex in sync ONLY when pathname is an actual tab route
   useEffect(() => {
-    const targetIndex = getVisualTabIndex(pathname);
-    if (targetIndex !== activeTabIndexRef.current && !isDraggingRef.current) {
+    const targetIndex = getTabIndexFromPathname(pathname);
+    if (targetIndex !== null && targetIndex !== activeTabIndexRef.current && !isDraggingRef.current) {
       activeTabIndexRef.current = targetIndex;
       setActiveTabIndex(targetIndex);
       if (screenWidth > 0) {
@@ -151,7 +152,7 @@ export default function TabsLayout() {
   const [initialOffsetSet, setInitialOffsetSet] = useState(false);
   useEffect(() => {
     if (!initialOffsetSet && screenWidth > 0) {
-      const initialIdx = getVisualTabIndex(pathname);
+      const initialIdx = getTabIndexFromPathname(pathname) ?? 0;
       if (initialIdx > 0) {
         pagerRef.current?.scrollTo({ x: initialIdx * screenWidth, animated: false });
         scrollX.setValue(initialIdx * screenWidth);
@@ -160,7 +161,7 @@ export default function TabsLayout() {
     }
   }, [screenWidth, initialOffsetSet, pathname, scrollX]);
 
-  // Handle Tab Press from Bottom Navbar
+  // Handle Tab Press from Bottom Navbar (pure scroll without polluting router history stack)
   const handleTabPress = useCallback(
     (index: number) => {
       triggerHaptic('buttonTap');
@@ -169,25 +170,23 @@ export default function TabsLayout() {
       if (screenWidth > 0) {
         pagerRef.current?.scrollTo({ x: index * screenWidth, animated: true });
       }
-      const targetPath = index === 0 ? '/play' : index === 1 ? '/modes' : '/you';
-      if (pathname !== targetPath) {
-        router.navigate(targetPath as any);
-      }
     },
-    [screenWidth, pathname, router]
+    [screenWidth]
   );
 
-  // Android Hardware Back Button: navigate back to Play if on Modes or You
+  // Android Hardware Back Button: ONLY intercept if active route is actually a tab
+  // If user is on a pushed screen (/friends, /leaderboard, /settings), let system pop naturally!
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (activeTabIndexRef.current > 0) {
+      const tabIdx = getTabIndexFromPathname(pathname);
+      if (tabIdx !== null && activeTabIndexRef.current > 0) {
         handleTabPress(0);
         return true;
       }
       return false;
     });
     return () => sub.remove();
-  }, [handleTabPress]);
+  }, [pathname, handleTabPress]);
 
   // Handle real-time finger drag across the screen
   const handleScroll = Animated.event(
@@ -216,10 +215,6 @@ export default function TabsLayout() {
         triggerHaptic('buttonTap');
         activeTabIndexRef.current = newIndex;
         setActiveTabIndex(newIndex);
-      }
-      const targetPath = newIndex === 0 ? '/play' : newIndex === 1 ? '/modes' : '/you';
-      if (pathname !== targetPath) {
-        router.navigate(targetPath as any);
       }
     }
   };
