@@ -17,12 +17,15 @@ import { PRIVACY_VERSION } from '../src/lib/privacy';
 import { isSupabaseConfigured, supabase } from '../src/lib/supabase';
 import { useUserStore } from '../src/stores/userStore';
 import { startLocationPrewarm } from '../src/lib/locationCache';
+import { useTheme, ACCENT_COLOR_STORAGE_KEY } from '../src/theme/ThemeProvider';
 
-const GHOSTRUN_LOGO = require('../assets/splash-mark.png');
+const GHOSTRUN_MARK_MINT = require('../assets/ghostrun-mark-mint.png');
+const GHOSTRUN_MARK_OLIVE = require('../assets/ghostrun-mark-olive.png');
 
 export default function SplashScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark, setAccentColor } = useTheme();
   const [statusMessage, setStatusMessage] = useState('Starting…');
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -89,13 +92,20 @@ export default function SplashScreen() {
         return;
       }
 
+      const operativeColor = profileRes.data.color;
+
       // Sync userStore immediately
       useUserStore.getState().setProfile({
         id: profileRes.data.id,
         display_name: profileRes.data.display_name || 'Operative',
-        color: profileRes.data.color,
+        color: operativeColor,
         email: sessionRes.data.session.user.email,
       });
+
+      if (operativeColor) {
+        void AsyncStorage.setItem(ACCENT_COLOR_STORAGE_KEY, operativeColor);
+        void setAccentColor(operativeColor);
+      }
 
       // If user hasn't completed safety & permissions onboarding, guide them there
       if (onboardedVal !== 'true') {
@@ -121,7 +131,7 @@ export default function SplashScreen() {
       setHasError(true);
       setErrorMessage(err instanceof Error ? err.message : 'Failed to launch GhostRun.');
     }
-  }, [router]);
+  }, [router, setAccentColor]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -131,20 +141,44 @@ export default function SplashScreen() {
   }, [bootstrapApp]);
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
       <Animated.View style={[styles.brandContainer, { opacity: fadeAnim }]}>
-        <Image accessibilityLabel="GhostRun Logo" source={GHOSTRUN_LOGO} style={styles.logo} />
-        <Text style={styles.brandTitle}>GhostRun</Text>
-        <Text style={styles.brandTagline}>Real-World GPS Chase</Text>
+        <Image
+          accessibilityLabel="GhostRun Logo"
+          source={isDark ? GHOSTRUN_MARK_MINT : GHOSTRUN_MARK_OLIVE}
+          style={[
+            styles.logo,
+            { tintColor: isDark ? '#FFFFFF' : '#000000' },
+          ]}
+          resizeMode="contain"
+        />
+        <Text style={[styles.brandTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+          GHOST<Text style={{ color: colors.primary }}>RUN</Text>
+        </Text>
+        <Text style={[styles.brandTagline, { color: colors.textSecondary }]}>
+          Real-World GPS Chase
+        </Text>
       </Animated.View>
 
       <View style={[styles.bottomSection, { bottom: Math.max(insets.bottom, 16) + 32 }]}>
         {hasError ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorTitle}>Configuration Notice</Text>
-            <Text style={styles.errorMessage}>{errorMessage}</Text>
+          <View
+            style={[
+              styles.errorBox,
+              {
+                backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
+                borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#FECACA',
+              },
+            ]}
+          >
+            <Text style={[styles.errorTitle, { color: isDark ? '#FCA5A5' : '#991B1B' }]}>
+              Configuration Notice
+            </Text>
+            <Text style={[styles.errorMessage, { color: isDark ? '#F87171' : '#B91C1C' }]}>
+              {errorMessage}
+            </Text>
             <Pressable
               accessibilityRole="button"
               onPress={() => {
@@ -152,15 +186,19 @@ export default function SplashScreen() {
                 setStatusMessage('Retrying…');
                 void bootstrapApp();
               }}
-              style={styles.retryButton}
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
             >
-              <Text style={styles.retryText}>Try again</Text>
+              <Text style={[styles.retryText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                Try again
+              </Text>
             </Pressable>
           </View>
         ) : (
           <View style={styles.loadingBox}>
-            <ActivityIndicator color="#1D4ED8" size="small" />
-            <Text style={styles.statusText}>{statusMessage}</Text>
+            <ActivityIndicator color={colors.primary} size="small" />
+            <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+              {statusMessage}
+            </Text>
           </View>
         )}
       </View>
@@ -171,7 +209,6 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 28,
@@ -181,24 +218,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    height: 80,
+    height: 72,
     marginBottom: 16,
-    width: 80,
+    width: 72,
   },
   brandTitle: {
-    color: '#0F172A',
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontFamily: 'Archivo-Black',
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: 2,
     textAlign: 'center',
   },
   brandTagline: {
-    color: '#64748B',
     fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.3,
-    marginTop: 4,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginTop: 6,
     textAlign: 'center',
+    textTransform: 'uppercase',
   },
   bottomSection: {
     bottom: 52,
@@ -213,33 +250,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   statusText: {
-    color: '#64748B',
     fontSize: 13,
     fontWeight: '500',
   },
   errorBox: {
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
     borderRadius: 14,
     borderWidth: 1,
     padding: 16,
   },
   errorTitle: {
-    color: '#991B1B',
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 4,
   },
   errorMessage: {
-    color: '#B91C1C',
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
   },
   retryButton: {
     alignItems: 'center',
-    backgroundColor: '#1D4ED8',
     borderRadius: 10,
     justifyContent: 'center',
     marginTop: 12,
@@ -247,7 +278,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   retryText: {
-    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
   },

@@ -14,6 +14,7 @@ import {
   tokens as defaultTokens,
 } from './tokens';
 import { getTintedDarkColors, getTintedLightColors } from './colorTint';
+import { useUserStore } from '../stores/userStore';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -65,7 +66,10 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const systemScheme = useColorScheme();
   const [themeMode, setThemeModeState] = useState<ThemeMode>(initialMode || 'system');
-  const [accentColor, setAccentColorState] = useState<string | null>(initialAccentColor || null);
+  const [accentColor, setAccentColorState] = useState<string | null>(() => {
+    if (initialAccentColor) return initialAccentColor;
+    return useUserStore.getState().profile?.color || null;
+  });
 
   useEffect(() => {
     let isMounted = true;

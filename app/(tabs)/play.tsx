@@ -182,7 +182,7 @@ export function PlayContent() {
               accessibilityLabel="GhostRun Logo"
             />
             <Text style={[styles.brandTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
-              GHOSTRUN
+              GHOST<Text style={{ color: colors.primary }}>RUN</Text>
             </Text>
           </View>
 
