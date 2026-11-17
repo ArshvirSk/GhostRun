@@ -11,6 +11,7 @@ export interface UserProfile {
   color: string;
   email?: string;
   created_at?: string;
+  is_vanguard?: boolean;
 }
 
 interface UserStoreState {
@@ -33,6 +34,7 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
       color: updated.color || current?.color || colors.palette[0],
       email: updated.email || current?.email,
       created_at: updated.created_at || current?.created_at,
+      is_vanguard: updated.is_vanguard !== undefined ? updated.is_vanguard : current?.is_vanguard,
     };
 
     set({ profile: merged, isHydrated: true });

@@ -42,8 +42,8 @@ export function YouContent() {
   const { formatDistance } = useUnits();
 
   const storedProfile = useUserStore((s) => s.profile);
-  const [profile, setProfile] = useState<{ display_name: string; color: string } | null>(
-    () => (storedProfile ? { display_name: storedProfile.display_name, color: storedProfile.color } : null)
+  const [profile, setProfile] = useState<{ display_name: string; color: string; is_vanguard?: boolean } | null>(
+    () => (storedProfile ? { display_name: storedProfile.display_name, color: storedProfile.color, is_vanguard: storedProfile.is_vanguard } : null)
   );
   const [userId, setUserId] = useState<string | null>(() => storedProfile?.id || null);
   const [isEditing, setIsEditing] = useState(false);
@@ -53,7 +53,11 @@ export function YouContent() {
   // Keep state synced with userStore
   useEffect(() => {
     if (storedProfile) {
-      setProfile({ display_name: storedProfile.display_name, color: storedProfile.color });
+      setProfile({
+        display_name: storedProfile.display_name,
+        color: storedProfile.color,
+        is_vanguard: storedProfile.is_vanguard,
+      });
       if (!isEditing) {
         setDraftName(storedProfile.display_name);
         setDraftColor(storedProfile.color);
@@ -385,9 +389,29 @@ export function YouContent() {
                 </View>
               </View>
 
-              <Text style={[styles.codenameText, { color: colors.text }]} numberOfLines={1}>
-                @{displayName.toUpperCase()}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <Text style={[styles.codenameText, { color: colors.text }]} numberOfLines={1}>
+                  @{displayName.toUpperCase()}
+                </Text>
+                {Boolean(profile?.is_vanguard) && (
+                  <View
+                    style={[
+                      styles.vanguardBadgePill,
+                      {
+                        borderColor: colors.accent,
+                        backgroundColor: isDark
+                          ? 'rgba(184, 163, 255, 0.15)'
+                          : 'rgba(102, 80, 164, 0.10)',
+                      },
+                    ]}
+                  >
+                    <Ionicons name="shield-checkmark" size={10} color={colors.accent} style={{ marginRight: 3 }} />
+                    <Text style={[styles.vanguardBadgePillText, { color: colors.accent }]}>
+                      VANGUARD
+                    </Text>
+                  </View>
+                )}
+              </View>
 
               <Text style={[styles.rankText, { color: colors.textMuted }]}>
                 ACTIVE PLAYER
@@ -1200,6 +1224,21 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     textTransform: 'uppercase',
     marginTop: 2,
+  },
+  vanguardBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 2,
+  },
+  vanguardBadgePillText: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   rankText: {
     fontFamily: 'SegoeUI-SemiBold',

@@ -21,6 +21,7 @@ import { getFriendsHosting } from '../../src/lib/friends';
 import { HostPresence } from '../../src/lib/friendsCore';
 import { useUserStore } from '../../src/stores/userStore';
 import { startLocationPrewarm } from '../../src/lib/locationCache';
+import { VanguardEventModal } from '../../src/components/VanguardEventModal';
 
 const GHOSTRUN_MARK_MINT = require('../../assets/ghostrun-mark-mint.png');
 const GHOSTRUN_MARK_OLIVE = require('../../assets/ghostrun-mark-olive.png');
@@ -45,6 +46,7 @@ export function PlayContent() {
   const [refreshing, setRefreshing] = useState(false);
   const [seasonData, setSeasonData] = useState<ActiveSeasonData | null>(null);
   const [friendsHosting, setFriendsHosting] = useState<HostPresence[]>([]);
+  const [vanguardModalVisible, setVanguardModalVisible] = useState(false);
 
   // Keep displayName synced instantly whenever userStore updates
   useEffect(() => {
@@ -166,17 +168,20 @@ export function PlayContent() {
           />
         }
       >
-        {/* Top Header Row with GhostRun Brand Mark */}
+        {/* Top Header Row with GhostRun Brand Mark (Pure White in Dark Mode, Pure Black in Light Mode) */}
         <View style={styles.headerRow}>
           <View style={styles.brandContainer}>
             <Image
               source={isDark ? GHOSTRUN_MARK_MINT : GHOSTRUN_MARK_OLIVE}
-              style={styles.logo}
+              style={[
+                styles.logo,
+                { tintColor: isDark ? '#FFFFFF' : '#000000' },
+              ]}
               resizeMode="contain"
               accessibilityLabel="GhostRun Logo"
             />
-            <Text style={[styles.brandTitle, { color: colors.text }]}>
-              GHOST<Text style={{ color: colors.primary }}>RUN</Text>
+            <Text style={[styles.brandTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
+              GHOSTRUN
             </Text>
           </View>
         </View>
@@ -314,39 +319,52 @@ export function PlayContent() {
           </View>
         )}
 
-        {/* Middle Featured Mode Card */}
+        {/* Vanguard Protocol Launch Event Card (GhostRun's Native Time-Based Founder Event) */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Featured Game Mode"
+          accessibilityLabel="Vanguard Protocol Launch Event"
           onPress={() => {
             triggerHaptic('buttonTap');
-            router.push('/host/mode' as any);
+            setVanguardModalVisible(true);
           }}
-          style={[
-            styles.promoCard,
+          style={({ pressed }) => [
+            styles.vanguardBannerCard,
             {
               backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
               borderColor: colors.borderDark,
             },
+            pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
           ]}
         >
-          <Text style={[styles.promoHeader, { color: colors.accent }]}>
-            FEATURED · CLASSIC CHASE
-          </Text>
-          <View style={styles.promoContent}>
+          <View style={styles.vanguardBannerTop}>
+            <View style={styles.vanguardTagRow}>
+              <View style={[styles.pulsingDot, { backgroundColor: colors.accent }]} />
+              <Text style={[styles.vanguardTagText, { color: colors.accent }]}>
+                VANGUARD PROTOCOL · 14 DAYS LEFT
+              </Text>
+            </View>
+            <Ionicons name="sparkles" size={14} color={colors.accent} />
+          </View>
+
+          <View style={styles.vanguardBannerContent}>
             <View
               style={[
-                styles.ogBadge,
+                styles.vanguardBadgePill,
                 {
                   borderColor: colors.accent,
-                  backgroundColor: isDark ? 'rgba(184, 163, 255, 0.12)' : 'rgba(102, 80, 164, 0.1)',
+                  backgroundColor: isDark
+                    ? 'rgba(184, 163, 255, 0.12)'
+                    : 'rgba(102, 80, 164, 0.08)',
                 },
               ]}
             >
-              <Text style={[styles.ogBadgeText, { color: colors.accent }]}>OG</Text>
+              <Ionicons name="shield-checkmark" size={12} color={colors.accent} style={{ marginRight: 4 }} />
+              <Text style={[styles.vanguardBadgePillText, { color: colors.accent }]}>
+                VANGUARD
+              </Text>
             </View>
-            <Text style={[styles.promoText, { color: colors.text }]} numberOfLines={2}>
-              Outrun hunter radar pings and reach the secret extraction target.
+            <Text style={[styles.vanguardBannerText, { color: colors.text }]} numberOfLines={2}>
+              Become a Founding Operative. Lock the permanent Vanguard insignia & lifetime hosting.
             </Text>
             <Ionicons
               name="chevron-forward"
@@ -480,6 +498,12 @@ export function PlayContent() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* GhostRun's Native Vanguard Protocol Founder Event Modal */}
+      <VanguardEventModal
+        visible={vanguardModalVisible}
+        onClose={() => setVanguardModalVisible(false)}
+      />
     </View>
   );
 }
@@ -582,40 +606,50 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  promoCard: {
+  vanguardBannerCard: {
     borderRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
     marginBottom: 26,
   },
-  promoHeader: {
-    fontFamily: 'Archivo-SemiBold',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  promoContent: {
+  vanguardBannerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  ogBadge: {
-    borderWidth: 1.5,
-    borderRadius: 7,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+  vanguardTagRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
   },
-  ogBadgeText: {
+  vanguardTagText: {
+    fontFamily: 'Archivo-SemiBold',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  vanguardBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  vanguardBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  vanguardBadgePillText: {
     fontFamily: 'Archivo-Black',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
-  promoText: {
+  vanguardBannerText: {
     fontFamily: 'SegoeUI-Regular',
     fontSize: 13,
     lineHeight: 18,
