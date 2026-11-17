@@ -321,14 +321,8 @@ export default function LeaderboardScreen() {
           </Text>
         </Pressable>
 
-        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs }}>
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs, marginBottom: spacing.sm }}>
           LEADERBOARD
-        </Text>
-        <Text
-          variant="body"
-          style={{ color: colors.textMuted, marginTop: 2, marginBottom: spacing.sm }}
-        >
-          Season Echo standings ({currentSeason}) & head-to-head records.
         </Text>
 
         {/* 3-Tab Segment Bar with Animated Slider */}

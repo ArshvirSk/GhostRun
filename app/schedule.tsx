@@ -234,11 +234,8 @@ export default function ScheduleScreen() {
           </Text>
         </Pressable>
 
-        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs }}>
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs, marginBottom: spacing.sm }}>
           SCHEDULE
-        </Text>
-        <Text variant="body" style={{ color: colors.textMuted, marginTop: 2, marginBottom: spacing.sm }}>
-          Plan upcoming operations, RSVP with your squad, and export calendars.
         </Text>
 
         {/* 2-Tab Segment Bar with Animated Slider */}

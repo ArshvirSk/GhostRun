@@ -366,11 +366,8 @@ export default function SettingsScreen() {
           </Text>
         </Pressable>
 
-        <Text variant="display" style={{ color: colors.text, marginTop: spacing.md }}>
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.md, marginBottom: spacing.lg }}>
           SETTINGS
-        </Text>
-        <Text variant="body" style={{ color: colors.textMuted, marginTop: 4, marginBottom: spacing.lg }}>
-          Tactical display, unit calibration, audio telemetry, notifications, and operative privacy.
         </Text>
 
         {/* 1. Tactical Display */}
@@ -382,9 +379,6 @@ export default function SettingsScreen() {
             <View style={{ marginBottom: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Interface Theme
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Calibrated for sunlight evasion (Light) and stealth night operations (Dark).
               </Text>
             </View>
 
@@ -407,31 +401,23 @@ export default function SettingsScreen() {
                 ]}
               >
                 <Ionicons
-                  name={themeMode === 'system' ? 'radio-button-on' : 'radio-button-off'}
-                  size={16}
+                  name={themeMode === 'system' ? 'phone-portrait' : 'phone-portrait-outline'}
+                  size={20}
                   color={themeMode === 'system' ? colors.primary : colors.textMuted}
                 />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    variant="label"
-                    style={{
-                      color: themeMode === 'system' ? colors.text : colors.textMuted,
-                      fontSize: 12,
-                      fontWeight: '700',
-                    }}
-                  >
-                    SYSTEM
-                  </Text>
-                  <Text
-                    variant="caption"
-                    style={{
-                      color: themeMode === 'system' ? colors.primary : colors.textSubtle,
-                      fontSize: 10,
-                    }}
-                  >
-                    Auto (OS)
-                  </Text>
-                </View>
+                <Text
+                  variant="label"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={{
+                    color: themeMode === 'system' ? colors.text : colors.textMuted,
+                    fontSize: 12,
+                    fontWeight: '700',
+                    textAlign: 'center',
+                  }}
+                >
+                  SYSTEM
+                </Text>
               </Pressable>
 
               <Pressable
@@ -451,31 +437,23 @@ export default function SettingsScreen() {
                 ]}
               >
                 <Ionicons
-                  name={themeMode === 'light' ? 'radio-button-on' : 'radio-button-off'}
-                  size={16}
+                  name={themeMode === 'light' ? 'sunny' : 'sunny-outline'}
+                  size={20}
                   color={themeMode === 'light' ? colors.primary : colors.textMuted}
                 />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    variant="label"
-                    style={{
-                      color: themeMode === 'light' ? colors.text : colors.textMuted,
-                      fontSize: 12,
-                      fontWeight: '700',
-                    }}
-                  >
-                    LIGHT
-                  </Text>
-                  <Text
-                    variant="caption"
-                    style={{
-                      color: themeMode === 'light' ? colors.primary : colors.textSubtle,
-                      fontSize: 10,
-                    }}
-                  >
-                    Sunlight
-                  </Text>
-                </View>
+                <Text
+                  variant="label"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={{
+                    color: themeMode === 'light' ? colors.text : colors.textMuted,
+                    fontSize: 12,
+                    fontWeight: '700',
+                    textAlign: 'center',
+                  }}
+                >
+                  LIGHT
+                </Text>
               </Pressable>
 
               <Pressable
@@ -495,31 +473,23 @@ export default function SettingsScreen() {
                 ]}
               >
                 <Ionicons
-                  name={themeMode === 'dark' ? 'radio-button-on' : 'radio-button-off'}
-                  size={16}
+                  name={themeMode === 'dark' ? 'moon' : 'moon-outline'}
+                  size={20}
                   color={themeMode === 'dark' ? colors.primary : colors.textMuted}
                 />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    variant="label"
-                    style={{
-                      color: themeMode === 'dark' ? colors.text : colors.textMuted,
-                      fontSize: 12,
-                      fontWeight: '700',
-                    }}
-                  >
-                    DARK
-                  </Text>
-                  <Text
-                    variant="caption"
-                    style={{
-                      color: themeMode === 'dark' ? colors.primary : colors.textSubtle,
-                      fontSize: 10,
-                    }}
-                  >
-                    Night Ops
-                  </Text>
-                </View>
+                <Text
+                  variant="label"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={{
+                    color: themeMode === 'dark' ? colors.text : colors.textMuted,
+                    fontSize: 12,
+                    fontWeight: '700',
+                    textAlign: 'center',
+                  }}
+                >
+                  DARK
+                </Text>
               </Pressable>
             </View>
 
@@ -591,9 +561,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Night Radar Map Style
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                High-contrast dark canvas for stealth operations and reduced screen glare.
-              </Text>
             </View>
             <Switch
               value={mapStyle === 'night'}
@@ -611,9 +578,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Runner Headstart Mini-Map
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2, lineHeight: 18 }}>
-                Shrinks the map into a sticky Picture-in-Picture corner view during the headstart phase while displaying scatter directives.
-              </Text>
             </View>
             <Switch
               value={headstartMinimap}
@@ -625,11 +589,8 @@ export default function SettingsScreen() {
 
           {headstartMinimap && (
             <View style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }}>
-              <Text variant="label" style={{ color: colors.primary, marginBottom: spacing.xs, fontSize: 11 }}>
-                DEFAULT DOCK CORNER (DRAGGABLE DURING PLAY)
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginBottom: spacing.sm, fontSize: 12 }}>
-                During matches, you can freely drag the mini-map to stick to any of the 4 corners. Choose your starting position:
+              <Text variant="label" style={{ color: colors.primary, marginBottom: spacing.sm, fontSize: 11 }}>
+                DEFAULT DOCK CORNER
               </Text>
               <View style={styles.cornerGrid}>
                 <Pressable
@@ -762,9 +723,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Distance Calibration
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 4, lineHeight: 18 }}>
-                Applied across boundary radius, tag distance, radar sweep telemetry, and game HUDs.
-              </Text>
             </View>
 
             <View style={styles.unitToggleRow}>
@@ -861,9 +819,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Tactical Audio Cues
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Pings, countdown ticks, and warning alarms during live rounds.
-              </Text>
             </View>
             <Switch
               value={audioEnabled}
@@ -878,9 +833,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 AI Tactical Voice Narration
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Spoken voice telemetry for phase changes, hunter warnings, and time calls.
-              </Text>
             </View>
             <Switch
               value={ttsEnabled}
@@ -894,9 +846,6 @@ export default function SettingsScreen() {
             <View style={{ flex: 1, paddingRight: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Haptic Feedback
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Sensory vibration pulses on proximity heat, role reveals, and tags.
               </Text>
             </View>
             <Switch
@@ -918,9 +867,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Remote Push Notifications
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Receive squad lobby invites and match start countdowns when app is closed.
-              </Text>
             </View>
             <Switch
               value={pushEnabled}
@@ -934,9 +880,6 @@ export default function SettingsScreen() {
             <View style={{ flex: 1, paddingRight: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Tactical Silent Alerts
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                In-game notifications vibrate silently without playing audio that reveals your location.
               </Text>
             </View>
             <Switch
@@ -952,9 +895,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Radar Proximity Warnings
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Trigger sensory pulses when targets or hunters enter proximity envelope.
-              </Text>
             </View>
             <Switch
               value={proximityAlertsEnabled}
@@ -968,9 +908,6 @@ export default function SettingsScreen() {
             <View style={{ flex: 1, paddingRight: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Field Safety Check-Ins
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Periodic safety prompts during extended field operations.
               </Text>
             </View>
             <Switch
@@ -996,9 +933,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Privacy Policy & Consent Matrix
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Review data collection guarantees, location retention, and ghost policies.
-              </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
@@ -1007,9 +941,6 @@ export default function SettingsScreen() {
             <View style={{ flex: 1, paddingRight: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Squad Lobby Presence
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Allow mutual squadmates to see when you are active and ready in a lobby (Consent C8).
               </Text>
             </View>
             <Switch
@@ -1025,9 +956,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Echo Rating Broadcast
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Share your season Echo rating on tactical squad leaderboards (Consent C9).
-              </Text>
             </View>
             <Switch
               value={echoConsent}
@@ -1041,9 +969,6 @@ export default function SettingsScreen() {
             <View style={{ flex: 1, paddingRight: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Privacy-Safe Diagnostics
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Anonymous error and telemetry events. Zero coordinates or messages recorded (Consent C7).
               </Text>
             </View>
             <Switch
@@ -1063,9 +988,6 @@ export default function SettingsScreen() {
             <View style={{ flex: 1 }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Export My Tactical Data
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Export operative profile, route logs, and consent history as structured JSON.
               </Text>
             </View>
             {busy === 'export' ? (
@@ -1088,7 +1010,7 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <Text variant="body" style={{ color: colors.textMuted, marginTop: spacing.xs, fontSize: 13, lineHeight: 18 }}>
-            GhostRun uploads GPS updates while running in the background. If your phone enters deep sleep, fixes may stall. For best results, exclude GhostRun from aggressive OS battery savers.
+            GhostRun uploads GPS updates while running in the background. For best results, exclude GhostRun from aggressive OS battery savers.
           </Text>
         </Card>
 
@@ -1106,9 +1028,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Transmit Field Feedback
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Report bugs, glitches, or suggest tactical enhancements.
-              </Text>
             </View>
             <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.accent} />
           </Pressable>
@@ -1122,9 +1041,6 @@ export default function SettingsScreen() {
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Rate GhostRun on Play Store
               </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Support the squad with a field rating on Google Play.
-              </Text>
             </View>
             <Ionicons name="star-outline" size={20} color={colors.warning} />
           </Pressable>
@@ -1137,9 +1053,6 @@ export default function SettingsScreen() {
             <View style={{ flex: 1 }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 Contact Tactical Support
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Email operations team with hardware diagnostics attached.
               </Text>
             </View>
             <Ionicons name="mail-outline" size={20} color={colors.primary} />
@@ -1315,11 +1228,12 @@ const styles = StyleSheet.create({
   },
   themeSegmentBtn: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
     borderWidth: 1.5,
   },
   unitsSection: {

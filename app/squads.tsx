@@ -186,11 +186,8 @@ export default function SquadsScreen() {
           </Text>
         </Pressable>
 
-        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs }}>
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs, marginBottom: spacing.sm }}>
           SQUADS
-        </Text>
-        <Text variant="body" style={{ color: colors.textMuted, marginTop: 2, marginBottom: spacing.sm }}>
-          Form persistent squads, recruit allies, and deploy together.
         </Text>
 
         {/* 3-Tab Segment Bar with Animated Slider (Labels fit all screen widths cleanly) */}

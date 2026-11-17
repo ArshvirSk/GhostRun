@@ -241,14 +241,8 @@ export default function FriendsScreen() {
           </Text>
         </Pressable>
 
-        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs }}>
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs, marginBottom: spacing.sm }}>
           FRIENDS
-        </Text>
-        <Text
-          variant="body"
-          style={{ color: colors.textMuted, marginTop: 2, marginBottom: spacing.sm }}
-        >
-          Connect with operatives, manage invites, and team up.
         </Text>
 
         {/* 4-Tab Segment Bar with Animated Slider */}
