@@ -1,6 +1,4 @@
-import {
-  sanitizeAnalyticsPayload,
-} from '../src/lib/analyticsCore';
+import { sanitizeAnalyticsPayload } from '../src/lib/analyticsCore';
 import {
   APP_VERSION,
   SUPPORT_EMAIL,
@@ -24,9 +22,12 @@ function assert(condition: boolean, message: string) {
 console.log('--- NF-17, NF-18 & NF-32 Diagnostics & Analytics Unit Tests ---');
 
 // Test 1: App Version & URLs
-assert(APP_VERSION === '2.9.7', 'Diagnostic app version matches project release version');
+assert(APP_VERSION === '2.9.9', 'Diagnostic app version matches project release version');
 assert(SUPPORT_EMAIL.includes('@ghostrun.app'), 'Support email uses official domain');
-assert(getPlayStoreReviewUrl().includes('com.ghostrun.app'), 'Review URL points to Google Play store package');
+assert(
+  getPlayStoreReviewUrl().includes('com.ghostrun.app'),
+  'Review URL points to Google Play store package',
+);
 
 // Test 2: Analytics Payload Sanitization - Clean input
 const clean = sanitizeAnalyticsPayload({

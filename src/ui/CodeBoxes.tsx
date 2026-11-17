@@ -98,13 +98,15 @@ export function CodeBoxes({
           onComplete?.(finalStr);
         }
       }
+    } else {
+      // User deleted character - shift focus back so backspacing flows naturally
+      if (index > 0) {
+        inputRefs.current[index - 1]?.focus();
+      }
     }
   };
 
-  const handleKeyPress = (
-    e: NativeSyntheticEvent<{ key: string }>,
-    index: number
-  ) => {
+  const handleKeyPress = (e: NativeSyntheticEvent<{ key: string }>, index: number) => {
     if (e.nativeEvent.key === 'Backspace') {
       if (!chars[index] && index > 0) {
         inputRefs.current[index - 1]?.focus();
@@ -116,13 +118,7 @@ export function CodeBoxes({
   };
 
   return (
-    <Animated.View
-      style={[
-        styles.row,
-        { transform: [{ translateX: shakeAnim }] },
-        style,
-      ]}
-    >
+    <Animated.View style={[styles.row, { transform: [{ translateX: shakeAnim }] }, style]}>
       {Array.from({ length }).map((_, index) => {
         const isFocused = focusedIndex === index;
         const char = chars[index] || '';
@@ -158,7 +154,7 @@ export function CodeBoxes({
               autoCorrect={false}
               cursorColor={colors.accent}
               editable={!disabled}
-              keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'visible-password'}
+              keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'default'}
               maxLength={1}
               onBlur={() => setFocusedIndex(-1)}
               onChangeText={(txt) => handleChangeText(txt, index)}

@@ -2,7 +2,7 @@
   "expo": {
     "name": "GhostRun",
     "slug": "ghostrun",
-    "version": "2.9.8",
+    "version": "2.9.9",
     "orientation": "portrait",
     "scheme": "ghost-run",
     "icon": "./assets/icon.png",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.ghostrun.app",
-      "versionCode": 23,
+      "versionCode": 24,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
@@ -45,10 +45,7 @@
               "pathPrefix": "/join"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
     },
@@ -62,16 +59,9 @@
         "NSLocationAlwaysUsageDescription": "GhostRun tracks background location during active matches to keep you in sync with your squad.",
         "NSMotionUsageDescription": "GhostRun measures pedometer and acceleration data to detect authentic foot sprinting and penalize vehicle transport.",
         "NSCameraUsageDescription": "GhostRun uses your camera to scan squad and match join QR codes.",
-        "UIBackgroundModes": [
-          "location",
-          "fetch",
-          "remote-notification"
-        ]
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"]
       },
-      "associatedDomains": [
-        "applinks:ghostrun.app",
-        "webcredentials:ghostrun.app"
-      ]
+      "associatedDomains": ["applinks:ghostrun.app", "webcredentials:ghostrun.app"]
     },
     "plugins": [
       "expo-router",
