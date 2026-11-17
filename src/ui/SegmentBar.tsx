@@ -169,10 +169,10 @@ const styles = StyleSheet.create({
     position: 'relative',
     height: 46,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   sliderPill: {
     position: 'absolute',
+    left: 0,
     top: 3,
     bottom: 3,
     borderWidth: 1,
