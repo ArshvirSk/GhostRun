@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-17  
 **Artifact:** `release/GhostRun-v2.9.6.apk`  
-**Size:** 56,709,860 bytes (54.08 MB)  
-**SHA-256 Checksum:** `610BA5ED0D44DC428C2C2BBC18D46A662B6A80F3AFCFB1B435D726E9CB237C87`  
+**Size:** 56,716,036 bytes (54.09 MB)  
+**SHA-256 Checksum:** `5D4D20B82127293C05057A95EE2E39C28542A17180465344DDB835811D59BD63`  
 **Version:** `2.9.6`  
 **VersionCode:** `21`  
 **Architecture:** `arm64-v8a`  
@@ -13,7 +13,12 @@
 
 ## Overview
 
-GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements across core screens. This release introduces the new military-grade **Tactical Rangefinder Zone Selector** engineered with a native `PanResponder` and `Animated.spring` gesture engine that guarantees 100% dead-center auto-snapping, direct finger tracking, physical friction, haptic tick feedback, left/right edge gradients, and glitch-free camera zooming, a dedicated high-priority **Social & Competitive Operations Hub** on the Profile tab (elevating Friends and Leaderboards from the bottom of the screen), silky-smooth sliding pills on both the main floating navbar and sub-tab bars, a horizontal swipe pager on Modes, Squads, and Schedule tabs, and streamlined card layouts.
+GhostRun **v2.9.6** delivers high-precision spatial, competitive, and navigational refinements across core screens:
+- **Dedicated Friends Screen (`/friends`)**: Full-screen horizontal swipe paging across **Operatives**, **Requests**, **Add Operative**, and **Privacy** with real-time invite sharing and presence status.
+- **Dedicated Leaderboard Screen (`/leaderboard`)**: Full-screen horizontal swipe paging across **This Season**, **Previous Season**, and **Echo Scoring Guide** with head-to-head match stats.
+- **Interactive Season 1 Banner (`app/(tabs)/play.tsx`)**: Tapping "Season 1: First Infiltration" links directly into seasonal leaderboard standings.
+- **Military-Grade Tactical Rangefinder Zone Selector (`src/ui/TacticalRangeSelector.tsx`)**: Native `PanResponder` and `Animated.spring` gesture engine with 100% dead-center auto-snapping and a strict 2.0 km perimeter hard cap.
+- **Centered Map Framing & Glitch-Free Camera (`app/host/area.tsx`)**: Calibrated viewport padding so the arena zone is framed dead-center inside the visible viewport.
 
 ---
 

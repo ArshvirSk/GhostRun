@@ -21,8 +21,6 @@ import { supabase } from '../../src/lib/supabase';
 import { useUnits } from '../../src/utils/units';
 import { BADGE_CATALOG } from '../../src/lib/badges';
 import { SeasonRecapModal } from '../../src/components/SeasonRecapModal';
-import { FriendsSheet } from '../../src/components/FriendsSheet';
-import { FriendsBoardModal } from '../../src/components/FriendsBoardModal';
 import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
 import { useUserStore } from '../../src/stores/userStore';
 import { listFriends } from '../../src/lib/friends';
@@ -80,8 +78,6 @@ export default function YouTab() {
   const [recapVisible, setRecapVisible] = useState(false);
   const [recapData, setRecapData] = useState<SeasonRecapData | null>(null);
   const [loadingRecap, setLoadingRecap] = useState(false);
-  const [friendsVisible, setFriendsVisible] = useState(false);
-  const [friendsBoardVisible, setFriendsBoardVisible] = useState(false);
   const [friendCount, setFriendCount] = useState(0);
 
   const handleOpenRecap = async () => {
@@ -285,7 +281,7 @@ export default function YouTab() {
               accessibilityLabel="Friends Hub"
               onPress={() => {
                 triggerHaptic('buttonTap');
-                setFriendsVisible(true);
+                router.push('/friends' as any);
               }}
               hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               style={[
@@ -304,7 +300,7 @@ export default function YouTab() {
               accessibilityLabel="Leaderboard"
               onPress={() => {
                 triggerHaptic('buttonTap');
-                setFriendsBoardVisible(true);
+                router.push('/leaderboard' as any);
               }}
               hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               style={[
@@ -538,7 +534,7 @@ export default function YouTab() {
             accessibilityLabel="Operative Network (Friends)"
             onPress={() => {
               triggerHaptic('buttonTap');
-              setFriendsVisible(true);
+              router.push('/friends' as any);
             }}
             style={({ pressed }) => [
               styles.socialHubCard,
@@ -587,7 +583,7 @@ export default function YouTab() {
             accessibilityLabel="Friends Echo Leaderboard"
             onPress={() => {
               triggerHaptic('buttonTap');
-              setFriendsBoardVisible(true);
+              router.push('/leaderboard' as any);
             }}
             style={({ pressed }) => [
               styles.socialHubCard,
@@ -1015,19 +1011,6 @@ export default function YouTab() {
         visible={recapVisible}
         recap={recapData}
         onClose={() => setRecapVisible(false)}
-      />
-
-      <FriendsSheet
-        visible={friendsVisible}
-        onClose={() => {
-          setFriendsVisible(false);
-          listFriends().then((f) => setFriendCount(f.length)).catch(() => {});
-        }}
-      />
-
-      <FriendsBoardModal
-        visible={friendsBoardVisible}
-        onClose={() => setFriendsBoardVisible(false)}
       />
     </View>
   );

@@ -236,13 +236,20 @@ export default function PlayScreen() {
 
         {/* Season Countdown / Announcement Banner (NF-31) */}
         {seasonData && (seasonData.countdown || seasonData.banners.length > 0) && (
-          <View
-            style={[
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View Season Leaderboard & Echo Standings"
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              router.push('/leaderboard' as any);
+            }}
+            style={({ pressed }) => [
               styles.seasonBanner,
               {
                 backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
                 borderColor: colors.borderDark || colors.border,
               },
+              pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
             ]}
           >
             <View style={styles.seasonBannerRow}>
@@ -261,7 +268,7 @@ export default function PlayScreen() {
               </View>
               <Ionicons name="sparkles-outline" size={18} color={colors.accent} />
             </View>
-          </View>
+          </Pressable>
         )}
 
         {/* Friends Hosting Now Presence Banner (FL-P1) */}
