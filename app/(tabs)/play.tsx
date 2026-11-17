@@ -22,6 +22,7 @@ import { HostPresence } from '../../src/lib/friendsCore';
 import { useUserStore } from '../../src/stores/userStore';
 import { startLocationPrewarm } from '../../src/lib/locationCache';
 import { CipherEventModal } from '../../src/components/CipherEventModal';
+import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
 import { TACTICAL_GOLD } from '../../src/theme/tokens';
 
 const GHOSTRUN_MARK_MINT = require('../../assets/ghostrun-mark-mint.png');
@@ -142,7 +143,10 @@ export function PlayContent() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadProfileAndActiveGame();
+    await Promise.all([
+      loadProfileAndActiveGame(),
+      new Promise((resolve) => setTimeout(resolve, 750)),
+    ]);
     setRefreshing(false);
   };
 
@@ -152,7 +156,7 @@ export function PlayContent() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
-      <ScrollView
+      <TacticalPullRefreshScrollView
         contentContainerStyle={[
           styles.scrollContent,
           {
@@ -161,13 +165,8 @@ export function PlayContent() {
           },
         ]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-          />
-        }
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       >
         {/* Top Header Row with GhostRun Brand Mark and Quick Access Icons */}
         <View style={styles.headerRow}>
@@ -535,7 +534,7 @@ export function PlayContent() {
             </Text>
           </Pressable>
         </View>
-      </ScrollView>
+      </TacticalPullRefreshScrollView>
 
       {/* GhostRun's Native Tactical Cipher Protocol Event Modal */}
       <CipherEventModal

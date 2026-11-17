@@ -22,6 +22,7 @@ import {
 } from '../../src/modes/registry';
 import { useHostStore } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
+import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
 
 type PlayerFilter = 'all' | 'solo' | 'squad' | 'massive';
 type DifficultyFilter = 'all' | '1' | '2' | '3';
@@ -53,6 +54,14 @@ export function ModesContent() {
   const allModes = getAllBaseModes();
   const allModifiers = getAllModifiers();
   const allRoles = getAllRoles();
+
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    triggerHaptic('buttonTap');
+    await new Promise((r) => setTimeout(r, 600));
+    setRefreshing(false);
+  };
 
   const filteredModes = useMemo(() => {
     return allModes.filter((m) => {
@@ -109,9 +118,11 @@ export function ModesContent() {
 
       {/* Segregated Gesture View: Modes vs Modifiers switch via SegmentBar */}
       {activeTab === 'modes' ? (
-        <ScrollView
+        <TacticalPullRefreshScrollView
           key="modes-page"
           style={{ flex: 1 }}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
           contentContainerStyle={[
             styles.pageContent,
             { paddingBottom: Math.max(insets.bottom, 20) + 140 },
@@ -278,12 +289,14 @@ export function ModesContent() {
               </View>
             )}
           </View>
-        </ScrollView>
+        </TacticalPullRefreshScrollView>
       ) : (
         /* Page 2: MODIFIERS & ROLES */
-        <ScrollView
+        <TacticalPullRefreshScrollView
           key="modifiers-page"
           style={{ flex: 1 }}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
           contentContainerStyle={[
             styles.pageContent,
             { paddingBottom: Math.max(insets.bottom, 20) + 140 },
@@ -499,7 +512,7 @@ export function ModesContent() {
               );
             })}
           </View>
-        </ScrollView>
+        </TacticalPullRefreshScrollView>
       )}
     </View>
   );

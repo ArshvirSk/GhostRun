@@ -19,6 +19,7 @@ import { Card } from '../src/ui/Card';
 import { Button } from '../src/ui/Button';
 import { SegmentBar } from '../src/ui/SegmentBar';
 import { triggerHaptic } from '../src/motion/haptics';
+import { TacticalPullRefreshScrollView } from '../src/components/TacticalPullRefresh';
 import {
   FriendsBoardEntry,
   HeadToHeadStats,
@@ -50,6 +51,8 @@ export default function LeaderboardScreen() {
   const [h2hStats, setH2hStats] = useState<HeadToHeadStats | null>(null);
   const [loadingH2h, setLoadingH2h] = useState(false);
 
+  const [refreshing, setRefreshing] = useState(false);
+
   const pagerRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   const loadBoard = useCallback(async (tab: LeaderboardTabKey) => {
@@ -76,6 +79,18 @@ export default function LeaderboardScreen() {
       setLoading(false);
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadBoard(activeTab),
+        new Promise((resolve) => setTimeout(resolve, 750)),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadBoard, activeTab]);
 
   useEffect(() => {
     if (activeTab === 'current' || activeTab === 'previous') {
@@ -351,7 +366,9 @@ export default function LeaderboardScreen() {
         {/* TAB 1: CURRENT SEASON STANDINGS */}
         {/* ============================================================== */}
         <View style={{ width: screenWidth }}>
-          <ScrollView
+          <TacticalPullRefreshScrollView
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             contentContainerStyle={[
               styles.tabContent,
               { paddingBottom: Math.max(insets.bottom, 16) + 80 },
@@ -365,14 +382,16 @@ export default function LeaderboardScreen() {
             ) : (
               renderBoardContent()
             )}
-          </ScrollView>
+          </TacticalPullRefreshScrollView>
         </View>
 
         {/* ============================================================== */}
         {/* TAB 2: PREVIOUS SEASON ARCHIVE */}
         {/* ============================================================== */}
         <View style={{ width: screenWidth }}>
-          <ScrollView
+          <TacticalPullRefreshScrollView
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
             contentContainerStyle={[
               styles.tabContent,
               { paddingBottom: Math.max(insets.bottom, 16) + 80 },
@@ -386,7 +405,7 @@ export default function LeaderboardScreen() {
             ) : (
               renderBoardContent()
             )}
-          </ScrollView>
+          </TacticalPullRefreshScrollView>
         </View>
 
         {/* ============================================================== */}

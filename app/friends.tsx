@@ -24,6 +24,7 @@ import { Card } from '../src/ui/Card';
 import { Button } from '../src/ui/Button';
 import { SegmentBar } from '../src/ui/SegmentBar';
 import { triggerHaptic } from '../src/motion/haptics';
+import { TacticalPullRefreshScrollView } from '../src/components/TacticalPullRefresh';
 import {
   FriendProfile,
   FriendRequest,
@@ -70,8 +71,6 @@ export default function FriendsScreen() {
     shareEcho: true,
   });
 
-  const pagerRef = useRef<React.ElementRef<typeof ScrollView>>(null);
-
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -92,6 +91,21 @@ export default function FriendsScreen() {
       setLoading(false);
     }
   }, []);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadData(),
+        new Promise((resolve) => setTimeout(resolve, 750)),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadData]);
+
+  const pagerRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   useEffect(() => {
     void loadData();
@@ -281,7 +295,9 @@ export default function FriendsScreen() {
           {/* TAB 1: OPERATIVES LIST */}
           {/* ============================================================== */}
           <View style={{ width: screenWidth }}>
-            <ScrollView
+            <TacticalPullRefreshScrollView
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
               contentContainerStyle={[
                 styles.tabContent,
                 { paddingBottom: Math.max(insets.bottom, 16) + 80 },
@@ -419,7 +435,7 @@ export default function FriendsScreen() {
                   );
                 })
               )}
-            </ScrollView>
+            </TacticalPullRefreshScrollView>
           </View>
 
           {/* ============================================================== */}

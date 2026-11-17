@@ -24,6 +24,7 @@ import { SeasonRecapModal } from '../../src/components/SeasonRecapModal';
 import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
 import { useUserStore } from '../../src/stores/userStore';
 import { listFriends } from '../../src/lib/friends';
+import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
 import { TACTICAL_GOLD } from '../../src/theme/tokens';
 
 interface MatchHistoryItem {
@@ -218,6 +219,19 @@ export function YouContent() {
     return () => clearTimeout(timer);
   }, [loadProfileAndHistory]);
 
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadProfileAndHistory(),
+        new Promise((resolve) => setTimeout(resolve, 750)),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadProfileAndHistory]);
+
   const handleSelectColor = async (c: string) => {
     triggerHaptic('buttonTap');
     setDraftColor(c);
@@ -266,7 +280,9 @@ export function YouContent() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
+      <TacticalPullRefreshScrollView
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
         contentContainerStyle={[
           styles.content,
           {
@@ -1025,7 +1041,7 @@ export function YouContent() {
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
         </Card>
-      </ScrollView>
+      </TacticalPullRefreshScrollView>
 
       <SeasonRecapModal
         visible={recapVisible}
