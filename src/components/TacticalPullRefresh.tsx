@@ -1,8 +1,8 @@
 import React, {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useRef,
-  useState,
 } from 'react';
 import {
   Animated,
@@ -10,6 +10,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   PanResponder,
+  RefreshControl,
   ScrollView,
   ScrollViewProps,
   StyleSheet,
@@ -64,31 +65,20 @@ export const TacticalPullRefreshScrollView = forwardRef<
   const currentPullRef = useRef(0);
   const isDraggingPull = useRef(false);
   const hasTriggeredHaptic = useRef(false);
-  const pullPhaseRef = useRef<'idle' | 'pulling' | 'threshold' | 'refreshing'>('idle');
 
-  // Single guarded refresh trigger — prevents double-reboot
-  const executeRefresh = async () => {
-    if (isRefreshingRef.current) return;
-    isRefreshingRef.current = true;
-    pullPhaseRef.current = 'refreshing';
-
-    // Hold at resting height while async onRefresh runs
-    Animated.spring(pullAnim, {
-      toValue: restingHeight,
-      useNativeDriver: false,
-      friction: 8,
-      tension: 40,
-    }).start();
-
-    try {
-      await Promise.all([
-        Promise.resolve(onRefresh()),
-        new Promise((resolve) => setTimeout(resolve, 800)),
-      ]);
-    } finally {
-      isRefreshingRef.current = false;
+  // Synchronize curtain animation with external refreshing prop
+  useEffect(() => {
+    if (refreshing) {
+      Animated.spring(pullAnim, {
+        toValue: restingHeight,
+        useNativeDriver: false,
+        friction: 8,
+        tension: 40,
+      }).start();
+    } else {
       currentPullRef.current = 0;
-      pullPhaseRef.current = 'idle';
+      isDraggingPull.current = false;
+      hasTriggeredHaptic.current = false;
       Animated.spring(pullAnim, {
         toValue: 0,
         useNativeDriver: false,
@@ -96,62 +86,68 @@ export const TacticalPullRefreshScrollView = forwardRef<
         tension: 50,
       }).start();
     }
+  }, [refreshing, restingHeight, pullAnim]);
+
+  // Single guarded refresh trigger — prevents duplicate syncs and 2-time reboots
+  const executeRefresh = async () => {
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
+    try {
+      await Promise.resolve(onRefresh());
+    } finally {
+      isRefreshingRef.current = false;
+    }
   };
 
-  // PanResponder strictly for deliberate vertical downward pull at scrollY <= 0
+  // PanResponder to track finger pull in real-time
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
 
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        if (isRefreshingRef.current) return false;
-        if (scrollYRef.current > 1) return false;
+        if (refreshing || isRefreshingRef.current) return false;
+        if (scrollYRef.current > 2) return false;
         return (
-          gestureState.dy > 12 &&
-          gestureState.dy > Math.abs(gestureState.dx) * 1.8
+          gestureState.dy > 3 &&
+          gestureState.dy > Math.abs(gestureState.dx) * 1.1
         );
       },
 
       onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        if (isRefreshingRef.current) return false;
-        if (scrollYRef.current > 1) return false;
+        if (refreshing || isRefreshingRef.current) return false;
+        if (scrollYRef.current > 2) return false;
         return (
-          gestureState.dy > 12 &&
-          gestureState.dy > Math.abs(gestureState.dx) * 1.8
+          gestureState.dy > 3 &&
+          gestureState.dy > Math.abs(gestureState.dx) * 1.1
         );
       },
 
       onPanResponderGrant: () => {
         isDraggingPull.current = true;
         hasTriggeredHaptic.current = false;
-        pullPhaseRef.current = 'pulling';
       },
 
-      onPanResponderTerminationRequest: () => !isDraggingPull.current,
+      onPanResponderTerminationRequest: () => false,
 
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy <= 0) {
           pullAnim.setValue(0);
           currentPullRef.current = 0;
-          pullPhaseRef.current = 'idle';
           return;
         }
 
         const dy = Math.max(0, gestureState.dy);
-        // Elastic rubber-band resistance curve
         const pull = Math.min(maxPullHeight, Math.pow(dy, 0.82) * 2.0);
         currentPullRef.current = pull;
         pullAnim.setValue(pull);
 
         if (pull >= thresholdHeight) {
-          pullPhaseRef.current = 'threshold';
           if (!hasTriggeredHaptic.current) {
             hasTriggeredHaptic.current = true;
             triggerHaptic('buttonTap');
           }
         } else {
-          pullPhaseRef.current = 'pulling';
           if (hasTriggeredHaptic.current) {
             hasTriggeredHaptic.current = false;
           }
@@ -162,12 +158,12 @@ export const TacticalPullRefreshScrollView = forwardRef<
         isDraggingPull.current = false;
         const finalPull = currentPullRef.current;
 
-        if (finalPull >= thresholdHeight && !isRefreshingRef.current) {
+        if (finalPull >= thresholdHeight) {
           triggerHaptic('tagConfirmed');
           void executeRefresh();
-        } else if (!isRefreshingRef.current) {
-          pullPhaseRef.current = 'idle';
+        } else {
           currentPullRef.current = 0;
+          hasTriggeredHaptic.current = false;
           Animated.spring(pullAnim, {
             toValue: 0,
             useNativeDriver: false,
@@ -179,9 +175,9 @@ export const TacticalPullRefreshScrollView = forwardRef<
 
       onPanResponderTerminate: () => {
         isDraggingPull.current = false;
-        if (!isRefreshingRef.current) {
-          pullPhaseRef.current = 'idle';
-          currentPullRef.current = 0;
+        currentPullRef.current = 0;
+        hasTriggeredHaptic.current = false;
+        if (!refreshing) {
           Animated.spring(pullAnim, {
             toValue: 0,
             useNativeDriver: false,
@@ -231,6 +227,17 @@ export const TacticalPullRefreshScrollView = forwardRef<
         bounces={false}
         nestedScrollEnabled={true}
         contentContainerStyle={contentContainerStyle}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              void executeRefresh();
+            }}
+            colors={['transparent']}
+            tintColor="transparent"
+            progressBackgroundColor="transparent"
+          />
+        }
         {...restProps}
       >
         {children}
@@ -250,14 +257,14 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    borderBottomWidth: 0, // NO border line — zero thin line when closed
+    borderBottomWidth: 0, // Zero thin line when closed
   },
   mascotAnchor: {
     width: 96,
     height: 65,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginBottom: -1, // Sits precisely flush with the bottom ledge of the pulled curtain
+    marginBottom: -1, // Pinned flush to the bottom ledge divider of the pulled curtain
   },
   mascotImage: {
     width: 96,
