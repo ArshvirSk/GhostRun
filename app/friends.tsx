@@ -33,6 +33,7 @@ import {
   SearchedOperative,
   formatFriendInviteUrl,
   formatFriendDeepLink,
+  formatFriendWebInviteUrl,
 } from '../src/lib/friendsCore';
 import {
   listFriends,
@@ -271,12 +272,12 @@ export default function FriendsScreen() {
         ? `@${userProfile.display_name}`
         : 'Operative';
       const myIdentifier = userProfile?.handle || userProfile?.display_name || 'Operative';
-      const deepLink = formatFriendDeepLink(myIdentifier);
-      const downloadUrl = 'https://github.com/ArshvirSk/GhostRun/releases/latest';
+      const webInviteUrl = formatFriendWebInviteUrl(myIdentifier);
 
       await Share.share({
         title: 'Join my GhostRun Network',
-        message: `Deploy with me on GhostRun! Connect to my operative network (${tag}):\n\n⚡ Open in GhostRun:\n${deepLink}\n\n📦 Download GhostRun:\n${downloadUrl}`,
+        message: `Deploy with me on GhostRun! Connect to my operative network (${tag}):\n${webInviteUrl}`,
+        url: webInviteUrl,
       });
     } catch {
       // share dismissed

@@ -96,3 +96,12 @@ export function formatFriendInviteUrl(token: string, baseUrl: string = 'https://
 export function formatFriendDeepLink(identifier: string): string {
   return `ghost-run://friends?add=${encodeURIComponent(identifier)}`;
 }
+
+export const GHOSTRUN_WEB_URL = 'https://arshvirsk.github.io/GhostRun';
+
+/**
+ * Formats a clickable HTTPS web link that opens in browsers and redirects to GhostRun.
+ */
+export function formatFriendWebInviteUrl(identifier: string): string {
+  return `${GHOSTRUN_WEB_URL}/invite?add=${encodeURIComponent(identifier)}`;
+}

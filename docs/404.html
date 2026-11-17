@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GhostRun — Redirecting</title>
+  <script>
+    (function() {
+      // In GitHub Pages, if someone hits /join/ABCD or /invite?add=AlphaOP, redirect to /invite/ with query
+      const path = window.location.pathname;
+      const search = window.location.search;
+      const hash = window.location.hash;
+
+      // Extract match code if path looks like /join/ABCD
+      const match = path.match(/\/join\/([A-Za-z0-9]{4})/i);
+      if (match) {
+        window.location.replace('/GhostRun/invite/?code=' + match[1].toUpperCase());
+        return;
+      }
+
+      // If search params exist, forward to /invite/
+      if (search) {
+        window.location.replace('/GhostRun/invite/' + search + hash);
+        return;
+      }
+
+      // Otherwise go to home
+      window.location.replace('/GhostRun/invite/');
+    })();
+  </script>
+</head>
+<body style="background-color: #101014; color: #FFF; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh;">
+  <p>Redirecting to GhostRun Tactical Network...</p>
+</body>
+</html>

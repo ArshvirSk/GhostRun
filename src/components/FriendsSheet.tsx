@@ -23,6 +23,7 @@ import {
   FriendSettings,
   formatFriendInviteUrl,
   formatFriendDeepLink,
+  formatFriendWebInviteUrl,
 } from '../lib/friendsCore';
 import { useUserStore } from '../stores/userStore';
 import {
@@ -167,13 +168,13 @@ export function FriendsSheet({ visible, onClose }: FriendsSheetProps) {
       ? `@${userProfile.display_name}`
       : 'Operative';
     const myIdentifier = userProfile?.handle || userProfile?.display_name || 'Operative';
-    const deepLink = formatFriendDeepLink(myIdentifier);
-    const downloadUrl = 'https://github.com/ArshvirSk/GhostRun/releases/latest';
+    const webInviteUrl = formatFriendWebInviteUrl(myIdentifier);
 
     try {
       await Share.share({
         title: 'GhostRun Operative Invite',
-        message: `Deploy with me on GhostRun! Connect to my operative network (${tag}):\n\n⚡ Open in GhostRun:\n${deepLink}\n\n📦 Download GhostRun:\n${downloadUrl}`,
+        message: `Deploy with me on GhostRun! Connect to my operative network (${tag}):\n${webInviteUrl}`,
+        url: webInviteUrl,
       });
     } catch {
       // share dismissed

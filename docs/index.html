@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GhostRun — Operative Network</title>
+  <meta name="description" content="Deploy with me on GhostRun, the real-world GPS tactical game.">
+  <link rel="icon" type="image/png" href="./assets/favicon.png">
+  <meta property="og:title" content="GhostRun — Tactical Operative Network">
+  <meta property="og:description" content="Deploy on GhostRun: Real-world GPS tactical multiplayer tag.">
+  <meta property="og:image" content="./assets/splash-logo.png">
+  <meta name="theme-color" content="#101014">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #101014;
+      color: #F3F4F6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+      overflow-x: hidden;
+    }
+    .container {
+      width: 100%;
+      max-width: 440px;
+      background-color: #18181F;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 32px 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      text-align: center;
+      position: relative;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background-color: rgba(199, 243, 107, 0.12);
+      border: 1px solid rgba(199, 243, 107, 0.3);
+      border-radius: 20px;
+      color: #C7F36B;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      background-color: #C7F36B;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .logo-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .logo-img {
+      width: 28px;
+      height: 28px;
+    }
+    .logo-title {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #FFFFFF;
+    }
+    .logo-title span {
+      color: #C7F36B;
+    }
+    .avatar-circle {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #EC4899, #8B5CF6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 900;
+      color: #FFFFFF;
+      margin: 0 auto 16px auto;
+      border: 3px solid #101014;
+      box-shadow: 0 0 20px rgba(236, 72, 153, 0.3);
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: #FFFFFF;
+    }
+    p.subtext {
+      font-size: 14px;
+      line-height: 20px;
+      color: #9CA3AF;
+      margin-bottom: 28px;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 800;
+      text-decoration: none;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .btn-primary {
+      background-color: #C7F36B;
+      color: #101014;
+      box-shadow: 0 4px 14px rgba(199, 243, 107, 0.25);
+    }
+    .btn-secondary {
+      background-color: rgba(255, 255, 255, 0.05);
+      color: #E5E7EB;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .btn-secondary:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+    .info-footer {
+      font-size: 12px;
+      color: #6B7280;
+      margin-top: 18px;
+      line-height: 18px;
+    }
+    .status-note {
+      font-size: 12px;
+      color: #10B981;
+      margin-bottom: 16px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="badge">
+      <div class="badge-dot"></div>
+      <span id="badge-text">Tactical Connection</span>
+    </div>
+
+    <div class="logo-row">
+      <img src="./assets/ghostrun-mark-mint.png" alt="GhostRun" class="logo-img">
+      <div class="logo-title">GHOST<span>RUN</span></div>
+    </div>
+
+    <div class="avatar-circle" id="avatar-initial">?</div>
+
+    <h1 id="headline">Connect Operative</h1>
+    <p class="subtext" id="subtext">Deploy on real-world tactical GPS missions together.</p>
+
+    <div class="status-note" id="status-note">
+      ⚡ Launching GhostRun...
+    </div>
+
+    <a href="#" id="open-app-btn" class="btn btn-primary">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+      </svg>
+      <span>Open in GhostRun</span>
+    </a>
+
+    <a href="https://github.com/ArshvirSk/GhostRun/releases/latest" class="btn btn-secondary" id="download-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+      <span>Download GhostRun APK (v2.9.9)</span>
+    </a>
+
+    <div class="info-footer">
+      GhostRun is an IRL tactical GPS predator-prey tag game.<br>Available on Android ARM64.
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const addParam = urlParams.get('add') || urlParams.get('friend') || urlParams.get('friend_invite');
+      const codeParam = urlParams.get('code');
+
+      const headlineEl = document.getElementById('headline');
+      const subtextEl = document.getElementById('subtext');
+      const avatarEl = document.getElementById('avatar-initial');
+      const openBtn = document.getElementById('open-app-btn');
+      const badgeText = document.getElementById('badge-text');
+      const statusNote = document.getElementById('status-note');
+
+      let deepLink = 'ghost-run://friends';
+      let intentUrl = 'intent://friends#Intent;scheme=ghost-run;package=com.ghostrun.app;end';
+
+      if (addParam) {
+        const cleanName = decodeURIComponent(addParam).replace(/^@/, '');
+        headlineEl.textContent = 'Connect with @' + cleanName;
+        subtextEl.textContent = cleanName + ' invites you to connect your operative network on GhostRun.';
+        avatarEl.textContent = cleanName.charAt(0).toUpperCase();
+        badgeText.textContent = 'Operative Invite';
+
+        deepLink = 'ghost-run://friends?add=' + encodeURIComponent(cleanName);
+        intentUrl = 'intent://friends?add=' + encodeURIComponent(cleanName) + '#Intent;scheme=ghost-run;package=com.ghostrun.app;end';
+      } else if (codeParam) {
+        const cleanCode = codeParam.toUpperCase();
+        headlineEl.textContent = 'Deploy to Match ' + cleanCode;
+        subtextEl.textContent = 'You have been invited to join a tactical match lobby.';
+        avatarEl.textContent = cleanCode.charAt(0);
+        badgeText.textContent = 'Squad Infiltration';
+
+        deepLink = 'ghost-run://join?code=' + encodeURIComponent(cleanCode);
+        intentUrl = 'intent://join?code=' + encodeURIComponent(cleanCode) + '#Intent;scheme=ghost-run;package=com.ghostrun.app;end';
+      }
+
+      openBtn.href = deepLink;
+
+      // Smart launch for Android / iOS
+      openBtn.addEventListener('click', function(e) {
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        if (isAndroid) {
+          window.location.href = intentUrl;
+        } else {
+          window.location.href = deepLink;
+        }
+      });
+
+      // Auto-attempt redirect on mobile devices
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isMobile) {
+        statusNote.style.display = 'block';
+        setTimeout(function() {
+          const isAndroid = /Android/i.test(navigator.userAgent);
+          window.location.href = isAndroid ? intentUrl : deepLink;
+        }, 500);
+      }
+    })();
+  </script>
+</body>
+</html>
