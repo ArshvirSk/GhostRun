@@ -7,7 +7,6 @@ import {
   RefreshControl,
   Image,
   Text,
-  PanResponder,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -33,7 +32,7 @@ interface ActiveGamePill {
   status: string;
 }
 
-export default function PlayScreen() {
+export function PlayContent() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
@@ -146,25 +145,8 @@ export default function PlayScreen() {
 
   const formattedName = displayName.endsWith('.') ? displayName : `${displayName}.`;
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return (
-          gestureState.dx < -30 &&
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
-        );
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -50) {
-          triggerHaptic('buttonTap');
-          router.navigate('/modes' as any);
-        }
-      },
-    })
-  ).current;
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]} {...panResponder.panHandlers}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       <ScrollView
@@ -693,7 +675,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   seasonBanner: {
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderRadius: 14,
     borderWidth: 1,
     marginBottom: 16,
@@ -701,7 +684,7 @@ const styles = StyleSheet.create({
   seasonBannerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   seasonBannerTitle: {
     fontFamily: 'Archivo-Bold',
@@ -734,3 +717,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+export default function PlayRoute() {
+  return null;
+}

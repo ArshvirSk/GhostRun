@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,7 +6,6 @@ import {
   Pressable,
   TextInput,
   ActivityIndicator,
-  PanResponder,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,7 +35,7 @@ interface MatchHistoryItem {
   winner?: string;
 }
 
-export default function YouTab() {
+export function YouContent() {
   const { colors, isDark, setAccentColor } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -259,25 +258,8 @@ export default function YouTab() {
   const signatureColor = profile?.color || colors.primary;
   const shortId = userId ? userId.slice(0, 6).toUpperCase() : '8492';
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return (
-          gestureState.dx > 30 &&
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
-        );
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > 50) {
-          triggerHaptic('buttonTap');
-          router.navigate('/modes' as any);
-        }
-      },
-    })
-  ).current;
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]} {...panResponder.panHandlers}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -1499,3 +1481,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
+
+export default function YouRoute() {
+  return null;
+}

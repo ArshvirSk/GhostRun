@@ -1,12 +1,9 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   useWindowDimensions,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-  PanResponder,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,7 +40,7 @@ const MODIFIER_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   operator: 'radio-outline',
 };
 
-export default function ModesTab() {
+export function ModesContent() {
   const { colors, spacing } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -52,8 +49,6 @@ export default function ModesTab() {
   const [activeTab, setActiveTab] = useState<TabKey>('modes');
   const [playerFilter, setPlayerFilter] = useState<PlayerFilter>('all');
   const [diffFilter, setDiffFilter] = useState<DifficultyFilter>('all');
-
-  const pagerRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   const allModes = getAllBaseModes();
   const allModifiers = getAllModifiers();
@@ -82,55 +77,10 @@ export default function ModesTab() {
   const handleTabChange = (id: string) => {
     const tabKey = id as TabKey;
     setActiveTab(tabKey);
-    const targetX = tabKey === 'modes' ? 0 : screenWidth;
-    pagerRef.current?.scrollTo({ x: targetX, animated: true });
   };
-
-  const handlePagerScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetX = e.nativeEvent.contentOffset.x;
-    const pageIndex = Math.round(offsetX / screenWidth);
-    const newTab: TabKey = pageIndex === 0 ? 'modes' : 'modifiers';
-    if (newTab !== activeTab) {
-      triggerHaptic('buttonTap');
-      setActiveTab(newTab);
-    }
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // If on MODES and swiping right towards Play:
-        if (
-          activeTab === 'modes' &&
-          gestureState.dx > 35 &&
-          gestureState.dx > Math.abs(gestureState.dy) * 1.5
-        ) {
-          return true;
-        }
-        // If on MODIFIERS and swiping left towards You:
-        if (
-          activeTab === 'modifiers' &&
-          gestureState.dx < -35 &&
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
-        ) {
-          return true;
-        }
-        return false;
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (activeTab === 'modes' && gestureState.dx > 50) {
-          triggerHaptic('buttonTap');
-          router.navigate('/play' as any);
-        } else if (activeTab === 'modifiers' && gestureState.dx < -50) {
-          triggerHaptic('buttonTap');
-          router.navigate('/you' as any);
-        }
-      },
-    })
-  ).current;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]} {...panResponder.panHandlers}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Sticky Top Header */}
       <View
         style={[
@@ -157,19 +107,11 @@ export default function ModesTab() {
         />
       </View>
 
-      {/* Horizontal Swipeable Pager */}
-      <ScrollView
-        ref={pagerRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handlePagerScrollEnd}
-        scrollEventThrottle={16}
-        style={{ flex: 1 }}
-      >
-        {/* Page 1: MODES */}
+      {/* Segregated Gesture View: Modes vs Modifiers switch via SegmentBar */}
+      {activeTab === 'modes' ? (
         <ScrollView
-          style={{ width: screenWidth }}
+          key="modes-page"
+          style={{ flex: 1 }}
           contentContainerStyle={[
             styles.pageContent,
             { paddingBottom: Math.max(insets.bottom, 20) + 140 },
@@ -337,13 +279,14 @@ export default function ModesTab() {
             )}
           </View>
         </ScrollView>
-
-        {/* Page 2: MODIFIERS & ROLES */}
+      ) : (
+        /* Page 2: MODIFIERS & ROLES */
         <ScrollView
-          style={{ width: screenWidth }}
+          key="modifiers-page"
+          style={{ flex: 1 }}
           contentContainerStyle={[
             styles.pageContent,
-            { paddingBottom: Math.max(insets.bottom, 20) + 100 },
+            { paddingBottom: Math.max(insets.bottom, 20) + 140 },
           ]}
           showsVerticalScrollIndicator={false}
         >
@@ -557,9 +500,13 @@ export default function ModesTab() {
             })}
           </View>
         </ScrollView>
-      </ScrollView>
+      )}
     </View>
   );
+}
+
+export default function ModesRoute() {
+  return null;
 }
 
 const styles = StyleSheet.create({
