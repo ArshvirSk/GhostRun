@@ -65,7 +65,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
 
   const scrollYRef = useRef(0);
   const refreshStatusRef = useRef<RefreshStatus>('idle');
-  const isUserInitiatedRef = useRef(false);
+  const lastRefreshEndTimeRef = useRef(0);
   const pullAnim = useRef(new Animated.Value(0)).current;
   const currentPullRef = useRef(0);
   const hasTriggeredHaptic = useRef(false);
@@ -82,7 +82,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
     return Math.min(maxPullHeight, thresholdHeight * 0.95 + stretch);
   };
 
-  // Guarded refresh executor — strictly one refresh per gesture, zero duplicate reboot
+  // Guarded refresh executor — strictly one refresh per gesture, zero duplicate reboot or reopening
   const executeRefresh = async () => {
     if (refreshStatusRef.current === 'refreshing' || refreshStatusRef.current === 'closing') {
       return;
@@ -115,31 +115,19 @@ export const TacticalPullRefreshScrollView = forwardRef<
         refreshStatusRef.current = 'idle';
         currentPullRef.current = 0;
         hasTriggeredHaptic.current = false;
-        isUserInitiatedRef.current = false;
+        lastRefreshEndTimeRef.current = Date.now();
       });
     }
   };
 
-  // Synchronize curtain animation with external refreshing prop changes ONLY
-  // (Completely ignores external prop updates during user-initiated gestures to prevent second reopening)
+  // Synchronize curtain closing if external refreshing prop transitions to false while refreshing
+  // Note: Curtain is strictly gesture-driven like Snapchat — external props NEVER automatically reopen it!
   const prevRefreshingProp = useRef(refreshing);
   useEffect(() => {
     const wasRefreshing = prevRefreshingProp.current;
     prevRefreshingProp.current = refreshing;
 
-    if (isUserInitiatedRef.current) {
-      return; // Handled 100% by user gesture lifecycle
-    }
-
-    if (!wasRefreshing && refreshing && refreshStatusRef.current === 'idle') {
-      refreshStatusRef.current = 'refreshing';
-      Animated.spring(pullAnim, {
-        toValue: restingHeight,
-        useNativeDriver: false,
-        friction: 8,
-        tension: 44,
-      }).start();
-    } else if (wasRefreshing && !refreshing && refreshStatusRef.current === 'refreshing') {
+    if (wasRefreshing && !refreshing && refreshStatusRef.current === 'refreshing') {
       refreshStatusRef.current = 'closing';
       Animated.spring(pullAnim, {
         toValue: 0,
@@ -150,20 +138,22 @@ export const TacticalPullRefreshScrollView = forwardRef<
         refreshStatusRef.current = 'idle';
         currentPullRef.current = 0;
         hasTriggeredHaptic.current = false;
+        lastRefreshEndTimeRef.current = Date.now();
       });
     }
-  }, [refreshing, restingHeight, pullAnim]);
+  }, [refreshing, pullAnim]);
 
   // Responsive gesture disambiguation:
-  // 1. Must be idle
+  // 1. Must be idle and past debounce cooldown
   // 2. Must be at top of list (scrollY <= 1)
-  // 3. dy > 2: captures immediately on first motion before native Android 8px touch slop intercepts
+  // 3. dy > 3: captures immediately on first intentional motion before native Android touch slop intercepts
   // 4. dy > |dx| * 1.15: allows downward thumb pulls while letting horizontal tab paging pass freely
   const shouldStartPull = (gestureState: { dx: number; dy: number }) => {
     if (refreshStatusRef.current !== 'idle') return false;
+    if (Date.now() - lastRefreshEndTimeRef.current < 350) return false;
     if (scrollYRef.current > 1) return false;
     return (
-      gestureState.dy > 2 &&
+      gestureState.dy > 3 &&
       gestureState.dy > Math.abs(gestureState.dx) * 1.15
     );
   };
@@ -178,7 +168,6 @@ export const TacticalPullRefreshScrollView = forwardRef<
 
       onPanResponderGrant: () => {
         refreshStatusRef.current = 'pulling';
-        isUserInitiatedRef.current = true;
         hasTriggeredHaptic.current = false;
       },
 
@@ -230,7 +219,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
             refreshStatusRef.current = 'idle';
             currentPullRef.current = 0;
             hasTriggeredHaptic.current = false;
-            isUserInitiatedRef.current = false;
+            lastRefreshEndTimeRef.current = Date.now();
           });
         }
       },
@@ -247,7 +236,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
             refreshStatusRef.current = 'idle';
             currentPullRef.current = 0;
             hasTriggeredHaptic.current = false;
-            isUserInitiatedRef.current = false;
+            lastRefreshEndTimeRef.current = Date.now();
           });
         }
       },
@@ -317,7 +306,7 @@ const styles = StyleSheet.create({
     height: 65,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginBottom: -1, // Sits precisely flush with the bottom ledge of the pulled curtain
+    marginBottom: -6, // Sits precisely flush with the bottom ledge of the pulled curtain, zero green gap
   },
   mascotImage: {
     width: 96,
