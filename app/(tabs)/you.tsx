@@ -25,6 +25,7 @@ import { FriendsSheet } from '../../src/components/FriendsSheet';
 import { FriendsBoardModal } from '../../src/components/FriendsBoardModal';
 import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
 import { useUserStore } from '../../src/stores/userStore';
+import { listFriends } from '../../src/lib/friends';
 
 interface MatchHistoryItem {
   id: string;
@@ -81,6 +82,7 @@ export default function YouTab() {
   const [loadingRecap, setLoadingRecap] = useState(false);
   const [friendsVisible, setFriendsVisible] = useState(false);
   const [friendsBoardVisible, setFriendsBoardVisible] = useState(false);
+  const [friendCount, setFriendCount] = useState(0);
 
   const handleOpenRecap = async () => {
     triggerHaptic('buttonTap');
@@ -134,6 +136,16 @@ export default function YouTab() {
           color: profData.color,
           email: authData.user.email,
         });
+      }
+
+      // Fetch friends list count
+      try {
+        const friendsList = await listFriends();
+        if (Array.isArray(friendsList)) {
+          setFriendCount(friendsList.length);
+        }
+      } catch {
+        // non-blocking
       }
 
       // 3. Fetch match history
@@ -262,29 +274,69 @@ export default function YouTab() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Header Row */}
+        {/* Top Header Row with Social & Settings Actions */}
         <View style={styles.topRow}>
           <Text style={[styles.pageTitle, { color: colors.text }]}>
             PROFILE
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Settings"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              router.push('/settings' as any);
-            }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={[
-              styles.settingsButton,
-              {
-                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            <Ionicons name="settings-sharp" size={20} color={colors.text} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Friends Hub"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                setFriendsVisible(true);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              style={[
+                styles.headerIconButton,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Ionicons name="people-outline" size={19} color={colors.primary} />
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Leaderboard"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                setFriendsBoardVisible(true);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              style={[
+                styles.headerIconButton,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Ionicons name="trophy-outline" size={19} color={colors.accent || '#F59E0B'} />
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                router.push('/settings' as any);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              style={[
+                styles.headerIconButton,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Ionicons name="settings-outline" size={19} color={colors.text} />
+            </Pressable>
+          </View>
         </View>
 
         {/* Hero Operative Dossier Card */}
@@ -477,6 +529,98 @@ export default function YouTab() {
             </View>
           )}
         </Card>
+
+        {/* Social & Competitive Operations Hub (High-Visibility Friends & Leaderboard Cards) */}
+        <View style={styles.socialHubRow}>
+          {/* Friends Hub Card */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Operative Network (Friends)"
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              setFriendsVisible(true);
+            }}
+            style={({ pressed }) => [
+              styles.socialHubCard,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.border,
+              },
+              pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+            ]}
+          >
+            <View
+              style={[
+                styles.socialHubIconWrap,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(199, 243, 107, 0.12)'
+                    : 'rgba(85, 122, 34, 0.10)',
+                },
+              ]}
+            >
+              <Ionicons name="people" size={20} color={colors.primary} />
+            </View>
+            <View style={styles.socialHubMeta}>
+              <View style={styles.socialHubTitleRow}>
+                <Text style={[styles.socialHubTitle, { color: colors.text }]}>
+                  Friends
+                </Text>
+                {friendCount > 0 && (
+                  <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
+                    <Text style={[styles.countBadgeText, { color: colors.primaryText }]}>
+                      {friendCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.socialHubSub, { color: colors.textMuted }]}>
+                Network & Invites
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </Pressable>
+
+          {/* Leaderboard Hub Card */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Friends Echo Leaderboard"
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              setFriendsBoardVisible(true);
+            }}
+            style={({ pressed }) => [
+              styles.socialHubCard,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.border,
+              },
+              pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+            ]}
+          >
+            <View
+              style={[
+                styles.socialHubIconWrap,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(255, 215, 0, 0.14)'
+                    : 'rgba(217, 119, 6, 0.12)',
+                },
+              ]}
+            >
+              <Ionicons name="trophy" size={20} color={colors.accent || '#F59E0B'} />
+            </View>
+            <View style={styles.socialHubMeta}>
+              <Text style={[styles.socialHubTitle, { color: colors.text }]}>
+                Leaderboard
+              </Text>
+              <Text style={[styles.socialHubSub, { color: colors.textMuted }]}>
+                Echo Rankings
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </Pressable>
+        </View>
 
         {/* Section: Performance Stats */}
         <View style={styles.sectionHeaderRow}>
@@ -854,36 +998,6 @@ export default function YouTab() {
             accessibilityRole="button"
             onPress={() => {
               triggerHaptic('buttonTap');
-              setFriendsVisible(true);
-            }}
-            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
-          >
-            <Ionicons name="people-outline" size={19} color={colors.primary} />
-            <Text style={[styles.menuRowText, { color: colors.text }]}>
-              Operative Network (Friends)
-            </Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              setFriendsBoardVisible(true);
-            }}
-            style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
-          >
-            <Ionicons name="trophy-outline" size={19} color={colors.accent || colors.primary} />
-            <Text style={[styles.menuRowText, { color: colors.text }]}>
-              Friends Echo Leaderboard
-            </Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              triggerHaptic('buttonTap');
               router.push('/settings' as any);
             }}
             style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
@@ -905,7 +1019,10 @@ export default function YouTab() {
 
       <FriendsSheet
         visible={friendsVisible}
-        onClose={() => setFriendsVisible(false)}
+        onClose={() => {
+          setFriendsVisible(false);
+          listFriends().then((f) => setFriendCount(f.length)).catch(() => {});
+        }}
       />
 
       <FriendsBoardModal
@@ -960,11 +1077,77 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialHubRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  socialHubCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+  },
+  socialHubIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialHubMeta: {
+    flex: 1,
+  },
+  socialHubTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  socialHubTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  socialHubSub: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  countBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    minWidth: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBadgeText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 10,
+    fontWeight: '800',
+  },
   heroCard: {
     padding: 18,
     borderRadius: 20,
     borderWidth: 1,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   heroRow: {
     flexDirection: 'row',

@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-17  
 **Artifact:** `release/GhostRun-v2.9.6.apk`  
-**Size:** 56,707,656 bytes (54.08 MB)  
-**SHA-256 Checksum:** `2879B2A815C6BE6716AACF05EB7DC62D62C590EE315300559C77D9DEE09ED64E`  
+**Size:** 56,709,860 bytes (54.08 MB)  
+**SHA-256 Checksum:** `610BA5ED0D44DC428C2C2BBC18D46A662B6A80F3AFCFB1B435D726E9CB237C87`  
 **Version:** `2.9.6`  
 **VersionCode:** `21`  
 **Architecture:** `arm64-v8a`  
@@ -13,13 +13,20 @@
 
 ## Overview
 
-GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements across core screens. This release introduces the new military-grade **Tactical Rangefinder Zone Selector** engineered with a native `PanResponder` and `Animated.spring` gesture engine that guarantees 100% dead-center auto-snapping, direct finger tracking, physical friction, haptic tick feedback, left/right edge gradients, and glitch-free camera zooming, silky-smooth sliding pills on both the main floating navbar and sub-tab bars, a horizontal swipe pager on Modes, Squads, and Schedule tabs, and streamlined card layouts.
+GhostRun **v2.9.6** delivers high-precision spatial and navigational refinements across core screens. This release introduces the new military-grade **Tactical Rangefinder Zone Selector** engineered with a native `PanResponder` and `Animated.spring` gesture engine that guarantees 100% dead-center auto-snapping, direct finger tracking, physical friction, haptic tick feedback, left/right edge gradients, and glitch-free camera zooming, a dedicated high-priority **Social & Competitive Operations Hub** on the Profile tab (elevating Friends and Leaderboards from the bottom of the screen), silky-smooth sliding pills on both the main floating navbar and sub-tab bars, a horizontal swipe pager on Modes, Squads, and Schedule tabs, and streamlined card layouts.
 
 ---
 
 ## Key Highlights & Changes
 
-### 1. PanResponder Spring Dial Zone Selector & 2km Hard Cap (`src/ui/TacticalRangeSelector.tsx`)
+### 1. Social & Competitive Operations Hub (`app/(tabs)/you.tsx`)
+- **Prominent Social Cards**: Elevated **Friends** and **Leaderboards** from being buried at the bottom of the system menu to a primary 2-column interactive hub positioned directly below the Operative Profile card.
+- **Friends Hub Card**: Displays real-time connected friends count badge, "Network & Invites", and opens the full `FriendsSheet` with 1 tap.
+- **Leaderboard Hub Card**: Features gold trophy accent, "Echo Rankings", and launches the `FriendsBoardModal`.
+- **Top Header Quick Actions**: Added dedicated action buttons for Friends, Leaderboard, and Settings in the top header row for instant 1-tap access.
+- **Cleaned System Protocols**: Removed redundant/buried entries from the bottom system protocols card so it only holds essential legal/setup guides.
+
+### 2. PanResponder Spring Dial Zone Selector & 2km Hard Cap (`src/ui/TacticalRangeSelector.tsx`)
 - **Native PanResponder Architecture**: Completely replaced native Android `ScrollView` with a `PanResponder` and `Animated.spring` gesture engine. Avoids Android's `disableIntervalMomentum` trap that caused intermediate drag freezing.
 - **100% Dead-Center Auto-Snapping**: On finger release anywhere between two sizes, `targetIdx` calculates `Math.round((centerPadding - projectedOffset) / ITEM_WIDTH)` and animates directly to `(windowWidth - ITEM_WIDTH)/2 - clampedIdx * ITEM_WIDTH`. Impossible to get stuck midway between numbers.
 - **Direct 1:1 Finger Tracking**: Dial tracks touch gestures with instant 120fps responsiveness and subtle over-scroll resistance at boundary limits (200m and 2000m).
