@@ -63,14 +63,14 @@ export function getBoardEmptyStateMessage(friendCount: number): {
 } {
   if (friendCount === 0) {
     return {
-      title: 'No Operative Connections',
-      subtitle: 'Add friends by exact handle or invite link to start your private friends board.',
+      title: 'No Operatives Connected',
+      subtitle: 'Add operatives by codename or share your invite link to build your tactical network.',
     };
   }
   if (friendCount < 2) {
     return {
       title: 'Squad Too Small',
-      subtitle: 'Invite two friends to start a private friends board.',
+      subtitle: 'Connect with two or more operatives to view friends on the seasonal leaderboard.',
     };
   }
   return {

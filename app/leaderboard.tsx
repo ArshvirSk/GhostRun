@@ -203,8 +203,8 @@ export default function LeaderboardScreen() {
           <Text style={[styles.emptyTitle, { color: colors.text }]}>{msg.title}</Text>
           <Text style={[styles.emptySub, { color: colors.textMuted }]}>{msg.subtitle}</Text>
           <Button
-            title="Recruit Friends"
-            variant="secondary"
+            title="Add an Operative"
+            variant="primary"
             size="md"
             onPress={() => router.push('/friends' as any)}
             style={{ marginTop: 14 }}

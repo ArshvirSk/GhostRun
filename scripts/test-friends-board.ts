@@ -43,12 +43,12 @@ console.log('  PASS: 60-minute privacy delay rule strictly verified');
 console.log('\n[2] Testing Empty State Copy Across Squad Sizes...');
 
 const zeroFriends = getBoardEmptyStateMessage(0);
-assert.strictEqual(zeroFriends.title, 'No Operative Connections');
-assert(zeroFriends.subtitle.includes('Add friends by exact handle'));
+assert.strictEqual(zeroFriends.title, 'No Operatives Connected');
+assert(zeroFriends.subtitle.includes('Add operatives by codename'));
 
 const oneFriend = getBoardEmptyStateMessage(1);
 assert.strictEqual(oneFriend.title, 'Squad Too Small');
-assert(oneFriend.subtitle.includes('Invite two friends'));
+assert(oneFriend.subtitle.includes('Connect with two or more operatives'));
 
 const fullSquadNoRounds = getBoardEmptyStateMessage(3);
 assert.strictEqual(fullSquadNoRounds.title, 'No Counted Rounds Yet');

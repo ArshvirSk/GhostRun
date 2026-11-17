@@ -76,29 +76,35 @@ BEGIN
     JOIN public.profiles pr ON pr.id = eo.user_id
     LEFT JOIN operative_rounds sub ON sub.user_id = eo.user_id
     GROUP BY eo.user_id, pr.display_name, pr.handle
+  ),
+  ranked_operatives AS (
+    SELECT
+      oa.*,
+      dense_rank() OVER (ORDER BY oa.season_echo DESC, oa.rounds_counted DESC) as rank
+    FROM operative_aggregates oa
   )
   SELECT coalesce(jsonb_agg(
     jsonb_build_object(
-      'rank', dense_rank() OVER (ORDER BY oa.season_echo DESC, oa.rounds_counted DESC),
-      'user_id', oa.user_id,
-      'display_name', oa.display_name,
-      'handle', oa.handle,
-      'season_echo', round(oa.season_echo),
+      'rank', ro.rank,
+      'user_id', ro.user_id,
+      'display_name', ro.display_name,
+      'handle', ro.handle,
+      'season_echo', round(ro.season_echo),
       'tier', CASE
-        WHEN oa.avg_best >= 85 THEN 'Revenant'
-        WHEN oa.avg_best >= 70 THEN 'Phantom'
-        WHEN oa.avg_best >= 55 THEN 'Wraith'
-        WHEN oa.avg_best >= 40 THEN 'Shade'
+        WHEN ro.avg_best >= 85 THEN 'Revenant'
+        WHEN ro.avg_best >= 70 THEN 'Phantom'
+        WHEN ro.avg_best >= 55 THEN 'Wraith'
+        WHEN ro.avg_best >= 40 THEN 'Shade'
         ELSE 'Whisper'
       END,
-      'rounds_counted', oa.rounds_counted,
-      'avg_ghost', round((oa.avg_ghost * 100)::numeric, 1),
-      'avg_cash', round((oa.avg_cash * 100)::numeric, 1),
-      'is_self', (oa.user_id = v_caller_id)
-    ) ORDER BY oa.season_echo DESC, oa.rounds_counted DESC
+      'rounds_counted', ro.rounds_counted,
+      'avg_ghost', round((ro.avg_ghost * 100)::numeric, 1),
+      'avg_cash', round((ro.avg_cash * 100)::numeric, 1),
+      'is_self', (ro.user_id = v_caller_id)
+    ) ORDER BY ro.rank ASC
   ), '[]'::jsonb)
   INTO v_board
-  FROM operative_aggregates oa;
+  FROM ranked_operatives ro;
 
   RETURN jsonb_build_object(
     'can_view', true,
