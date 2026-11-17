@@ -559,7 +559,12 @@ export default function YouTab() {
             </View>
             <View style={styles.socialHubMeta}>
               <View style={styles.socialHubTitleRow}>
-                <Text style={[styles.socialHubTitle, { color: colors.text }]}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  style={[styles.socialHubTitle, { color: colors.text }]}
+                >
                   Friends
                 </Text>
                 {friendCount > 0 && (
@@ -570,11 +575,15 @@ export default function YouTab() {
                   </View>
                 )}
               </View>
-              <Text style={[styles.socialHubSub, { color: colors.textMuted }]}>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
+                style={[styles.socialHubSub, { color: colors.textMuted }]}
+              >
                 Network & Invites
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </Pressable>
 
           {/* Leaderboard Hub Card */}
@@ -607,14 +616,23 @@ export default function YouTab() {
               <Ionicons name="trophy" size={20} color={colors.accent || '#F59E0B'} />
             </View>
             <View style={styles.socialHubMeta}>
-              <Text style={[styles.socialHubTitle, { color: colors.text }]}>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                style={[styles.socialHubTitle, { color: colors.text }]}
+              >
                 Leaderboard
               </Text>
-              <Text style={[styles.socialHubSub, { color: colors.textMuted }]}>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
+                style={[styles.socialHubSub, { color: colors.textMuted }]}
+              >
                 Echo Rankings
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </Pressable>
         </View>
 
@@ -1075,27 +1093,29 @@ const styles = StyleSheet.create({
   },
   socialHubRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     marginBottom: 20,
   },
   socialHubCard: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     borderRadius: 16,
     borderWidth: 1,
     gap: 10,
   },
   socialHubIconWrap: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   socialHubMeta: {
     flex: 1,
+    justifyContent: 'center',
   },
   socialHubTitleRow: {
     flexDirection: 'row',
@@ -1104,7 +1124,7 @@ const styles = StyleSheet.create({
   },
   socialHubTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '800',
     letterSpacing: -0.2,
   },

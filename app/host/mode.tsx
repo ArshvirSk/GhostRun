@@ -115,12 +115,29 @@ export default function HostModeScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Main Mode Selection Scroll */}
-      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: 120 }]}>
-        <Text variant="display" style={{ color: colors.text, marginTop: spacing.sm }}>
+      {/* Main Mode Selection Scroll with Generous Breathing Space */}
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.md,
+            paddingBottom: 170 + insets.bottom,
+          },
+        ]}
+      >
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs }}>
           Choose Game Mode
         </Text>
-        <Text variant="body" style={{ color: colors.textMuted, marginBottom: spacing.lg }}>
+        <Text
+          variant="body"
+          style={{
+            color: colors.textMuted,
+            marginTop: 4,
+            marginBottom: spacing.xl,
+            lineHeight: 20,
+          }}
+        >
           Select the tactical objective for this outdoor session.
         </Text>
 
@@ -131,8 +148,8 @@ export default function HostModeScreen() {
               key={m.id}
               variant={isSelected ? 'accent' : 'default'}
               style={{
-                marginBottom: spacing.md,
-                padding: spacing.md,
+                marginBottom: spacing.lg,
+                padding: spacing.lg,
                 borderColor: isSelected ? colors.accent : colors.border,
                 borderWidth: isSelected ? 2 : 1,
               }}
@@ -146,7 +163,18 @@ export default function HostModeScreen() {
                   <Text variant="title" style={{ color: colors.text }}>
                     {m.name}
                   </Text>
-                  <Text variant="label" numberOfLines={1} style={{ color: colors.accent, marginTop: 2 }}>
+                  <Text
+                    variant="label"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    style={{
+                      color: colors.accent,
+                      marginTop: 4,
+                      fontSize: 11,
+                      letterSpacing: 0.5,
+                    }}
+                  >
                     {m.idealPlayers} • {m.complexity === 'high' ? 'COMPLEX' : 'STANDARD'}
                   </Text>
                 </View>
@@ -157,7 +185,15 @@ export default function HostModeScreen() {
                 />
               </View>
 
-              <Text variant="body" style={{ color: colors.textMuted, marginTop: spacing.sm, marginBottom: spacing.md }}>
+              <Text
+                variant="body"
+                style={{
+                  color: colors.textMuted,
+                  marginTop: spacing.md,
+                  marginBottom: spacing.md,
+                  lineHeight: 20,
+                }}
+              >
                 {m.tagline}
               </Text>
 

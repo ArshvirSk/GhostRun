@@ -43,6 +43,7 @@ export default function LeaderboardScreen() {
   const [loading, setLoading] = useState(true);
   const [boardEntries, setBoardEntries] = useState<FriendsBoardEntry[]>([]);
   const [canView, setCanView] = useState(true);
+  const [enablingEcho, setEnablingEcho] = useState(false);
   const [currentSeason, setCurrentSeason] = useState('2026-11');
 
   // Head-to-Head inspection modal
@@ -61,10 +62,16 @@ export default function LeaderboardScreen() {
       setCurrentSeason(seasonToFetch);
 
       const res = await fetchFriendsBoard(seasonToFetch);
-      setCanView(res.canView);
+      // Only lock the view if explicitly refused because share_echo is turned off by user
+      if (res.reason === 'share_echo_disabled') {
+        setCanView(false);
+      } else {
+        setCanView(true);
+      }
       setBoardEntries(res.board);
     } catch {
       setBoardEntries([]);
+      setCanView(true);
     } finally {
       setLoading(false);
     }
@@ -104,13 +111,20 @@ export default function LeaderboardScreen() {
 
   const handleEnableShareEcho = async () => {
     triggerHaptic('buttonTap');
-    await updateFriendSettings({
-      allowFriendRequests: true,
-      showPresence: true,
-      shareEcho: true,
-    });
+    setEnablingEcho(true);
+    try {
+      await updateFriendSettings({
+        allowFriendRequests: true,
+        showPresence: true,
+        shareEcho: true,
+      });
+    } catch (e) {
+      console.warn('Update friend settings error:', e);
+    }
+    // Optimistically unlock view and refresh
     setCanView(true);
-    void loadBoard(activeTab);
+    await loadBoard(activeTab);
+    setEnablingEcho(false);
   };
 
   const getRankBadgeStyle = (rank: number) => {
@@ -160,9 +174,11 @@ export default function LeaderboardScreen() {
             Coordinates and locations are never shared.
           </Text>
           <Button
-            title="Enable Season Echo"
+            title={enablingEcho ? 'Enabling...' : 'Enable Season Echo'}
             variant="primary"
             size="md"
+            loading={enablingEcho}
+            disabled={enablingEcho}
             onPress={() => void handleEnableShareEcho()}
             style={{ marginTop: 14 }}
           />

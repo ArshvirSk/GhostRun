@@ -244,7 +244,7 @@ export default function ScheduleScreen() {
         {/* 2-Tab Segment Bar with Animated Slider */}
         <SegmentBar
           items={[
-            { id: 'upcoming', label: `UPCOMING (${upcomingGames.length})` },
+            { id: 'upcoming', label: upcomingGames.length > 0 ? `UPCOMING (${upcomingGames.length})` : 'UPCOMING' },
             { id: 'create', label: 'SCHEDULE NEW' },
           ]}
           activeId={activeTab}
@@ -819,19 +819,25 @@ const styles = StyleSheet.create({
   },
   modeChipsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
+    alignItems: 'center',
   },
   presetsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    justifyContent: 'space-between',
   },
   presetChip: {
+    flexGrow: 1,
+    flexBasis: '47%',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
   },
   timePreview: {

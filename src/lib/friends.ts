@@ -192,6 +192,40 @@ export async function getFriendsHosting(): Promise<HostPresence[]> {
   }
 }
 
+export async function fetchFriendSettings(): Promise<FriendSettings> {
+  const defaults: FriendSettings = {
+    allowFriendRequests: true,
+    showPresence: true,
+    shareEcho: true,
+  };
+
+  if (!supabase) return defaults;
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return defaults;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('allow_friend_requests, show_presence, share_echo')
+      .eq('id', user.id)
+      .single();
+
+    if (error || !data) return defaults;
+
+    return {
+      allowFriendRequests: data.allow_friend_requests !== false,
+      showPresence: Boolean(data.show_presence),
+      shareEcho: data.share_echo !== false,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
 export async function updateFriendSettings(
   settings: FriendSettings,
 ): Promise<{ success: boolean; error?: string }> {

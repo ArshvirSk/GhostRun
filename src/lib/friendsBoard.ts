@@ -27,7 +27,7 @@ export async function fetchFriendsBoard(
 
     if (error || !data) {
       return {
-        canView: false,
+        canView: true, // Default open so users without friends or offline aren't locked out
         reason: error?.message || 'Failed to load friends board',
         season: season || '2026-11',
         board: [],
@@ -37,8 +37,10 @@ export async function fetchFriendsBoard(
     const raw = data as Record<string, unknown>;
     const rawBoard = (raw.board as Array<Record<string, unknown>>) ?? [];
 
+    const isExplicitlyDisabled = raw.can_view === false && raw.reason === 'share_echo_disabled';
+
     return {
-      canView: Boolean(raw.can_view),
+      canView: !isExplicitlyDisabled,
       reason: raw.reason ? String(raw.reason) : undefined,
       season: String(raw.season ?? '2026-11'),
       board: rawBoard.map((item) => ({
@@ -56,7 +58,7 @@ export async function fetchFriendsBoard(
     };
   } catch (err: unknown) {
     return {
-      canView: false,
+      canView: true,
       reason: err instanceof Error ? err.message : 'Network error',
       season: season || '2026-11',
       board: [],

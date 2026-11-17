@@ -196,7 +196,7 @@ export default function SquadsScreen() {
         {/* 3-Tab Segment Bar with Animated Slider (Labels fit all screen widths cleanly) */}
         <SegmentBar
           items={[
-            { id: 'my_crews', label: `SQUADS (${crews.length})` },
+            { id: 'my_crews', label: crews.length > 0 ? `SQUADS (${crews.length})` : 'SQUADS' },
             { id: 'create', label: 'FORM SQUAD' },
             { id: 'join', label: 'JOIN' },
           ]}

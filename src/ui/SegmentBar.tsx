@@ -38,12 +38,14 @@ export function SegmentBar({
     items.findIndex((item) => item.id === currentSelected)
   );
 
-  const itemWidth = containerWidth > 8 ? (containerWidth - 8) / items.length : 0;
+  const paddingInset = 3;
+  const itemWidth =
+    containerWidth > paddingInset * 2 ? (containerWidth - paddingInset * 2) / items.length : 0;
 
   useEffect(() => {
     if (itemWidth > 0) {
       Animated.spring(slideAnim, {
-        toValue: selectedIndex * itemWidth + 4,
+        toValue: selectedIndex * itemWidth + paddingInset,
         friction: 8,
         tension: 75,
         useNativeDriver: true,
@@ -54,6 +56,18 @@ export function SegmentBar({
   const handleSelect = (id: string) => {
     onSelect?.(id);
     onChange?.(id);
+  };
+
+  const getFontSize = () => {
+    if (items.length >= 4) return 11;
+    if (items.length === 3) return 12;
+    return 13;
+  };
+
+  const getLetterSpacing = () => {
+    if (items.length >= 4) return 0.2;
+    if (items.length === 3) return 0.4;
+    return 0.8;
   };
 
   return (
@@ -104,10 +118,16 @@ export function SegmentBar({
           >
             <Text
               variant="label"
+              numberOfLines={1}
+              adjustsFontSizeToFit={true}
+              minimumFontScale={0.75}
               style={{
                 color: isSelected ? colors.accent : colors.textMuted,
                 fontWeight: isSelected ? '800' : '600',
-                letterSpacing: 0.8,
+                fontSize: getFontSize(),
+                letterSpacing: getLetterSpacing(),
+                textAlign: 'center',
+                flexShrink: 1,
               }}
             >
               {item.label}
@@ -144,16 +164,17 @@ export function SegmentBar({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    padding: 4,
+    padding: 3,
     borderWidth: 1,
     position: 'relative',
-    height: 48,
+    height: 46,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   sliderPill: {
     position: 'absolute',
-    top: 4,
-    bottom: 4,
+    top: 3,
+    bottom: 3,
     borderWidth: 1,
     elevation: 3,
     shadowColor: '#000000',
@@ -167,12 +188,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     backgroundColor: 'transparent',
   },
   badge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 1,
-    marginLeft: 6,
+    marginLeft: 4,
   },
 });

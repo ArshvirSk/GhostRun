@@ -52,7 +52,7 @@ create policy team_messages_select_team_members on public.team_messages
         and p.user_id = (select auth.uid())
         and (
           p.team::text = team_messages.team
-          or coalesce(p.role, '') = 'operator'
+          or coalesce(p.secret_role, '') = 'operator'
         )
     )
     and not exists (

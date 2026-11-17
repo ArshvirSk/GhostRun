@@ -37,6 +37,7 @@ import {
   respondFriendRequest,
   removeFriend,
   updateFriendSettings,
+  fetchFriendSettings,
 } from '../src/lib/friends';
 import { listMyBlocks, unblockUser } from '../src/lib/moderation';
 import { BlockItem } from '../src/lib/moderationCore';
@@ -74,15 +75,17 @@ export default function FriendsScreen() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [friendsList, reqs, blockList] = await Promise.all([
+      const [friendsList, reqs, blockList, currentSettings] = await Promise.all([
         listFriends(),
         listFriendRequests(),
         listMyBlocks(),
+        fetchFriendSettings(),
       ]);
       setFriends(friendsList);
       setIncomingRequests(reqs.incoming);
       setOutgoingRequests(reqs.outgoing);
       setBlocks(blockList);
+      setSettings(currentSettings);
     } catch {
       // offline fallback
     } finally {
@@ -251,7 +254,7 @@ export default function FriendsScreen() {
         {/* 4-Tab Segment Bar with Animated Slider */}
         <SegmentBar
           items={[
-            { id: 'friends', label: `FRIENDS (${friends.length})` },
+            { id: 'friends', label: friends.length > 0 ? `FRIENDS (${friends.length})` : 'FRIENDS' },
             {
               id: 'requests',
               label: incomingRequests.length > 0 ? `REQUESTS (${incomingRequests.length})` : 'REQUESTS',

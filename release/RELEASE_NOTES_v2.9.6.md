@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-17  
 **Artifact:** `release/GhostRun-v2.9.6.apk`  
-**Size:** 56,716,036 bytes (54.09 MB)  
-**SHA-256 Checksum:** `5D4D20B82127293C05057A95EE2E39C28542A17180465344DDB835811D59BD63`  
+**Size:** 56,718,276 bytes (54.09 MB)  
+**SHA-256 Checksum:** `8F2712E826E94BBD09F2210BE7B03DDBFE0D636A16EEAAC542D50A6991EB5996`  
 **Version:** `2.9.6`  
 **VersionCode:** `21`  
 **Architecture:** `arm64-v8a`  
@@ -14,6 +14,11 @@
 ## Overview
 
 GhostRun **v2.9.6** delivers high-precision spatial, competitive, and navigational refinements across core screens:
+- **Centering & No-Wrap Tab Bars (`src/ui/SegmentBar.tsx`)**: Re-engineered segmented control tabs with single-line strict enforcement, dynamic font scaling, tight padding, and centered spring pill alignment across Friends, Leaderboard, Squads, and Schedule.
+- **Social & Competitive Hub Layout (`app/(tabs)/you.tsx`)**: Fixed Friends and Leaderboard cards so "Friends" and "Leaderboard" never break words across lines; optimized spacing, padding, and vertical centering.
+- **Season Echo Default & Live Integration (`app/leaderboard.tsx` & Supabase)**: Applied all seasonal leaderboard migrations (`FL-P1` through `FL-P3`) to Supabase. Season Echo is now ON by default with live backend integration; tapping "Enable Season Echo" immediately activates scoring.
+- **Schedule Form Layout & Mode Wrapping (`app/schedule.tsx`)**: Added `flexWrap: 'wrap'` to game mode chips preventing right-edge clipping; transformed rendezvous presets into a clean 2x2 symmetric centered grid.
+- **Generous Step 1 Mode Selection Spacing (`app/host/mode.tsx`)**: Expanded bottom scroll clearance to 170+dp and card margins so the final mode card (`Jailbreak`) floats comfortably above the bottom dock with zero overlap.
 - **Dedicated Friends Screen (`/friends`)**: Full-screen horizontal swipe paging across **Operatives**, **Requests**, **Add Operative**, and **Privacy** with real-time invite sharing and presence status.
 - **Dedicated Leaderboard Screen (`/leaderboard`)**: Full-screen horizontal swipe paging across **This Season**, **Previous Season**, and **Echo Scoring Guide** with head-to-head match stats.
 - **Interactive Season 1 Banner (`app/(tabs)/play.tsx`)**: Tapping "Season 1: First Infiltration" links directly into seasonal leaderboard standings.
