@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
 import { useUserStore } from '../stores/userStore';
 import { triggerHaptic } from '../motion/haptics';
+import { TACTICAL_GOLD } from '../theme/tokens';
 
 interface CipherEventModalProps {
   visible: boolean;
@@ -64,7 +65,7 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
             {
               backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
               borderColor: colors.borderDark,
-              paddingBottom: Math.max(insets.bottom, 20) + 12,
+              paddingBottom: Math.max(insets.bottom, 16) + 10,
             },
           ]}
         >
@@ -75,8 +76,8 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
 
           <View style={styles.headerRow}>
             <View style={styles.statusTag}>
-              <View style={[styles.pulseDot, { backgroundColor: colors.accent }]} />
-              <Text style={[styles.statusTagText, { color: colors.accent }]}>
+              <View style={[styles.pulseDot, { backgroundColor: TACTICAL_GOLD.primary }]} />
+              <Text style={[styles.statusTagText, { color: TACTICAL_GOLD.primary }]}>
                 TACTICAL HUD // CLASSIFIED ACCESS
               </Text>
             </View>
@@ -100,7 +101,11 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+            style={{ flexShrink: 1 }}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Math.max(insets.bottom, 24) + 40 },
+            ]}
           >
             {/* Title & Gimmick Briefing */}
             <View style={styles.heroSection}>
@@ -108,16 +113,16 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
                 style={[
                   styles.cipherPill,
                   {
-                    borderColor: colors.accent,
-                    backgroundColor: isDark
-                      ? 'rgba(234, 179, 8, 0.12)'
-                      : 'rgba(202, 138, 4, 0.08)',
+                    borderColor: TACTICAL_GOLD.primary,
+                    backgroundColor: TACTICAL_GOLD.bgLight,
                   },
                 ]}
               >
-                <Ionicons name="radio" size={15} color={colors.accent} style={{ marginRight: 5 }} />
-                <Text style={[styles.cipherPillText, { color: colors.accent }]}>
-                  CIPHER PROTOCOL
+                <View style={styles.cpTagBoxSmall}>
+                  <Text style={styles.cpTagTextSmall}>CP</Text>
+                </View>
+                <Text style={[styles.cipherPillText, { color: TACTICAL_GOLD.primary }]}>
+                  CIPHER PROTOCOL · 14 DAYS LEFT
                 </Text>
               </View>
 
@@ -125,39 +130,41 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
                 Project Ghost Cipher
               </Text>
               <Text style={[styles.heroSubtitle, { color: colors.textMuted }]}>
-                Season 1 Founding Operative clearance. Calibrate your tactical transponder during the 14-day launch window to permanently claim custom radar camouflage and priority access to prototype combat mutators.
+                Season 1 Founding Operative clearance. Calibrate your tactical transponder during the 14-day launch window to permanently claim custom gold radar camouflage and priority access to prototype combat mutators.
               </Text>
             </View>
 
-            {/* Tactical Cyber Dossier Card (Original GhostRun ID - NOT Scram's 3 text lines) */}
+            {/* Tactical Cyber Dossier Card (Original GhostRun ID with [CP] Badge) */}
             <View
               style={[
                 styles.dossierCard,
                 {
                   backgroundColor: isDark ? 'rgba(0, 0, 0, 0.40)' : 'rgba(255, 255, 255, 0.70)',
-                  borderColor: colors.accent,
+                  borderColor: TACTICAL_GOLD.primary,
                 },
               ]}
             >
-              {/* Dossier Header */}
+              {/* Dossier Header - Zero Overflow */}
               <View style={styles.dossierHeader}>
                 <View style={styles.dossierHeaderLeft}>
-                  <Ionicons name="shield-checkmark" size={13} color={colors.accent} />
-                  <Text style={[styles.dossierOrgText, { color: colors.accent }]}>
-                    GHOSTRUN TACTICAL CORPS
+                  <Ionicons name="shield-checkmark" size={14} color={TACTICAL_GOLD.primary} />
+                  <Text style={[styles.dossierOrgText, { color: TACTICAL_GOLD.primary }]}>
+                    GHOSTRUN CORPS
                   </Text>
                 </View>
+
+                {/* Tactical 2-Letter Gold [CP] Badge */}
                 <View
                   style={[
-                    styles.dossierClearanceBadge,
+                    styles.cpTagBox,
                     {
-                      borderColor: colors.accent,
-                      backgroundColor: isDark ? 'rgba(234, 179, 8, 0.18)' : 'rgba(202, 138, 4, 0.12)',
+                      borderColor: TACTICAL_GOLD.primary,
+                      backgroundColor: TACTICAL_GOLD.bgMedium,
                     },
                   ]}
                 >
-                  <Text style={[styles.dossierClearanceText, { color: colors.accent }]}>
-                    CIPHER-01
+                  <Text style={[styles.cpTagText, { color: TACTICAL_GOLD.primary }]}>
+                    CP
                   </Text>
                 </View>
               </View>
@@ -166,7 +173,7 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
               <View style={styles.dossierIdentityRow}>
                 <View style={[styles.operativeAvatar, { backgroundColor: signatureColor }]}>
                   <Text style={styles.operativeAvatarText}>{initial}</Text>
-                  <View style={[styles.avatarStatusRing, { borderColor: colors.accent }]} />
+                  <View style={[styles.avatarStatusRing, { borderColor: TACTICAL_GOLD.primary }]} />
                 </View>
 
                 <View style={styles.operativeDetails}>
@@ -174,47 +181,50 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
                     <Text style={[styles.dossierCodename, { color: colors.text }]} numberOfLines={1}>
                       @{displayName.toUpperCase()}
                     </Text>
+                    {/* Inline [CP] Tag */}
                     <View
                       style={[
-                        styles.inlineCipherBadge,
-                        { borderColor: colors.accent, backgroundColor: 'rgba(234, 179, 8, 0.15)' },
+                        styles.inlineCpBadge,
+                        {
+                          borderColor: TACTICAL_GOLD.primary,
+                          backgroundColor: TACTICAL_GOLD.bgMedium,
+                        },
                       ]}
                     >
-                      <Ionicons name="radio" size={9} color={colors.accent} style={{ marginRight: 3 }} />
-                      <Text style={[styles.inlineCipherBadgeText, { color: colors.accent }]}>
-                        CIPHER
+                      <Text style={[styles.inlineCpBadgeText, { color: TACTICAL_GOLD.primary }]}>
+                        CP
                       </Text>
                     </View>
                   </View>
 
                   <Text style={[styles.dossierSerial, { color: colors.textMuted }]}>
-                    SERIAL: GR-OP-{serialNumber} · FOUNDING OPERATIVE
+                    SERIAL: GR-OP-{serialNumber} · FOUNDING CIPHER
                   </Text>
                 </View>
               </View>
 
-              {/* Live Radar Scope Simulation Graphic (Direct Gameplay Tie-In) */}
+              {/* Truly Golden Radar Scope Simulation Graphic */}
               <View
                 style={[
                   styles.radarScopeBox,
                   {
                     backgroundColor: isDark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(0, 0, 0, 0.05)',
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.08)',
+                    borderColor: 'rgba(245, 158, 11, 0.25)',
                   },
                 ]}
               >
                 <View style={styles.radarVisualRow}>
-                  {/* Concentric Radar Wave Graphic */}
+                  {/* Concentric Golden Radar Wave Graphic */}
                   <View style={styles.radarWavesContainer}>
-                    <View style={[styles.radarCircleOuter, { borderColor: colors.accent }]} />
-                    <View style={[styles.radarCircleMid, { borderColor: colors.accent }]} />
-                    <View style={[styles.radarCenterBlip, { backgroundColor: colors.accent }]} />
+                    <View style={[styles.radarCircleOuter, { borderColor: TACTICAL_GOLD.glow }]} />
+                    <View style={[styles.radarCircleMid, { borderColor: TACTICAL_GOLD.primary }]} />
+                    <View style={[styles.radarCenterBlip, { backgroundColor: TACTICAL_GOLD.glow }]} />
                   </View>
 
                   <View style={styles.radarDetailsCol}>
                     <View style={styles.radarStatusLine}>
-                      <View style={[styles.pulseDot, { backgroundColor: colors.accent }]} />
-                      <Text style={[styles.radarStatusTitle, { color: colors.text }]}>
+                      <View style={[styles.pulseDot, { backgroundColor: TACTICAL_GOLD.glow }]} />
+                      <Text style={[styles.radarStatusTitle, { color: TACTICAL_GOLD.glow }]}>
                         Gold Radar Pulse Waveform
                       </Text>
                     </View>
@@ -232,25 +242,25 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
                 CLEARANCES INCLUDED WITH CIPHER TRANSPONDER
               </Text>
 
-              {/* Perk 1: Radar Signature */}
+              {/* Perk 1: Gold Radar Signature */}
               <View style={styles.perkCard}>
                 <View
                   style={[
                     styles.perkIconBox,
                     {
-                      borderColor: colors.accent,
-                      backgroundColor: isDark ? 'rgba(234, 179, 8, 0.12)' : 'rgba(202, 138, 4, 0.08)',
+                      borderColor: TACTICAL_GOLD.primary,
+                      backgroundColor: TACTICAL_GOLD.bgLight,
                     },
                   ]}
                 >
-                  <Ionicons name="radio-outline" size={18} color={colors.accent} />
+                  <Ionicons name="radio-outline" size={18} color={TACTICAL_GOLD.primary} />
                 </View>
                 <View style={styles.perkTextCol}>
                   <Text style={[styles.perkTitle, { color: colors.text }]}>
-                    Tactical Radar Signature
+                    Gold Tactical Radar Pulse
                   </Text>
                   <Text style={[styles.perkDescription, { color: colors.textMuted }]}>
-                    Your position pulses with an exclusive translucent gold ripple on live hunter and runner field maps.
+                    Your location pulses with an exclusive translucent gold ripple on live hunter and runner field maps.
                   </Text>
                 </View>
               </View>
@@ -261,12 +271,12 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
                   style={[
                     styles.perkIconBox,
                     {
-                      borderColor: colors.accent,
-                      backgroundColor: isDark ? 'rgba(234, 179, 8, 0.12)' : 'rgba(202, 138, 4, 0.08)',
+                      borderColor: TACTICAL_GOLD.primary,
+                      backgroundColor: TACTICAL_GOLD.bgLight,
                     },
                   ]}
                 >
-                  <Ionicons name="hardware-chip-outline" size={18} color={colors.accent} />
+                  <Ionicons name="hardware-chip-outline" size={18} color={TACTICAL_GOLD.primary} />
                 </View>
                 <View style={styles.perkTextCol}>
                   <Text style={[styles.perkTitle, { color: colors.text }]}>
@@ -284,12 +294,12 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
                   style={[
                     styles.perkIconBox,
                     {
-                      borderColor: colors.accent,
-                      backgroundColor: isDark ? 'rgba(234, 179, 8, 0.12)' : 'rgba(202, 138, 4, 0.08)',
+                      borderColor: TACTICAL_GOLD.primary,
+                      backgroundColor: TACTICAL_GOLD.bgLight,
                     },
                   ]}
                 >
-                  <Ionicons name="globe-outline" size={18} color={colors.accent} />
+                  <Ionicons name="globe-outline" size={18} color={TACTICAL_GOLD.primary} />
                 </View>
                 <View style={styles.perkTextCol}>
                   <Text style={[styles.perkTitle, { color: colors.text }]}>
@@ -309,14 +319,14 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
                   style={[
                     styles.activatedButton,
                     {
-                      borderColor: colors.accent,
-                      backgroundColor: isDark ? 'rgba(234, 179, 8, 0.15)' : 'rgba(202, 138, 4, 0.10)',
+                      borderColor: TACTICAL_GOLD.primary,
+                      backgroundColor: TACTICAL_GOLD.bgMedium,
                     },
                   ]}
                 >
-                  <Ionicons name="checkmark-circle" size={18} color={colors.accent} style={{ marginRight: 6 }} />
-                  <Text style={[styles.activatedButtonText, { color: colors.accent }]}>
-                    CIPHER CLEARANCE ACTIVE
+                  <Ionicons name="checkmark-circle" size={18} color={TACTICAL_GOLD.primary} style={{ marginRight: 6 }} />
+                  <Text style={[styles.activatedButtonText, { color: TACTICAL_GOLD.primary }]}>
+                    CP CLEARANCE ACTIVE
                   </Text>
                 </View>
               ) : (
@@ -328,7 +338,7 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
                   style={({ pressed }) => [
                     styles.primaryButton,
                     {
-                      backgroundColor: colors.accent,
+                      backgroundColor: TACTICAL_GOLD.primary,
                       opacity: activating ? 0.7 : pressed ? 0.92 : 1,
                       transform: [{ scale: pressed ? 0.985 : 1 }],
                     },
@@ -343,7 +353,7 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
 
               <Text style={[styles.finePrint, { color: colors.textMuted }]}>
                 {isCipher
-                  ? 'Transponder calibrated. [CIPHER] insignia active on your tactical dossier.'
+                  ? 'Transponder calibrated. [CP] tag active on your tactical profile.'
                   : 'Season 1 Operative window · One-time calibration · Free launch clearance'}
               </Text>
             </View>
@@ -357,11 +367,11 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    maxHeight: '92%',
+    maxHeight: '90%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderTopWidth: 1,
@@ -384,7 +394,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   statusTag: {
     flexDirection: 'row',
@@ -412,30 +422,46 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingTop: 4,
   },
   heroSection: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   cipherPill: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    gap: 8,
+    marginBottom: 10,
+  },
+  cpTagBoxSmall: {
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    backgroundColor: 'rgba(245, 158, 11, 0.20)',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  cpTagTextSmall: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#F59E0B',
+    letterSpacing: 0.5,
   },
   cipherPillText: {
-    fontFamily: 'Archivo-Black',
-    fontSize: 11,
+    fontFamily: 'Archivo-Bold',
+    fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
   },
   heroTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: '900',
     textAlign: 'center',
     letterSpacing: -0.4,
@@ -444,15 +470,15 @@ const styles = StyleSheet.create({
   heroSubtitle: {
     fontFamily: 'SegoeUI-Regular',
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 18,
     textAlign: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
   },
   dossierCard: {
     borderRadius: 18,
     borderWidth: 1.5,
     padding: 16,
-    marginBottom: 22,
+    marginBottom: 20,
   },
   dossierHeader: {
     flexDirection: 'row',
@@ -467,22 +493,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flex: 1,
   },
   dossierOrgText: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.1,
   },
-  dossierClearanceBadge: {
-    borderWidth: 1,
+  cpTagBox: {
+    borderWidth: 1.5,
     borderRadius: 6,
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  dossierClearanceText: {
+  cpTagText: {
     fontFamily: 'Archivo-Black',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.8,
   },
@@ -528,15 +557,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  inlineCipherBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
+  inlineCpBadge: {
+    borderWidth: 1.5,
     borderRadius: 5,
     paddingHorizontal: 5,
-    paddingVertical: 1.5,
+    paddingVertical: 1,
   },
-  inlineCipherBadgeText: {
+  inlineCpBadgeText: {
     fontFamily: 'Archivo-Black',
     fontSize: 9,
     fontWeight: '900',
@@ -595,9 +622,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   radarStatusTitle: {
-    fontFamily: 'Archivo-SemiBold',
+    fontFamily: 'Archivo-Bold',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   radarStatusSub: {
     fontFamily: 'SegoeUI-Regular',
@@ -605,7 +632,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   perksContainer: {
-    marginBottom: 22,
+    marginBottom: 20,
   },
   perksHeader: {
     fontFamily: 'Archivo-SemiBold',
@@ -618,7 +645,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   perkIconBox: {
     width: 36,
@@ -641,7 +668,7 @@ const styles = StyleSheet.create({
   perkDescription: {
     fontFamily: 'SegoeUI-Regular',
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 16,
   },
   actionContainer: {
     alignItems: 'center',
@@ -651,7 +678,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderRadius: 14,
     marginBottom: 10,
   },

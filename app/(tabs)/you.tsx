@@ -24,6 +24,7 @@ import { SeasonRecapModal } from '../../src/components/SeasonRecapModal';
 import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
 import { useUserStore } from '../../src/stores/userStore';
 import { listFriends } from '../../src/lib/friends';
+import { TACTICAL_GOLD } from '../../src/theme/tokens';
 
 interface MatchHistoryItem {
   id: string;
@@ -395,21 +396,8 @@ export function YouContent() {
                   @{displayName.toUpperCase()}
                 </Text>
                 {Boolean(profile?.is_cipher || profile?.is_vanguard) && (
-                  <View
-                    style={[
-                      styles.cipherBadgePill,
-                      {
-                        borderColor: colors.accent,
-                        backgroundColor: isDark
-                          ? 'rgba(234, 179, 8, 0.16)'
-                          : 'rgba(202, 138, 4, 0.10)',
-                      },
-                    ]}
-                  >
-                    <Ionicons name="radio" size={10} color={colors.accent} style={{ marginRight: 3 }} />
-                    <Text style={[styles.cipherBadgePillText, { color: colors.accent }]}>
-                      CIPHER
-                    </Text>
+                  <View style={styles.cpBadgePill}>
+                    <Text style={styles.cpBadgePillText}>CP</Text>
                   </View>
                 )}
               </View>
@@ -1226,20 +1214,23 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 2,
   },
-  cipherBadgePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
+  cpBadgePill: {
+    borderWidth: 1.5,
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
+    borderColor: TACTICAL_GOLD.primary,
+    backgroundColor: TACTICAL_GOLD.bgMedium,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 2,
   },
-  cipherBadgePillText: {
+  cpBadgePillText: {
     fontFamily: 'Archivo-Black',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
+    color: TACTICAL_GOLD.primary,
   },
   rankText: {
     fontFamily: 'SegoeUI-SemiBold',

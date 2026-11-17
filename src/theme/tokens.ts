@@ -257,6 +257,16 @@ export const typography = {
   },
 } as const;
 
+export const TACTICAL_GOLD = {
+  primary: '#F59E0B',
+  glow: '#FBBF24',
+  light: '#FEF3C7',
+  bgLight: 'rgba(245, 158, 11, 0.12)',
+  bgMedium: 'rgba(245, 158, 11, 0.18)',
+  border: '#F59E0B',
+  borderGlow: 'rgba(245, 158, 11, 0.40)',
+} as const;
+
 export const tokens = {
   colors: darkColors as unknown as ColorTokens,
   spacing,

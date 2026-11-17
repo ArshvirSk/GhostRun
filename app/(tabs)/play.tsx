@@ -22,6 +22,7 @@ import { HostPresence } from '../../src/lib/friendsCore';
 import { useUserStore } from '../../src/stores/userStore';
 import { startLocationPrewarm } from '../../src/lib/locationCache';
 import { CipherEventModal } from '../../src/components/CipherEventModal';
+import { TACTICAL_GOLD } from '../../src/theme/tokens';
 
 const GHOSTRUN_MARK_MINT = require('../../assets/ghostrun-mark-mint.png');
 const GHOSTRUN_MARK_OLIVE = require('../../assets/ghostrun-mark-olive.png');
@@ -319,7 +320,7 @@ export function PlayContent() {
           </View>
         )}
 
-        {/* Tactical Cipher Protocol Event Card (No redundant title row to avoid overflow) */}
+        {/* Tactical Cipher Protocol Event Card with Iconic [CP] Tag */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Cipher Protocol Launch Event"
@@ -337,47 +338,32 @@ export function PlayContent() {
           ]}
         >
           <View style={styles.cipherCardInner}>
+            {/* Iconic 2-Letter Gold [CP] Tag (like Scram's OG, but Cipher Protocol) */}
             <View
               style={[
-                styles.cipherIconBox,
+                styles.cpTagBox,
                 {
-                  borderColor: colors.accent,
-                  backgroundColor: isDark
-                    ? 'rgba(234, 179, 8, 0.12)'
-                    : 'rgba(202, 138, 4, 0.08)',
+                  borderColor: TACTICAL_GOLD.primary,
+                  backgroundColor: TACTICAL_GOLD.bgMedium,
                 },
               ]}
             >
-              <Ionicons name="radio" size={18} color={colors.accent} />
-            </View>
-
-            <View style={styles.cipherTextCol}>
-              <View style={styles.cipherHeadingRow}>
-                <Text style={[styles.cipherTitleText, { color: colors.text }]}>
-                  CIPHER PROTOCOL
-                </Text>
-                <View
-                  style={[
-                    styles.cipherDaysPill,
-                    {
-                      borderColor: colors.accent,
-                      backgroundColor: isDark
-                        ? 'rgba(234, 179, 8, 0.16)'
-                        : 'rgba(202, 138, 4, 0.10)',
-                    },
-                  ]}
-                >
-                  <Text style={[styles.cipherDaysPillText, { color: colors.accent }]}>
-                    14 DAYS LEFT
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={[styles.cipherSubText, { color: colors.textMuted }]} numberOfLines={1}>
-                Classified radar signature & prototype mutator access
+              <Text style={[styles.cpTagText, { color: TACTICAL_GOLD.primary }]}>
+                CP
               </Text>
             </View>
 
+            {/* Clean Middle Column - No colliding chips, No overflow */}
+            <View style={styles.cipherTextCol}>
+              <Text style={[styles.cipherTitleText, { color: colors.text }]} numberOfLines={1}>
+                CIPHER PROTOCOL
+              </Text>
+              <Text style={[styles.cipherSubText, { color: colors.textMuted }]} numberOfLines={1}>
+                Classified gold radar pulse · 14 days left
+              </Text>
+            </View>
+
+            {/* Trailing Navigation Chevron */}
             <Ionicons
               name="chevron-forward"
               size={18}
@@ -620,50 +606,41 @@ const styles = StyleSheet.create({
   },
   cipherCard: {
     borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderWidth: 1,
     marginBottom: 24,
   },
   cipherCardInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
-  cipherIconBox: {
-    width: 36,
-    height: 36,
+  cpTagBox: {
+    width: 38,
+    height: 38,
     borderRadius: 10,
-    borderWidth: 1,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+  },
+  cpTagText: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.6,
   },
   cipherTextCol: {
     flex: 1,
-  },
-  cipherHeadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 3,
+    justifyContent: 'center',
   },
   cipherTitleText: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '800',
-    letterSpacing: 0.6,
-  },
-  cipherDaysPill: {
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-  },
-  cipherDaysPillText: {
-    fontFamily: 'Archivo-Black',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   cipherSubText: {
     fontFamily: 'SegoeUI-Regular',
