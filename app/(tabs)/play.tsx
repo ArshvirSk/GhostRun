@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   RefreshControl,
   Image,
   Text,
+  PanResponder,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -145,8 +146,25 @@ export default function PlayScreen() {
 
   const formattedName = displayName.endsWith('.') ? displayName : `${displayName}.`;
 
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return (
+          gestureState.dx < -30 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
+        );
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -50) {
+          triggerHaptic('buttonTap');
+          router.navigate('/modes' as any);
+        }
+      },
+    })
+  ).current;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]} {...panResponder.panHandlers}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       <ScrollView

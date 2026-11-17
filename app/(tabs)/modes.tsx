@@ -6,6 +6,7 @@ import {
   useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  PanResponder,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -95,8 +96,41 @@ export default function ModesTab() {
     }
   };
 
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // If on MODES and swiping right towards Play:
+        if (
+          activeTab === 'modes' &&
+          gestureState.dx > 35 &&
+          gestureState.dx > Math.abs(gestureState.dy) * 1.5
+        ) {
+          return true;
+        }
+        // If on MODIFIERS and swiping left towards You:
+        if (
+          activeTab === 'modifiers' &&
+          gestureState.dx < -35 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5
+        ) {
+          return true;
+        }
+        return false;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (activeTab === 'modes' && gestureState.dx > 50) {
+          triggerHaptic('buttonTap');
+          router.navigate('/play' as any);
+        } else if (activeTab === 'modifiers' && gestureState.dx < -50) {
+          triggerHaptic('buttonTap');
+          router.navigate('/you' as any);
+        }
+      },
+    })
+  ).current;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]} {...panResponder.panHandlers}>
       {/* Sticky Top Header */}
       <View
         style={[
