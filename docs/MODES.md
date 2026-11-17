@@ -55,6 +55,7 @@ A game is: **one base mode + zero or more role add-ons + zero or more modifiers*
 | 16  | Campus / Tournament Edition     | Collaboration                                           | 16+                   | L      | Web dashboard, brackets                               | Med         |
 | 17  | Streamer Mode (audience twists) | Collaboration                                           | any                   | M      | Delayed spectator feed, votes                         | Med         |
 | 18  | Community Rule Packs            | Platform                                                | any                   | M–L    | Mode definition schema                                | Med         |
+| 19  | PINPOINT (IRL OpenGuessr) [v3.0]| Base mode                                               | 2 / 4–16+             | M      | Photo submission RPC, onion-skin overlay, 5000-pt scoring | Low     |
 
 ---
 
@@ -524,6 +525,33 @@ create table heat_presses (
   - Bottom sheet includes a dedicated 7-sector status card displaying controller badge, contender status, and coordinates for every sector.
   - Post-game Result screen displays winner badges ("Runners Claim Dominance!", "Hunters Win by Points!") and a detailed Territory Pulse Debrief card with sector metrics.
 - **Verification:** Acceptance verified through end-to-end simulator harness `scripts/sim/index.ts territory-pulse` testing sector spawning, neutral capture, pulse scoring, contest tagging incapacitation, exclusion of incapacitated runners from majority, and multi-pulse territory flips.
+
+---
+
+### 4.7 Outbreak Horde Mode (PvP Swarm Tag) [v3.0]
+
+**Pitch.** Pure physical human-vs-human infection tag. Starts with 1 Patient Zero against $N-1$ Survivors. Tagged survivors flip to the swarm. Survivors burn ticking health-as-time to buy tactical stealth abilities (Cloak, Cloak+, Haste) and replenish life at dynamic, shrinking, and drifting Antidote zones. See full spec: [`docs/specs/HORDE_OUTBREAK_MODE_SPEC.md`](specs/HORDE_OUTBREAK_MODE_SPEC.md).
+
+---
+
+### 4.8 PINPOINT ("IRL OpenGuessr") [v3.0]
+
+**Pitch.** Real-world geolocation scavenger hunt deduction mode. Teams (Duos, Trios, Squads, or Solo FFA) explore an arena up to **750m in radius**, deduce the physical location of a target photograph taken within the bounds, match the perspective using an onion-skin camera overlay, and capture their shot for up to **5,000 points**. See full spec: [`docs/specs/PINPOINT_MODE_SPEC.md`](specs/PINPOINT_MODE_SPEC.md).
+
+**Rules & Architecture:**
+- **Max Radius:** Up to 750 meters ($\sim 1.77\text{ km}^2$).
+- **3 Photo Sourcing Methods:**
+  1. *Method A (Scout & Swap):* Turn-based peer scouting where teams snap target photos for each other.
+  2. *Method B (Host Pre-Drop):* Room host prepares 3–5 tagged photos before the match; all teams race on the same targets simultaneously.
+  3. *Method C (Map POI Auto-Drop):* OpenStreetMap/MapLibre POI features (monuments, gazebos, fountains, bridges) automatically queried with satellite/vector clues.
+- **Progressive Clue Engine:**
+  - $T+0:00$: Pure sight ($1.0\times$ multiplier).
+  - $T+0:45$: Clue 1 — Hot & Cold acoustic sonar pulses via loudspeaker (`src/modes/hot_cold.ts`) and edge aura ($0.9\times$ multiplier).
+  - $T+1:30$: Clue 2 — Sector triangulation & 250m ring shrink ($0.8\times$ multiplier).
+  - $T+2:15$: Clue 3 — Compass heading vector / azimuth needle ($0.7\times$ multiplier).
+- **Viewfinder:** `expo-camera` with semi-transparent target onion-skin overlay and opacity slider (0–100%).
+- **5,000 Points Scoring Matrix:** Proximity (0–4000 pts) + Heading alignment (0–500 pts) + Speed bonus (0–500 pts) $\times$ Clue multiplier.
+- **Data Model:** `pinpoint_games`, `pinpoint_rounds`, `pinpoint_submissions`, and server-authoritative PostGIS `submit_pinpoint_shot` RPC.
 
 ---
 

@@ -22,17 +22,17 @@ GhostRun has progressed from its early architecture through **v2.9.0**, achievin
 ## 2. Core Candidate Pillars
 
 ```
-                     ┌───────────────────────────────────┐
-                     │     GhostRun v3.0 Flagship        │
-                     └─────────────────┬─────────────────┘
-                                       │
-        ┌──────────────────┬───────────┼───────────┬──────────────────┐
-        ▼                  ▼           ▼           ▼                  ▼
-┌───────────────┐  ┌───────────────┐ ┌───────────┐ ┌───────────────┐ ┌───────────────┐
-│  Pillar 1     │  │  Pillar 2     │ │ Pillar 3  │ │  Pillar 4     │ │  Pillar 5     │
-│  Multi-Floor  │  │  Tactical     │ │ Flagship  │ │  Post-Match   │ │  Outdoor      │
-│  Indoor 3D    │  │  Audio Engine │ │ Horde     │ │  Telemetry    │ │  Resilience   │
-└───────────────┘  └───────────────┘ └───────────┘ └───────────────┘ └───────────────┘
+                                 ┌───────────────────────────────────┐
+                                 │     GhostRun v3.0 Flagship        │
+                                 └─────────────────┬─────────────────┘
+                                                   │
+        ┌───────────────┬──────────────┬───────────┴──────────┬──────────────┬───────────────┐
+        ▼               ▼              ▼                      ▼              ▼               ▼
+┌───────────────┐┌───────────────┐┌───────────┐       ┌───────────────┐┌───────────────┐┌───────────────┐
+│  Pillar 1     ││  Pillar 2     ││ Pillar 3  │       │  Pillar 4     ││  Pillar 5     ││  Pillar 6     │
+│  Multi-Floor  ││  Tactical     ││ Flagship  │       │  Post-Match   ││  Outdoor      ││  PINPOINT     │
+│  Indoor 3D    ││  Audio Engine ││ Horde     │       │  Telemetry    ││  Resilience   ││  IRL Guessr   │
+└───────────────┘└───────────────┘└───────────┘       └───────────────┘└───────────────┘└───────────────┘
 ```
 
 ---
@@ -220,6 +220,47 @@ Real-world playtests reveal two major field vulnerabilities: battery drain and t
 
 ---
 
+### Pillar 6: Competitive IRL Scavenger Hunt — PINPOINT ("IRL OpenGuessr")
+
+Brings the viral deduction gameplay of **OpenGuessr / GeoGuessr** into the physical park and urban space. Instead of chasing or fleeing, teams (2v2, 3v3, 4v4, Multi-Team, or Solo FFA) explore an arena up to **750m in radius** (~1.77 $\text{km}^2$), analyzing a target photo taken within the boundary to race, deduce its location, align the shot via an onion-skin viewfinder, and submit their capture for up to **5,000 points**.
+
+```mermaid
+flowchart LR
+    Target["Target Photo Latched"] --> Clues["Progressive Clues (Hot/Cold Sonar -> Sector Triangulation -> Bearing)"]
+    Clues --> Viewfinder["Onion-Skin Viewfinder Overlay (expo-camera)"]
+    Viewfinder --> Scoring["5,000 Pts Matrix: Proximity (4000) + Heading (500) + Speed (500)"]
+```
+
+#### 1. Core Mechanics & Arena Limits
+- **Arena Radius:** Configurable up to **750 meters** max ($1,500\text{m}$ diameter). Out-of-bounds submissions are rejected by server-side PostGIS.
+- **Team Formats:** Duos (2v2), Trios (3v3), Squads (4v4), Multi-team (4 teams of 2), or Solo Free-For-All (FFA).
+- **Match Duration:** 3 to 5 rounds of 2:00 to 5:00 minutes each.
+
+#### 2. The 3 Photo Sourcing Methods
+PINPOINT supports three flexible sourcing pipelines:
+1. **Method A: Scout & Swap (Turn-Based Peer Scouting):** Teams split up for 2 minutes to secretly snap deceptive landmark photos for each other, then swap targets and race to find them.
+2. **Method B: Host Pre-Drop (Curated Event Mode):** The room host walks or selects 3–5 tagged photos before match start; all teams compete on the exact same targets simultaneously.
+3. **Method C: Map POI Auto-Drop (Autonomous OSM / MapLibre Engine):** OpenStreetMap points of interest (fountains, monuments, gazebos, pavilions, footbridges) are automatically retrieved within the 750m boundary with aerial/vector thumbnail clues for instant zero-prep play.
+
+#### 3. Progressive Clue Engine & Dynamic Hints
+To prevent stalled gameplay in large 750m zones, hints unlock automatically over time:
+- **T+0:00 – T+0:45 (Pure Sight):** Target photo only; $1.0\times$ score multiplier.
+- **T+0:45 (Clue 1 — Hot & Cold Radar):** Acoustic sonar pulse via phone loudspeaker (`src/modes/hot_cold.ts`) and screen edge heat aura ($0.9\times$ multiplier).
+- **T+1:30 (Clue 2 — Sector Triangulation):** Highlights target quadrant or shrinks radar search ring to 250m ($0.8\times$ multiplier).
+- **T+2:15 (Clue 3 — Heading Vector):** Compass azimuth arrow pointing straight at target ($0.7\times$ multiplier).
+
+#### 4. Viewfinder & Camera Alignment
+- **Onion-Skin Target Ghost:** Live camera feed (`expo-camera`) with semi-transparent target photo overlay and interactive opacity slider (0% to 100%).
+- **Instant Sensor Latch:** Tapping `[ PINPOINT SHOT ]` immediately captures high-res JPEG, GPS coordinates, compass heading degrees, and timestamp.
+
+#### 5. OpenGuessr 5,000 Points Scoring Matrix
+- **GPS Proximity (0 to 4,000 pts):** Exponential decay $4000 \cdot e^{-\Delta d / k}$ (Bullseye $\le 3\text{m} = 4000\text{ pts}$).
+- **Heading Alignment (0 to 500 pts):** Cosine orientation delta $500 \cdot \max(0, \cos(\Delta \theta))$ (within $10^\circ = 500\text{ pts}$).
+- **Speed Bonus (0 to 500 pts):** Remaining round time bonus.
+- **Detailed Specification:** See companion document [docs/specs/PINPOINT_MODE_SPEC.md](file:///c:/ASK_Main/ASK/Projects/GhostRun/docs/specs/PINPOINT_MODE_SPEC.md).
+
+---
+
 ## 3. Candidate Comparison & Trade-Off Matrix
 
 | Candidate Feature | Core Experience Impact | Dev Effort | Battery / Perf Impact | Viral / Social Value |
@@ -227,6 +268,7 @@ Real-world playtests reveal two major field vulnerabilities: battery drain and t
 | **Multi-Floor / Indoor 3D Tactical Stealth** | ⭐⭐⭐⭐⭐ (5/5) | Medium | Light sensor load (Barometer) | ⭐⭐⭐⭐⭐ (5/5) |
 | **Tactical Audio Engine & Proximity SFX** | ⭐⭐⭐⭐⭐ (5/5) | Low–Med | Negligible (Audio efficient) | ⭐⭐⭐⭐ (4/5) |
 | **Horde Mode (Infection Tag)** | ⭐⭐⭐⭐⭐ (5/5) | Medium | None | ⭐⭐⭐⭐⭐ (5/5) |
+| **PINPOINT Mode (IRL OpenGuessr)** | ⭐⭐⭐⭐⭐ (5/5) | Medium | Light (Camera + GPS) | ⭐⭐⭐⭐⭐ (5/5) |
 | **Animated Replay & Story Card Export** | ⭐⭐⭐⭐ (4/5) | Medium | Client-side export only | ⭐⭐⭐⭐⭐ (5/5) |
 | **Adaptive Battery Guard (GPS Gating)** | ⭐⭐⭐⭐ (4/5) | Low–Med | **+40% Battery Life** | ⭐⭐ (2/5) |
 | **Direct Crew Push Dispatch** | ⭐⭐⭐ (3/5) | Low | None | ⭐⭐⭐ (3/5) |
@@ -241,6 +283,7 @@ Real-world playtests reveal two major field vulnerabilities: battery drain and t
 1. **Multi-Floor & Indoor 3D Tactical Stealth:** Calibrated barometer delta, floor hysteresis, Step 4 3D building prism selector, and QR drift protection.
 2. **Tactical Audio & Proximity Heartbeat:** Screen-off earbud stealth with floor-pitch harmonic cues.
 3. **Horde Mode (Infection Tag):** Multi-story swarm tag across campus buildings and parks.
+4. **PINPOINT Mode (IRL OpenGuessr):** Up to 750m zone photo-matching deduction hunt with progressive clues.
 
 ---
 
@@ -248,7 +291,8 @@ Real-world playtests reveal two major field vulnerabilities: battery drain and t
 > *Focus: Sensory immersion & post-match virality.*
 1. **Tactical Audio Engine**: Sonar chirps, countdown sirens, and escalating proximity heartbeat.
 2. **Horde Mode (Infection)**: Dynamic Hunter conversion for massive outdoor group chases.
-3. **Animated 2D Telemetry Replay & Story Card Export**: Post-match chase playback and Instagram story export.
+3. **PINPOINT Mode (IRL OpenGuessr)**: Turn-based Scout & Swap photo hunt for park meetups.
+4. **Animated 2D Telemetry Replay & Story Card Export**: Post-match chase playback and Instagram story export.
 
 ---
 
@@ -257,5 +301,6 @@ Real-world playtests reveal two major field vulnerabilities: battery drain and t
 1. **Multi-Floor & Indoor 3D Stealth** (Barometer $\Delta P$, 3D building extrusion, floor pills).
 2. **Tactical Audio & Proximity Heartbeat Engine** (Screen-off earbud stealth).
 3. **Horde Mode (Infection)** (The ultimate party tag mode).
-4. **Animated 2D Telemetry Replay & Story Export** (Post-game glory).
-5. **Adaptive Battery Guard & Dead-Zone Buffering** (Rock-solid real-world reliability).
+4. **PINPOINT Mode (IRL OpenGuessr)** (750m zone, 3 sourcing methods, onion-skin camera, 5000-pt scoring).
+5. **Animated 2D Telemetry Replay & Story Export** (Post-game glory).
+6. **Adaptive Battery Guard & Dead-Zone Buffering** (Rock-solid real-world reliability).
