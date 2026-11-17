@@ -200,6 +200,8 @@ export default function JoinGameScreen() {
     }
   }
 
+  const logoColor = isDark ? '#FFFFFF' : '#000000';
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -210,7 +212,7 @@ export default function JoinGameScreen() {
           styles.content,
           {
             paddingHorizontal: spacing.lg,
-            paddingTop: Math.max(insets.top, 16) + 10,
+            paddingTop: Math.max(insets.top, 16) + 8,
             paddingBottom: Math.max(insets.bottom, 16) + 24,
           },
         ]}
@@ -234,41 +236,16 @@ export default function JoinGameScreen() {
           <View style={styles.brandRow}>
             <Image
               source={isDark ? GHOSTRUN_MARK_MINT : GHOSTRUN_MARK_OLIVE}
-              style={styles.logoMark}
+              style={[styles.logoMark, { tintColor: logoColor }]}
               resizeMode="contain"
               accessibilityLabel="GhostRun Mark"
             />
-            <Text style={[styles.brandText, { color: colors.text }]}>
-              GHOST<Text style={{ color: colors.primary }}>RUN</Text>
-            </Text>
-            <View
-              style={[
-                styles.versionPill,
-                { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark },
-              ]}
-            >
-              <Text style={[styles.versionText, { color: colors.primary }]}>v2.9.9</Text>
-            </View>
+            <Text style={[styles.brandText, { color: logoColor }]}>GHOSTRUN</Text>
           </View>
         </View>
 
         {/* Hero Section */}
         <View style={styles.heroSection}>
-          <View
-            style={[
-              styles.tacticalBadge,
-              {
-                backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.2)',
-                borderColor: colors.primary,
-              },
-            ]}
-          >
-            <View style={[styles.pulsingDot, { backgroundColor: colors.primary }]} />
-            <Text style={[styles.tacticalBadgeText, { color: colors.primary }]}>
-              SQUAD INFILTRATION
-            </Text>
-          </View>
-
           <Text variant="display" style={[styles.heroTitle, { color: colors.text }]}>
             Join Your Crew
           </Text>
@@ -429,11 +406,7 @@ export default function JoinGameScreen() {
                 <View style={styles.cameraOverlay}>
                   {/* Top Control Strip inside camera */}
                   <View style={styles.cameraTopRow}>
-                    <View style={styles.cameraStatusPill}>
-                      <View style={[styles.cameraDot, { backgroundColor: colors.primary }]} />
-                      <Text style={styles.cameraStatusText}>AIM AT HOST QR</Text>
-                    </View>
-
+                    <View style={{ flex: 1 }} />
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel="Toggle Flashlight"
@@ -513,20 +486,13 @@ export default function JoinGameScreen() {
                       <Text style={styles.feedbackText}>{scanFeedback.message}</Text>
                     </View>
                   ) : (
-                    <Text style={styles.cameraHint}>Hold camera steady over host's QR code</Text>
+                    <Text style={styles.cameraHint}>Keep it steady</Text>
                   )}
                 </View>
               </View>
             )}
           </View>
         )}
-
-        {/* Footer info */}
-        <View style={styles.footerRow}>
-          <Text style={[styles.footerText, { color: colors.textMuted }]}>
-            GhostRun Tactical Protocol • Secure Grid Access
-          </Text>
-        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -538,13 +504,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   closeButton: {
     width: 38,
@@ -568,41 +534,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1.5,
   },
-  versionPill: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  versionText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
   heroSection: {
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  tacticalBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
-    marginBottom: 10,
-  },
-  pulsingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  tacticalBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    marginBottom: 24,
   },
   heroTitle: {
     fontSize: 28,
@@ -824,13 +757,5 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
     overflow: 'hidden',
-  },
-  footerRow: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 11,
-    letterSpacing: 0.5,
   },
 });
