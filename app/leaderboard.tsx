@@ -647,6 +647,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     marginTop: 12,
+    textAlign: 'center',
+    alignSelf: 'center',
+    width: '100%',
   },
   emptySub: {
     fontFamily: 'SegoeUI-Regular',

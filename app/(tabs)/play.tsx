@@ -169,7 +169,7 @@ export function PlayContent() {
           />
         }
       >
-        {/* Top Header Row with GhostRun Brand Mark (Pure White in Dark Mode, Pure Black in Light Mode) */}
+        {/* Top Header Row with GhostRun Brand Mark and Quick Access Icons */}
         <View style={styles.headerRow}>
           <View style={styles.brandContainer}>
             <Image
@@ -184,6 +184,46 @@ export function PlayContent() {
             <Text style={[styles.brandTitle, { color: isDark ? '#FFFFFF' : '#000000' }]}>
               GHOSTRUN
             </Text>
+          </View>
+
+          <View style={styles.headerActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Friends Hub"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                router.push('/friends' as any);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              style={[
+                styles.headerIconButton,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Ionicons name="people-outline" size={19} color={colors.primary} />
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Leaderboard"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                router.push('/leaderboard' as any);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              style={[
+                styles.headerIconButton,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Ionicons name="trophy-outline" size={19} color={colors.accent || '#F59E0B'} />
+            </Pressable>
           </View>
         </View>
 
@@ -534,6 +574,19 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '900',
     letterSpacing: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statusPill: {
     flexDirection: 'row',

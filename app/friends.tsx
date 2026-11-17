@@ -968,6 +968,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     marginTop: 12,
+    textAlign: 'center',
+    alignSelf: 'center',
+    width: '100%',
   },
   emptySub: {
     fontFamily: 'SegoeUI-Regular',
@@ -987,6 +990,7 @@ const styles = StyleSheet.create({
   emptySubText: {
     fontFamily: 'SegoeUI-Regular',
     fontSize: 13,
+    textAlign: 'center',
   },
   sectionTitle: {
     fontFamily: 'Archivo-Bold',

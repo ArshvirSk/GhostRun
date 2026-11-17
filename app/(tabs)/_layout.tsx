@@ -105,18 +105,23 @@ function getTabIndexFromPathname(pathname: string): number | null {
   return null;
 }
 
+let savedActiveTabIndex = 0;
+
 export default function TabsLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const { width: screenWidth } = useWindowDimensions();
 
-  const [activeTabIndex, setActiveTabIndex] = useState(() => getTabIndexFromPathname(pathname) ?? 0);
+  const [activeTabIndex, setActiveTabIndex] = useState(() => {
+    const directIdx = getTabIndexFromPathname(pathname);
+    return directIdx !== null && directIdx !== 0 ? directIdx : savedActiveTabIndex;
+  });
   const activeTabIndexRef = useRef(activeTabIndex);
   const isDraggingRef = useRef(false);
 
   const pagerRef = useRef<React.ElementRef<typeof ScrollView>>(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
+  const scrollX = useRef(new Animated.Value(activeTabIndex * (screenWidth || 1))).current;
 
   // Geometry calculations for floating bottom bar and sliding pill
   const paddingH = 16;
@@ -136,23 +141,50 @@ export default function TabsLayout() {
     extrapolate: 'clamp',
   });
 
-  // Keep activeTabIndex in sync ONLY when pathname is an actual tab route
+  const prevPathnameRef = useRef(pathname);
+
+  // Keep activeTabIndex in sync when pathname changes
   useEffect(() => {
+    const prev = prevPathnameRef.current;
+    prevPathnameRef.current = pathname;
+
+    const prevWasSubscreen = getTabIndexFromPathname(prev) === null;
+    const currentIsTab = getTabIndexFromPathname(pathname) !== null;
+
+    // Case 1: Returning via Back from a subscreen (like /friends, /leaderboard, /settings)
+    // Restore the exact tab the user was on before navigating away!
+    if (prevWasSubscreen && currentIsTab) {
+      const restoredIndex = savedActiveTabIndex;
+      activeTabIndexRef.current = restoredIndex;
+      setActiveTabIndex(restoredIndex);
+      if (screenWidth > 0) {
+        pagerRef.current?.scrollTo({ x: restoredIndex * screenWidth, animated: false });
+        scrollX.setValue(restoredIndex * screenWidth);
+      }
+      return;
+    }
+
+    // Case 2: Intentional deep link or router navigation to /modes or /you
     const targetIndex = getTabIndexFromPathname(pathname);
-    if (targetIndex !== null && targetIndex !== activeTabIndexRef.current && !isDraggingRef.current) {
+    if (
+      targetIndex !== null &&
+      targetIndex !== activeTabIndexRef.current &&
+      !isDraggingRef.current
+    ) {
+      savedActiveTabIndex = targetIndex;
       activeTabIndexRef.current = targetIndex;
       setActiveTabIndex(targetIndex);
       if (screenWidth > 0) {
         pagerRef.current?.scrollTo({ x: targetIndex * screenWidth, animated: true });
       }
     }
-  }, [pathname, screenWidth]);
+  }, [pathname, screenWidth, scrollX]);
 
   // Initial scroll to match current pathname on mount
   const [initialOffsetSet, setInitialOffsetSet] = useState(false);
   useEffect(() => {
     if (!initialOffsetSet && screenWidth > 0) {
-      const initialIdx = getTabIndexFromPathname(pathname) ?? 0;
+      const initialIdx = getTabIndexFromPathname(pathname) ?? savedActiveTabIndex;
       if (initialIdx > 0) {
         pagerRef.current?.scrollTo({ x: initialIdx * screenWidth, animated: false });
         scrollX.setValue(initialIdx * screenWidth);
@@ -165,6 +197,7 @@ export default function TabsLayout() {
   const handleTabPress = useCallback(
     (index: number) => {
       triggerHaptic('buttonTap');
+      savedActiveTabIndex = index;
       activeTabIndexRef.current = index;
       setActiveTabIndex(index);
       if (screenWidth > 0) {
@@ -198,6 +231,7 @@ export default function TabsLayout() {
           const x = e.nativeEvent.contentOffset.x;
           const currentIdx = Math.min(2, Math.max(0, Math.round(x / screenWidth)));
           if (currentIdx !== activeTabIndexRef.current) {
+            savedActiveTabIndex = currentIdx;
             activeTabIndexRef.current = currentIdx;
             setActiveTabIndex(currentIdx);
           }
@@ -213,6 +247,7 @@ export default function TabsLayout() {
       const newIndex = Math.min(2, Math.max(0, Math.round(x / screenWidth)));
       if (newIndex !== activeTabIndexRef.current) {
         triggerHaptic('buttonTap');
+        savedActiveTabIndex = newIndex;
         activeTabIndexRef.current = newIndex;
         setActiveTabIndex(newIndex);
       }
