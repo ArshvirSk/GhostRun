@@ -102,11 +102,12 @@ export default function ModesTab() {
         style={[
           styles.headerArea,
           {
-            paddingTop: Math.max(insets.top, 20) + spacing.xs,
+            paddingTop: Math.max(insets.top, 20) + spacing.sm,
+            paddingBottom: spacing.sm,
           },
         ]}
       >
-        <Text variant="display" style={{ color: colors.text, marginBottom: spacing.sm }}>
+        <Text variant="display" style={{ color: colors.text, marginBottom: spacing.md }}>
           GAME MODES & MUTATORS
         </Text>
 
@@ -137,26 +138,22 @@ export default function ModesTab() {
           style={{ width: screenWidth }}
           contentContainerStyle={[
             styles.pageContent,
-            { paddingBottom: Math.max(insets.bottom, 20) + 100 },
+            { paddingBottom: Math.max(insets.bottom, 20) + 140 },
           ]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Filter Chips */}
+          {/* Filter Chips - Single row, 100% visible, no horizontal scroll conflict */}
           <View style={styles.filterSection}>
-            <Text variant="label" style={{ color: colors.textMuted, marginBottom: 6 }}>
+            <Text variant="label" style={{ color: colors.textMuted, marginBottom: 8, fontSize: 11, letterSpacing: 0.8 }}>
               SQUAD SIZE
             </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterChipsRow}
-            >
+            <View style={styles.filterChipsRow}>
               {(
                 [
-                  { id: 'all', label: 'ALL SIZES' },
+                  { id: 'all', label: 'ALL' },
                   { id: 'solo', label: 'SOLO (1)' },
                   { id: 'squad', label: 'SQUAD (2–4)' },
-                  { id: 'massive', label: 'MASSIVE (5+)' },
+                  { id: 'massive', label: '5+ MASSIVE' },
                 ] as const
               ).map((opt) => (
                 <Chip
@@ -164,22 +161,19 @@ export default function ModesTab() {
                   label={opt.label}
                   variant={playerFilter === opt.id ? 'accent' : 'muted'}
                   size="sm"
+                  style={{ flex: 1, paddingHorizontal: 2 }}
                   onPress={() => setPlayerFilter(opt.id)}
                 />
               ))}
-            </ScrollView>
+            </View>
 
-            <Text variant="label" style={{ color: colors.textMuted, marginTop: 10, marginBottom: 6 }}>
+            <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: 8, fontSize: 11, letterSpacing: 0.8 }}>
               COMPLEXITY
             </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterChipsRow}
-            >
+            <View style={styles.filterChipsRow}>
               {(
                 [
-                  { id: 'all', label: 'ALL TIERS' },
+                  { id: 'all', label: 'ALL' },
                   { id: '1', label: 'CASUAL ★' },
                   { id: '2', label: 'TACTICAL ★★' },
                   { id: '3', label: 'HARDCORE ★★★' },
@@ -190,16 +184,16 @@ export default function ModesTab() {
                   label={opt.label}
                   variant={diffFilter === opt.id ? 'accent' : 'muted'}
                   size="sm"
+                  style={{ flex: 1, paddingHorizontal: 2 }}
                   onPress={() => setDiffFilter(opt.id)}
                 />
               ))}
-            </ScrollView>
+            </View>
           </View>
 
           {/* Mode Cards List */}
           <View style={styles.cardList}>
             {filteredModes.map((mode) => {
-              const stars = '★'.repeat(mode.difficulty) + '☆'.repeat(3 - mode.difficulty);
               const diffLabel =
                 mode.difficulty === 1 ? 'CASUAL' : mode.difficulty === 2 ? 'TACTICAL' : 'HARDCORE';
 
@@ -234,25 +228,28 @@ export default function ModesTab() {
                     {mode.tagline}
                   </Text>
 
-                  {/* Compact, clean horizontal chips */}
+                  {/* Compact, clean horizontal chips - guaranteed single line */}
                   <View style={styles.badgeRow}>
                     <Chip
                       icon={<Ionicons name="people-outline" size={12} color={colors.textMuted} />}
                       label={mode.idealPlayers}
                       variant="muted"
                       size="sm"
+                      style={{ flexShrink: 1, paddingHorizontal: 6 }}
                     />
                     <Chip
                       icon={<Ionicons name="flash-outline" size={12} color={colors.accent} />}
-                      label={`${stars} ${diffLabel}`}
+                      label={`${'★'.repeat(mode.difficulty)} ${diffLabel}`}
                       variant="accent"
                       size="sm"
+                      style={{ flexShrink: 1, paddingHorizontal: 6 }}
                     />
                     <Chip
                       icon={<Ionicons name="compass-outline" size={12} color={colors.primary} />}
                       label={mode.layer.toUpperCase()}
                       variant="default"
                       size="sm"
+                      style={{ flexShrink: 0, paddingHorizontal: 6 }}
                     />
                   </View>
 
@@ -535,28 +532,29 @@ const styles = StyleSheet.create({
   },
   headerArea: {
     paddingHorizontal: 18,
-    paddingBottom: 4,
+    paddingBottom: 8,
   },
   segmentBar: {
-    marginVertical: 4,
+    marginTop: 4,
+    marginBottom: 12,
   },
   pageContent: {
     paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingTop: 12,
   },
   filterSection: {
-    marginBottom: 14,
+    marginBottom: 16,
   },
   filterChipsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     paddingVertical: 2,
   },
   cardList: {
-    gap: 12,
+    gap: 16,
   },
   modeCard: {
-    padding: 14,
+    padding: 16,
     borderRadius: 16,
     borderWidth: 1.2,
   },
@@ -567,14 +565,15 @@ const styles = StyleSheet.create({
   },
   badgeRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    flexWrap: 'nowrap',
     gap: 6,
-    marginTop: 10,
+    marginTop: 12,
   },
   cardActions: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 12,
+    marginTop: 14,
   },
   emptyBox: {
     padding: 32,
