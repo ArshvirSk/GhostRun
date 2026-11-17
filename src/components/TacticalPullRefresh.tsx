@@ -1,6 +1,5 @@
 import React, {
   forwardRef,
-  useEffect,
   useImperativeHandle,
   useRef,
 } from 'react';
@@ -82,79 +81,46 @@ export const TacticalPullRefreshScrollView = forwardRef<
     return Math.min(maxPullHeight, thresholdHeight * 0.95 + stretch);
   };
 
-  // Guarded refresh executor — strictly one refresh per gesture, zero duplicate reboot or reopening
-  const executeRefresh = async () => {
+  // Guarded refresh executor — Snapchat-style: releases directly back to 0 with zero hanging or reopening
+  const executeRefresh = () => {
     if (refreshStatusRef.current === 'refreshing' || refreshStatusRef.current === 'closing') {
       return;
     }
-    refreshStatusRef.current = 'refreshing';
+    refreshStatusRef.current = 'closing';
 
-    // Smoothly snap to resting height while data syncs
+    // Smoothly spring curtain directly shut immediately upon finger release (pure Snapchat interaction)
     Animated.spring(pullAnim, {
-      toValue: restingHeight,
+      toValue: 0,
       useNativeDriver: false,
-      friction: 8,
-      tension: 44,
-    }).start();
+      friction: 9,
+      tension: 48,
+    }).start(() => {
+      refreshStatusRef.current = 'idle';
+      currentPullRef.current = 0;
+      hasTriggeredHaptic.current = false;
+      lastRefreshEndTimeRef.current = Date.now();
+    });
 
+    // Execute background data sync asynchronously — completely decoupled from UI curtain closing
     try {
-      await Promise.all([
-        Promise.resolve(onRefresh?.()),
-        new Promise((resolve) => setTimeout(resolve, 550)),
-      ]);
+      void Promise.resolve(onRefresh?.());
     } catch {
-      // Graceful fallback on network glitch
-    } finally {
-      refreshStatusRef.current = 'closing';
-      Animated.spring(pullAnim, {
-        toValue: 0,
-        useNativeDriver: false,
-        friction: 9,
-        tension: 52,
-      }).start(() => {
-        refreshStatusRef.current = 'idle';
-        currentPullRef.current = 0;
-        hasTriggeredHaptic.current = false;
-        lastRefreshEndTimeRef.current = Date.now();
-      });
+      // Graceful fallback
     }
   };
-
-  // Synchronize curtain closing if external refreshing prop transitions to false while refreshing
-  // Note: Curtain is strictly gesture-driven like Snapchat — external props NEVER automatically reopen it!
-  const prevRefreshingProp = useRef(refreshing);
-  useEffect(() => {
-    const wasRefreshing = prevRefreshingProp.current;
-    prevRefreshingProp.current = refreshing;
-
-    if (wasRefreshing && !refreshing && refreshStatusRef.current === 'refreshing') {
-      refreshStatusRef.current = 'closing';
-      Animated.spring(pullAnim, {
-        toValue: 0,
-        useNativeDriver: false,
-        friction: 9,
-        tension: 52,
-      }).start(() => {
-        refreshStatusRef.current = 'idle';
-        currentPullRef.current = 0;
-        hasTriggeredHaptic.current = false;
-        lastRefreshEndTimeRef.current = Date.now();
-      });
-    }
-  }, [refreshing, pullAnim]);
 
   // Responsive gesture disambiguation:
   // 1. Must be idle and past debounce cooldown
   // 2. Must be at top of list (scrollY <= 1)
-  // 3. dy > 3: captures immediately on first intentional motion before native Android touch slop intercepts
-  // 4. dy > |dx| * 1.15: allows downward thumb pulls while letting horizontal tab paging pass freely
+  // 3. dy > 6: captures intentional downward pull while ignoring static finger touches
+  // 4. dy > |dx| * 1.8: allows vertical pull while letting horizontal tab paging pass freely
   const shouldStartPull = (gestureState: { dx: number; dy: number }) => {
     if (refreshStatusRef.current !== 'idle') return false;
     if (Date.now() - lastRefreshEndTimeRef.current < 350) return false;
     if (scrollYRef.current > 1) return false;
     return (
-      gestureState.dy > 3 &&
-      gestureState.dy > Math.abs(gestureState.dx) * 1.15
+      gestureState.dy > 6 &&
+      gestureState.dy > Math.abs(gestureState.dx) * 1.8
     );
   };
 
