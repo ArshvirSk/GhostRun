@@ -10,7 +10,6 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   PanResponder,
-  RefreshControl,
   ScrollView,
   ScrollViewProps,
   StyleSheet,
@@ -66,16 +65,16 @@ export const TacticalPullRefreshScrollView = forwardRef<
   const isDraggingPull = useRef(false);
   const hasTriggeredHaptic = useRef(false);
 
-  // Synchronize curtain animation with external refreshing prop
+  // Synchronize curtain animation with external refreshing prop changes
   useEffect(() => {
-    if (refreshing) {
+    if (refreshing && !isRefreshingRef.current) {
       Animated.spring(pullAnim, {
         toValue: restingHeight,
         useNativeDriver: false,
         friction: 8,
         tension: 40,
       }).start();
-    } else {
+    } else if (!refreshing && !isRefreshingRef.current) {
       currentPullRef.current = 0;
       isDraggingPull.current = false;
       hasTriggeredHaptic.current = false;
@@ -88,14 +87,35 @@ export const TacticalPullRefreshScrollView = forwardRef<
     }
   }, [refreshing, restingHeight, pullAnim]);
 
-  // Single guarded refresh trigger — prevents duplicate syncs and 2-time reboots
+  // Single guarded refresh trigger — strictly one refresh per gesture, no reboot
   const executeRefresh = async () => {
     if (isRefreshingRef.current) return;
     isRefreshingRef.current = true;
+
+    // Smoothly hold at resting height while data syncs
+    Animated.spring(pullAnim, {
+      toValue: restingHeight,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 40,
+    }).start();
+
     try {
-      await Promise.resolve(onRefresh());
+      await Promise.all([
+        Promise.resolve(onRefresh()),
+        new Promise((resolve) => setTimeout(resolve, 650)),
+      ]);
     } finally {
       isRefreshingRef.current = false;
+      currentPullRef.current = 0;
+      isDraggingPull.current = false;
+      hasTriggeredHaptic.current = false;
+      Animated.spring(pullAnim, {
+        toValue: 0,
+        useNativeDriver: false,
+        friction: 9,
+        tension: 50,
+      }).start();
     }
   };
 
@@ -138,6 +158,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
         }
 
         const dy = Math.max(0, gestureState.dy);
+        // Smooth rubber-band curve
         const pull = Math.min(maxPullHeight, Math.pow(dy, 0.82) * 2.0);
         currentPullRef.current = pull;
         pullAnim.setValue(pull);
@@ -177,7 +198,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
         isDraggingPull.current = false;
         currentPullRef.current = 0;
         hasTriggeredHaptic.current = false;
-        if (!refreshing) {
+        if (!isRefreshingRef.current) {
           Animated.spring(pullAnim, {
             toValue: 0,
             useNativeDriver: false,
@@ -218,7 +239,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
         </View>
       </Animated.View>
 
-      {/* Main Screen Content ScrollView */}
+      {/* Main Screen Content ScrollView — strictly NO native RefreshControl spinner circle */}
       <ScrollView
         ref={internalScrollRef}
         onScroll={handleScroll}
@@ -227,17 +248,6 @@ export const TacticalPullRefreshScrollView = forwardRef<
         bounces={false}
         nestedScrollEnabled={true}
         contentContainerStyle={contentContainerStyle}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              void executeRefresh();
-            }}
-            colors={['transparent']}
-            tintColor="transparent"
-            progressBackgroundColor="transparent"
-          />
-        }
         {...restProps}
       >
         {children}
