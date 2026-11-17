@@ -12,6 +12,7 @@ export interface UserProfile {
   email?: string;
   created_at?: string;
   is_vanguard?: boolean;
+  is_cipher?: boolean;
 }
 
 interface UserStoreState {
@@ -28,13 +29,21 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
 
   setProfile: (updated) => {
     const current = get().profile;
+    const isCipher =
+      updated.is_cipher !== undefined
+        ? updated.is_cipher
+        : updated.is_vanguard !== undefined
+        ? updated.is_vanguard
+        : current?.is_cipher ?? current?.is_vanguard;
+
     const merged: UserProfile = {
       id: updated.id || current?.id || 'local_user',
       display_name: updated.display_name,
       color: updated.color || current?.color || colors.palette[0],
       email: updated.email || current?.email,
       created_at: updated.created_at || current?.created_at,
-      is_vanguard: updated.is_vanguard !== undefined ? updated.is_vanguard : current?.is_vanguard,
+      is_vanguard: isCipher,
+      is_cipher: isCipher,
     };
 
     set({ profile: merged, isHydrated: true });
@@ -97,6 +106,8 @@ AsyncStorage.getItem(USER_PROFILE_KEY)
               color: parsed.color || colors.palette[0],
               email: parsed.email,
               created_at: parsed.created_at,
+              is_vanguard: parsed.is_cipher ?? parsed.is_vanguard,
+              is_cipher: parsed.is_cipher ?? parsed.is_vanguard,
             },
             isHydrated: true,
           });

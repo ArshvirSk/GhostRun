@@ -42,8 +42,8 @@ export function YouContent() {
   const { formatDistance } = useUnits();
 
   const storedProfile = useUserStore((s) => s.profile);
-  const [profile, setProfile] = useState<{ display_name: string; color: string; is_vanguard?: boolean } | null>(
-    () => (storedProfile ? { display_name: storedProfile.display_name, color: storedProfile.color, is_vanguard: storedProfile.is_vanguard } : null)
+  const [profile, setProfile] = useState<{ display_name: string; color: string; is_cipher?: boolean; is_vanguard?: boolean } | null>(
+    () => (storedProfile ? { display_name: storedProfile.display_name, color: storedProfile.color, is_cipher: storedProfile.is_cipher, is_vanguard: storedProfile.is_vanguard } : null)
   );
   const [userId, setUserId] = useState<string | null>(() => storedProfile?.id || null);
   const [isEditing, setIsEditing] = useState(false);
@@ -56,6 +56,7 @@ export function YouContent() {
       setProfile({
         display_name: storedProfile.display_name,
         color: storedProfile.color,
+        is_cipher: storedProfile.is_cipher,
         is_vanguard: storedProfile.is_vanguard,
       });
       if (!isEditing) {
@@ -393,21 +394,21 @@ export function YouContent() {
                 <Text style={[styles.codenameText, { color: colors.text }]} numberOfLines={1}>
                   @{displayName.toUpperCase()}
                 </Text>
-                {Boolean(profile?.is_vanguard) && (
+                {Boolean(profile?.is_cipher || profile?.is_vanguard) && (
                   <View
                     style={[
-                      styles.vanguardBadgePill,
+                      styles.cipherBadgePill,
                       {
                         borderColor: colors.accent,
                         backgroundColor: isDark
-                          ? 'rgba(184, 163, 255, 0.15)'
-                          : 'rgba(102, 80, 164, 0.10)',
+                          ? 'rgba(234, 179, 8, 0.16)'
+                          : 'rgba(202, 138, 4, 0.10)',
                       },
                     ]}
                   >
-                    <Ionicons name="shield-checkmark" size={10} color={colors.accent} style={{ marginRight: 3 }} />
-                    <Text style={[styles.vanguardBadgePillText, { color: colors.accent }]}>
-                      VANGUARD
+                    <Ionicons name="radio" size={10} color={colors.accent} style={{ marginRight: 3 }} />
+                    <Text style={[styles.cipherBadgePillText, { color: colors.accent }]}>
+                      CIPHER
                     </Text>
                   </View>
                 )}
@@ -1225,7 +1226,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 2,
   },
-  vanguardBadgePill: {
+  cipherBadgePill: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
@@ -1234,7 +1235,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     marginTop: 2,
   },
-  vanguardBadgePillText: {
+  cipherBadgePillText: {
     fontFamily: 'Archivo-Black',
     fontSize: 9,
     fontWeight: '900',

@@ -21,7 +21,7 @@ import { getFriendsHosting } from '../../src/lib/friends';
 import { HostPresence } from '../../src/lib/friendsCore';
 import { useUserStore } from '../../src/stores/userStore';
 import { startLocationPrewarm } from '../../src/lib/locationCache';
-import { VanguardEventModal } from '../../src/components/VanguardEventModal';
+import { CipherEventModal } from '../../src/components/CipherEventModal';
 
 const GHOSTRUN_MARK_MINT = require('../../assets/ghostrun-mark-mint.png');
 const GHOSTRUN_MARK_OLIVE = require('../../assets/ghostrun-mark-olive.png');
@@ -46,7 +46,7 @@ export function PlayContent() {
   const [refreshing, setRefreshing] = useState(false);
   const [seasonData, setSeasonData] = useState<ActiveSeasonData | null>(null);
   const [friendsHosting, setFriendsHosting] = useState<HostPresence[]>([]);
-  const [vanguardModalVisible, setVanguardModalVisible] = useState(false);
+  const [cipherModalVisible, setCipherModalVisible] = useState(false);
 
   // Keep displayName synced instantly whenever userStore updates
   useEffect(() => {
@@ -319,16 +319,16 @@ export function PlayContent() {
           </View>
         )}
 
-        {/* Vanguard Protocol Launch Event Card (GhostRun's Native Time-Based Founder Event) */}
+        {/* Tactical Cipher Protocol Event Card (No redundant title row to avoid overflow) */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Vanguard Protocol Launch Event"
+          accessibilityLabel="Cipher Protocol Launch Event"
           onPress={() => {
             triggerHaptic('buttonTap');
-            setVanguardModalVisible(true);
+            setCipherModalVisible(true);
           }}
           style={({ pressed }) => [
-            styles.vanguardBannerCard,
+            styles.cipherCard,
             {
               backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
               borderColor: colors.borderDark,
@@ -336,36 +336,48 @@ export function PlayContent() {
             pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
           ]}
         >
-          <View style={styles.vanguardBannerTop}>
-            <View style={styles.vanguardTagRow}>
-              <View style={[styles.pulsingDot, { backgroundColor: colors.accent }]} />
-              <Text style={[styles.vanguardTagText, { color: colors.accent }]}>
-                VANGUARD PROTOCOL · 14 DAYS LEFT
-              </Text>
-            </View>
-            <Ionicons name="sparkles" size={14} color={colors.accent} />
-          </View>
-
-          <View style={styles.vanguardBannerContent}>
+          <View style={styles.cipherCardInner}>
             <View
               style={[
-                styles.vanguardBadgePill,
+                styles.cipherIconBox,
                 {
                   borderColor: colors.accent,
                   backgroundColor: isDark
-                    ? 'rgba(184, 163, 255, 0.12)'
-                    : 'rgba(102, 80, 164, 0.08)',
+                    ? 'rgba(234, 179, 8, 0.12)'
+                    : 'rgba(202, 138, 4, 0.08)',
                 },
               ]}
             >
-              <Ionicons name="shield-checkmark" size={12} color={colors.accent} style={{ marginRight: 4 }} />
-              <Text style={[styles.vanguardBadgePillText, { color: colors.accent }]}>
-                VANGUARD
+              <Ionicons name="radio" size={18} color={colors.accent} />
+            </View>
+
+            <View style={styles.cipherTextCol}>
+              <View style={styles.cipherHeadingRow}>
+                <Text style={[styles.cipherTitleText, { color: colors.text }]}>
+                  CIPHER PROTOCOL
+                </Text>
+                <View
+                  style={[
+                    styles.cipherDaysPill,
+                    {
+                      borderColor: colors.accent,
+                      backgroundColor: isDark
+                        ? 'rgba(234, 179, 8, 0.16)'
+                        : 'rgba(202, 138, 4, 0.10)',
+                    },
+                  ]}
+                >
+                  <Text style={[styles.cipherDaysPillText, { color: colors.accent }]}>
+                    14 DAYS LEFT
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={[styles.cipherSubText, { color: colors.textMuted }]} numberOfLines={1}>
+                Classified radar signature & prototype mutator access
               </Text>
             </View>
-            <Text style={[styles.vanguardBannerText, { color: colors.text }]} numberOfLines={2}>
-              Become a Founding Operative. Lock the permanent Vanguard insignia & lifetime hosting.
-            </Text>
+
             <Ionicons
               name="chevron-forward"
               size={18}
@@ -499,10 +511,10 @@ export function PlayContent() {
         </View>
       </ScrollView>
 
-      {/* GhostRun's Native Vanguard Protocol Founder Event Modal */}
-      <VanguardEventModal
-        visible={vanguardModalVisible}
-        onClose={() => setVanguardModalVisible(false)}
+      {/* GhostRun's Native Tactical Cipher Protocol Event Modal */}
+      <CipherEventModal
+        visible={cipherModalVisible}
+        onClose={() => setCipherModalVisible(false)}
       />
     </View>
   );
@@ -606,55 +618,57 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  vanguardBannerCard: {
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+  cipherCard: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1,
-    marginBottom: 26,
+    marginBottom: 24,
   },
-  vanguardBannerTop: {
+  cipherCardInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    gap: 12,
   },
-  vanguardTagRow: {
-    flexDirection: 'row',
+  cipherIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
   },
-  vanguardTagText: {
-    fontFamily: 'Archivo-SemiBold',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  vanguardBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  vanguardBadgePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-  },
-  vanguardBadgePillText: {
-    fontFamily: 'Archivo-Black',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  vanguardBannerText: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '600',
+  cipherTextCol: {
     flex: 1,
+  },
+  cipherHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 3,
+  },
+  cipherTitleText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  cipherDaysPill: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+  },
+  cipherDaysPillText: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  cipherSubText: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 12,
+    lineHeight: 16,
   },
   actionGroup: {
     gap: 12,
