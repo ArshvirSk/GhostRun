@@ -54,7 +54,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
   const topInset = Math.max(insets?.top || 0, 24);
   const restingHeight = topInset + 68;
   const thresholdHeight = topInset + 92;
-  // Extended pull range so user can pull down deeply like Snapchat without hitting a hard wall
+  // Extended pull range: allows deep pull-down just like Snapchat (up to 380dp)
   const maxPullHeight = Math.min((windowHeight || 800) * 0.48, 380);
 
   const { colors, isDark } = useTheme();
@@ -65,35 +65,36 @@ export const TacticalPullRefreshScrollView = forwardRef<
 
   const scrollYRef = useRef(0);
   const refreshStatusRef = useRef<RefreshStatus>('idle');
+  const isUserInitiatedRef = useRef(false);
   const pullAnim = useRef(new Animated.Value(0)).current;
   const currentPullRef = useRef(0);
   const hasTriggeredHaptic = useRef(false);
 
-  // Smooth elastic response curve — direct tactile control that follows the finger
+  // Progressive elastic response curve — direct tactile feel that tracks finger movement
   const calculatePull = (dy: number) => {
     if (dy <= 0) return 0;
     if (dy <= thresholdHeight) {
-      return dy * 0.92;
+      return dy * 0.95; // direct 1:1 finger tracking
     }
-    // Progressive resistance past threshold all the way to maxPullHeight
+    // Smooth progressive resistance past threshold all the way down
     const extra = dy - thresholdHeight;
     const stretch = Math.pow(extra, 0.76) * 1.85;
-    return Math.min(maxPullHeight, thresholdHeight * 0.92 + stretch);
+    return Math.min(maxPullHeight, thresholdHeight * 0.95 + stretch);
   };
 
-  // Guarded refresh executor — guaranteed single execution with smooth snap and clean close
+  // Guarded refresh executor — strictly one refresh per gesture, zero duplicate reboot
   const executeRefresh = async () => {
     if (refreshStatusRef.current === 'refreshing' || refreshStatusRef.current === 'closing') {
       return;
     }
     refreshStatusRef.current = 'refreshing';
 
-    // Hold at resting height while data syncs
+    // Smoothly snap to resting height while data syncs
     Animated.spring(pullAnim, {
       toValue: restingHeight,
       useNativeDriver: false,
       friction: 8,
-      tension: 42,
+      tension: 44,
     }).start();
 
     try {
@@ -104,7 +105,6 @@ export const TacticalPullRefreshScrollView = forwardRef<
     } catch {
       // Graceful fallback on network glitch
     } finally {
-      // Mark as closing so external prop changes never trigger duplicate reopenings
       refreshStatusRef.current = 'closing';
       Animated.spring(pullAnim, {
         toValue: 0,
@@ -115,27 +115,31 @@ export const TacticalPullRefreshScrollView = forwardRef<
         refreshStatusRef.current = 'idle';
         currentPullRef.current = 0;
         hasTriggeredHaptic.current = false;
+        isUserInitiatedRef.current = false;
       });
     }
   };
 
   // Synchronize curtain animation with external refreshing prop changes ONLY
+  // (Completely ignores external prop updates during user-initiated gestures to prevent second reopening)
   const prevRefreshingProp = useRef(refreshing);
   useEffect(() => {
     const wasRefreshing = prevRefreshingProp.current;
     prevRefreshingProp.current = refreshing;
 
-    // External trigger (e.g. parent programmatically set refreshing = true)
+    if (isUserInitiatedRef.current) {
+      return; // Handled 100% by user gesture lifecycle
+    }
+
     if (!wasRefreshing && refreshing && refreshStatusRef.current === 'idle') {
       refreshStatusRef.current = 'refreshing';
       Animated.spring(pullAnim, {
         toValue: restingHeight,
         useNativeDriver: false,
         friction: 8,
-        tension: 42,
+        tension: 44,
       }).start();
     } else if (wasRefreshing && !refreshing && refreshStatusRef.current === 'refreshing') {
-      // External trigger finished
       refreshStatusRef.current = 'closing';
       Animated.spring(pullAnim, {
         toValue: 0,
@@ -150,17 +154,18 @@ export const TacticalPullRefreshScrollView = forwardRef<
     }
   }, [refreshing, restingHeight, pullAnim]);
 
-  // Strict gesture disambiguation:
+  // Responsive gesture disambiguation:
   // 1. Must be idle
   // 2. Must be at top of list (scrollY <= 1)
-  // 3. Must be pulling downward by at least 12dp
-  // 4. Must be strongly vertical (dy > |dx| * 2.2) so horizontal tab paging is NEVER hijacked
+  // 3. dy > 2: captures immediately on first motion before native Android 8px touch slop intercepts
+  // 4. dy > |dx| * 1.15: allows downward thumb pulls while letting horizontal tab paging pass freely
   const shouldStartPull = (gestureState: { dx: number; dy: number }) => {
     if (refreshStatusRef.current !== 'idle') return false;
     if (scrollYRef.current > 1) return false;
-    if (gestureState.dy <= 12) return false;
-    if (gestureState.dy <= Math.abs(gestureState.dx) * 2.2) return false;
-    return true;
+    return (
+      gestureState.dy > 2 &&
+      gestureState.dy > Math.abs(gestureState.dx) * 1.15
+    );
   };
 
   const panResponder = useRef(
@@ -173,6 +178,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
 
       onPanResponderGrant: () => {
         refreshStatusRef.current = 'pulling';
+        isUserInitiatedRef.current = true;
         hasTriggeredHaptic.current = false;
       },
 
@@ -224,6 +230,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
             refreshStatusRef.current = 'idle';
             currentPullRef.current = 0;
             hasTriggeredHaptic.current = false;
+            isUserInitiatedRef.current = false;
           });
         }
       },
@@ -240,6 +247,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
             refreshStatusRef.current = 'idle';
             currentPullRef.current = 0;
             hasTriggeredHaptic.current = false;
+            isUserInitiatedRef.current = false;
           });
         }
       },
@@ -282,7 +290,6 @@ export const TacticalPullRefreshScrollView = forwardRef<
         scrollEventThrottle={16}
         overScrollMode="never"
         bounces={false}
-        nestedScrollEnabled={true}
         contentContainerStyle={contentContainerStyle}
         {...restProps}
       >
