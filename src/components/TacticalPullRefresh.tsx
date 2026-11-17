@@ -13,6 +13,7 @@ import {
   ScrollView,
   ScrollViewProps,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +29,8 @@ export interface TacticalPullRefreshScrollViewProps extends ScrollViewProps {
   tintColor?: string;
   children?: React.ReactNode;
 }
+
+type RefreshStatus = 'idle' | 'pulling' | 'refreshing' | 'closing';
 
 export const TacticalPullRefreshScrollView = forwardRef<
   React.ElementRef<typeof ScrollView>,
@@ -46,10 +49,13 @@ export const TacticalPullRefreshScrollView = forwardRef<
   ref
 ) {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+
   const topInset = Math.max(insets?.top || 0, 24);
-  const restingHeight = topInset + 72;
-  const thresholdHeight = topInset + 88;
-  const maxPullHeight = topInset + 160;
+  const restingHeight = topInset + 68;
+  const thresholdHeight = topInset + 92;
+  // Extended pull range so user can pull down deeply like Snapchat without hitting a hard wall
+  const maxPullHeight = Math.min((windowHeight || 800) * 0.48, 380);
 
   const { colors, isDark } = useTheme();
   const primaryColor = tintColor || colors.primary;
@@ -58,108 +64,132 @@ export const TacticalPullRefreshScrollView = forwardRef<
   useImperativeHandle(ref, () => internalScrollRef.current as React.ElementRef<typeof ScrollView>);
 
   const scrollYRef = useRef(0);
-  const isRefreshingRef = useRef(false);
-
+  const refreshStatusRef = useRef<RefreshStatus>('idle');
   const pullAnim = useRef(new Animated.Value(0)).current;
   const currentPullRef = useRef(0);
-  const isDraggingPull = useRef(false);
   const hasTriggeredHaptic = useRef(false);
 
-  // Synchronize curtain animation with external refreshing prop changes
-  useEffect(() => {
-    if (refreshing && !isRefreshingRef.current) {
-      Animated.spring(pullAnim, {
-        toValue: restingHeight,
-        useNativeDriver: false,
-        friction: 8,
-        tension: 40,
-      }).start();
-    } else if (!refreshing && !isRefreshingRef.current) {
-      currentPullRef.current = 0;
-      isDraggingPull.current = false;
-      hasTriggeredHaptic.current = false;
-      Animated.spring(pullAnim, {
-        toValue: 0,
-        useNativeDriver: false,
-        friction: 9,
-        tension: 50,
-      }).start();
+  // Smooth elastic response curve — direct tactile control that follows the finger
+  const calculatePull = (dy: number) => {
+    if (dy <= 0) return 0;
+    if (dy <= thresholdHeight) {
+      return dy * 0.92;
     }
-  }, [refreshing, restingHeight, pullAnim]);
+    // Progressive resistance past threshold all the way to maxPullHeight
+    const extra = dy - thresholdHeight;
+    const stretch = Math.pow(extra, 0.76) * 1.85;
+    return Math.min(maxPullHeight, thresholdHeight * 0.92 + stretch);
+  };
 
-  // Single guarded refresh trigger — strictly one refresh per gesture, no reboot
+  // Guarded refresh executor — guaranteed single execution with smooth snap and clean close
   const executeRefresh = async () => {
-    if (isRefreshingRef.current) return;
-    isRefreshingRef.current = true;
+    if (refreshStatusRef.current === 'refreshing' || refreshStatusRef.current === 'closing') {
+      return;
+    }
+    refreshStatusRef.current = 'refreshing';
 
-    // Smoothly hold at resting height while data syncs
+    // Hold at resting height while data syncs
     Animated.spring(pullAnim, {
       toValue: restingHeight,
       useNativeDriver: false,
       friction: 8,
-      tension: 40,
+      tension: 42,
     }).start();
 
     try {
       await Promise.all([
-        Promise.resolve(onRefresh()),
-        new Promise((resolve) => setTimeout(resolve, 650)),
+        Promise.resolve(onRefresh?.()),
+        new Promise((resolve) => setTimeout(resolve, 550)),
       ]);
+    } catch {
+      // Graceful fallback on network glitch
     } finally {
-      isRefreshingRef.current = false;
-      currentPullRef.current = 0;
-      isDraggingPull.current = false;
-      hasTriggeredHaptic.current = false;
+      // Mark as closing so external prop changes never trigger duplicate reopenings
+      refreshStatusRef.current = 'closing';
       Animated.spring(pullAnim, {
         toValue: 0,
         useNativeDriver: false,
         friction: 9,
-        tension: 50,
-      }).start();
+        tension: 52,
+      }).start(() => {
+        refreshStatusRef.current = 'idle';
+        currentPullRef.current = 0;
+        hasTriggeredHaptic.current = false;
+      });
     }
   };
 
-  // PanResponder to track finger pull in real-time
+  // Synchronize curtain animation with external refreshing prop changes ONLY
+  const prevRefreshingProp = useRef(refreshing);
+  useEffect(() => {
+    const wasRefreshing = prevRefreshingProp.current;
+    prevRefreshingProp.current = refreshing;
+
+    // External trigger (e.g. parent programmatically set refreshing = true)
+    if (!wasRefreshing && refreshing && refreshStatusRef.current === 'idle') {
+      refreshStatusRef.current = 'refreshing';
+      Animated.spring(pullAnim, {
+        toValue: restingHeight,
+        useNativeDriver: false,
+        friction: 8,
+        tension: 42,
+      }).start();
+    } else if (wasRefreshing && !refreshing && refreshStatusRef.current === 'refreshing') {
+      // External trigger finished
+      refreshStatusRef.current = 'closing';
+      Animated.spring(pullAnim, {
+        toValue: 0,
+        useNativeDriver: false,
+        friction: 9,
+        tension: 52,
+      }).start(() => {
+        refreshStatusRef.current = 'idle';
+        currentPullRef.current = 0;
+        hasTriggeredHaptic.current = false;
+      });
+    }
+  }, [refreshing, restingHeight, pullAnim]);
+
+  // Strict gesture disambiguation:
+  // 1. Must be idle
+  // 2. Must be at top of list (scrollY <= 1)
+  // 3. Must be pulling downward by at least 12dp
+  // 4. Must be strongly vertical (dy > |dx| * 2.2) so horizontal tab paging is NEVER hijacked
+  const shouldStartPull = (gestureState: { dx: number; dy: number }) => {
+    if (refreshStatusRef.current !== 'idle') return false;
+    if (scrollYRef.current > 1) return false;
+    if (gestureState.dy <= 12) return false;
+    if (gestureState.dy <= Math.abs(gestureState.dx) * 2.2) return false;
+    return true;
+  };
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
 
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        if (refreshing || isRefreshingRef.current) return false;
-        if (scrollYRef.current > 2) return false;
-        return (
-          gestureState.dy > 3 &&
-          gestureState.dy > Math.abs(gestureState.dx) * 1.1
-        );
-      },
-
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        if (refreshing || isRefreshingRef.current) return false;
-        if (scrollYRef.current > 2) return false;
-        return (
-          gestureState.dy > 3 &&
-          gestureState.dy > Math.abs(gestureState.dx) * 1.1
-        );
-      },
+      onMoveShouldSetPanResponder: (_, gestureState) => shouldStartPull(gestureState),
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => shouldStartPull(gestureState),
 
       onPanResponderGrant: () => {
-        isDraggingPull.current = true;
+        refreshStatusRef.current = 'pulling';
         hasTriggeredHaptic.current = false;
       },
 
-      onPanResponderTerminationRequest: () => false,
+      onPanResponderTerminationRequest: () => {
+        return refreshStatusRef.current !== 'pulling';
+      },
 
       onPanResponderMove: (_, gestureState) => {
+        if (refreshStatusRef.current !== 'pulling') return;
+
         if (gestureState.dy <= 0) {
           pullAnim.setValue(0);
           currentPullRef.current = 0;
           return;
         }
 
-        const dy = Math.max(0, gestureState.dy);
-        // Smooth rubber-band curve
-        const pull = Math.min(maxPullHeight, Math.pow(dy, 0.82) * 2.0);
+        const pull = calculatePull(gestureState.dy);
         currentPullRef.current = pull;
         pullAnim.setValue(pull);
 
@@ -176,35 +206,41 @@ export const TacticalPullRefreshScrollView = forwardRef<
       },
 
       onPanResponderRelease: () => {
-        isDraggingPull.current = false;
-        const finalPull = currentPullRef.current;
+        if (refreshStatusRef.current !== 'pulling') return;
 
+        const finalPull = currentPullRef.current;
         if (finalPull >= thresholdHeight) {
           triggerHaptic('tagConfirmed');
           void executeRefresh();
         } else {
-          currentPullRef.current = 0;
-          hasTriggeredHaptic.current = false;
+          // User let go before threshold — snap back smoothly like Snapchat
+          refreshStatusRef.current = 'closing';
           Animated.spring(pullAnim, {
             toValue: 0,
             useNativeDriver: false,
             friction: 8,
             tension: 50,
-          }).start();
+          }).start(() => {
+            refreshStatusRef.current = 'idle';
+            currentPullRef.current = 0;
+            hasTriggeredHaptic.current = false;
+          });
         }
       },
 
       onPanResponderTerminate: () => {
-        isDraggingPull.current = false;
-        currentPullRef.current = 0;
-        hasTriggeredHaptic.current = false;
-        if (!isRefreshingRef.current) {
+        if (refreshStatusRef.current === 'pulling') {
+          refreshStatusRef.current = 'closing';
           Animated.spring(pullAnim, {
             toValue: 0,
             useNativeDriver: false,
             friction: 8,
             tension: 50,
-          }).start();
+          }).start(() => {
+            refreshStatusRef.current = 'idle';
+            currentPullRef.current = 0;
+            hasTriggeredHaptic.current = false;
+          });
         }
       },
     })
@@ -217,7 +253,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
 
   return (
     <View style={[styles.rootContainer, style]} {...panResponder.panHandlers}>
-      {/* Snapchat-Style Pull Down Curtain — strictly NO border, zero thin line at rest */}
+      {/* Snapchat-Style Pull Down Curtain — strictly NO border line at rest */}
       <Animated.View
         pointerEvents="none"
         style={[
@@ -267,14 +303,14 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    borderBottomWidth: 0, // Zero thin line when closed
+    borderBottomWidth: 0, // NO border line — zero thin line when closed
   },
   mascotAnchor: {
     width: 96,
     height: 65,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginBottom: -1, // Pinned flush to the bottom ledge divider of the pulled curtain
+    marginBottom: -1, // Sits precisely flush with the bottom ledge of the pulled curtain
   },
   mascotImage: {
     width: 96,
