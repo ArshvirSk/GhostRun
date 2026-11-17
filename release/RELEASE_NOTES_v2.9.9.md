@@ -1,9 +1,9 @@
-# GhostRun v2.9.9 Release Notes — Join Room Restyling, Live Camera QR Viewfinder, Friends Live Search & Tactical Deep Linking
+# GhostRun v2.9.9 Release Notes — Join Room Restyling, Live Camera QR Viewfinder, Friends Live Search & Clickable HTTPS Tactical Invites
 
 **Release Date:** 2026-11-18  
 **Artifact:** `release/GhostRun-v2.9.9.apk`  
-**Size:** 57,260,912 bytes (54.61 MB)  
-**SHA-256 Checksum:** `7AF9A548251BE2EC411C940C98C400D5BEF1EDD2DE09243ACBF1B8394A28E442`  
+**Size:** 57,261,032 bytes (54.61 MB)  
+**SHA-256 Checksum:** `939B446B8DAAF7FD62405CD482820C4612274AA0DD49121DD1041FC941F6F739`  
 **Version:** `2.9.9`  
 **VersionCode:** `24`  
 **Architecture:** `arm64-v8a`  
@@ -13,7 +13,13 @@
 
 ## Overview
 
-GhostRun **v2.9.9** delivers critical improvements across the multiplayer onboarding flow, friends management system, and live camera subsystem:
+GhostRun **v2.9.9** delivers critical improvements across the multiplayer onboarding flow, friends management system, live camera subsystem, and tactical share links:
+
+- **Clickable HTTPS Tactical Invites (`app/friends.tsx`, `docs/invite/index.html`)**:
+  - Replaced non-linkified custom scheme URIs (`ghost-run://`) with a universally clickable, secure HTTPS web URL: `https://arshvirsk.github.io/GhostRun/invite?add=<identifier>`.
+  - Recognized and linkified automatically across WhatsApp, Discord, Telegram, SMS, Instagram, and Messenger.
+  - Hosted directly via GitHub Pages on the repository, featuring an auto-launch intent script that immediately opens the GhostRun app to the Add Operative tab.
+  - Includes tactical landing card showing operative codename, avatar, and one-tap fallback to download the release APK.
 
 - **Friends Network Live Search & Matching (`app/friends.tsx`, `src/lib/friends.ts`)**:
   - Resolved operative lookup failures where searching by codename or unhandled profile returned "Player not found".
@@ -21,12 +27,6 @@ GhostRun **v2.9.9** delivers critical improvements across the multiplayer onboar
   - Added debounced live search in Tab 3 ("ADD") displaying match cards with initial avatar, operative name, `@handle`, and real-time relationship badges ("Connected", "Sent", "Accept", or "Add").
   - Updated `send_friend_request` RPC on the backend to match operatives by either `display_name` or `handle`.
   - Added a search filter bar to Tab 1 ("FRIENDS") to swiftly search through connected allies.
-
-- **Invite Link 404 Resolution & Deep Link Routing (`app/friends.tsx`, `src/lib/friendsCore.ts`)**:
-  - Eliminated the non-functional `https://ghostrun.app/join?friend_invite=self` link that prompted Chrome to return a 404 page.
-  - Implemented `formatFriendDeepLink(identifier)` producing custom URI scheme links (`ghost-run://friends?add=<identifier>`).
-  - Native share message now includes the operative's tag, direct in-app deep link, and fallback download link to the latest GitHub release (`https://github.com/ArshvirSk/GhostRun/releases/latest`).
-  - Added deep-link route parameter consumption (`useLocalSearchParams<{ add?: string }>()`) in `app/friends.tsx` that auto-navigates to the Add tab and populates the target operative codename.
 
 - **Live Camera QR Viewfinder (`app/join.tsx`)**:
   - Replaced the previous static placeholder block with a fully operational, real-time `CameraView` powered by `expo-camera`.
