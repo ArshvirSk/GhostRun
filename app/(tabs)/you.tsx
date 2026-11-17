@@ -360,7 +360,7 @@ export function YouContent() {
               >
                 <Text style={styles.avatarInitial}>{initial}</Text>
               </View>
-              <View style={[styles.avatarLiveBadge, { backgroundColor: colors.primary }]} />
+              <View style={[styles.avatarLiveBadge, { backgroundColor: signatureColor }]} />
             </View>
 
             {/* Operative Callsign & Credentials */}
@@ -371,14 +371,16 @@ export function YouContent() {
                     styles.tagBadge,
                     {
                       backgroundColor: isDark
-                        ? 'rgba(199, 243, 107, 0.12)'
-                        : 'rgba(85, 122, 34, 0.10)',
-                      borderColor: colors.primary,
+                        ? 'rgba(255, 255, 255, 0.08)'
+                        : 'rgba(0, 0, 0, 0.05)',
+                      borderColor: isDark
+                        ? 'rgba(255, 255, 255, 0.16)'
+                        : 'rgba(0, 0, 0, 0.12)',
                     },
                   ]}
                 >
-                  <Text style={[styles.tagBadgeText, { color: colors.primary }]}>
-                    #{shortId}
+                  <Text style={[styles.tagBadgeText, { color: colors.textSecondary }]}>
+                    OP-{shortId}
                   </Text>
                 </View>
               </View>
@@ -393,45 +395,68 @@ export function YouContent() {
             </View>
           </View>
 
-          {/* Quick Monochromatic Theme & Palette Selector (2 Rows of 8, Fully Visible) */}
+          {/* Quick Monochromatic Theme & Palette Selector (2 Rows of 8, Perfectly Aligned) */}
           <View
             style={[
               styles.quickThemeBar,
               { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' },
             ]}
           >
-            <View style={styles.quickPaletteGrid}>
-              {colors.palette.map((c) => {
-                const isSelected = (profile?.color || colors.primary).toLowerCase() === c.toLowerCase();
-                return (
-                  <Pressable
-                    key={`quick-${c}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Select theme color ${c}`}
-                    onPress={() => void handleSelectColor(c)}
-                    style={[
-                      styles.paletteSwatch,
-                      { backgroundColor: c },
-                      isSelected && {
-                        borderWidth: 2,
-                        borderColor: '#FFFFFF',
-                        transform: [{ scale: 1.12 }],
-                      },
-                    ]}
-                  >
-                    {isSelected && (
-                      <Ionicons name="checkmark-sharp" size={16} color="#000000" />
-                    )}
-                  </Pressable>
-                );
-              })}
+            <View style={styles.paletteGrid}>
+              <View style={styles.paletteRow}>
+                {colors.palette.slice(0, 8).map((c) => {
+                  const isSelected = (profile?.color || colors.primary).toLowerCase() === c.toLowerCase();
+                  const isLight = ['#c7f36b', '#fbbf24', '#38bdf8', '#b8a3ff', '#14b8a6', '#84cc16'].includes(c.toLowerCase());
+                  return (
+                    <Pressable
+                      key={`quick-${c}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select theme color ${c}`}
+                      onPress={() => void handleSelectColor(c)}
+                      style={[
+                        styles.paletteSwatch,
+                        { backgroundColor: c },
+                        isSelected && styles.paletteSwatchSelected,
+                      ]}
+                    >
+                      {isSelected && (
+                        <Ionicons name="checkmark-sharp" size={16} color={isLight ? '#000000' : '#FFFFFF'} />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={[styles.paletteRow, { marginTop: 10 }]}>
+                {colors.palette.slice(8, 16).map((c) => {
+                  const isSelected = (profile?.color || colors.primary).toLowerCase() === c.toLowerCase();
+                  const isLight = ['#c7f36b', '#fbbf24', '#38bdf8', '#b8a3ff', '#14b8a6', '#84cc16'].includes(c.toLowerCase());
+                  return (
+                    <Pressable
+                      key={`quick-${c}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select theme color ${c}`}
+                      onPress={() => void handleSelectColor(c)}
+                      style={[
+                        styles.paletteSwatch,
+                        { backgroundColor: c },
+                        isSelected && styles.paletteSwatchSelected,
+                      ]}
+                    >
+                      {isSelected && (
+                        <Ionicons name="checkmark-sharp" size={16} color={isLight ? '#000000' : '#FFFFFF'} />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
           </View>
 
-          {/* Edit Callsign & Signature Trigger */}
+          {/* Edit Callsign Trigger */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Edit Profile and Radar Color"
+            accessibilityLabel="Edit Codename"
             onPress={() => {
               triggerHaptic('buttonTap');
               setIsEditing(!isEditing);
@@ -450,7 +475,7 @@ export function YouContent() {
               color={colors.text}
             />
             <Text style={[styles.editTriggerText, { color: colors.text }]}>
-              {isEditing ? 'Close Editor' : 'Edit Profile & Color'}
+              {isEditing ? 'Close Editor' : 'Edit Codename'}
             </Text>
           </Pressable>
 
@@ -477,41 +502,8 @@ export function YouContent() {
                 ]}
               />
 
-              <Text
-                style={[
-                  styles.inputLabel,
-                  { color: colors.textMuted, marginTop: 14, marginBottom: 8 },
-                ]}
-              >
-                PLAYER COLOR
-              </Text>
-              <View style={styles.paletteRow}>
-                {colors.palette.map((c) => {
-                  const isSelected = draftColor.toLowerCase() === c.toLowerCase();
-                  return (
-                    <Pressable
-                      key={c}
-                      onPress={() => void handleSelectColor(c)}
-                      style={[
-                        styles.paletteSwatch,
-                        { backgroundColor: c },
-                        isSelected && {
-                          borderWidth: 2,
-                          borderColor: '#FFFFFF',
-                          transform: [{ scale: 1.15 }],
-                        },
-                      ]}
-                    >
-                      {isSelected && (
-                        <Ionicons name="checkmark-sharp" size={16} color="#000000" />
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-
               <Button
-                title={savingProfile ? 'Updating Profile…' : 'Save Profile'}
+                title={savingProfile ? 'Updating Codename…' : 'Save Codename'}
                 variant="primary"
                 size="md"
                 disabled={savingProfile || !draftName.trim()}
@@ -1258,19 +1250,13 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
   },
-  quickPaletteGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 2,
+  paletteGrid: {
+    paddingVertical: 4,
   },
   paletteRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    paddingVertical: 6,
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   paletteSwatch: {
     width: 32,
@@ -1278,6 +1264,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  paletteSwatchSelected: {
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    transform: [{ scale: 1.14 }],
   },
   sectionHeading: {
     fontFamily: 'Archivo-SemiBold',
