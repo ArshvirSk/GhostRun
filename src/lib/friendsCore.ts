@@ -39,6 +39,14 @@ export interface HostPresence {
   expiresAt: string;
 }
 
+export interface SearchedOperative {
+  id: string;
+  displayName: string;
+  handle: string | null;
+  color: string;
+  relationship: 'friend' | 'pending_outgoing' | 'pending_incoming' | 'none';
+}
+
 export interface FriendSettings {
   allowFriendRequests: boolean;
   showPresence: boolean;
@@ -80,4 +88,11 @@ export function isPresenceExpired(
  */
 export function formatFriendInviteUrl(token: string, baseUrl: string = 'https://ghostrun.app'): string {
   return `${baseUrl}/join?friend_invite=${token}`;
+}
+
+/**
+ * Formats a tactical deep link to open GhostRun directly to add an operative.
+ */
+export function formatFriendDeepLink(identifier: string): string {
+  return `ghost-run://friends?add=${encodeURIComponent(identifier)}`;
 }

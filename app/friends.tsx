@@ -15,10 +15,11 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../src/theme/ThemeProvider';
+import { useUserStore } from '../src/stores/userStore';
 import { Text } from '../src/ui/Text';
 import { Card } from '../src/ui/Card';
 import { Button } from '../src/ui/Button';
@@ -29,7 +30,9 @@ import {
   FriendProfile,
   FriendRequest,
   FriendSettings,
+  SearchedOperative,
   formatFriendInviteUrl,
+  formatFriendDeepLink,
 } from '../src/lib/friendsCore';
 import {
   listFriends,
@@ -39,6 +42,7 @@ import {
   removeFriend,
   updateFriendSettings,
   fetchFriendSettings,
+  searchOperatives,
 } from '../src/lib/friends';
 import { listMyBlocks, unblockUser } from '../src/lib/moderation';
 import { BlockItem } from '../src/lib/moderationCore';
@@ -47,9 +51,11 @@ type FriendsTabKey = 'friends' | 'requests' | 'add' | 'privacy';
 
 export default function FriendsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ add?: string; tab?: string }>();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const { colors, spacing, radii, isDark } = useTheme();
+  const userProfile = useUserStore((s) => s.profile);
 
   const [activeTab, setActiveTab] = useState<FriendsTabKey>('friends');
   const [loading, setLoading] = useState(true);
@@ -58,11 +64,19 @@ export default function FriendsScreen() {
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
   const [blocks, setBlocks] = useState<BlockItem[]>([]);
 
+  // Filter in Tab 1 (Friends)
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+
   // Add friend state
   const [targetHandle, setTargetHandle] = useState('');
   const [sendingRequest, setSendingRequest] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [statusType, setStatusType] = useState<'success' | 'error' | ''>('');
+
+  // Live search state
+  const [searchResults, setSearchResults] = useState<SearchedOperative[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Privacy settings state
   const [settings, setSettings] = useState<FriendSettings>({
@@ -108,6 +122,52 @@ export default function FriendsScreen() {
     void loadData();
   }, [loadData]);
 
+  // Handle deep link / navigation parameter (e.g. ghost-run://friends?add=AlphaOP)
+  useEffect(() => {
+    if (params.add) {
+      const decoded = decodeURIComponent(params.add).trim();
+      if (decoded) {
+        setTargetHandle(decoded);
+        setActiveTab('add');
+        setTimeout(() => {
+          pagerRef.current?.scrollTo({ x: 2 * screenWidth, animated: true });
+        }, 100);
+      }
+    }
+  }, [params.add, screenWidth]);
+
+  // Live debounced search for operatives in registry
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    const trimmed = targetHandle.trim().replace(/^@/, '');
+    if (trimmed.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await searchOperatives(trimmed);
+        setSearchResults(results);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [targetHandle]);
+
   const handleTabChange = (id: string) => {
     const tabKey = id as FriendsTabKey;
     setActiveTab(tabKey);
@@ -129,8 +189,8 @@ export default function FriendsScreen() {
     }
   };
 
-  const handleSendRequest = async () => {
-    const clean = targetHandle.trim().replace(/^@/, '');
+  const handleSendRequestTo = async (handleOrName: string) => {
+    const clean = handleOrName.trim().replace(/^@/, '');
     if (!clean) return;
 
     setSendingRequest(true);
@@ -145,17 +205,22 @@ export default function FriendsScreen() {
       setStatusType('success');
       setStatusMessage(
         res.status === 'already_friends'
-          ? `You and @${clean} are already connected!`
-          : `Tactical friend request dispatched to @${clean}.`
+          ? `You and ${clean} are already connected!`
+          : res.status === 'accepted'
+          ? `Friend request accepted! You and ${clean} are now connected.`
+          : `Tactical friend request dispatched to ${clean}.`
       );
-      setTargetHandle('');
       void loadData();
+      // Re-query search to update status badge
+      void searchOperatives(clean).then(setSearchResults);
     } else {
       triggerHaptic('error');
       setStatusType('error');
       setStatusMessage(res.error || res.reason || 'Could not send request.');
     }
   };
+
+  const handleSendRequest = () => handleSendRequestTo(targetHandle);
 
   const handleRespond = async (requesterId: string | undefined, action: 'accept' | 'decline') => {
     if (!requesterId) return;
@@ -164,6 +229,10 @@ export default function FriendsScreen() {
     if (res.success) {
       triggerHaptic(action === 'accept' ? 'tagConfirmed' : 'error');
       void loadData();
+      const currentQuery = targetHandle.trim().replace(/^@/, '');
+      if (currentQuery.length >= 2) {
+        void searchOperatives(currentQuery).then(setSearchResults);
+      }
     } else {
       Alert.alert('Error', res.error || 'Failed to update request');
     }
@@ -196,11 +265,18 @@ export default function FriendsScreen() {
   const handleShareInvite = async () => {
     triggerHaptic('buttonTap');
     try {
-      const url = formatFriendInviteUrl('self');
+      const tag = userProfile?.handle
+        ? `@${userProfile.handle}`
+        : userProfile?.display_name
+        ? `@${userProfile.display_name}`
+        : 'Operative';
+      const myIdentifier = userProfile?.handle || userProfile?.display_name || 'Operative';
+      const deepLink = formatFriendDeepLink(myIdentifier);
+      const downloadUrl = 'https://github.com/ArshvirSk/GhostRun/releases/latest';
+
       await Share.share({
         title: 'Join my GhostRun Network',
-        message: `Deploy with me on GhostRun! Connect to my operative network: ${url}`,
-        url,
+        message: `Deploy with me on GhostRun! Connect to my operative network (${tag}):\n\n⚡ Open in GhostRun:\n${deepLink}\n\n📦 Download GhostRun:\n${downloadUrl}`,
       });
     } catch {
       // share dismissed
@@ -331,11 +407,45 @@ export default function FriendsScreen() {
                     Share Tactical Invite Link
                   </Text>
                   <Text style={[styles.inviteBannerSub, { color: colors.textMuted }]}>
-                    Invite allies via WhatsApp, Discord, or link
+                    Invite allies via WhatsApp, Discord, or tactical link
                   </Text>
                 </View>
                 <Ionicons name="arrow-forward" size={16} color={colors.primary} />
               </Pressable>
+
+              {/* Filter Bar when friends exist */}
+              {friends.length > 0 && (
+                <View
+                  style={[
+                    styles.filterBox,
+                    {
+                      backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Ionicons name="search-outline" size={16} color={colors.textMuted} />
+                  <TextInput
+                    value={friendSearchQuery}
+                    onChangeText={setFriendSearchQuery}
+                    placeholder="Filter connected operatives..."
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={[styles.filterInput, { color: colors.text }]}
+                  />
+                  {friendSearchQuery.length > 0 && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear filter"
+                      onPress={() => setFriendSearchQuery('')}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+                    </Pressable>
+                  )}
+                </View>
+              )}
 
               {friends.length === 0 ? (
                 <Card
@@ -363,8 +473,40 @@ export default function FriendsScreen() {
                     style={{ marginTop: 14 }}
                   />
                 </Card>
+              ) : friends.filter((f) => {
+                  if (!friendSearchQuery.trim()) return true;
+                  const q = friendSearchQuery.toLowerCase().trim();
+                  return (
+                    f.displayName.toLowerCase().includes(q) ||
+                    (f.handle && f.handle.toLowerCase().includes(q))
+                  );
+                }).length === 0 ? (
+                <Card
+                  variant="default"
+                  style={[
+                    styles.emptySubCard,
+                    {
+                      backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                      borderColor: colors.border,
+                      marginTop: 8,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.emptySubText, { color: colors.textMuted }]}>
+                    No connected operatives match "{friendSearchQuery}".
+                  </Text>
+                </Card>
               ) : (
-                friends.map((f) => {
+                friends
+                  .filter((f) => {
+                    if (!friendSearchQuery.trim()) return true;
+                    const q = friendSearchQuery.toLowerCase().trim();
+                    return (
+                      f.displayName.toLowerCase().includes(q) ||
+                      (f.handle && f.handle.toLowerCase().includes(q))
+                    );
+                  })
+                  .map((f) => {
                   const initial = (f.displayName || '?')[0].toUpperCase();
                   return (
                     <Card
@@ -592,6 +734,7 @@ export default function FriendsScreen() {
                 { paddingBottom: Math.max(insets.bottom, 16) + 80 },
               ]}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
               <Card
                 variant="default"
@@ -606,29 +749,158 @@ export default function FriendsScreen() {
                 <View style={styles.cardHeaderRow}>
                   <Ionicons name="person-add-outline" size={20} color={colors.primary} />
                   <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>
-                    Send Tactical Invite
+                    Find & Add Operative
                   </Text>
                 </View>
                 <Text style={[styles.cardHeaderSub, { color: colors.textMuted }]}>
-                  Enter an operative’s exact codename or handle to dispatch a friend request.
+                  Type a codename or @handle to search the operative network live.
                 </Text>
 
-                <TextInput
-                  value={targetHandle}
-                  onChangeText={setTargetHandle}
-                  placeholder="e.g. ShadowRunner or @ShadowRunner"
-                  placeholderTextColor={colors.textMuted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={[
-                    styles.textInput,
-                    {
-                      backgroundColor: isDark ? colors.surface : colors.surfaceElevated,
-                      color: colors.text,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                />
+                <View style={styles.inputRow}>
+                  <TextInput
+                    value={targetHandle}
+                    onChangeText={setTargetHandle}
+                    placeholder="e.g. AlphaOP or @AlphaOP"
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="search"
+                    onSubmitEditing={() => void handleSendRequest()}
+                    style={[
+                      styles.textInput,
+                      {
+                        backgroundColor: isDark ? colors.surface : colors.surfaceElevated,
+                        color: colors.text,
+                        borderColor: colors.border,
+                        flex: 1,
+                        paddingRight: targetHandle ? 40 : 14,
+                      },
+                    ]}
+                  />
+                  {targetHandle.length > 0 && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear input"
+                      onPress={() => {
+                        setTargetHandle('');
+                        setSearchResults([]);
+                        setStatusMessage('');
+                      }}
+                      style={styles.inputClearBtn}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                    </Pressable>
+                  )}
+                </View>
+
+                {isSearching && (
+                  <View style={styles.searchingRow}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={[styles.searchingText, { color: colors.textMuted }]}>
+                      Searching operative registry…
+                    </Text>
+                  </View>
+                )}
+
+                {/* Live Search Results */}
+                {searchResults.length > 0 && (
+                  <View style={{ marginTop: 14 }}>
+                    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+                      MATCHING OPERATIVES ({searchResults.length})
+                    </Text>
+                    {searchResults.map((op) => {
+                      const initial = (op.displayName || '?')[0].toUpperCase();
+                      return (
+                        <View
+                          key={op.id}
+                          style={[
+                            styles.searchResultCard,
+                            {
+                              backgroundColor: isDark ? colors.surface : colors.surfaceElevated,
+                              borderColor: colors.border,
+                            },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.avatarCircleSmall,
+                              { backgroundColor: op.color || colors.primary },
+                            ]}
+                          >
+                            <Text style={styles.avatarInitialSmall}>{initial}</Text>
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 10 }}>
+                            <Text style={[styles.friendName, { color: colors.text }]}>
+                              {op.displayName}
+                            </Text>
+                            <Text style={[styles.friendHandle, { color: colors.textMuted }]}>
+                              {op.handle ? `@${op.handle}` : `@${op.displayName}`}
+                            </Text>
+                          </View>
+                          {op.relationship === 'friend' ? (
+                            <View
+                              style={[
+                                styles.statusBadge,
+                                {
+                                  backgroundColor: isDark
+                                    ? 'rgba(74, 222, 128, 0.15)'
+                                    : 'rgba(22, 101, 52, 0.12)',
+                                  borderColor: colors.success,
+                                },
+                              ]}
+                            >
+                              <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                              <Text style={[styles.statusBadgeText, { color: colors.success }]}>
+                                Connected
+                              </Text>
+                            </View>
+                          ) : op.relationship === 'pending_outgoing' ? (
+                            <View
+                              style={[
+                                styles.statusBadge,
+                                {
+                                  backgroundColor: isDark
+                                    ? 'rgba(234, 179, 8, 0.15)'
+                                    : 'rgba(161, 98, 7, 0.12)',
+                                  borderColor: '#EAB308',
+                                },
+                              ]}
+                            >
+                              <Ionicons name="time-outline" size={14} color="#EAB308" />
+                              <Text style={[styles.statusBadgeText, { color: '#EAB308' }]}>
+                                Sent
+                              </Text>
+                            </View>
+                          ) : op.relationship === 'pending_incoming' ? (
+                            <Button
+                              title="Accept"
+                              variant="primary"
+                              size="sm"
+                              onPress={() => void handleRespond(op.id, 'accept')}
+                            />
+                          ) : (
+                            <Button
+                              title="Add"
+                              variant="primary"
+                              size="sm"
+                              disabled={sendingRequest}
+                              onPress={() => void handleSendRequestTo(op.handle || op.displayName)}
+                            />
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {!isSearching && targetHandle.trim().length >= 2 && searchResults.length === 0 && (
+                  <View style={[styles.searchEmptyNote, { borderColor: colors.border }]}>
+                    <Text style={[styles.searchEmptyNoteText, { color: colors.textMuted }]}>
+                      No registered operative matches "{targetHandle.trim()}". You can still dispatch an invitation below.
+                    </Text>
+                  </View>
+                )}
 
                 {statusMessage !== '' && (
                   <View
@@ -696,11 +968,11 @@ export default function FriendsScreen() {
                 <View style={styles.cardHeaderRow}>
                   <Ionicons name="link-outline" size={20} color={colors.accent || colors.primary} />
                   <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>
-                    Universal Tactical Link
+                    Tactical Invite Link
                   </Text>
                 </View>
                 <Text style={[styles.cardHeaderSub, { color: colors.textMuted }]}>
-                  Broadcast your personalized invite link to recruit new squadmates.
+                  Broadcast your personalized operative link to recruit allies and squadmates.
                 </Text>
 
                 <Button
@@ -1071,5 +1343,88 @@ const styles = StyleSheet.create({
     fontFamily: 'SegoeUI-Regular',
     fontSize: 11,
     marginTop: 2,
+  },
+  filterBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  filterInput: {
+    flex: 1,
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  inputClearBtn: {
+    position: 'absolute',
+    right: 12,
+    padding: 4,
+  },
+  searchingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  searchingText: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 12,
+  },
+  searchResultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  avatarCircleSmall: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitialSmall: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  statusBadgeText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  searchEmptyNote: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  searchEmptyNoteText: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });

@@ -8,6 +8,7 @@ import {
   FriendRequest,
   HostPresence,
   FriendSettings,
+  SearchedOperative,
 } from './friendsCore';
 
 export async function sendFriendRequest(targetHandle: string): Promise<{
@@ -245,5 +246,33 @@ export async function updateFriendSettings(
       success: false,
       error: err instanceof Error ? err.message : 'Failed to update settings',
     };
+  }
+}
+
+export async function searchOperatives(query: string): Promise<SearchedOperative[]> {
+  if (!supabase) return [];
+  const clean = query.trim();
+  if (!clean) return [];
+
+  try {
+    const { data, error } = await supabase.rpc('search_operatives', {
+      p_query: clean,
+    });
+    if (error || !data) return [];
+    return (data as Array<{
+      id: string;
+      display_name: string;
+      handle: string | null;
+      color: string;
+      relationship: 'friend' | 'pending_outgoing' | 'pending_incoming' | 'none';
+    }>).map((item) => ({
+      id: item.id,
+      displayName: item.display_name,
+      handle: item.handle,
+      color: item.color,
+      relationship: item.relationship,
+    }));
+  } catch {
+    return [];
   }
 }

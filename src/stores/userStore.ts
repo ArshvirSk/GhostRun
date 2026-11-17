@@ -8,6 +8,7 @@ export const USER_PROFILE_KEY = '@ghostrun:profile';
 export interface UserProfile {
   id: string;
   display_name: string;
+  handle?: string | null;
   color: string;
   email?: string;
   created_at?: string;
@@ -39,6 +40,7 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
     const merged: UserProfile = {
       id: updated.id || current?.id || 'local_user',
       display_name: updated.display_name,
+      handle: updated.handle !== undefined ? updated.handle : current?.handle,
       color: updated.color || current?.color || colors.palette[0],
       email: updated.email || current?.email,
       created_at: updated.created_at || current?.created_at,
@@ -70,7 +72,7 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, color, created_at')
+        .select('id, display_name, handle, color, created_at')
         .eq('id', uid)
         .maybeSingle();
 
@@ -79,6 +81,7 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
       const synced: UserProfile = {
         id: data.id,
         display_name: data.display_name || get().profile?.display_name || 'Operative',
+        handle: data.handle ?? get().profile?.handle ?? null,
         color: data.color || get().profile?.color || colors.palette[0],
         created_at: data.created_at,
       };
@@ -103,6 +106,7 @@ AsyncStorage.getItem(USER_PROFILE_KEY)
             profile: {
               id: parsed.id || 'local_user',
               display_name: parsed.display_name,
+              handle: parsed.handle ?? null,
               color: parsed.color || colors.palette[0],
               email: parsed.email,
               created_at: parsed.created_at,

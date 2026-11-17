@@ -22,7 +22,9 @@ import {
   FriendRequest,
   FriendSettings,
   formatFriendInviteUrl,
+  formatFriendDeepLink,
 } from '../lib/friendsCore';
+import { useUserStore } from '../stores/userStore';
 import {
   listFriends,
   listFriendRequests,
@@ -53,6 +55,7 @@ export function FriendsSheet({ visible, onClose }: FriendsSheetProps) {
   const [targetHandle, setTargetHandle] = useState('');
   const [sendingRequest, setSendingRequest] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+  const userProfile = useUserStore((s) => s.profile);
 
   // Privacy settings state
   const [settings, setSettings] = useState<FriendSettings>({
@@ -158,11 +161,19 @@ export function FriendsSheet({ visible, onClose }: FriendsSheetProps) {
   };
 
   const handleShareInvite = async () => {
-    const fakeToken = `inv_${Math.random().toString(36).substring(2, 10)}`;
-    const url = formatFriendInviteUrl(fakeToken);
+    const tag = userProfile?.handle
+      ? `@${userProfile.handle}`
+      : userProfile?.display_name
+      ? `@${userProfile.display_name}`
+      : 'Operative';
+    const myIdentifier = userProfile?.handle || userProfile?.display_name || 'Operative';
+    const deepLink = formatFriendDeepLink(myIdentifier);
+    const downloadUrl = 'https://github.com/ArshvirSk/GhostRun/releases/latest';
+
     try {
       await Share.share({
-        message: `Add me on GhostRun for private games and Echo leaderboards: ${url}`,
+        title: 'GhostRun Operative Invite',
+        message: `Deploy with me on GhostRun! Connect to my operative network (${tag}):\n\n⚡ Open in GhostRun:\n${deepLink}\n\n📦 Download GhostRun:\n${downloadUrl}`,
       });
     } catch {
       // share dismissed

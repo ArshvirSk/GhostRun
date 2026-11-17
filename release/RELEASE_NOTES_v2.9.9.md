@@ -1,9 +1,9 @@
-# GhostRun v2.9.9 Release Notes — Join Room Restyling, Live Camera QR Viewfinder & Tactical Branding
+# GhostRun v2.9.9 Release Notes — Join Room Restyling, Live Camera QR Viewfinder, Friends Live Search & Tactical Deep Linking
 
 **Release Date:** 2026-11-18  
 **Artifact:** `release/GhostRun-v2.9.9.apk`  
-**Size:** 57,253,696 bytes (54.60 MB)  
-**SHA-256 Checksum:** `84665A5FEDBAE383868A1C6EBE49DDBB128CBA8964B79325E9B81335E52CE34F`  
+**Size:** 57,260,912 bytes (54.61 MB)  
+**SHA-256 Checksum:** `7AF9A548251BE2EC411C940C98C400D5BEF1EDD2DE09243ACBF1B8394A28E442`  
 **Version:** `2.9.9`  
 **VersionCode:** `24`  
 **Architecture:** `arm64-v8a`  
@@ -13,23 +13,34 @@
 
 ## Overview
 
-GhostRun **v2.9.9** delivers a major upgrade to the multiplayer onboarding and lobby entry experience:
+GhostRun **v2.9.9** delivers critical improvements across the multiplayer onboarding flow, friends management system, and live camera subsystem:
+
+- **Friends Network Live Search & Matching (`app/friends.tsx`, `src/lib/friends.ts`)**:
+  - Resolved operative lookup failures where searching by codename or unhandled profile returned "Player not found".
+  - Deployed `search_operatives(p_query text)` RPC on Supabase PostgreSQL supporting live, case-insensitive substring and exact matches against both `display_name` and `handle` (with optional `@`).
+  - Added debounced live search in Tab 3 ("ADD") displaying match cards with initial avatar, operative name, `@handle`, and real-time relationship badges ("Connected", "Sent", "Accept", or "Add").
+  - Updated `send_friend_request` RPC on the backend to match operatives by either `display_name` or `handle`.
+  - Added a search filter bar to Tab 1 ("FRIENDS") to swiftly search through connected allies.
+
+- **Invite Link 404 Resolution & Deep Link Routing (`app/friends.tsx`, `src/lib/friendsCore.ts`)**:
+  - Eliminated the non-functional `https://ghostrun.app/join?friend_invite=self` link that prompted Chrome to return a 404 page.
+  - Implemented `formatFriendDeepLink(identifier)` producing custom URI scheme links (`ghost-run://friends?add=<identifier>`).
+  - Native share message now includes the operative's tag, direct in-app deep link, and fallback download link to the latest GitHub release (`https://github.com/ArshvirSk/GhostRun/releases/latest`).
+  - Added deep-link route parameter consumption (`useLocalSearchParams<{ add?: string }>()`) in `app/friends.tsx` that auto-navigates to the Add tab and populates the target operative codename.
 
 - **Live Camera QR Viewfinder (`app/join.tsx`)**:
   - Replaced the previous static placeholder block with a fully operational, real-time `CameraView` powered by `expo-camera`.
   - Tactical HUD overlay with 4 neon mint corner brackets, a live scanning status badge, and an animated laser sweep line.
   - Built-in torch (flashlight) toggle for scanning host QR codes in dark outdoor or park environments.
-  - Automatic parsing of web invite links (`https://ghostrun.app/join/ABCD`), deep links (`ghost-run://join?code=ABCD`), and direct 4-character codes with acoustic confirmation chime (`scan_success`), tactical vibration, and automatic lobby connection.
+  - Automatic parsing of web invite links, deep links (`ghost-run://join?code=ABCD`), and direct 4-character codes with acoustic confirmation chime (`scan_success`), tactical vibration, and automatic lobby connection.
   - Graceful camera permission handling with a dedicated tactical authorization card and one-tap access grant.
 
 - **Join Room Restyling & GhostRun Branding (`app/join.tsx`)**:
-  - Integrated official GhostRun brand mark (`ghostrun-mark-mint.png` / `ghostrun-mark-olive.png`), styled `GHOST`**`RUN`** logotype, and `v2.9.9` version pill in the top navigation bar.
-  - Added a tactical `SQUAD INFILTRATION` badge with a pulsing indicator.
-  - Implemented a dedicated "Clear code" action for quick code corrections.
-  - Polished Obsidian dark theme styling with high-contrast inputs and tactile feedback.
+  - Integrated official GhostRun brand mark, styled `GHOST`**`RUN`** logotype, top-aligned layout, and dynamic monochrome theme adaptation.
+  - Polished Obsidian dark theme styling with high-contrast inputs and tactical feedback.
 
 - **Android CodeBoxes Backspace & Focus Fix (`src/ui/CodeBoxes.tsx`)**:
-  - Resolved an Android keyboard bug where deleting a character left the focus trapped in the empty box, preventing smooth backspacing across code digits. Focus now shifts backward automatically when a character is cleared.
+  - Resolved an Android keyboard bug where deleting a character left the focus trapped in the empty box. Focus now shifts backward automatically when a character is cleared.
   - Switched keyboard type to `default` with `autoCapitalize="characters"` on Android to eliminate password masking and eye-icon artifacts.
 
 - **Roadmap & Mode Specification Updates**:
