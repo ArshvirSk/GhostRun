@@ -81,46 +81,56 @@ export const TacticalPullRefreshScrollView = forwardRef<
     return Math.min(maxPullHeight, thresholdHeight * 0.95 + stretch);
   };
 
-  // Guarded refresh executor — Snapchat-style: releases directly back to 0 with zero hanging or reopening
-  const executeRefresh = () => {
+  // Guarded refresh executor — guaranteed single execution with smooth hold and clean spring-shut
+  const executeRefresh = async () => {
     if (refreshStatusRef.current === 'refreshing' || refreshStatusRef.current === 'closing') {
       return;
     }
-    refreshStatusRef.current = 'closing';
+    refreshStatusRef.current = 'refreshing';
 
-    // Smoothly spring curtain directly shut immediately upon finger release (pure Snapchat interaction)
+    // Smoothly snap to resting height while data syncs
     Animated.spring(pullAnim, {
-      toValue: 0,
+      toValue: restingHeight,
       useNativeDriver: false,
-      friction: 9,
-      tension: 48,
-    }).start(() => {
-      refreshStatusRef.current = 'idle';
-      currentPullRef.current = 0;
-      hasTriggeredHaptic.current = false;
-      lastRefreshEndTimeRef.current = Date.now();
-    });
+      friction: 8,
+      tension: 44,
+    }).start();
 
-    // Execute background data sync asynchronously — completely decoupled from UI curtain closing
     try {
-      void Promise.resolve(onRefresh?.());
+      await Promise.all([
+        Promise.resolve(onRefresh?.()),
+        new Promise((resolve) => setTimeout(resolve, 550)),
+      ]);
     } catch {
-      // Graceful fallback
+      // Graceful fallback on network glitch
+    } finally {
+      refreshStatusRef.current = 'closing';
+      Animated.spring(pullAnim, {
+        toValue: 0,
+        useNativeDriver: false,
+        friction: 9,
+        tension: 52,
+      }).start(() => {
+        refreshStatusRef.current = 'idle';
+        currentPullRef.current = 0;
+        hasTriggeredHaptic.current = false;
+        lastRefreshEndTimeRef.current = Date.now();
+      });
     }
   };
 
   // Responsive gesture disambiguation:
-  // 1. Must be idle and past debounce cooldown
+  // 1. Must be idle and past 500ms post-refresh lockout (completely blocks momentum flings from re-opening)
   // 2. Must be at top of list (scrollY <= 1)
-  // 3. dy > 6: captures intentional downward pull while ignoring static finger touches
-  // 4. dy > |dx| * 1.8: allows vertical pull while letting horizontal tab paging pass freely
+  // 3. dy > 4: captures immediately on intentional downward pull
+  // 4. dy > |dx| * 1.15: allows downward thumb pulls while letting horizontal tab paging pass freely
   const shouldStartPull = (gestureState: { dx: number; dy: number }) => {
     if (refreshStatusRef.current !== 'idle') return false;
-    if (Date.now() - lastRefreshEndTimeRef.current < 350) return false;
+    if (Date.now() - lastRefreshEndTimeRef.current < 500) return false;
     if (scrollYRef.current > 1) return false;
     return (
-      gestureState.dy > 6 &&
-      gestureState.dy > Math.abs(gestureState.dx) * 1.8
+      gestureState.dy > 4 &&
+      gestureState.dy > Math.abs(gestureState.dx) * 1.15
     );
   };
 
@@ -134,6 +144,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
 
       onPanResponderGrant: () => {
         refreshStatusRef.current = 'pulling';
+        currentPullRef.current = 0;
         hasTriggeredHaptic.current = false;
       },
 
