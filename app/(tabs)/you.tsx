@@ -563,18 +563,19 @@ export function YouContent() {
             },
           ]}
         >
+          {/* Main Echo Metrics Row */}
           <View style={styles.echoTierHeaderRow}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                <Ionicons name="trophy" size={14} color="#F59E0B" />
-                <Text style={[styles.echoTierSeasonLabel, { color: colors.textMuted }]}>
-                  SEASON ECHO DIVISION
-                </Text>
-              </View>
+            {/* Left: Label & Tier */}
+            <View>
+              <Text style={[styles.echoTierSeasonLabel, { color: colors.textMuted }]}>
+                SEASON ECHO
+              </Text>
               <Text style={[styles.echoTierTitle, { color: colors.primary }]}>
                 Tier {echoProfile?.tier || 'Whisper'}
               </Text>
             </View>
+
+            {/* Right: Points & Rates */}
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={[styles.echoTierPts, { color: colors.text }]}>
                 {echoProfile?.echoTotal ?? 0}{' '}
@@ -586,41 +587,33 @@ export function YouContent() {
             </View>
           </View>
 
-          {/* Action Row */}
-          <View style={[styles.echoTierActionRow, { borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="View public profile dossier"
-              onPress={() => {
-                triggerHaptic('buttonTap');
-                if (userId) {
-                  router.push({
-                    pathname: '/profile/[id]',
-                    params: { id: userId, name: profile?.display_name || '', color: profile?.color || '' },
-                  });
-                }
-              }}
-              style={styles.echoTierPillBtn}
-            >
-              <Ionicons name="person-circle-outline" size={14} color={colors.primary} />
-              <Text style={[styles.echoTierPillText, { color: colors.primary }]}>Preview Profile</Text>
-              <Ionicons name="chevron-forward" size={12} color={colors.primary} />
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="View leaderboard"
-              onPress={() => {
-                triggerHaptic('buttonTap');
-                router.push('/leaderboard' as any);
-              }}
-              style={styles.echoTierPillBtn}
-            >
-              <Ionicons name="stats-chart" size={13} color="#F59E0B" />
-              <Text style={[styles.echoTierPillText, { color: colors.text }]}>Leaderboard</Text>
-              <Ionicons name="chevron-forward" size={12} color={colors.textMuted} />
-            </Pressable>
-          </View>
+          {/* Action: Preview Profile */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Preview Public Profile"
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              if (userId) {
+                router.push({
+                  pathname: '/profile/[id]',
+                  params: { id: userId, name: profile?.display_name || '', color: profile?.color || '' },
+                });
+              }
+            }}
+            style={({ pressed }) => [
+              styles.echoTierPreviewBtn,
+              {
+                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+              },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <Text style={[styles.echoTierPreviewText, { color: colors.text }]}>
+              Preview Public Profile
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+          </Pressable>
         </Card>
 
         {/* Social & Competitive Operations Hub (High-Visibility Friends & Leaderboard Cards) */}
@@ -710,7 +703,7 @@ export function YouContent() {
                 },
               ]}
             >
-              <Ionicons name="trophy" size={20} color={colors.accent || '#F59E0B'} />
+              <Ionicons name="trophy-outline" size={20} color={colors.accent || '#F59E0B'} />
             </View>
             <View style={styles.socialHubMeta}>
               <Text
@@ -1599,60 +1592,52 @@ const styles = StyleSheet.create({
   echoTierCard: {
     borderRadius: 16,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 1,
   },
   echoTierHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 14,
   },
   echoTierSeasonLabel: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
+    marginBottom: 4,
   },
   echoTierTitle: {
     fontFamily: 'Archivo-Black',
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: -0.5,
-    marginTop: 2,
   },
   echoTierPts: {
     fontFamily: 'Archivo-Black',
     fontSize: 22,
     fontWeight: '900',
+    marginBottom: 2,
   },
   echoTierSubRates: {
     fontFamily: 'SegoeUI-Regular',
     fontSize: 11,
-    marginTop: 2,
   },
-  echoTierActionRow: {
+  echoTierPreviewBtn: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    gap: 10,
+    height: 42,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
   },
-  echoTierPillBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-  },
-  echoTierPillText: {
+  echoTierPreviewText: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });
 

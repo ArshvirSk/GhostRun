@@ -1047,12 +1047,9 @@ export default function ResultScreen() {
           <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
             <Card variant="elevated" style={styles.cardInner}>
               <View style={styles.cardHeaderRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons color="#F59E0B" name="trophy" size={16} />
-                  <Text variant="label" color="#F59E0B">
-                    SEASON ECHO // COMPETITIVE YIELD
-                  </Text>
-                </View>
+                <Text variant="label" color="#F59E0B">
+                  SEASON ECHO // COMPETITIVE YIELD
+                </Text>
                 <Chip
                   label={roundScore?.counted ? 'SEASON RECORDED' : 'CASUAL ROUND'}
                   variant={roundScore?.counted ? 'accent' : 'default'}

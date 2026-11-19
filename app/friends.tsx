@@ -459,7 +459,7 @@ export default function FriendsScreen() {
                     pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
                   ]}
                 >
-                  <Ionicons name="trophy" size={16} color="#F59E0B" />
+                  <Ionicons name="trophy-outline" size={16} color={colors.accent || colors.primary} />
                   <Text style={[styles.minimalActionText, { color: colors.text }]}>Leaderboard</Text>
                   <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
                 </Pressable>
