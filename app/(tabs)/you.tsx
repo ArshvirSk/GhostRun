@@ -535,31 +535,61 @@ export function YouContent() {
             </View>
           </View>
 
-          {/* Edit Callsign Trigger */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Edit Codename"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              setIsEditing(!isEditing);
-            }}
-            style={[
-              styles.editTriggerBtn,
-              {
-                backgroundColor: isDark ? colors.surfaceMuted : colors.surfaceElevated,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            <Ionicons
-              name={isEditing ? 'close' : 'create-outline'}
-              size={16}
-              color={colors.text}
-            />
-            <Text style={[styles.editTriggerText, { color: colors.text }]}>
-              {isEditing ? 'Close Editor' : 'Edit Codename'}
-            </Text>
-          </Pressable>
+          {/* Operative Action Triggers (Preview Profile & Edit Callsign) */}
+          <View style={styles.avatarActionsRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Preview Public Profile"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                if (userId) {
+                  router.push({
+                    pathname: '/profile/[id]',
+                    params: { id: userId, name: profile?.display_name || '', color: profile?.color || '' },
+                  });
+                }
+              }}
+              style={({ pressed }) => [
+                styles.avatarActionBtn,
+                {
+                  backgroundColor: isDark ? colors.surfaceMuted : colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Ionicons name="person-outline" size={15} color={colors.text} />
+              <Text style={[styles.avatarActionBtnText, { color: colors.text }]}>
+                Preview Profile
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit Codename"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                setIsEditing(!isEditing);
+              }}
+              style={({ pressed }) => [
+                styles.avatarActionBtn,
+                {
+                  backgroundColor: isDark ? colors.surfaceMuted : colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Ionicons
+                name={isEditing ? 'close' : 'create-outline'}
+                size={15}
+                color={colors.text}
+              />
+              <Text style={[styles.avatarActionBtnText, { color: colors.text }]}>
+                {isEditing ? 'Close Editor' : 'Edit Codename'}
+              </Text>
+            </Pressable>
+          </View>
 
           {/* Edit Panel Drawer */}
           {isEditing && (
@@ -596,15 +626,21 @@ export function YouContent() {
           )}
         </Card>
 
-        {/* Season Echo Tier & Standing Card (FL-P2) */}
-        <Card
-          variant="default"
-          style={[
+        {/* Season Echo Tier & Standing Card - Direct Leaderboard Access */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Season Echo Division and Leaderboard"
+          onPress={() => {
+            triggerHaptic('buttonTap');
+            router.push('/leaderboard' as any);
+          }}
+          style={({ pressed }) => [
             styles.echoTierCard,
             {
               backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
               borderColor: colors.border,
             },
+            pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
           ]}
         >
           {/* Main Echo Metrics Row */}
@@ -631,144 +667,78 @@ export function YouContent() {
             </View>
           </View>
 
-          {/* Action: Preview Profile */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Preview Public Profile"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              if (userId) {
-                router.push({
-                  pathname: '/profile/[id]',
-                  params: { id: userId, name: profile?.display_name || '', color: profile?.color || '' },
-                });
-              }
-            }}
-            style={({ pressed }) => [
-              styles.echoTierPreviewBtn,
+          {/* Sleek Leaderboard Access Footer */}
+          <View
+            style={[
+              styles.echoTierFooterRow,
               {
-                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                borderTopColor: isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.06)',
               },
-              pressed && { opacity: 0.8 },
             ]}
           >
-            <Text style={[styles.echoTierPreviewText, { color: colors.text }]}>
-              Preview Public Profile
-            </Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-          </Pressable>
-        </Card>
-
-        {/* Social & Competitive Operations Hub (High-Visibility Friends & Leaderboard Cards) */}
-        <View style={styles.socialHubRow}>
-          {/* Friends Hub Card */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Operative Network (Friends)"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              router.push('/friends' as any);
-            }}
-            style={({ pressed }) => [
-              styles.socialHubCard,
-              {
-                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                borderColor: colors.border,
-              },
-              pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <View
-              style={[
-                styles.socialHubIconWrap,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(199, 243, 107, 0.12)'
-                    : 'rgba(85, 122, 34, 0.10)',
-                },
-              ]}
-            >
-              <Ionicons name="people" size={20} color={colors.primary} />
-            </View>
-            <View style={styles.socialHubMeta}>
-              <View style={styles.socialHubTitleRow}>
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                  style={[styles.socialHubTitle, { color: colors.text }]}
-                >
-                  Friends
-                </Text>
-                {friendCount > 0 && (
-                  <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.countBadgeText, { color: colors.primaryText }]}>
-                      {friendCount}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.85}
-                style={[styles.socialHubSub, { color: colors.textMuted }]}
-              >
-                Network & Invites
-              </Text>
-            </View>
-          </Pressable>
-
-          {/* Leaderboard Hub Card */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Friends Echo Leaderboard"
-            onPress={() => {
-              triggerHaptic('buttonTap');
-              router.push('/leaderboard' as any);
-            }}
-            style={({ pressed }) => [
-              styles.socialHubCard,
-              {
-                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                borderColor: colors.border,
-              },
-              pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <View
-              style={[
-                styles.socialHubIconWrap,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(255, 215, 0, 0.14)'
-                    : 'rgba(217, 119, 6, 0.12)',
-                },
-              ]}
-            >
-              <Ionicons name="trophy-outline" size={20} color={colors.accent || '#F59E0B'} />
-            </View>
-            <View style={styles.socialHubMeta}>
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                style={[styles.socialHubTitle, { color: colors.text }]}
-              >
-                Leaderboard
-              </Text>
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.85}
-                style={[styles.socialHubSub, { color: colors.textMuted }]}
-              >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="trophy-outline" size={14} color={colors.accent || '#F59E0B'} />
+              <Text style={[styles.echoTierFooterText, { color: colors.textSecondary }]}>
                 Echo Rankings
               </Text>
             </View>
-          </Pressable>
-        </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={[styles.echoTierFooterAction, { color: colors.primary }]}>
+                View Leaderboard
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+            </View>
+          </View>
+        </Pressable>
+
+        {/* Friends (Operative Network & Invites) - Full Width Hub Card */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Operative Network (Friends)"
+          onPress={() => {
+            triggerHaptic('buttonTap');
+            router.push('/friends' as any);
+          }}
+          style={({ pressed }) => [
+            styles.friendsCard,
+            {
+              backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+              borderColor: colors.border,
+            },
+            pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+          ]}
+        >
+          <View
+            style={[
+              styles.friendsIconWrap,
+              {
+                backgroundColor: isDark
+                  ? 'rgba(199, 243, 107, 0.12)'
+                  : 'rgba(85, 122, 34, 0.10)',
+              },
+            ]}
+          >
+            <Ionicons name="people" size={20} color={colors.primary} />
+          </View>
+          <View style={styles.friendsMeta}>
+            <View style={styles.friendsTitleRow}>
+              <Text style={[styles.friendsTitle, { color: colors.text }]}>
+                Friends
+              </Text>
+              {friendCount > 0 && (
+                <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.countBadgeText, { color: colors.primaryText }]}>
+                    {friendCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.friendsSub, { color: colors.textMuted }]}>
+              Network & Invites
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Pressable>
 
         {/* Section: Performance Stats */}
         <View style={styles.sectionHeaderRow}>
@@ -1226,44 +1196,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  socialHubRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  socialHubCard: {
-    flex: 1,
+  friendsCard: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderRadius: 16,
     borderWidth: 1,
-    gap: 10,
+    gap: 12,
+    marginBottom: 20,
   },
-  socialHubIconWrap: {
+  friendsIconWrap: {
     width: 38,
     height: 38,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  socialHubMeta: {
+  friendsMeta: {
     flex: 1,
     justifyContent: 'center',
   },
-  socialHubTitleRow: {
+  friendsTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  socialHubTitle: {
+  friendsTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
-  socialHubSub: {
+  friendsSub: {
     fontFamily: 'SegoeUI-Regular',
     fontSize: 11,
     marginTop: 1,
@@ -1372,17 +1337,22 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginTop: 2,
   },
-  editTriggerBtn: {
+  avatarActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
+  },
+  avatarActionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    marginTop: 16,
   },
-  editTriggerText: {
+  avatarActionBtnText: {
     fontFamily: 'Archivo-Bold',
     fontSize: 13,
     fontWeight: '700',
@@ -1668,20 +1638,24 @@ const styles = StyleSheet.create({
     fontFamily: 'SegoeUI-Regular',
     fontSize: 11,
   },
-  echoTierPreviewBtn: {
+  echoTierFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 42,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
-  echoTierPreviewText: {
+  echoTierFooterText: {
+    fontFamily: 'SegoeUI-SemiBold',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  echoTierFooterAction: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });
 
