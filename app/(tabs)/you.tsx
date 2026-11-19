@@ -471,26 +471,6 @@ export function YouContent() {
 
             {/* Operative Callsign & Credentials */}
             <View style={styles.heroMeta}>
-              <View style={styles.badgeRow}>
-                <View
-                  style={[
-                    styles.tagBadge,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(255, 255, 255, 0.08)'
-                        : 'rgba(0, 0, 0, 0.05)',
-                      borderColor: isDark
-                        ? 'rgba(255, 255, 255, 0.16)'
-                        : 'rgba(0, 0, 0, 0.12)',
-                    },
-                  ]}
-                >
-                  <Text style={[styles.tagBadgeText, { color: colors.textSecondary }]}>
-                    OP-{shortId}
-                  </Text>
-                </View>
-              </View>
-
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
                 <Text style={[styles.codenameText, { color: colors.text }]} numberOfLines={1}>
                   @{displayName.toUpperCase()}

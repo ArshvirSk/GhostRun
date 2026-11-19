@@ -170,24 +170,26 @@ export function matchesSearchQuery(
   const cleanQuery = query.trim();
   if (!cleanQuery) return true;
 
-  // Check if query is searching for NAME#TAG or #TAG
+  // Check if query is searching for NAME#TAG
   if (cleanQuery.includes('#')) {
     const { codename, tag } = parseCodenameAndTag(cleanQuery);
+    // Bare tag search (e.g. "#10D1") without username is prohibited
+    if (!codename) return false;
     if (tag && tagline && tagline.toUpperCase() !== tag.toUpperCase()) {
       return false;
     }
-    if (codename && displayName) {
+    if (displayName) {
       return normalizeForSearch(displayName).includes(normalizeForSearch(codename));
     }
-    return Boolean(tag && tagline && tagline.toUpperCase() === tag.toUpperCase());
+    return false;
   }
 
   const normQuery = normalizeForSearch(cleanQuery);
   if (!normQuery) return true;
 
+  // Search matches display name or handle only (bare tagline search is prohibited)
   if (displayName && normalizeForSearch(displayName).includes(normQuery)) return true;
   if (handle && normalizeForSearch(handle).includes(normQuery)) return true;
-  if (tagline && tagline.toLowerCase().includes(normQuery)) return true;
 
   return false;
 }

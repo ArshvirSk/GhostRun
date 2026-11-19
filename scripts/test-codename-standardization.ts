@@ -106,7 +106,9 @@ assert.strictEqual(formatted, 'ALPHAOP#10D1');
 // Match with #TAG
 assert.strictEqual(matchesSearchQuery('ALPHAOP#10D1', 'ALPHAOP', null, '10D1'), true);
 assert.strictEqual(matchesSearchQuery('ALPHAOP#9999', 'ALPHAOP', null, '10D1'), false);
-assert.strictEqual(matchesSearchQuery('#10D1', 'ALPHAOP', null, '10D1'), true);
+// Bare tag search (#TAG) without username is prohibited
+assert.strictEqual(matchesSearchQuery('#10D1', 'ALPHAOP', null, '10D1'), false);
+assert.strictEqual(matchesSearchQuery('@ALPHAOP#10D1', 'ALPHAOP', null, '10D1'), true);
 console.log('  PASS: Valorant-style discriminator tags and parsing verified.');
 
 console.log('\nAll Codename & Username Standardization tests passed successfully!\n');

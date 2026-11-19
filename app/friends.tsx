@@ -547,7 +547,7 @@ export default function FriendsScreen() {
                   <TextInput
                     value={friendSearchQuery}
                     onChangeText={setFriendSearchQuery}
-                    placeholder="Filter by name, handle, or #tag..."
+                    placeholder="Filter by name or name#tag..."
                     placeholderTextColor={colors.textMuted}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -955,14 +955,14 @@ export default function FriendsScreen() {
                   </Text>
                 </View>
                 <Text style={[styles.cardHeaderSub, { color: colors.textMuted }]}>
-                  Type a codename, NAME#TAG, or #TAG to search the operative network live.
+                  Search operatives live by CODENAME or exact CODENAME#TAG.
                 </Text>
 
                 <View style={styles.inputRow}>
                   <TextInput
                     value={targetHandle}
                     onChangeText={setTargetHandle}
-                    placeholder="e.g. ALPHAOP#10D1, ALPHAOP, or #10D1"
+                    placeholder="e.g. ALPHAOP#10D1 or ALPHAOP"
                     placeholderTextColor={colors.textMuted}
                     autoCapitalize="characters"
                     autoCorrect={false}

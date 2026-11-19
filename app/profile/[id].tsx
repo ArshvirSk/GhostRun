@@ -184,7 +184,7 @@ export default function OperativeProfileScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.text} />
           <Text style={[styles.backText, { color: colors.text }]}>BACK</Text>
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>PROFILE</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>OPERATIVE DOSSIER</Text>
         <View style={{ width: 60 }} />
       </View>
 
