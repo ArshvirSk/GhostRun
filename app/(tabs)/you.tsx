@@ -27,7 +27,7 @@ import { listFriends, fetchOperativeProfile } from '../../src/lib/friends';
 import { getPlayerEchoProfile, PlayerEchoProfile } from '../../src/lib/echo';
 import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
 import { TACTICAL_GOLD } from '../../src/theme/tokens';
-import { sanitizeCodename } from '../../src/lib/codename';
+import { sanitizeCodename, sanitizeTagline, validateTagline } from '../../src/lib/codename';
 
 interface MatchHistoryItem {
   id: string;
@@ -46,12 +46,14 @@ export function YouContent() {
   const { formatDistance } = useUnits();
 
   const storedProfile = useUserStore((s) => s.profile);
-  const [profile, setProfile] = useState<{ display_name: string; color: string; is_cipher?: boolean; is_vanguard?: boolean } | null>(
-    () => (storedProfile ? { display_name: storedProfile.display_name, color: storedProfile.color, is_cipher: storedProfile.is_cipher, is_vanguard: storedProfile.is_vanguard } : null)
+  const [profile, setProfile] = useState<{ display_name: string; tagline?: string | null; color: string; is_cipher?: boolean; is_vanguard?: boolean } | null>(
+    () => (storedProfile ? { display_name: storedProfile.display_name, tagline: storedProfile.tagline, color: storedProfile.color, is_cipher: storedProfile.is_cipher, is_vanguard: storedProfile.is_vanguard } : null)
   );
   const [userId, setUserId] = useState<string | null>(() => storedProfile?.id || null);
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState(() => storedProfile?.display_name || '');
+  const [draftTagline, setDraftTagline] = useState(() => storedProfile?.tagline || '');
+  const [taglineError, setTaglineError] = useState<string | null>(null);
   const [draftColor, setDraftColor] = useState<string>(() => storedProfile?.color || colors.palette[0]);
 
   // Keep state synced with userStore
@@ -59,12 +61,14 @@ export function YouContent() {
     if (storedProfile) {
       setProfile({
         display_name: storedProfile.display_name,
+        tagline: storedProfile.tagline,
         color: storedProfile.color,
         is_cipher: storedProfile.is_cipher,
         is_vanguard: storedProfile.is_vanguard,
       });
       if (!isEditing) {
         setDraftName(storedProfile.display_name);
+        setDraftTagline(storedProfile.tagline || '');
         setDraftColor(storedProfile.color);
       }
     }
@@ -110,6 +114,7 @@ export function YouContent() {
           const parsed = JSON.parse(localProfileRaw);
           setProfile(parsed);
           setDraftName(parsed.display_name || '');
+          if (parsed.tagline) setDraftTagline(parsed.tagline);
           const c = parsed.color || colors.palette[0];
           setDraftColor(c);
           void setAccentColor(c);
@@ -126,19 +131,23 @@ export function YouContent() {
       // 2. Fetch server profile
       const { data: profData } = await supabase
         .from('profiles')
-        .select('display_name, color')
+        .select('display_name, tagline, color')
         .eq('id', authData.user.id)
         .maybeSingle();
 
       if (profData) {
-        setProfile(profData);
+        const defaultTag = profData.tagline || authData.user.id.slice(0, 4).toUpperCase();
+        const mergedProf = { ...profData, tagline: defaultTag };
+        setProfile(mergedProf);
         setDraftName(profData.display_name || '');
+        setDraftTagline(defaultTag);
         const c = profData.color || colors.palette[0];
         setDraftColor(c);
         void setAccentColor(c);
         useUserStore.getState().setProfile({
           id: authData.user.id,
           display_name: profData.display_name,
+          tagline: defaultTag,
           color: profData.color,
           email: authData.user.email,
         });
@@ -291,7 +300,7 @@ export function YouContent() {
     setDraftColor(c);
     void setAccentColor(c);
     const currentName = draftName || profile?.display_name || 'Operative';
-    const updated = { display_name: currentName, color: c };
+    const updated = { display_name: currentName, tagline: profile?.tagline || null, color: c };
     setProfile(updated);
     try {
       await AsyncStorage.setItem('@ghostrun:profile', JSON.stringify(updated));
@@ -301,6 +310,7 @@ export function YouContent() {
       useUserStore.getState().setProfile({
         id: userId || '',
         display_name: updated.display_name,
+        tagline: updated.tagline,
         color: c,
       });
     } catch {
@@ -311,19 +321,37 @@ export function YouContent() {
   const saveProfile = async () => {
     const cleanName = sanitizeCodename(draftName);
     if (!cleanName || !userId || !supabase) return;
+
+    const fallbackTag = userId ? userId.slice(0, 4).toUpperCase() : '10D1';
+    let cleanTag = draftTagline.trim() ? sanitizeTagline(draftTagline) : (profile?.tagline || fallbackTag);
+    if (cleanTag) {
+      const tagVal = validateTagline(cleanTag);
+      if (!tagVal.valid) {
+        setTaglineError(tagVal.error || 'Tagline must be 3-5 alphanumeric characters.');
+        return;
+      }
+      cleanTag = tagVal.clean;
+    }
+
     setSavingProfile(true);
+    setTaglineError(null);
     triggerHaptic('buttonTap');
     try {
-      const updated = { display_name: cleanName, color: draftColor };
-      await supabase.from('profiles').update(updated).eq('id', userId);
+      const updated = { display_name: cleanName, tagline: cleanTag, color: draftColor };
+      const { error: updateErr } = await supabase.from('profiles').update(updated).eq('id', userId);
+      if (updateErr) {
+        setTaglineError(updateErr.message);
+        return;
+      }
       await AsyncStorage.setItem('@ghostrun:profile', JSON.stringify(updated));
       await setAccentColor(draftColor);
       useUserStore.getState().setProfile({ id: userId, ...updated });
       setProfile(updated);
       setDraftName(cleanName);
+      setDraftTagline(cleanTag || '');
       setIsEditing(false);
-    } catch {
-      // ignore
+    } catch (err: any) {
+      setTaglineError(err?.message || 'Failed to update credentials');
     } finally {
       setSavingProfile(false);
     }
@@ -463,10 +491,15 @@ export function YouContent() {
                 </View>
               </View>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
                 <Text style={[styles.codenameText, { color: colors.text }]} numberOfLines={1}>
                   @{displayName.toUpperCase()}
                 </Text>
+                {Boolean(profile?.tagline) && (
+                  <Text style={[styles.taglineText, { color: colors.textMuted }]}>
+                    #{profile?.tagline?.toUpperCase()}
+                  </Text>
+                )}
                 {Boolean(profile?.is_cipher || profile?.is_vanguard) && (
                   <View style={styles.cpBadgePill}>
                     <Text style={styles.cpBadgePillText}>CP</Text>
@@ -607,29 +640,79 @@ export function YouContent() {
           {/* Edit Panel Drawer */}
           {isEditing && (
             <View style={[styles.editDrawer, { borderTopColor: colors.border }]}>
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
-                CODENAME
-              </Text>
-              <TextInput
-                value={draftName}
-                onChangeText={(text) => setDraftName(sanitizeCodename(text))}
-                placeholder="YOUR CODENAME"
-                placeholderTextColor={colors.textSubtle}
-                maxLength={20}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                style={[
-                  styles.textInput,
-                  {
-                    backgroundColor: isDark ? colors.surface : colors.surfaceElevated,
-                    color: colors.text,
-                    borderColor: colors.border,
-                  },
-                ]}
-              />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {/* CODENAME INPUT */}
+                <View style={{ flex: 2 }}>
+                  <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
+                    CODENAME
+                  </Text>
+                  <TextInput
+                    value={draftName}
+                    onChangeText={(text) => {
+                      setDraftName(sanitizeCodename(text));
+                      if (taglineError) setTaglineError(null);
+                    }}
+                    placeholder="YOUR CODENAME"
+                    placeholderTextColor={colors.textSubtle}
+                    maxLength={20}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    style={[
+                      styles.textInput,
+                      {
+                        backgroundColor: isDark ? colors.surface : colors.surfaceElevated,
+                        color: colors.text,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  />
+                </View>
+
+                {/* DISCRIMINATOR TAGLINE INPUT */}
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
+                    TAG (#)
+                  </Text>
+                  <View
+                    style={[
+                      styles.tagInputWrapper,
+                      {
+                        backgroundColor: isDark ? colors.surface : colors.surfaceElevated,
+                        borderColor: taglineError ? (colors.danger || '#ef4444') : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.tagPrefix, { color: colors.textMuted }]}>#</Text>
+                    <TextInput
+                      value={draftTagline}
+                      onChangeText={(text) => {
+                        setDraftTagline(sanitizeTagline(text));
+                        if (taglineError) setTaglineError(null);
+                      }}
+                      placeholder="10D1"
+                      placeholderTextColor={colors.textSubtle}
+                      maxLength={5}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      style={[
+                        styles.tagInput,
+                        {
+                          color: colors.text,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {taglineError && (
+                <Text style={[styles.errorHelperText, { color: colors.danger || '#ef4444' }]}>
+                  {taglineError}
+                </Text>
+              )}
 
               <Button
-                title={savingProfile ? 'Updating Codename…' : 'Save Codename'}
+                title={savingProfile ? 'Updating Credentials…' : 'Save Codename & Tag'}
                 variant="primary"
                 size="md"
                 disabled={savingProfile || !draftName.trim()}
@@ -1326,6 +1409,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 2,
   },
+  taglineText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   cpBadgePill: {
     borderWidth: 1.5,
     borderRadius: 6,
@@ -1393,6 +1482,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 15,
     fontWeight: '700',
+  },
+  tagInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+  },
+  tagPrefix: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 15,
+    fontWeight: '900',
+    marginRight: 4,
+  },
+  tagInput: {
+    flex: 1,
+    fontFamily: 'SegoeUI-SemiBold',
+    fontSize: 15,
+    fontWeight: '700',
+    padding: 0,
+    height: '100%',
+  },
+  errorHelperText: {
+    fontFamily: 'SegoeUI-SemiBold',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
   },
   quickThemeBar: {
     marginTop: 14,

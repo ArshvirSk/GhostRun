@@ -81,7 +81,7 @@ export default function OperativeProfileScreen() {
 
   const handleSendRequest = async () => {
     if (!dossier) return;
-    const identifier = dossier.handle || dossier.displayName;
+    const identifier = dossier.tagline ? `${dossier.displayName}#${dossier.tagline}` : (dossier.handle || dossier.displayName);
     if (!identifier) return;
 
     triggerHaptic('buttonTap');
@@ -220,10 +220,15 @@ export default function OperativeProfileScreen() {
             </View>
 
             <View style={styles.identityMeta}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
                 <Text numberOfLines={1} style={[styles.displayName, { color: colors.text }]}>
                   {displayName}
                 </Text>
+                {Boolean(dossier?.tagline) && (
+                  <Text style={[styles.taglineText, { color: colors.textMuted }]}>
+                    #{dossier?.tagline?.toUpperCase()}
+                  </Text>
+                )}
                 {dossier?.isSelf && (
                   <View
                     style={[
@@ -765,6 +770,12 @@ const styles = StyleSheet.create({
   displayName: {
     fontSize: 20,
     fontWeight: '800',
+    fontFamily: 'Orbitron_700Bold',
+    letterSpacing: 0.5,
+  },
+  taglineText: {
+    fontSize: 14,
+    fontWeight: '700',
     fontFamily: 'Orbitron_700Bold',
     letterSpacing: 0.5,
   },

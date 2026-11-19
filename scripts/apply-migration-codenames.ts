@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Client } from 'pg';
 
 async function main() {
-  const sqlPath = path.resolve(__dirname, '../supabase/migrations/20261120090000_fl_p8_standardize_codenames_and_search.sql');
+  const sqlPath = path.resolve(__dirname, '../supabase/migrations/20261120100000_fl_p9_discriminator_taglines.sql');
   const sql = fs.readFileSync(sqlPath, 'utf8');
 
   const client = new Client({
@@ -14,11 +14,11 @@ async function main() {
   console.log('Connecting to Supabase...');
   await client.connect();
 
-  console.log('Applying migration 20261120090000_fl_p8_standardize_codenames_and_search.sql...');
+  console.log('Applying migration 20261120100000_fl_p9_discriminator_taglines.sql...');
   await client.query(sql);
 
-  console.log('Verifying updated profiles:');
-  const res = await client.query('SELECT id, display_name, handle FROM public.profiles ORDER BY created_at DESC;');
+  console.log('Verifying updated profiles with tagline:');
+  const res = await client.query('SELECT id, display_name, tagline, handle FROM public.profiles ORDER BY created_at DESC;');
   console.log(res.rows);
 
   await client.end();

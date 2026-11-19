@@ -547,7 +547,7 @@ export default function FriendsScreen() {
                   <TextInput
                     value={friendSearchQuery}
                     onChangeText={setFriendSearchQuery}
-                    placeholder="Filter connected operatives..."
+                    placeholder="Filter by name, handle, or #tag..."
                     placeholderTextColor={colors.textMuted}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -592,7 +592,7 @@ export default function FriendsScreen() {
                     style={{ marginTop: 14 }}
                   />
                 </Card>
-              ) : friends.filter((f) => matchesSearchQuery(friendSearchQuery, f.displayName, f.handle)).length === 0 ? (
+              ) : friends.filter((f) => matchesSearchQuery(friendSearchQuery, f.displayName, f.handle, f.tagline)).length === 0 ? (
                 <Card
                   variant="default"
                   style={[
@@ -610,7 +610,7 @@ export default function FriendsScreen() {
                 </Card>
               ) : (
                 friends
-                  .filter((f) => matchesSearchQuery(friendSearchQuery, f.displayName, f.handle))
+                  .filter((f) => matchesSearchQuery(friendSearchQuery, f.displayName, f.handle, f.tagline))
                   .map((f) => {
                   const initial = (f.displayName || '?')[0].toUpperCase();
                   return (
@@ -630,7 +630,7 @@ export default function FriendsScreen() {
                         <Pressable
                           accessibilityRole="button"
                           onPress={() => openOperativeProfile(f.userId, f.displayName, f.color)}
-                          style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                          style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}
                         >
                           {/* Avatar */}
                           <View
@@ -644,10 +644,15 @@ export default function FriendsScreen() {
 
                           {/* Operative Info */}
                           <View style={styles.friendMeta}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
                               <Text style={[styles.friendName, { color: colors.text }]}>
                                 {f.displayName}
                               </Text>
+                              {Boolean(f.tagline) && (
+                                <Text style={[styles.taglineMuted, { color: colors.textMuted }]}>
+                                  #{f.tagline}
+                                </Text>
+                              )}
                               {f.showPresence && (
                                 <View
                                   style={[
@@ -745,9 +750,16 @@ export default function FriendsScreen() {
                         </Text>
                       </View>
                       <View style={styles.friendMeta}>
-                        <Text style={[styles.friendName, { color: colors.text }]}>
-                          {req.displayName}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.friendName, { color: colors.text }]}>
+                            {req.displayName}
+                          </Text>
+                          {Boolean(req.tagline) && (
+                            <Text style={[styles.taglineMuted, { color: colors.textMuted }]}>
+                              #{req.tagline}
+                            </Text>
+                          )}
+                        </View>
                         <Text style={[styles.friendHandle, { color: colors.textMuted }]}>
                           {req.handle ? `@${req.handle}` : 'Tactical Operative'}
                         </Text>
@@ -816,9 +828,16 @@ export default function FriendsScreen() {
                         </Text>
                       </View>
                       <View style={styles.friendMeta}>
-                        <Text style={[styles.friendName, { color: colors.text }]}>
-                          {out.displayName}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.friendName, { color: colors.text }]}>
+                            {out.displayName}
+                          </Text>
+                          {Boolean(out.tagline) && (
+                            <Text style={[styles.taglineMuted, { color: colors.textMuted }]}>
+                              #{out.tagline}
+                            </Text>
+                          )}
+                        </View>
                         <Text style={[styles.friendHandle, { color: colors.textMuted }]}>
                           {out.handle ? `@${out.handle}` : 'Pending Confirmation'}
                         </Text>
@@ -936,14 +955,14 @@ export default function FriendsScreen() {
                   </Text>
                 </View>
                 <Text style={[styles.cardHeaderSub, { color: colors.textMuted }]}>
-                  Type a codename or @handle to search the operative network live.
+                  Type a codename, NAME#TAG, or #TAG to search the operative network live.
                 </Text>
 
                 <View style={styles.inputRow}>
                   <TextInput
                     value={targetHandle}
                     onChangeText={setTargetHandle}
-                    placeholder="e.g. ALPHAOP or @ALPHAOP"
+                    placeholder="e.g. ALPHAOP#10D1, ALPHAOP, or #10D1"
                     placeholderTextColor={colors.textMuted}
                     autoCapitalize="characters"
                     autoCorrect={false}
@@ -1008,7 +1027,7 @@ export default function FriendsScreen() {
                           <Pressable
                             accessibilityRole="button"
                             onPress={() => openOperativeProfile(op.id, op.displayName, op.color)}
-                            style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                            style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}
                           >
                             <View
                               style={[
@@ -1019,9 +1038,16 @@ export default function FriendsScreen() {
                               <Text style={styles.avatarInitialSmall}>{initial}</Text>
                             </View>
                             <View style={{ flex: 1, marginLeft: 10 }}>
-                              <Text style={[styles.friendName, { color: colors.text }]}>
-                                {op.displayName}
-                              </Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                                <Text style={[styles.friendName, { color: colors.text }]}>
+                                  {op.displayName}
+                                </Text>
+                                {Boolean(op.tagline) && (
+                                  <Text style={[styles.taglineMuted, { color: colors.textMuted }]}>
+                                    #{op.tagline}
+                                  </Text>
+                                )}
+                              </View>
                               <Text style={[styles.friendHandle, { color: colors.textMuted }]}>
                                 {op.handle ? `@${op.handle}` : `@${op.displayName}`}
                               </Text>
@@ -1074,7 +1100,7 @@ export default function FriendsScreen() {
                               variant="primary"
                               size="sm"
                               disabled={sendingRequest}
-                              onPress={() => void handleSendRequestTo(op.handle || op.displayName)}
+                              onPress={() => void handleSendRequestTo(op.tagline ? `${op.displayName}#${op.tagline}` : (op.handle || op.displayName))}
                             />
                           )}
                         </View>
@@ -1432,6 +1458,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Bold',
     fontSize: 15,
     fontWeight: '800',
+  },
+  taglineMuted: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   friendHandle: {
     fontFamily: 'SegoeUI-Regular',

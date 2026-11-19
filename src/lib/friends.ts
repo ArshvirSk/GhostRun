@@ -78,6 +78,7 @@ export async function listFriends(): Promise<FriendProfile[]> {
     return (data as Array<{
       user_id: string;
       display_name: string;
+      tagline: string | null;
       handle: string | null;
       color: string;
       show_presence: boolean;
@@ -86,6 +87,7 @@ export async function listFriends(): Promise<FriendProfile[]> {
     }>).map((item) => ({
       userId: item.user_id,
       displayName: item.display_name,
+      tagline: item.tagline,
       handle: item.handle,
       color: item.color,
       showPresence: Boolean(item.show_presence),
@@ -109,6 +111,7 @@ export async function listFriendRequests(): Promise<{
       incoming?: Array<{
         requester_id: string;
         display_name: string;
+        tagline: string | null;
         handle: string | null;
         color: string;
         requested_at: string;
@@ -116,6 +119,7 @@ export async function listFriendRequests(): Promise<{
       outgoing?: Array<{
         target_id: string;
         display_name: string;
+        tagline: string | null;
         handle: string | null;
         color: string;
         requested_at: string;
@@ -125,6 +129,7 @@ export async function listFriendRequests(): Promise<{
       incoming: (raw.incoming ?? []).map((r) => ({
         requesterId: r.requester_id,
         displayName: r.display_name,
+        tagline: r.tagline,
         handle: r.handle,
         color: r.color,
         requestedAt: r.requested_at,
@@ -132,6 +137,7 @@ export async function listFriendRequests(): Promise<{
       outgoing: (raw.outgoing ?? []).map((r) => ({
         targetId: r.target_id,
         displayName: r.display_name,
+        tagline: r.tagline,
         handle: r.handle,
         color: r.color,
         requestedAt: r.requested_at,
@@ -293,6 +299,7 @@ export async function fetchOperativeProfile(
       found: true,
       userId: data.user_id,
       displayName: data.display_name,
+      tagline: data.tagline ?? null,
       handle: data.handle,
       color: data.color,
       visibility: data.visibility as ProfileVisibility,
@@ -350,12 +357,14 @@ export async function searchOperatives(query: string): Promise<SearchedOperative
     return (data as Array<{
       id: string;
       display_name: string;
+      tagline: string | null;
       handle: string | null;
       color: string;
       relationship: 'friend' | 'pending_outgoing' | 'pending_incoming' | 'none';
     }>).map((item) => ({
       id: item.id,
       displayName: item.display_name,
+      tagline: item.tagline ?? null,
       handle: item.handle,
       color: item.color,
       relationship: item.relationship,

@@ -74,4 +74,39 @@ assert.strictEqual(codenameToHandle('GAY'), 'gay');
 assert.strictEqual(codenameToHandle('_GHOST_RUNNER_'), 'ghost_runner');
 console.log('  PASS: Canonical handle derivation produces compliant database handles.');
 
+// 6. Tactical Discriminator Tag (Valorant style)
+console.log('\n[6] Testing Tactical Discriminator Taglines...');
+import {
+  sanitizeTagline,
+  validateTagline,
+  parseCodenameAndTag,
+  formatCodenameWithTag,
+} from '../src/lib/codename';
+
+assert.strictEqual(sanitizeTagline('#10D1'), '10D1');
+assert.strictEqual(sanitizeTagline('na1'), 'NA1');
+assert.strictEqual(sanitizeTagline('007'), '007');
+assert.strictEqual(sanitizeTagline('too_long_tag'), 'TOOLO');
+
+assert.strictEqual(validateTagline('10D1').valid, true);
+assert.strictEqual(validateTagline('ab').valid, false); // < 3 chars
+assert.strictEqual(validateTagline('10D1').clean, '10D1');
+
+const parsed1 = parseCodenameAndTag('ALPHAOP#10D1');
+assert.strictEqual(parsed1.codename, 'ALPHAOP');
+assert.strictEqual(parsed1.tag, '10D1');
+
+const parsed2 = parseCodenameAndTag('Jash Damania #B8B9');
+assert.strictEqual(parsed2.codename, 'JASH DAMANIA');
+assert.strictEqual(parsed2.tag, 'B8B9');
+
+const formatted = formatCodenameWithTag('ALPHAOP', '10D1');
+assert.strictEqual(formatted, 'ALPHAOP#10D1');
+
+// Match with #TAG
+assert.strictEqual(matchesSearchQuery('ALPHAOP#10D1', 'ALPHAOP', null, '10D1'), true);
+assert.strictEqual(matchesSearchQuery('ALPHAOP#9999', 'ALPHAOP', null, '10D1'), false);
+assert.strictEqual(matchesSearchQuery('#10D1', 'ALPHAOP', null, '10D1'), true);
+console.log('  PASS: Valorant-style discriminator tags and parsing verified.');
+
 console.log('\nAll Codename & Username Standardization tests passed successfully!\n');

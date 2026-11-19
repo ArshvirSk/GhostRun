@@ -2,13 +2,14 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { colors } from '../theme/tokens';
-import { sanitizeCodename, codenameToHandle } from '../lib/codename';
+import { sanitizeCodename, codenameToHandle, sanitizeTagline } from '../lib/codename';
 
 export const USER_PROFILE_KEY = '@ghostrun:profile';
 
 export interface UserProfile {
   id: string;
   display_name: string;
+  tagline?: string | null;
   handle?: string | null;
   color: string;
   profile_visibility?: 'public' | 'private';
@@ -40,11 +41,13 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
         : current?.is_cipher ?? current?.is_vanguard;
 
     const cleanName = sanitizeCodename(updated.display_name || current?.display_name || 'OPERATIVE');
+    const cleanTag = updated.tagline !== undefined ? (sanitizeTagline(updated.tagline) || null) : (current?.tagline || null);
     const cleanHandle = updated.handle !== undefined ? updated.handle : (current?.handle || codenameToHandle(cleanName));
 
     const merged: UserProfile = {
       id: updated.id || current?.id || 'local_user',
       display_name: cleanName,
+      tagline: cleanTag,
       handle: cleanHandle,
       color: updated.color || current?.color || colors.palette[0],
       profile_visibility:
@@ -81,7 +84,7 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, handle, color, profile_visibility, created_at')
+        .select('id, display_name, tagline, handle, color, profile_visibility, created_at')
         .eq('id', uid)
         .maybeSingle();
 
@@ -91,6 +94,7 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
       const synced: UserProfile = {
         id: data.id,
         display_name: cleanName,
+        tagline: data.tagline ?? get().profile?.tagline ?? null,
         handle: data.handle ?? get().profile?.handle ?? codenameToHandle(cleanName),
         color: data.color || get().profile?.color || colors.palette[0],
         profile_visibility: (data.profile_visibility as 'public' | 'private') || 'public',
@@ -118,6 +122,7 @@ AsyncStorage.getItem(USER_PROFILE_KEY)
             profile: {
               id: parsed.id || 'local_user',
               display_name: cleanName,
+              tagline: parsed.tagline ?? null,
               handle: parsed.handle ?? codenameToHandle(cleanName),
               color: parsed.color || colors.palette[0],
               email: parsed.email,

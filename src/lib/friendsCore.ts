@@ -13,6 +13,7 @@ export const PRESENCE_TTL_MINUTES = 30;
 export interface FriendProfile {
   userId: string;
   displayName: string;
+  tagline?: string | null;
   handle?: string | null;
   color: string;
   showPresence: boolean;
@@ -24,6 +25,7 @@ export interface FriendRequest {
   requesterId?: string;
   targetId?: string;
   displayName: string;
+  tagline?: string | null;
   handle?: string | null;
   color: string;
   requestedAt: string;
@@ -42,6 +44,7 @@ export interface HostPresence {
 export interface SearchedOperative {
   id: string;
   displayName: string;
+  tagline?: string | null;
   handle: string | null;
   color: string;
   relationship: 'friend' | 'pending_outgoing' | 'pending_incoming' | 'none';
@@ -53,6 +56,7 @@ export interface OperativeProfileDossier {
   found: boolean;
   userId: string;
   displayName: string;
+  tagline?: string | null;
   handle: string | null;
   color: string;
   visibility: ProfileVisibility;
