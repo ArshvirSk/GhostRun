@@ -9,6 +9,8 @@ import {
   HostPresence,
   FriendSettings,
   SearchedOperative,
+  OperativeProfileDossier,
+  ProfileVisibility,
 } from './friendsCore';
 
 export async function sendFriendRequest(targetHandle: string): Promise<{
@@ -198,6 +200,7 @@ export async function fetchFriendSettings(): Promise<FriendSettings> {
     allowFriendRequests: true,
     showPresence: true,
     shareEcho: true,
+    profileVisibility: 'public',
   };
 
   if (!supabase) return defaults;
@@ -211,7 +214,7 @@ export async function fetchFriendSettings(): Promise<FriendSettings> {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('allow_friend_requests, show_presence, share_echo')
+      .select('allow_friend_requests, show_presence, share_echo, profile_visibility')
       .eq('id', user.id)
       .single();
 
@@ -221,6 +224,7 @@ export async function fetchFriendSettings(): Promise<FriendSettings> {
       allowFriendRequests: data.allow_friend_requests !== false,
       showPresence: Boolean(data.show_presence),
       shareEcho: data.share_echo !== false,
+      profileVisibility: (data.profile_visibility as ProfileVisibility) || 'public',
     };
   } catch {
     return defaults;
@@ -232,10 +236,11 @@ export async function updateFriendSettings(
 ): Promise<{ success: boolean; error?: string }> {
   if (!supabase) return { success: true };
   try {
-    const { data, error } = await supabase.rpc('set_friend_settings', {
+    const { error } = await supabase.rpc('set_friend_settings', {
       p_allow_requests: settings.allowFriendRequests,
       p_show_presence: settings.showPresence,
       p_share_echo: settings.shareEcho,
+      p_profile_visibility: settings.profileVisibility || 'public',
     });
     if (error) {
       return { success: false, error: error.message };
@@ -246,6 +251,61 @@ export async function updateFriendSettings(
       success: false,
       error: err instanceof Error ? err.message : 'Failed to update settings',
     };
+  }
+}
+
+export async function fetchOperativeProfile(
+  targetId: string,
+): Promise<OperativeProfileDossier | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.rpc('get_operative_profile', {
+      p_target_id: targetId,
+    });
+    if (error || !data || !data.found) return null;
+
+    return {
+      found: true,
+      userId: data.user_id,
+      displayName: data.display_name,
+      handle: data.handle,
+      color: data.color,
+      visibility: data.visibility as ProfileVisibility,
+      isFriend: Boolean(data.is_friend),
+      isSelf: Boolean(data.is_self),
+      friendshipStatus: data.friendship_status,
+      isRedacted: Boolean(data.is_redacted),
+      presence: data.presence
+        ? {
+            online: Boolean(data.presence.online),
+            gameId: data.presence.game_id,
+            modeId: data.presence.mode_id,
+            playerCount: data.presence.player_count,
+            expiresAt: data.presence.expires_at,
+          }
+        : null,
+      tier: data.tier,
+      seasonEcho: data.season_echo,
+      avgGhost: data.avg_ghost,
+      avgCash: data.avg_cash,
+      rounds: data.rounds,
+      won: data.won,
+      winRate: data.win_rate,
+      neverCaught: data.never_caught,
+      badges: data.badges,
+      headToHead: data.head_to_head
+        ? {
+            oppositeRounds: data.head_to_head.opposite_rounds,
+            myWins: data.head_to_head.my_wins,
+            friendWins: data.head_to_head.friend_wins,
+            timesGhostedThem: data.head_to_head.times_ghosted_them,
+            timesTheyCashedMe: data.head_to_head.times_they_cashed_me,
+          }
+        : null,
+      recentMatches: data.recent_matches,
+    };
+  } catch {
+    return null;
   }
 }
 

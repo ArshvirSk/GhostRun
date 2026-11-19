@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-19  
 **Artifact:** `release/GhostRun-v2.9.9.apk`  
-**Size:** 57,272,968 bytes (54.62 MB)  
-**SHA-256 Checksum:** `9083468EB950CF2D37F1022679FC8D2781FB34A57F4C75848B598C3FC8825AEC`  
+**Size:** 57,293,460 bytes (54.64 MB)  
+**SHA-256 Checksum:** `18372E1D817EB0D0B47ED08CDD590CBF5A95597DFACFEB712AFA0EB6CC2B5659`  
 **Version:** `2.9.9`  
 **VersionCode:** `24`  
 **Architecture:** `arm64-v8a`  
@@ -13,7 +13,17 @@
 
 ## Overview
 
-GhostRun **v2.9.9** delivers critical improvements across the multiplayer onboarding flow, friends management system, friends-only leaderboard, live camera subsystem, and tactical share links:
+GhostRun **v2.9.9** delivers critical improvements across the multiplayer onboarding flow, friends management system, tactical operative profiles, in-lobby & in-game friend requests, friends-only leaderboard, live camera subsystem, and tactical share links:
+
+- **Tactical Operative Profiles & Profile Privacy Overhaul (`src/components/OperativeProfileModal.tsx`, `src/lib/friends.ts`, `app/friends.tsx`, `app/settings.tsx`)**:
+  - Implemented the universal **Operative Profile Dossier Modal** accessible across the entire app.
+  - **Allied Operatives (Confirmed Friends)**: Unlocks full dossier containing career deployments (missions played, win rate %, evasions), current Season Echo score and tier, tactical badges showcase, live hosting/in-match presence indicator, recent match history, and interactive Head-to-Head telemetry.
+  - **Public vs Private Profile Privacy Control**: Users can toggle between **Public Profile** and **Private Profile** directly in both Friends (Privacy tab) and Settings.
+  - **Non-Friends (Public Profile)**: Displays public tactical summary (Tier, Season Echo, win rate %, badges showcase) and one-tap "+ Dispatch Ally Request".
+  - **Non-Friends (Private Profile)**: Displays a redacted, classified operative dossier with shielded lock badge and masked telemetry to protect player privacy, while still allowing ally requests.
+  - **Omnipresent In-Lobby & In-Game Add Friend (`app/lobby/[id].tsx`, `app/result/[id].tsx`)**:
+    - **In Lobby Squad Roster**: Tapping any player card or avatar opens their Operative Profile Modal with one-tap friend request/accept actions without leaving the lobby.
+    - **In Post-Match Scoreboard & Results**: Tapping any operative on the match podium or results list allows reviewing their performance and dispatching an instant tactical ally request.
 
 - **Friends Standings & Echo Leaderboard (`app/friends.tsx`, `src/lib/friendsBoard.ts`)**:
   - Integrated a dedicated **STANDINGS** tab directly inside the Friends screen (Tab 0 of 5: Standings, Friends, Requests, Add, Privacy).

@@ -10,6 +10,7 @@ export interface UserProfile {
   display_name: string;
   handle?: string | null;
   color: string;
+  profile_visibility?: 'public' | 'private';
   email?: string;
   created_at?: string;
   is_vanguard?: boolean;
@@ -42,6 +43,10 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
       display_name: updated.display_name,
       handle: updated.handle !== undefined ? updated.handle : current?.handle,
       color: updated.color || current?.color || colors.palette[0],
+      profile_visibility:
+        updated.profile_visibility !== undefined
+          ? updated.profile_visibility
+          : current?.profile_visibility ?? 'public',
       email: updated.email || current?.email,
       created_at: updated.created_at || current?.created_at,
       is_vanguard: isCipher,
@@ -72,7 +77,7 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, handle, color, created_at')
+        .select('id, display_name, handle, color, profile_visibility, created_at')
         .eq('id', uid)
         .maybeSingle();
 
@@ -83,6 +88,7 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
         display_name: data.display_name || get().profile?.display_name || 'Operative',
         handle: data.handle ?? get().profile?.handle ?? null,
         color: data.color || get().profile?.color || colors.palette[0],
+        profile_visibility: (data.profile_visibility as 'public' | 'private') || 'public',
         created_at: data.created_at,
       };
 

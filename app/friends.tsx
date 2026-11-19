@@ -56,6 +56,7 @@ import {
   fetchFriendsBoard,
   fetchHeadToHead,
 } from '../src/lib/friendsBoard';
+import { OperativeProfileModal } from '../src/components/OperativeProfileModal';
 import { listMyBlocks, unblockUser } from '../src/lib/moderation';
 import { BlockItem } from '../src/lib/moderationCore';
 
@@ -88,6 +89,20 @@ export default function FriendsScreen() {
   // Filter in Tab 2 (Friends)
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
 
+  // Operative Profile Modal state
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [inspectedUserId, setInspectedUserId] = useState<string | null>(null);
+  const [inspectedUserName, setInspectedUserName] = useState<string | undefined>(undefined);
+  const [inspectedUserColor, setInspectedUserColor] = useState<string | undefined>(undefined);
+
+  const openOperativeProfile = (id: string, name?: string, color?: string) => {
+    triggerHaptic('buttonTap');
+    setInspectedUserId(id);
+    setInspectedUserName(name);
+    setInspectedUserColor(color);
+    setProfileModalVisible(true);
+  };
+
   // Add friend state
   const [targetHandle, setTargetHandle] = useState('');
   const [sendingRequest, setSendingRequest] = useState(false);
@@ -104,6 +119,7 @@ export default function FriendsScreen() {
     allowFriendRequests: true,
     showPresence: false,
     shareEcho: true,
+    profileVisibility: 'public',
   });
 
   const loadBoard = useCallback(async (seasonType: 'current' | 'previous') => {
@@ -202,6 +218,7 @@ export default function FriendsScreen() {
         allowFriendRequests: settings.allowFriendRequests,
         showPresence: settings.showPresence,
         shareEcho: true,
+        profileVisibility: settings.profileVisibility,
       });
       setSettings((s) => ({ ...s, shareEcho: true }));
       setCanViewBoard(true);
@@ -401,11 +418,20 @@ export default function FriendsScreen() {
     }
   };
 
-  const handleToggleSetting = async (key: keyof FriendSettings, val: boolean) => {
+  const handleToggleSetting = async <K extends keyof FriendSettings>(
+    key: K,
+    val: FriendSettings[K],
+  ) => {
     triggerHaptic('buttonTap');
     const updated = { ...settings, [key]: val };
     setSettings(updated);
     await updateFriendSettings(updated);
+    if (key === 'profileVisibility') {
+      useUserStore.getState().setProfile({
+        display_name: userProfile?.display_name || 'Operative',
+        profile_visibility: val as 'public' | 'private',
+      });
+    }
   };
 
   const handleUnblock = async (blockedId: string, name: string) => {
@@ -647,7 +673,7 @@ export default function FriendsScreen() {
                       accessibilityRole="button"
                       onPress={() => {
                         if (!isCurrentUser) {
-                          void handleInspectFriend(entry.userId);
+                          openOperativeProfile(entry.userId, entry.displayName);
                         }
                       }}
                       style={({ pressed }) => [
@@ -884,44 +910,51 @@ export default function FriendsScreen() {
                       ]}
                     >
                       <View style={styles.friendRow}>
-                        {/* Avatar */}
-                        <View
-                          style={[
-                            styles.avatarCircle,
-                            { backgroundColor: f.color || colors.primary },
-                          ]}
+                        {/* Operative Info (Tappable to view full profile) */}
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => openOperativeProfile(f.userId, f.displayName, f.color)}
+                          style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
                         >
-                          <Text style={styles.avatarInitial}>{initial}</Text>
-                        </View>
-
-                        {/* Operative Info */}
-                        <View style={styles.friendMeta}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={[styles.friendName, { color: colors.text }]}>
-                              {f.displayName}
-                            </Text>
-                            {f.showPresence && (
-                              <View
-                                style={[
-                                  styles.liveBadge,
-                                  {
-                                    backgroundColor: isDark
-                                      ? 'rgba(74, 222, 128, 0.15)'
-                                      : 'rgba(22, 101, 52, 0.12)',
-                                  },
-                                ]}
-                              >
-                                <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
-                                <Text style={[styles.liveText, { color: colors.success }]}>
-                                  LIVE
-                                </Text>
-                              </View>
-                            )}
+                          {/* Avatar */}
+                          <View
+                            style={[
+                              styles.avatarCircle,
+                              { backgroundColor: f.color || colors.primary },
+                            ]}
+                          >
+                            <Text style={styles.avatarInitial}>{initial}</Text>
                           </View>
-                          <Text style={[styles.friendHandle, { color: colors.textMuted }]}>
-                            {f.handle ? `@${f.handle}` : 'Active Operative'}
-                          </Text>
-                        </View>
+
+                          {/* Operative Info */}
+                          <View style={styles.friendMeta}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={[styles.friendName, { color: colors.text }]}>
+                                {f.displayName}
+                              </Text>
+                              {f.showPresence && (
+                                <View
+                                  style={[
+                                    styles.liveBadge,
+                                    {
+                                      backgroundColor: isDark
+                                        ? 'rgba(74, 222, 128, 0.15)'
+                                        : 'rgba(22, 101, 52, 0.12)',
+                                    },
+                                  ]}
+                                >
+                                  <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
+                                  <Text style={[styles.liveText, { color: colors.success }]}>
+                                    LIVE
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={[styles.friendHandle, { color: colors.textMuted }]}>
+                              {f.handle ? `@${f.handle}` : 'Active Operative'}
+                            </Text>
+                          </View>
+                        </Pressable>
 
                         {/* Remove Action */}
                         <Pressable
@@ -1185,22 +1218,28 @@ export default function FriendsScreen() {
                             },
                           ]}
                         >
-                          <View
-                            style={[
-                              styles.avatarCircleSmall,
-                              { backgroundColor: op.color || colors.primary },
-                            ]}
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={() => openOperativeProfile(op.id, op.displayName, op.color)}
+                            style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
                           >
-                            <Text style={styles.avatarInitialSmall}>{initial}</Text>
-                          </View>
-                          <View style={{ flex: 1, marginLeft: 10 }}>
-                            <Text style={[styles.friendName, { color: colors.text }]}>
-                              {op.displayName}
-                            </Text>
-                            <Text style={[styles.friendHandle, { color: colors.textMuted }]}>
-                              {op.handle ? `@${op.handle}` : `@${op.displayName}`}
-                            </Text>
-                          </View>
+                            <View
+                              style={[
+                                styles.avatarCircleSmall,
+                                { backgroundColor: op.color || colors.primary },
+                              ]}
+                            >
+                              <Text style={styles.avatarInitialSmall}>{initial}</Text>
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                              <Text style={[styles.friendName, { color: colors.text }]}>
+                                {op.displayName}
+                              </Text>
+                              <Text style={[styles.friendHandle, { color: colors.textMuted }]}>
+                                {op.handle ? `@${op.handle}` : `@${op.displayName}`}
+                              </Text>
+                            </View>
+                          </Pressable>
                           {op.relationship === 'friend' ? (
                             <View
                               style={[
@@ -1412,7 +1451,7 @@ export default function FriendsScreen() {
                 </View>
 
                 {/* Share Echo Toggle */}
-                <View style={styles.toggleRow}>
+                <View style={[styles.toggleRow, { borderBottomColor: colors.border }]}>
                   <View style={{ flex: 1, paddingRight: 12 }}>
                     <Text style={[styles.toggleLabel, { color: colors.text }]}>
                       Share Season Echo
@@ -1424,6 +1463,25 @@ export default function FriendsScreen() {
                   <Switch
                     value={settings.shareEcho}
                     onValueChange={(val) => void handleToggleSetting('shareEcho', val)}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                  />
+                </View>
+
+                {/* Profile Visibility Toggle */}
+                <View style={styles.toggleRow}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={[styles.toggleLabel, { color: colors.text }]}>
+                      Public Profile Dossier
+                    </Text>
+                    <Text style={[styles.toggleSub, { color: colors.textMuted }]}>
+                      When enabled, non-allies can view your Tier, Season Echo, and badges. When disabled, your dossier is classified to non-allies.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={settings.profileVisibility === 'public'}
+                    onValueChange={(isPub) =>
+                      void handleToggleSetting('profileVisibility', isPub ? 'public' : 'private')
+                    }
                     trackColor={{ false: colors.border, true: colors.primary }}
                   />
                 </View>
@@ -1696,6 +1754,16 @@ export default function FriendsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Universal Operative Profile Modal */}
+      <OperativeProfileModal
+        visible={profileModalVisible}
+        targetUserId={inspectedUserId}
+        initialName={inspectedUserName}
+        initialColor={inspectedUserColor}
+        onClose={() => setProfileModalVisible(false)}
+        onFriendshipChanged={() => void loadData()}
+      />
     </KeyboardAvoidingView>
   );
 }

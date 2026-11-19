@@ -37,6 +37,7 @@ import { LobbyPrivacyModal } from '../../src/components/LobbyPrivacyModal';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { buildInvitePayload } from '../../src/lib/invite';
 import { pregenerateQrUri } from '../../src/lib/qrCache';
+import { OperativeProfileModal } from '../../src/components/OperativeProfileModal';
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from '../../src/lib/map';
 import { circleRing } from '../../src/lib/geo';
 import { getInstantLocation } from '../../src/lib/locationCache';
@@ -134,6 +135,20 @@ export default function LobbyScreen() {
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [healthReport, setHealthReport] = useState<TrackingHealthReport | null>(null);
   const [isProbingHealth, setIsProbingHealth] = useState(false);
+
+  // Operative Profile Modal state
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [inspectedUserId, setInspectedUserId] = useState<string | null>(null);
+  const [inspectedUserName, setInspectedUserName] = useState<string | undefined>(undefined);
+  const [inspectedUserColor, setInspectedUserColor] = useState<string | undefined>(undefined);
+
+  const handleInspectPlayer = (targetId: string, name?: string, color?: string) => {
+    triggerHaptic('buttonTap');
+    setInspectedUserId(targetId);
+    setInspectedUserName(name);
+    setInspectedUserColor(color);
+    setProfileModalVisible(true);
+  };
 
   const submitHealth = useCallback(
     async (health: string) => {
@@ -1010,6 +1025,7 @@ export default function LobbyScreen() {
                     onStartKick={setKickingPlayerId}
                     onConfirmKick={() => void confirmKick(player)}
                     onCancelKick={() => setKickingPlayerId(null)}
+                    onInspectPlayer={handleInspectPlayer}
                   />
                 ))}
               </View>
@@ -1060,12 +1076,23 @@ export default function LobbyScreen() {
                                 },
                               ]}
                             >
-                              <View style={styles.squadPlayerHeader}>
+                              <Pressable
+                                accessibilityRole="button"
+                                onPress={() => {
+                                  if (!isSelf && p.user_id) {
+                                    handleInspectPlayer(p.user_id, p.display_name, p.color);
+                                  }
+                                }}
+                                style={styles.squadPlayerHeader}
+                              >
                                 <View style={[styles.avatarDotSmall, { backgroundColor: p.color || colors.warning }]} />
                                 <Text style={styles.squadPlayerName} numberOfLines={1}>
                                   {p.display_name} {isSelf ? '(YOU)' : ''}
                                 </Text>
-                              </View>
+                                {!isSelf && (
+                                  <Ionicons name="person-circle-outline" size={13} color={colors.textMuted} style={{ marginLeft: 3 }} />
+                                )}
+                              </Pressable>
                               <Text style={styles.squadPlayerStatus}>
                                 {p.is_ready ? 'Ready' : 'Preparing'}
                               </Text>
@@ -1135,12 +1162,23 @@ export default function LobbyScreen() {
                                 },
                               ]}
                             >
-                              <View style={styles.squadPlayerHeader}>
+                              <Pressable
+                                accessibilityRole="button"
+                                onPress={() => {
+                                  if (!isSelf && p.user_id) {
+                                    handleInspectPlayer(p.user_id, p.display_name, p.color);
+                                  }
+                                }}
+                                style={styles.squadPlayerHeader}
+                              >
                                 <View style={[styles.avatarDotSmall, { backgroundColor: p.color || colors.hunter }]} />
                                 <Text style={styles.squadPlayerName} numberOfLines={1}>
                                   {p.display_name} {isSelf ? '(YOU)' : ''}
                                 </Text>
-                              </View>
+                                {!isSelf && (
+                                  <Ionicons name="person-circle-outline" size={13} color={colors.textMuted} style={{ marginLeft: 3 }} />
+                                )}
+                              </Pressable>
                               <Text style={styles.squadPlayerStatus}>
                                 {p.is_ready ? 'Ready' : 'Preparing'}
                               </Text>
@@ -1840,6 +1878,14 @@ export default function LobbyScreen() {
         onSelectOption={handleSelectPrivacyOption}
         onClose={() => setPrivacyModalVisible(false)}
       />
+
+      <OperativeProfileModal
+        visible={profileModalVisible}
+        targetUserId={inspectedUserId}
+        initialName={inspectedUserName}
+        initialColor={inspectedUserColor}
+        onClose={() => setProfileModalVisible(false)}
+      />
     </View>
   );
 }
@@ -1856,6 +1902,7 @@ function PlayerRow({
   onConfirmKick,
   onCancelKick,
   onToggleRemote,
+  onInspectPlayer,
 }: {
   player: LobbyPlayer;
   isHost: boolean;
@@ -1868,6 +1915,7 @@ function PlayerRow({
   onConfirmKick: () => void;
   onCancelKick: () => void;
   onToggleRemote?: () => void;
+  onInspectPlayer?: (targetId: string, name?: string, color?: string) => void;
 }) {
   const isKickingThis = kickingId === player.id;
 
@@ -1882,7 +1930,15 @@ function PlayerRow({
         },
       ]}
     >
-      <View style={styles.playerInfo}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          if (!isSelf && player.user_id && onInspectPlayer) {
+            onInspectPlayer(player.user_id, player.display_name, player.color);
+          }
+        }}
+        style={styles.playerInfo}
+      >
         <View style={[styles.avatarDot, { backgroundColor: player.color || colors.primary, borderRadius: radii.pill }]} />
         <View style={{ flex: 1, marginLeft: 10 }}>
           <View style={styles.nameRow}>
@@ -1891,6 +1947,9 @@ function PlayerRow({
             </Text>
             {isGameHost && (
               <MaterialCommunityIcons name="crown" size={16} color={colors.warning} style={{ marginLeft: 4 }} />
+            )}
+            {!isSelf && (
+              <Ionicons name="person-circle-outline" size={15} color={colors.textMuted} style={{ marginLeft: 4 }} />
             )}
           </View>
           {player.is_remote && (
@@ -1922,7 +1981,7 @@ function PlayerRow({
             size="sm"
           />
         </View>
-      </View>
+      </Pressable>
 
       {isHost && !isSelf && (
         <View style={[styles.playerActionsRow, { borderTopWidth: 1, borderTopColor: colors.borderDark }]}>

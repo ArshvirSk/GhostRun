@@ -8,6 +8,7 @@ import {
   Dimensions,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -26,6 +27,8 @@ import { colors, radii, spacing } from '../../src/theme/tokens';
 import { Button, Card, Chip, Text } from '../../src/ui';
 import { formatDistance, useUnits } from '../../src/utils/units';
 import { ShareRoundCardModal } from '../../src/components/ShareRoundCardModal';
+import { OperativeProfileModal } from '../../src/components/OperativeProfileModal';
+import { triggerHaptic } from '../../src/motion/haptics';
 import { getModeModule } from '../../src/modes/registry';
 
 const MAP_STYLE =
@@ -223,6 +226,20 @@ export default function ResultScreen() {
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [shareRecapFeedback, setShareRecapFeedback] = useState(false);
   const [shareCardModalVisible, setShareCardModalVisible] = useState(false);
+
+  // Operative Profile Modal state
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [inspectedUserId, setInspectedUserId] = useState<string | null>(null);
+  const [inspectedUserName, setInspectedUserName] = useState<string | undefined>(undefined);
+  const [inspectedUserColor, setInspectedUserColor] = useState<string | undefined>(undefined);
+
+  const handleInspectPlayer = (userId: string, name?: string, color?: string) => {
+    triggerHaptic('buttonTap');
+    setInspectedUserId(userId);
+    setInspectedUserName(name);
+    setInspectedUserColor(color);
+    setProfileModalVisible(true);
+  };
 
   const mountedRef = useRef(true);
   const leavingRef = useRef(false);
@@ -1220,7 +1237,16 @@ export default function ResultScreen() {
                   const isAgent = player.secret_role === 'agent';
 
                   return (
-                    <View key={player.id} style={styles.playerRow}>
+                    <Pressable
+                      key={player.id}
+                      accessibilityRole="button"
+                      onPress={() => {
+                        if (player.id !== state.my_player_id && player.user_id) {
+                          handleInspectPlayer(player.user_id, player.display_name, player.color);
+                        }
+                      }}
+                      style={styles.playerRow}
+                    >
                       <View style={[styles.playerDot, { backgroundColor: player.color }]} />
                       <View style={{ flex: 1, marginLeft: spacing.sm }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -1239,8 +1265,10 @@ export default function ResultScreen() {
                           {player.secret_role === 'bodyguard' && (
                             <Chip label="GUARD" variant="default" size="sm" />
                           )}
-                          {player.id === state.my_player_id && (
+                          {player.id === state.my_player_id ? (
                             <Text variant="caption" color={colors.primary}>(you)</Text>
+                          ) : (
+                            <Ionicons name="person-circle-outline" size={14} color={colors.textMuted} />
                           )}
                         </View>
                         <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
@@ -1260,7 +1288,7 @@ export default function ResultScreen() {
                       >
                         {isWinner ? 'Reached Target' : player.status === 'tagged' ? 'Tagged' : teamLabel(player.team)}
                       </Text>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </ScrollView>
@@ -1479,6 +1507,14 @@ export default function ResultScreen() {
         }}
         rawTrailPoints={myTrailPoints}
         onClose={() => setShareCardModalVisible(false)}
+      />
+
+      <OperativeProfileModal
+        visible={profileModalVisible}
+        targetUserId={inspectedUserId}
+        initialName={inspectedUserName}
+        initialColor={inspectedUserColor}
+        onClose={() => setProfileModalVisible(false)}
       />
     </View>
   );

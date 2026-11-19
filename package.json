@@ -46,6 +46,7 @@
     "test:echo": "node --import tsx scripts/test-echo-engine.ts",
     "calibrate:echo": "node --import tsx scripts/calibrate-echo.ts",
     "test:board": "node --import tsx scripts/test-friends-board.ts",
+    "test:profile": "node --import tsx scripts/test-operative-profile.ts",
     "test:google": "node --env-file=.env --import tsx scripts/test-google-auth.ts",
     "test:minimap": "node --import tsx scripts/test-minimap-corner.ts",
     "test:blackout": "node --import tsx scripts/test-blackout-radar.ts",

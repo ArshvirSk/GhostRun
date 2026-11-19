@@ -47,10 +47,56 @@ export interface SearchedOperative {
   relationship: 'friend' | 'pending_outgoing' | 'pending_incoming' | 'none';
 }
 
+export type ProfileVisibility = 'public' | 'private';
+
+export interface OperativeProfileDossier {
+  found: boolean;
+  userId: string;
+  displayName: string;
+  handle: string | null;
+  color: string;
+  visibility: ProfileVisibility;
+  isFriend: boolean;
+  isSelf: boolean;
+  friendshipStatus: 'friend' | 'pending_incoming' | 'pending_outgoing' | 'none' | 'self';
+  isRedacted: boolean;
+  presence?: {
+    online: boolean;
+    gameId?: string;
+    modeId?: string;
+    playerCount?: number;
+    expiresAt?: string;
+  } | null;
+  tier?: string;
+  seasonEcho?: number;
+  avgGhost?: number;
+  avgCash?: number;
+  rounds?: number;
+  won?: number;
+  winRate?: number;
+  neverCaught?: number;
+  badges?: string[];
+  headToHead?: {
+    oppositeRounds: number;
+    myWins: number;
+    friendWins: number;
+    timesGhostedThem: number;
+    timesTheyCashedMe: number;
+  } | null;
+  recentMatches?: Array<{
+    game_id: string;
+    mode_id: string;
+    team: string;
+    won: boolean;
+    created_at: string;
+  }>;
+}
+
 export interface FriendSettings {
   allowFriendRequests: boolean;
   showPresence: boolean;
   shareEcho: boolean;
+  profileVisibility?: ProfileVisibility;
 }
 
 /**

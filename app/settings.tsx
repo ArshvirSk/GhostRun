@@ -38,6 +38,7 @@ import {
   STORAGE_KEY_MINIMAP_ENABLED,
   type MiniMapCorner,
 } from '../src/components/MovableCornerMiniMap';
+import { useUserStore } from '../src/stores/userStore';
 
 const DELETE_WORD = 'DELETE';
 
@@ -64,8 +65,10 @@ export default function SettingsScreen() {
   const [safetyCheckinEnabled, setSafetyCheckinEnabled] = useState(true);
 
   // Privacy Consents
+  const currentProfile = useUserStore((s) => s.profile);
   const [presenceConsent, setPresenceConsent] = useState(true);
   const [echoConsent, setEchoConsent] = useState(true);
+  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>('public');
   const [analyticsOptIn, setLocalAnalyticsOptIn] = useState(false);
 
   // User session & UI state
@@ -251,6 +254,31 @@ export default function SettingsScreen() {
     await AsyncStorage.setItem('@ghostrun:consent_echo', String(val));
     if (supabase) {
       void supabase.rpc('set_consent', { consent_type: 'share_echo', granted: val });
+    }
+  };
+
+  useEffect(() => {
+    if (currentProfile?.profile_visibility) {
+      setProfileVisibility(currentProfile.profile_visibility);
+    }
+  }, [currentProfile?.profile_visibility]);
+
+  const toggleProfileVisibility = async (isPub: boolean) => {
+    triggerHaptic('buttonTap');
+    const nextVal: 'public' | 'private' = isPub ? 'public' : 'private';
+    setProfileVisibility(nextVal);
+    useUserStore.getState().setProfile({
+      display_name: currentProfile?.display_name || 'Operative',
+      profile_visibility: nextVal,
+    });
+    if (supabase) {
+      const { data: auth } = await supabase.auth.getUser();
+      if (auth.user) {
+        await supabase
+          .from('profiles')
+          .update({ profile_visibility: nextVal })
+          .eq('id', auth.user.id);
+      }
     }
   };
 
@@ -960,6 +988,23 @@ export default function SettingsScreen() {
             <Switch
               value={echoConsent}
               onValueChange={toggleEcho}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Public Profile Dossier
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Allow non-allies to view Tier, Season Echo, and badges
+              </Text>
+            </View>
+            <Switch
+              value={profileVisibility === 'public'}
+              onValueChange={(val) => void toggleProfileVisibility(val)}
               trackColor={{ false: colors.borderDark, true: colors.primary }}
               thumbColor={colors.textLight}
             />
