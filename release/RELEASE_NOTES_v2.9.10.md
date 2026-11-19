@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-19  
 **Artifact:** `release/GhostRun-v2.9.10.apk`  
-**Size:** 57,300,624 bytes (54.65 MB)  
-**SHA-256 Checksum:** `18F6BDDDFFF3E6584D443FDA7762B11DA6D72BA199F1E61F4AE23AE40FA83BF1`  
+**Size:** 57,315,384 bytes (54.66 MB)  
+**SHA-256 Checksum:** `D15F1727F1235BDD504178ED910C1A81FB84BE89758EA79F8F27C9C74F2DE200`  
 **Version:** `2.9.10`  
 **VersionCode:** `25`  
 **Architecture:** `arm64-v8a`  
@@ -13,7 +13,21 @@
 
 ## Overview
 
-GhostRun **v2.9.10** completes the social and tactical network overhaul by introducing in-person zero-typing Operative QR Beacons, a real-time Live Squad Radar for active game lobbies, intuitive standard friend terminology, universal Operative Profile inspection across the Seasonal Leaderboard, and database RPC fixes:
+GhostRun **v2.9.10** completes the social and tactical network overhaul by introducing in-person zero-typing Operative QR Beacons, a real-time Live Squad Radar across both the Friends Hub and Main Play Screen, intuitive friend terminology, post-match Echo yield debriefs, and seamless universal profile inspection:
+
+- **Play Screen Live Squad Radar (`app/(tabs)/play.tsx`)**:
+  - Automatically queries active host presence across allied operatives whenever the Play screen comes into focus.
+  - 15-second ambient background polling dynamically surfaces active friend lobbies with glowing green presence, host name, game mode, operative count, and a one-tap **"Quick Join"** button.
+
+- **Match Results Season Echo Yield & Post-Game Quick-Add (`app/result/[id].tsx`)**:
+  - Dedicated **Season Echo // Competitive Yield** debrief card displaying total PTS earned, outcome ($O$), yield ($Y$), presence ($P$), and distance ($D$) components.
+  - **Operative Roster Quick-Add**: Match summary displays friend status badges (`[✓ Friend]`, `[Request Sent]`) with an instant inline `[+ Add Friend]` button for non-friend players.
+
+- **Personal Season Echo Showcase (`app/(tabs)/you.tsx`)**:
+  - Prominent Division Tier card exhibiting current Season Echo tier, PTS total, average ghost/cash rates, and direct links to **"Preview Profile"** and the **Leaderboard**.
+
+- **Flexible Friend Requests & DB RPC (`scripts/migrate-send-friend-request.ts`)**:
+  - Enhanced `public.send_friend_request` to seamlessly resolve targets by UUID, handle, or display name with daily limits and reciprocal auto-acceptance.
 
 - **Simplified & Standardized Friends UI**:
   - Replaced ambiguous militaristic terminology across modals, buttons, and alerts with direct, universal friend interactions: **"Add Friend"**, **"Remove Friend"**, **"Friends"**, **"Friend Request Sent"**, and **"Accept"**.

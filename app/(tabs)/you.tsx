@@ -24,6 +24,7 @@ import { SeasonRecapModal } from '../../src/components/SeasonRecapModal';
 import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
 import { useUserStore } from '../../src/stores/userStore';
 import { listFriends } from '../../src/lib/friends';
+import { getPlayerEchoProfile, PlayerEchoProfile } from '../../src/lib/echo';
 import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
 import { TACTICAL_GOLD } from '../../src/theme/tokens';
 
@@ -86,6 +87,7 @@ export function YouContent() {
   const [recapData, setRecapData] = useState<SeasonRecapData | null>(null);
   const [loadingRecap, setLoadingRecap] = useState(false);
   const [friendCount, setFriendCount] = useState(0);
+  const [echoProfile, setEchoProfile] = useState<PlayerEchoProfile | null>(null);
 
   const handleOpenRecap = async () => {
     triggerHaptic('buttonTap');
@@ -146,6 +148,16 @@ export function YouContent() {
         const friendsList = await listFriends();
         if (Array.isArray(friendsList)) {
           setFriendCount(friendsList.length);
+        }
+      } catch {
+        // non-blocking
+      }
+
+      // Fetch personal Season Echo profile
+      try {
+        const ep = await getPlayerEchoProfile(authData.user.id);
+        if (ep) {
+          setEchoProfile(ep);
         }
       } catch {
         // non-blocking
@@ -538,6 +550,77 @@ export function YouContent() {
               />
             </View>
           )}
+        </Card>
+
+        {/* Season Echo Tier & Standing Card (FL-P2) */}
+        <Card
+          variant="default"
+          style={[
+            styles.echoTierCard,
+            {
+              backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <View style={styles.echoTierHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <Ionicons name="trophy" size={14} color="#F59E0B" />
+                <Text style={[styles.echoTierSeasonLabel, { color: colors.textMuted }]}>
+                  SEASON ECHO DIVISION
+                </Text>
+              </View>
+              <Text style={[styles.echoTierTitle, { color: colors.primary }]}>
+                Tier {echoProfile?.tier || 'Whisper'}
+              </Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={[styles.echoTierPts, { color: colors.text }]}>
+                {echoProfile?.echoTotal ?? 0}{' '}
+                <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>PTS</Text>
+              </Text>
+              <Text style={[styles.echoTierSubRates, { color: colors.textMuted }]}>
+                {Math.round((echoProfile?.avgGhost || 0) * 100)}% Ghost • {Math.round((echoProfile?.avgCash || 0) * 100)}% Cash
+              </Text>
+            </View>
+          </View>
+
+          {/* Action Row */}
+          <View style={[styles.echoTierActionRow, { borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="View public profile dossier"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                if (userId) {
+                  router.push({
+                    pathname: '/profile/[id]',
+                    params: { id: userId, name: profile?.display_name || '', color: profile?.color || '' },
+                  });
+                }
+              }}
+              style={styles.echoTierPillBtn}
+            >
+              <Ionicons name="person-circle-outline" size={14} color={colors.primary} />
+              <Text style={[styles.echoTierPillText, { color: colors.primary }]}>Preview Profile</Text>
+              <Ionicons name="chevron-forward" size={12} color={colors.primary} />
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="View leaderboard"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                router.push('/leaderboard' as any);
+              }}
+              style={styles.echoTierPillBtn}
+            >
+              <Ionicons name="stats-chart" size={13} color="#F59E0B" />
+              <Text style={[styles.echoTierPillText, { color: colors.text }]}>Leaderboard</Text>
+              <Ionicons name="chevron-forward" size={12} color={colors.textMuted} />
+            </Pressable>
+          </View>
         </Card>
 
         {/* Social & Competitive Operations Hub (High-Visibility Friends & Leaderboard Cards) */}
@@ -1512,6 +1595,64 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     textAlign: 'center',
     marginTop: 2,
+  },
+  echoTierCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  echoTierHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  echoTierSeasonLabel: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  echoTierTitle: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    marginTop: 2,
+  },
+  echoTierPts: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  echoTierSubRates: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  echoTierActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    gap: 10,
+  },
+  echoTierPillBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  echoTierPillText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
 

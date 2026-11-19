@@ -29,9 +29,27 @@ import { formatDistance, useUnits } from '../../src/utils/units';
 import { ShareRoundCardModal } from '../../src/components/ShareRoundCardModal';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { getModeModule } from '../../src/modes/registry';
+import { listFriends, listFriendRequests, sendFriendRequest } from '../../src/lib/friends';
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
+
+type RoundScore = {
+  game_id: string;
+  player_id: string;
+  user_id: string;
+  mode_id: string;
+  role: string;
+  o: number | null;
+  y: number | null;
+  p: number | null;
+  d: number | null;
+  echo: number;
+  contested: number | null;
+  hit: number | null;
+  counted: boolean;
+  excluded_reason: string | null;
+};
 
 type GhostPreview = {
   can_contribute: boolean;
@@ -222,9 +240,31 @@ export default function ResultScreen() {
   const [ghostDismissed, setGhostDismissed] = useState(false);
   const [ghostPermanentlyDeclined, setGhostPermanentlyDeclined] = useState(false);
   const [ghostScore, setGhostScore] = useState<GhostDuelScore | null>(null);
+  const [roundScore, setRoundScore] = useState<RoundScore | null>(null);
+  const [friendUserIds, setFriendUserIds] = useState<Set<string>>(new Set());
+  const [requestedUserIds, setRequestedUserIds] = useState<Set<string>>(new Set());
+  const [sendingFriendReq, setSendingFriendReq] = useState<Record<string, boolean>>({});
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [shareRecapFeedback, setShareRecapFeedback] = useState(false);
   const [shareCardModalVisible, setShareCardModalVisible] = useState(false);
+
+  const handleQuickAddFriend = async (targetUserId: string, targetName: string) => {
+    triggerHaptic('buttonTap');
+    setSendingFriendReq((prev) => ({ ...prev, [targetUserId]: true }));
+    try {
+      const res = await sendFriendRequest(targetUserId);
+      if (res.success) {
+        triggerHaptic('tagConfirmed');
+        setRequestedUserIds((prev) => new Set([...prev, targetUserId]));
+      }
+    } catch {
+      // ignore
+    } finally {
+      if (mountedRef.current) {
+        setSendingFriendReq((prev) => ({ ...prev, [targetUserId]: false }));
+      }
+    }
+  };
 
   const handleInspectPlayer = (userId: string, name?: string, color?: string) => {
     triggerHaptic('buttonTap');
@@ -315,6 +355,34 @@ export default function ResultScreen() {
       if (scoreRow) {
         setGhostScore(scoreRow as GhostDuelScore);
       }
+    }
+
+    // Fetch personal round score & echo metrics
+    try {
+      const { data: rsData } = await supabase
+        .from('round_scores')
+        .select('*')
+        .eq('game_id', gameId)
+        .maybeSingle();
+      if (mountedRef.current && rsData) {
+        setRoundScore(rsData as RoundScore);
+      }
+    } catch {
+      // offline/non-blocking
+    }
+
+    // Fetch friend relationships for roster quick-add
+    try {
+      const [friendsList, reqs] = await Promise.all([
+        listFriends(),
+        listFriendRequests(),
+      ]);
+      if (mountedRef.current) {
+        setFriendUserIds(new Set(friendsList.map((f) => f.userId)));
+        setRequestedUserIds(new Set(reqs.outgoing.map((r) => r.targetId || '').filter(Boolean)));
+      }
+    } catch {
+      // non-blocking
     }
   }, [gameId]);
 
@@ -724,7 +792,7 @@ export default function ResultScreen() {
       }
     : null;
 
-  const cardsCount = 7;
+  const cardsCount = 8;
 
   return (
     <View style={styles.screen}>
@@ -871,16 +939,18 @@ export default function ResultScreen() {
                 activeCardIndex === 0
                   ? 'OUTCOME DOSSIER'
                   : activeCardIndex === 1
-                    ? 'MATCH HIGHLIGHTS'
+                    ? 'SEASON ECHO'
                     : activeCardIndex === 2
-                      ? 'TACTICAL DEBRIEF'
+                      ? 'MATCH HIGHLIGHTS'
                       : activeCardIndex === 3
-                        ? 'OPERATIVE ROSTER'
+                        ? 'TACTICAL DEBRIEF'
                         : activeCardIndex === 4
-                          ? 'GHOST ARCHIVE'
+                          ? 'OPERATIVE ROSTER'
                           : activeCardIndex === 5
-                            ? 'MISSION RECAP'
-                            : 'COMMAND ACTIONS'
+                            ? 'GHOST ARCHIVE'
+                            : activeCardIndex === 6
+                              ? 'MISSION RECAP'
+                              : 'COMMAND ACTIONS'
               }
             </Text>
           </View>
@@ -968,12 +1038,77 @@ export default function ResultScreen() {
               </View>
 
               <Text variant="caption" color={colors.textSubtle} style={{ marginTop: spacing.md }}>
-                Swipe left for match highlights and tactical telemetry →
+                Swipe left for Season Echo yield and tactical highlights →
               </Text>
             </Card>
           </View>
 
-          {/* CARD 2: MATCH HIGHLIGHTS & STRATEGIC STATS */}
+          {/* CARD 2: SEASON ECHO & COMPETITIVE YIELD (FL-P2) */}
+          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <View style={styles.cardHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons color="#F59E0B" name="trophy" size={16} />
+                  <Text variant="label" color="#F59E0B">
+                    SEASON ECHO // COMPETITIVE YIELD
+                  </Text>
+                </View>
+                <Chip
+                  label={roundScore?.counted ? 'SEASON RECORDED' : 'CASUAL ROUND'}
+                  variant={roundScore?.counted ? 'accent' : 'default'}
+                  size="sm"
+                />
+              </View>
+
+              <View style={styles.echoHeroBox}>
+                <Text style={styles.echoHeroNumber}>
+                  +{roundScore ? Math.round(roundScore.echo) : 0}
+                </Text>
+                <Text style={styles.echoHeroUnit}>SEASON ECHO PTS EARNED</Text>
+              </View>
+
+              <View style={styles.echoGrid}>
+                <View style={styles.echoMetricItem}>
+                  <Text style={styles.echoMetricLabel}>OUTCOME (O)</Text>
+                  <Text style={styles.echoMetricValue}>
+                    +{roundScore?.o !== null && roundScore?.o !== undefined ? Math.round(roundScore.o) : 0}
+                  </Text>
+                </View>
+                <View style={styles.echoMetricItem}>
+                  <Text style={styles.echoMetricLabel}>YIELD (Y)</Text>
+                  <Text style={styles.echoMetricValue}>
+                    {roundScore?.y !== null && roundScore?.y !== undefined
+                      ? `${Math.round(roundScore.y * 100)}%`
+                      : '0%'}
+                  </Text>
+                </View>
+                <View style={styles.echoMetricItem}>
+                  <Text style={styles.echoMetricLabel}>PRESENCE (P)</Text>
+                  <Text style={styles.echoMetricValue}>
+                    {roundScore?.p !== null && roundScore?.p !== undefined
+                      ? `${roundScore.p.toFixed(1)}x`
+                      : '1.0x'}
+                  </Text>
+                </View>
+                <View style={styles.echoMetricItem}>
+                  <Text style={styles.echoMetricLabel}>DISTANCE (D)</Text>
+                  <Text style={styles.echoMetricValue}>
+                    {roundScore?.d !== null && roundScore?.d !== undefined
+                      ? `${Math.round(roundScore.d)}m`
+                      : '0m'}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.echoFooterText}>
+                {roundScore?.counted
+                  ? '✓ Recorded toward your Seasonal Leaderboard Division rank.'
+                  : roundScore?.excluded_reason || 'Casual round — competitive scoring requires multi-operative grid presence.'}
+              </Text>
+            </Card>
+          </View>
+
+          {/* CARD 3: MATCH HIGHLIGHTS & STRATEGIC STATS */}
           <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
             <Card variant="elevated" style={styles.cardInner}>
               <Text variant="label" color={colors.primary} style={{ marginBottom: spacing.sm }}>
@@ -1268,19 +1403,54 @@ export default function ResultScreen() {
                           {teamLabel(player.team)} · {position ? 'Position recorded' : 'No fix'}
                         </Text>
                       </View>
-                      <Text
-                        variant="caption"
-                        weight="bold"
-                        color={
-                          isWinner
-                            ? colors.success
-                            : player.status === 'tagged'
-                              ? colors.danger
-                              : colors.textMuted
-                        }
-                      >
-                        {isWinner ? 'Reached Target' : player.status === 'tagged' ? 'Tagged' : teamLabel(player.team)}
-                      </Text>
+                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <Text
+                          variant="caption"
+                          weight="bold"
+                          color={
+                            isWinner
+                              ? colors.success
+                              : player.status === 'tagged'
+                                ? colors.danger
+                                : colors.textMuted
+                          }
+                        >
+                          {isWinner ? 'Reached Target' : player.status === 'tagged' ? 'Tagged' : teamLabel(player.team)}
+                        </Text>
+
+                        {player.id !== state.my_player_id && player.user_id && (
+                          friendUserIds.has(player.user_id) ? (
+                            <View style={styles.friendPill}>
+                              <Ionicons name="checkmark" size={10} color="#10B981" />
+                              <Text style={styles.friendPillText}>Friend</Text>
+                            </View>
+                          ) : requestedUserIds.has(player.user_id) ? (
+                            <View style={styles.requestSentPill}>
+                              <Text style={styles.requestSentPillText}>Request Sent</Text>
+                            </View>
+                          ) : (
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel={`Add ${player.display_name} as friend`}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                void handleQuickAddFriend(player.user_id, player.display_name);
+                              }}
+                              disabled={Boolean(sendingFriendReq[player.user_id])}
+                              style={styles.rosterAddBtn}
+                            >
+                              {sendingFriendReq[player.user_id] ? (
+                                <ActivityIndicator size="small" color="#000000" />
+                              ) : (
+                                <>
+                                  <Ionicons name="person-add" size={10} color="#000000" />
+                                  <Text style={styles.rosterAddBtnText}>Add</Text>
+                                </>
+                              )}
+                            </Pressable>
+                          )
+                        )}
+                      </View>
                     </Pressable>
                   );
                 })}
@@ -1644,5 +1814,107 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: spacing.sm,
     padding: spacing.base,
+  },
+  echoHeroBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: spacing.sm,
+    paddingVertical: 10,
+    borderRadius: radii.md,
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  echoHeroNumber: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#F59E0B',
+    letterSpacing: -0.5,
+  },
+  echoHeroUnit: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#F59E0B',
+    letterSpacing: 1.5,
+    marginTop: 2,
+  },
+  echoGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 6,
+    marginBottom: spacing.xs,
+  },
+  echoMetricItem: {
+    flex: 1,
+    padding: 6,
+    borderRadius: radii.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    alignItems: 'center',
+  },
+  echoMetricLabel: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 9,
+    color: colors.textMuted,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  echoMetricValue: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 13,
+    color: colors.textLight,
+    fontWeight: '800',
+  },
+  echoFooterText: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 11,
+    color: colors.textMuted,
+    lineHeight: 15,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  friendPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  friendPillText: {
+    color: '#10B981',
+    fontSize: 10,
+    fontFamily: 'Archivo-Bold',
+    fontWeight: '700',
+  },
+  requestSentPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  requestSentPillText: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontFamily: 'SegoeUI-Regular',
+  },
+  rosterAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  rosterAddBtnText: {
+    color: '#000000',
+    fontFamily: 'Archivo-Bold',
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

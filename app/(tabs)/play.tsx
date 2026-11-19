@@ -8,7 +8,7 @@ import {
   Image,
   Text,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -140,12 +140,19 @@ export function PlayContent() {
     }
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
+  useFocusEffect(
+    useCallback(() => {
       void loadProfileAndActiveGame();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [loadProfileAndActiveGame]);
+      const interval = setInterval(() => {
+        void getFriendsHosting()
+          .then((hosts) => {
+            setFriendsHosting(hosts);
+          })
+          .catch(() => {});
+      }, 15000);
+      return () => clearInterval(interval);
+    }, [loadProfileAndActiveGame])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -322,46 +329,57 @@ export function PlayContent() {
           </Pressable>
         )}
 
-        {/* Friends Hosting Now Presence Banner (FL-P1) */}
+        {/* Friends Hosting Now Presence Radar (FL-P1) */}
         {friendsHosting.length > 0 && (
-          <View
-            style={[
-              styles.seasonBanner,
-              {
-                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                borderColor: colors.borderDark || colors.border,
-              },
-            ]}
-          >
-            <View style={styles.seasonBannerRow}>
-              <View style={[styles.pulsingDot, { backgroundColor: colors.success }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.seasonBannerTitle, { color: colors.text }]}>
-                  {friendsHosting[0].hostName} is Hosting
-                </Text>
-                <Text style={[styles.seasonBannerSubtitle, { color: colors.textMuted }]}>
-                  {friendsHosting[0].modeId.replace(/_/g, ' ')} • {friendsHosting[0].playerCount} player(s) in lobby
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  triggerHaptic('buttonTap');
-                  router.push({
-                    pathname: '/lobby/[id]',
-                    params: { id: friendsHosting[0].gameId },
-                  } as any);
-                }}
-                style={{
-                  backgroundColor: colors.primary,
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 4,
-                }}
-              >
-                <Text style={{ color: '#000', fontWeight: '700', fontSize: 12 }}>JOIN</Text>
-              </Pressable>
+          <View style={styles.radarSection}>
+            <View style={styles.radarHeader}>
+              <View style={[styles.pulsingDot, { backgroundColor: '#10B981' }]} />
+              <Text style={[styles.radarTitle, { color: colors.text }]}>
+                LIVE SQUAD RADAR ({friendsHosting.length})
+              </Text>
             </View>
+            {friendsHosting.map((host) => (
+              <View
+                key={host.gameId}
+                style={[
+                  styles.radarCard,
+                  {
+                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.06)',
+                    borderColor: '#10B981',
+                  },
+                ]}
+              >
+                <View style={styles.radarRow}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.radarHostName, { color: colors.text }]}>
+                        {host.hostName}
+                      </Text>
+                      <View style={styles.hostingBadge}>
+                        <Text style={styles.hostingBadgeText}>HOSTING</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.radarHostDetails, { color: colors.textMuted }]}>
+                      Mode: {host.modeId.replace(/_/g, ' ').toUpperCase()} • {host.playerCount} {host.playerCount === 1 ? 'Operative' : 'Operatives'} in Grid
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Join ${host.hostName}'s lobby`}
+                    onPress={() => {
+                      triggerHaptic('tagConfirmed');
+                      router.push({
+                        pathname: '/lobby/[id]',
+                        params: { id: host.gameId },
+                      } as any);
+                    }}
+                    style={styles.quickJoinBtn}
+                  >
+                    <Text style={styles.quickJoinBtnText}>Quick Join</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
           </View>
         )}
 
@@ -757,6 +775,70 @@ const styles = StyleSheet.create({
   linkSeparator: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  radarSection: {
+    marginBottom: 16,
+  },
+  radarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  radarTitle: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  radarCard: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 8,
+  },
+  radarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  radarHostName: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  hostingBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  hostingBadgeText: {
+    color: '#000000',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  radarHostDetails: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  quickJoinBtn: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickJoinBtnText: {
+    color: '#000000',
+    fontFamily: 'Archivo-Bold',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   seasonBanner: {
     paddingHorizontal: 16,
