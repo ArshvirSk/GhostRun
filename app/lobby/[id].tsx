@@ -1080,7 +1080,7 @@ export default function LobbyScreen() {
                               >
                                 <View style={[styles.avatarDotSmall, { backgroundColor: p.color || colors.warning }]} />
                                 <Text style={styles.squadPlayerName} numberOfLines={1}>
-                                  {p.display_name} {isSelf ? '(YOU)' : ''}
+                                  {p.display_name.toUpperCase()} {isSelf ? '(YOU)' : ''}
                                 </Text>
                                 {!isSelf && (
                                   <Ionicons name="person-circle-outline" size={13} color={colors.textMuted} style={{ marginLeft: 3 }} />
@@ -1166,7 +1166,7 @@ export default function LobbyScreen() {
                               >
                                 <View style={[styles.avatarDotSmall, { backgroundColor: p.color || colors.hunter }]} />
                                 <Text style={styles.squadPlayerName} numberOfLines={1}>
-                                  {p.display_name} {isSelf ? '(YOU)' : ''}
+                                  {p.display_name.toUpperCase()} {isSelf ? '(YOU)' : ''}
                                 </Text>
                                 {!isSelf && (
                                   <Ionicons name="person-circle-outline" size={13} color={colors.textMuted} style={{ marginLeft: 3 }} />
@@ -1242,7 +1242,7 @@ export default function LobbyScreen() {
                               <View style={styles.unassignedRowLeft}>
                                 <View style={[styles.avatarDotSmall, { backgroundColor: p.color || colors.primary }]} />
                                 <Text style={styles.unassignedRowName} numberOfLines={1}>
-                                  {p.display_name} {isSelf ? '(YOU)' : ''}
+                                  {p.display_name.toUpperCase()} {isSelf ? '(YOU)' : ''}
                                 </Text>
                                 {p.user_id === state.game.host_id && (
                                   <MaterialCommunityIcons name="crown" size={14} color={colors.warning} style={{ marginLeft: 4 }} />
@@ -1928,7 +1928,7 @@ function PlayerRow({
         <View style={{ flex: 1, marginLeft: 10 }}>
           <View style={styles.nameRow}>
             <Text variant="title" style={{ color: colors.text, fontSize: 15 }}>
-              {player.display_name} {isSelf && '(YOU)'}
+              {player.display_name.toUpperCase()} {isSelf && '(YOU)'}
             </Text>
             {isGameHost && (
               <MaterialCommunityIcons name="crown" size={16} color={colors.warning} style={{ marginLeft: 4 }} />

@@ -1382,7 +1382,7 @@ export default function ResultScreen() {
                       <View style={{ flex: 1, marginLeft: spacing.sm }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Text variant="body" weight="bold" color={colors.textLight}>
-                            {player.display_name}
+                            {player.display_name.toUpperCase()}
                           </Text>
                           {player.user_id === game.host_id && (
                             <MaterialCommunityIcons color={colors.warning} name="crown" size={13} />

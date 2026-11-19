@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { colors } from '../theme/tokens';
+import { sanitizeCodename, codenameToHandle } from '../lib/codename';
 
 export const USER_PROFILE_KEY = '@ghostrun:profile';
 
@@ -38,10 +39,13 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
         ? updated.is_vanguard
         : current?.is_cipher ?? current?.is_vanguard;
 
+    const cleanName = sanitizeCodename(updated.display_name || current?.display_name || 'OPERATIVE');
+    const cleanHandle = updated.handle !== undefined ? updated.handle : (current?.handle || codenameToHandle(cleanName));
+
     const merged: UserProfile = {
       id: updated.id || current?.id || 'local_user',
-      display_name: updated.display_name,
-      handle: updated.handle !== undefined ? updated.handle : current?.handle,
+      display_name: cleanName,
+      handle: cleanHandle,
       color: updated.color || current?.color || colors.palette[0],
       profile_visibility:
         updated.profile_visibility !== undefined
@@ -83,10 +87,11 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
 
       if (error || !data) return get().profile;
 
+      const cleanName = sanitizeCodename(data.display_name || get().profile?.display_name || 'OPERATIVE');
       const synced: UserProfile = {
         id: data.id,
-        display_name: data.display_name || get().profile?.display_name || 'Operative',
-        handle: data.handle ?? get().profile?.handle ?? null,
+        display_name: cleanName,
+        handle: data.handle ?? get().profile?.handle ?? codenameToHandle(cleanName),
         color: data.color || get().profile?.color || colors.palette[0],
         profile_visibility: (data.profile_visibility as 'public' | 'private') || 'public',
         created_at: data.created_at,
@@ -108,11 +113,12 @@ AsyncStorage.getItem(USER_PROFILE_KEY)
       try {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed.display_name === 'string') {
+          const cleanName = sanitizeCodename(parsed.display_name);
           useUserStore.setState({
             profile: {
               id: parsed.id || 'local_user',
-              display_name: parsed.display_name,
-              handle: parsed.handle ?? null,
+              display_name: cleanName,
+              handle: parsed.handle ?? codenameToHandle(cleanName),
               color: parsed.color || colors.palette[0],
               email: parsed.email,
               created_at: parsed.created_at,

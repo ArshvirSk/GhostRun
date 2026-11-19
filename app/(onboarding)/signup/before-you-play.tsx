@@ -18,6 +18,7 @@ import { isSupabaseConfigured, supabase } from '../../../src/lib/supabase';
 import { triggerHaptic } from '../../../src/motion/haptics';
 import { useSignupStore } from '../../../src/stores/signupStore';
 import { useUserStore } from '../../../src/stores/userStore';
+import { sanitizeCodename } from '../../../src/lib/codename';
 import { startLocationPrewarm } from '../../../src/lib/locationCache';
 import { colors, radii, spacing } from '../../../src/theme/tokens';
 import { Button } from '../../../src/ui/Button';
@@ -132,7 +133,7 @@ export default function SignupBeforeYouPlayScreen() {
         }
 
         if (currentSession) {
-          const effectiveName = name.trim() || 'Operative';
+          const effectiveName = sanitizeCodename(name) || 'OPERATIVE';
           const effectiveColor = color || colors.palette[0];
 
           // Immediately save in local userStore and persistent storage

@@ -163,7 +163,7 @@ export default function OperativeProfileScreen() {
     );
   };
 
-  const displayName = dossier?.displayName || name || 'Operative';
+  const displayName = (dossier?.displayName || name || 'OPERATIVE').toUpperCase();
   const displayHandle = dossier?.handle ? `@${dossier.handle}` : null;
   const avatarColor = dossier?.color || color || colors.primary;
   const firstLetter = displayName.charAt(0).toUpperCase();

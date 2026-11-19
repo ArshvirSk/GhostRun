@@ -42,6 +42,7 @@
     "test:routes": "node --import tsx scripts/test-route-resolution.ts",
     "test:theme": "node --import tsx scripts/test-theme-persistence.ts",
     "test:handles": "node --import tsx scripts/test-handles-moderation.ts",
+    "test:codenames": "node --import tsx scripts/test-codename-standardization.ts",
     "test:friends": "node --import tsx scripts/test-friends-graph.ts",
     "test:echo": "node --import tsx scripts/test-echo-engine.ts",
     "calibrate:echo": "node --import tsx scripts/calibrate-echo.ts",

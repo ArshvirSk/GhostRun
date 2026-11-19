@@ -163,7 +163,8 @@ export function PlayContent() {
     }
   };
 
-  const formattedName = displayName.endsWith('.') ? displayName : `${displayName}.`;
+  const upper = (displayName || 'OPERATIVE').toUpperCase();
+  const formattedName = upper.endsWith('.') ? upper : `${upper}.`;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

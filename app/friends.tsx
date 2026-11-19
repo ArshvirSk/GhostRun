@@ -52,6 +52,7 @@ import { OperativeBeaconModal } from '../src/components/OperativeBeaconModal';
 import { OperativeBeaconScannerModal } from '../src/components/OperativeBeaconScannerModal';
 import { listMyBlocks, unblockUser } from '../src/lib/moderation';
 import { BlockItem } from '../src/lib/moderationCore';
+import { normalizeForSearch, matchesSearchQuery } from '../src/lib/codename';
 
 type FriendsTabKey = 'friends' | 'requests' | 'add' | 'privacy';
 
@@ -591,14 +592,7 @@ export default function FriendsScreen() {
                     style={{ marginTop: 14 }}
                   />
                 </Card>
-              ) : friends.filter((f) => {
-                  if (!friendSearchQuery.trim()) return true;
-                  const q = friendSearchQuery.toLowerCase().trim();
-                  return (
-                    f.displayName.toLowerCase().includes(q) ||
-                    (f.handle && f.handle.toLowerCase().includes(q))
-                  );
-                }).length === 0 ? (
+              ) : friends.filter((f) => matchesSearchQuery(friendSearchQuery, f.displayName, f.handle)).length === 0 ? (
                 <Card
                   variant="default"
                   style={[
@@ -616,14 +610,7 @@ export default function FriendsScreen() {
                 </Card>
               ) : (
                 friends
-                  .filter((f) => {
-                    if (!friendSearchQuery.trim()) return true;
-                    const q = friendSearchQuery.toLowerCase().trim();
-                    return (
-                      f.displayName.toLowerCase().includes(q) ||
-                      (f.handle && f.handle.toLowerCase().includes(q))
-                    );
-                  })
+                  .filter((f) => matchesSearchQuery(friendSearchQuery, f.displayName, f.handle))
                   .map((f) => {
                   const initial = (f.displayName || '?')[0].toUpperCase();
                   return (
@@ -956,9 +943,9 @@ export default function FriendsScreen() {
                   <TextInput
                     value={targetHandle}
                     onChangeText={setTargetHandle}
-                    placeholder="e.g. AlphaOP or @AlphaOP"
+                    placeholder="e.g. ALPHAOP or @ALPHAOP"
                     placeholderTextColor={colors.textMuted}
-                    autoCapitalize="none"
+                    autoCapitalize="characters"
                     autoCorrect={false}
                     returnKeyType="search"
                     onSubmitEditing={() => void handleSendRequest()}

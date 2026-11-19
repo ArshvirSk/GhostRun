@@ -20,6 +20,7 @@ import { colors, radii, spacing } from '../../../src/theme/tokens';
 import { Button } from '../../../src/ui/Button';
 import { Card } from '../../../src/ui/Card';
 import { Text } from '../../../src/ui/Text';
+import { sanitizeCodename, validateCodename } from '../../../src/lib/codename';
 
 export default function SignupNameScreen() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function SignupNameScreen() {
           const meta = data.user.user_metadata || {};
           const metaName = meta.full_name || meta.name || '';
           if (metaName) {
-            const clean = metaName.slice(0, 20);
+            const clean = sanitizeCodename(metaName);
             setLocalName(clean);
             setName(clean);
           }
@@ -51,19 +52,20 @@ export default function SignupNameScreen() {
     });
   }, []);
 
-  const trimmed = localName.trim();
-  const isValid = trimmed.length >= 1 && trimmed.length <= 20;
+  const cleanInput = sanitizeCodename(localName);
+  const isValid = cleanInput.length >= 2 && cleanInput.length <= 20;
 
   const handleNext = async () => {
-    if (!isValid) {
-      setError('Codename must be between 1 and 20 characters.');
+    const val = validateCodename(localName);
+    if (!val.valid) {
+      setError(val.error || 'Codename must be between 2 and 20 characters.');
       triggerHaptic('error');
       return;
     }
     setError('');
-    setName(trimmed);
+    setName(val.clean);
     setColor(selectedColor);
-    useUserStore.getState().setProfile({ display_name: trimmed, color: selectedColor });
+    useUserStore.getState().setProfile({ display_name: val.clean, color: selectedColor });
     triggerHaptic('buttonTap');
 
     // If operative is already authenticated (e.g. from Google Sign-In), skip account creation
@@ -123,7 +125,7 @@ export default function SignupNameScreen() {
               {/* Codename Callout Chip */}
               <View style={[styles.calloutChip, { borderColor: selectedColor }]}>
                 <Text style={styles.calloutText} variant="mono">
-                  {trimmed.length > 0 ? trimmed.toUpperCase() : 'CODENAME'}
+                  {cleanInput.length > 0 ? cleanInput : 'CODENAME'}
                 </Text>
               </View>
             </View>
@@ -139,20 +141,21 @@ export default function SignupNameScreen() {
                 CODENAME / DISPLAY NAME
               </Text>
               <Text style={styles.charCount} variant="mono">
-                {trimmed.length}/20
+                {cleanInput.length}/20
               </Text>
             </View>
 
             <TextInput
               accessibilityLabel="Codename input"
-              autoCapitalize="words"
+              autoCapitalize="characters"
               autoCorrect={false}
               maxLength={20}
               onChangeText={(text) => {
-                setLocalName(text);
+                const cleaned = sanitizeCodename(text);
+                setLocalName(cleaned);
                 if (error) setError('');
               }}
-              placeholder="e.g. Nightrunner, Ghost-7"
+              placeholder="e.g. NIGHTRUNNER, SHADOW_7"
               placeholderTextColor={colors.textSubtle}
               style={[styles.textInput, error ? styles.textInputError : null]}
               value={localName}

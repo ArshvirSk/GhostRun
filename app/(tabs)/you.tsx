@@ -27,6 +27,7 @@ import { listFriends, fetchOperativeProfile } from '../../src/lib/friends';
 import { getPlayerEchoProfile, PlayerEchoProfile } from '../../src/lib/echo';
 import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
 import { TACTICAL_GOLD } from '../../src/theme/tokens';
+import { sanitizeCodename } from '../../src/lib/codename';
 
 interface MatchHistoryItem {
   id: string;
@@ -308,16 +309,18 @@ export function YouContent() {
   };
 
   const saveProfile = async () => {
-    if (!draftName.trim() || !userId || !supabase) return;
+    const cleanName = sanitizeCodename(draftName);
+    if (!cleanName || !userId || !supabase) return;
     setSavingProfile(true);
     triggerHaptic('buttonTap');
     try {
-      const updated = { display_name: draftName.trim(), color: draftColor };
+      const updated = { display_name: cleanName, color: draftColor };
       await supabase.from('profiles').update(updated).eq('id', userId);
       await AsyncStorage.setItem('@ghostrun:profile', JSON.stringify(updated));
       await setAccentColor(draftColor);
       useUserStore.getState().setProfile({ id: userId, ...updated });
       setProfile(updated);
+      setDraftName(cleanName);
       setIsEditing(false);
     } catch {
       // ignore
@@ -609,11 +612,12 @@ export function YouContent() {
               </Text>
               <TextInput
                 value={draftName}
-                onChangeText={setDraftName}
-                placeholder="Your Codename"
+                onChangeText={(text) => setDraftName(sanitizeCodename(text))}
+                placeholder="YOUR CODENAME"
                 placeholderTextColor={colors.textSubtle}
                 maxLength={20}
-                autoCapitalize="words"
+                autoCapitalize="characters"
+                autoCorrect={false}
                 style={[
                   styles.textInput,
                   {
