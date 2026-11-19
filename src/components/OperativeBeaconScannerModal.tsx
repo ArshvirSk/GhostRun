@@ -125,7 +125,7 @@ export function OperativeBeaconScannerModal({
         }, 2500);
       }
     } catch {
-      setFeedback({ success: false, message: 'Failed to dispatch ally request' });
+      setFeedback({ success: false, message: 'Failed to send friend request' });
       setTimeout(() => {
         setIsProcessing(false);
         lastScannedRef.current = null;

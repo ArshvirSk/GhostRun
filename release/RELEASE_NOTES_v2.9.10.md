@@ -2,8 +2,8 @@
 
 **Release Date:** 2026-11-19  
 **Artifact:** `release/GhostRun-v2.9.10.apk`  
-**Size:** 57,301,368 bytes (54.65 MB)  
-**SHA-256 Checksum:** `1BAA4B6A1F76E76CB6FFD97EF3886CE3BBD0FE1C1847DE56CE0348EA15BCD403`  
+**Size:** 57,300,604 bytes (54.65 MB)  
+**SHA-256 Checksum:** `B55D0AAE6CC2A98EE0E9DEC29D047EC6FCCC8F865B78341F621339D868942FFF`  
 **Version:** `2.9.10`  
 **VersionCode:** `25`  
 **Architecture:** `arm64-v8a`  
@@ -13,11 +13,20 @@
 
 ## Overview
 
-GhostRun **v2.9.10** completes the social and tactical network overhaul by introducing in-person zero-typing Operative QR Beacons, a real-time Live Squad Radar for active game lobbies, and universal Operative Profile Dossier inspection across the Seasonal Leaderboard:
+GhostRun **v2.9.10** completes the social and tactical network overhaul by introducing in-person zero-typing Operative QR Beacons, a real-time Live Squad Radar for active game lobbies, intuitive standard friend terminology, universal Operative Profile inspection across the Seasonal Leaderboard, and database RPC fixes:
+
+- **Simplified & Standardized Friends UI**:
+  - Replaced ambiguous militaristic terminology across modals, buttons, and alerts with direct, universal friend interactions: **"Add Friend"**, **"Remove Friend"**, **"Friends"**, **"Friend Request Sent"**, and **"Accept"**.
+  - Search results explicitly indicate confirmed **"Friends"** and **"Request Sent"** statuses with distinctive color accents.
+
+- **Operative Profile RPC Fix & Friendship State Guard**:
+  - Resolved column reference in `get_operative_profile` RPC (`round_scores`, `player_badges`, `host_presence`, and `games.created_at`).
+  - Corrected `player_status` enum handling (`tagged`).
+  - Guaranteed confirmed friends reliably load their full stats and Head-to-Head records with a dedicated "Remove Friend" action instead of erroneously showing friend request buttons.
 
 - **In-Person Zero-Typing "Operative QR Beacon" (`src/components/OperativeBeaconModal.tsx`, `src/components/OperativeBeaconScannerModal.tsx`, `app/friends.tsx`)**:
   - **Show My Operative Beacon**: Operatives can open a dedicated high-contrast QR Beacon displaying their unique profile link (`https://arshvirsk.github.io/GhostRun/invite?add=@handle` or user ID), operative codename, and live avatar with zero configuration.
-  - **Scan Operative Beacon**: A tactical live camera scanner modal equipped with flashlight controls, neon corner reticle brackets, and an animated laser sweep line. Pointing the camera at another player's beacon automatically parses the operative identifier, sounds the acoustic confirmation chime (`scan_success`), triggers haptic feedback, and dispatches the ally request instantly.
+  - **Scan Operative Beacon**: A tactical live camera scanner modal equipped with flashlight controls, neon corner reticle brackets, and an animated laser sweep line. Pointing the camera at another player's beacon automatically parses the operative identifier, sounds the acoustic confirmation chime (`scan_success`), triggers haptic feedback, and sends the friend request instantly.
 
 - **Live Squad Radar (`app/friends.tsx`, `src/lib/friends.ts`)**:
   - Automatically queries active host presence (`getFriendsHosting()`) across your allied network.

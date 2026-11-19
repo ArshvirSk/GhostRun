@@ -115,7 +115,7 @@ export function OperativeBeaconModal({
                 {displayName}
               </Text>
               <Text style={[styles.opHandle, { color: colors.textMuted }]}>
-                {handle ? `@${handle}` : 'Allied Operative'}
+                {handle ? `@${handle}` : 'GhostRun Player'}
               </Text>
             </View>
           </View>

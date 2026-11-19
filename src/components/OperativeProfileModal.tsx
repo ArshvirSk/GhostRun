@@ -128,8 +128,8 @@ export function OperativeProfileModal({
     if (!dossier) return;
     triggerHaptic('buttonTap');
     Alert.alert(
-      'Remove Ally',
-      `Disconnect @${dossier.displayName} from your operative network?`,
+      'Remove Friend',
+      `Remove @${dossier.displayName} from your friends?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -148,7 +148,7 @@ export function OperativeProfileModal({
               );
               onFriendshipChanged?.();
             } else {
-              Alert.alert('Error', 'Failed to disconnect operative');
+              Alert.alert('Error', 'Failed to remove friend');
             }
           },
         },
@@ -234,7 +234,7 @@ export function OperativeProfileModal({
               >
                 <Ionicons name="shield-checkmark" size={13} color={colors.success} />
                 <Text style={[styles.pillBadgeText, { color: colors.success }]}>
-                  CONFIRMED ALLY
+                  FRIENDS
                 </Text>
               </View>
             ) : dossier?.isRedacted ? (
@@ -251,7 +251,7 @@ export function OperativeProfileModal({
               >
                 <Ionicons name="lock-closed" size={13} color={colors.danger} />
                 <Text style={[styles.pillBadgeText, { color: colors.danger }]}>
-                  PRIVATE DOSSIER
+                  PRIVATE PROFILE
                 </Text>
               </View>
             ) : (
@@ -298,10 +298,17 @@ export function OperativeProfileModal({
             <View style={{ paddingVertical: 40, alignItems: 'center' }}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-                Decrypting tactical dossier…
+                Loading profile…
               </Text>
             </View>
-          ) : dossier?.isRedacted ? (
+          ) : !dossier ? (
+            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+              <Ionicons name="alert-circle-outline" size={44} color={colors.textMuted} />
+              <Text style={[styles.loadingText, { color: colors.textMuted, marginTop: 8 }]}>
+                Could not load profile.
+              </Text>
+            </View>
+          ) : dossier.isRedacted ? (
             /* ============================================================== */
             /* REDACTED / PRIVATE VIEW (Non-Friend + Private Profile) */
             /* ============================================================== */
@@ -317,10 +324,10 @@ export function OperativeProfileModal({
               >
                 <Ionicons name="shield-half-outline" size={44} color={colors.textMuted} />
                 <Text style={[styles.redactedTitle, { color: colors.text }]}>
-                  CLASSIFIED OPERATIVE DOSSIER
+                  PRIVATE PROFILE
                 </Text>
                 <Text style={[styles.redactedSub, { color: colors.textMuted }]}>
-                  This operative maintains a private profile. Full career deployments, tactical badges, and performance telemetry are restricted to confirmed allies.
+                  This player has a private profile. Match history, points, and stats are only visible to friends.
                 </Text>
               </View>
 
@@ -328,7 +335,7 @@ export function OperativeProfileModal({
               <View style={{ marginTop: 20 }}>
                 {dossier.friendshipStatus === 'none' && (
                   <Button
-                    title={actionLoading ? 'Dispatching…' : '+ Dispatch Ally Request'}
+                    title={actionLoading ? 'Sending…' : '+ Add Friend'}
                     variant="primary"
                     size="md"
                     disabled={actionLoading}
@@ -337,7 +344,7 @@ export function OperativeProfileModal({
                 )}
                 {dossier.friendshipStatus === 'pending_outgoing' && (
                   <Button
-                    title="Ally Request Dispatched"
+                    title="Friend Request Sent"
                     variant="secondary"
                     size="md"
                     disabled
@@ -345,7 +352,7 @@ export function OperativeProfileModal({
                 )}
                 {dossier.friendshipStatus === 'pending_incoming' && (
                   <Button
-                    title={actionLoading ? 'Accepting…' : 'Accept Tactical Request'}
+                    title={actionLoading ? 'Accepting…' : 'Accept Request'}
                     variant="primary"
                     size="md"
                     disabled={actionLoading}
@@ -532,32 +539,32 @@ export function OperativeProfileModal({
               <View style={{ marginTop: 20 }}>
                 {dossier?.isFriend && !dossier.isSelf ? (
                   <Button
-                    title={actionLoading ? 'Updating…' : 'Disconnect Ally'}
+                    title={actionLoading ? 'Removing…' : 'Remove Friend'}
                     variant="ghost"
                     size="sm"
                     disabled={actionLoading}
                     onPress={handleRemoveOperative}
                   />
-                ) : !dossier?.isSelf ? (
-                  dossier?.friendshipStatus === 'pending_outgoing' ? (
-                    <Button title="Request Dispatched" variant="secondary" size="md" disabled />
-                  ) : dossier?.friendshipStatus === 'pending_incoming' ? (
+                ) : !dossier?.isSelf && dossier?.friendshipStatus ? (
+                  dossier.friendshipStatus === 'pending_outgoing' ? (
+                    <Button title="Friend Request Sent" variant="secondary" size="md" disabled />
+                  ) : dossier.friendshipStatus === 'pending_incoming' ? (
                     <Button
-                      title={actionLoading ? 'Accepting…' : 'Accept Tactical Request'}
+                      title={actionLoading ? 'Accepting…' : 'Accept Request'}
                       variant="primary"
                       size="md"
                       disabled={actionLoading}
                       onPress={() => void handleAcceptRequest()}
                     />
-                  ) : (
+                  ) : dossier.friendshipStatus === 'none' ? (
                     <Button
-                      title={actionLoading ? 'Dispatching…' : '+ Dispatch Ally Request'}
+                      title={actionLoading ? 'Sending…' : '+ Add Friend'}
                       variant="primary"
                       size="md"
                       disabled={actionLoading}
                       onPress={() => void handleSendRequest()}
                     />
-                  )
+                  ) : null
                 ) : null}
               </View>
             </ScrollView>

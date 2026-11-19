@@ -157,14 +157,14 @@ export default function FriendsScreen() {
     try {
       const res = await sendFriendRequest(target);
       if (!res.success) {
-        return { success: false, message: res.reason || res.error || 'Failed to dispatch request' };
+        return { success: false, message: res.reason || res.error || 'Failed to send friend request' };
       }
       await loadData();
-      return { success: true, message: `Ally request dispatched to ${target}!` };
+      return { success: true, message: `Friend request sent to ${target}!` };
     } catch (err: unknown) {
       return {
         success: false,
-        message: err instanceof Error ? err.message : 'Failed to dispatch request',
+        message: err instanceof Error ? err.message : 'Failed to send friend request',
       };
     }
   };
@@ -269,7 +269,7 @@ export default function FriendsScreen() {
           ? `You and ${clean} are already connected!`
           : res.status === 'accepted'
           ? `Friend request accepted! You and ${clean} are now connected.`
-          : `Tactical friend request dispatched to ${clean}.`
+          : `Friend request sent to ${clean}.`
       );
       void loadData();
       // Re-query search to update status badge
@@ -302,8 +302,8 @@ export default function FriendsScreen() {
   const handleRemoveFriend = (friendId: string, name: string) => {
     triggerHaptic('buttonTap');
     Alert.alert(
-      'Remove Operative',
-      `Disconnect @${name} from your operative network?`,
+      'Remove Friend',
+      `Remove @${name} from your friends?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -315,7 +315,7 @@ export default function FriendsScreen() {
               triggerHaptic('tagConfirmed');
               void loadData();
             } else {
-              Alert.alert('Error', 'Failed to disconnect friend');
+              Alert.alert('Error', 'Failed to remove friend');
             }
           },
         },
@@ -562,10 +562,10 @@ export default function FriendsScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.inviteBannerTitle, { color: colors.text }]}>
-                    Share Tactical Invite Link
+                    Share Friend Invite Link
                   </Text>
                   <Text style={[styles.inviteBannerSub, { color: colors.textMuted }]}>
-                    Invite allies via WhatsApp, Discord, or tactical link
+                    Invite friends via WhatsApp, Discord, or link
                   </Text>
                 </View>
                 <Ionicons name="arrow-forward" size={16} color={colors.primary} />
@@ -841,7 +841,7 @@ export default function FriendsScreen() {
                   ]}
                 >
                   <Text style={[styles.emptySubText, { color: colors.textMuted }]}>
-                    No pending invitations dispatched.
+                    No pending friend requests sent.
                   </Text>
                 </Card>
               ) : (
@@ -1094,7 +1094,7 @@ export default function FriendsScreen() {
                             >
                               <Ionicons name="checkmark-circle" size={14} color={colors.success} />
                               <Text style={[styles.statusBadgeText, { color: colors.success }]}>
-                                Connected
+                                Friends
                               </Text>
                             </View>
                           ) : op.relationship === 'pending_outgoing' ? (
@@ -1111,7 +1111,7 @@ export default function FriendsScreen() {
                             >
                               <Ionicons name="time-outline" size={14} color="#EAB308" />
                               <Text style={[styles.statusBadgeText, { color: '#EAB308' }]}>
-                                Sent
+                                Request Sent
                               </Text>
                             </View>
                           ) : op.relationship === 'pending_incoming' ? (
@@ -1123,7 +1123,7 @@ export default function FriendsScreen() {
                             />
                           ) : (
                             <Button
-                              title="Add"
+                              title="Add Friend"
                               variant="primary"
                               size="sm"
                               disabled={sendingRequest}
@@ -1139,7 +1139,7 @@ export default function FriendsScreen() {
                 {!isSearching && targetHandle.trim().length >= 2 && searchResults.length === 0 && (
                   <View style={[styles.searchEmptyNote, { borderColor: colors.border }]}>
                     <Text style={[styles.searchEmptyNoteText, { color: colors.textMuted }]}>
-                      No registered operative matches "{targetHandle.trim()}". You can still dispatch an invitation below.
+                      No players match "{targetHandle.trim()}". You can still send a request below.
                     </Text>
                   </View>
                 )}
@@ -1186,7 +1186,7 @@ export default function FriendsScreen() {
                 )}
 
                 <Button
-                  title={sendingRequest ? 'Dispatching…' : 'Send Friend Request'}
+                  title={sendingRequest ? 'Sending…' : 'Send Friend Request'}
                   variant="primary"
                   size="md"
                   disabled={sendingRequest || !targetHandle.trim()}
@@ -1210,11 +1210,11 @@ export default function FriendsScreen() {
                 <View style={styles.cardHeaderRow}>
                   <Ionicons name="link-outline" size={20} color={colors.accent || colors.primary} />
                   <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>
-                    Tactical Invite Link
+                    Friend Invite Link
                   </Text>
                 </View>
                 <Text style={[styles.cardHeaderSub, { color: colors.textMuted }]}>
-                  Broadcast your personalized operative link to recruit allies and squadmates.
+                  Share your invite link to add friends and squadmates.
                 </Text>
 
                 <Button
@@ -1311,10 +1311,10 @@ export default function FriendsScreen() {
                 <View style={styles.toggleRow}>
                   <View style={{ flex: 1, paddingRight: 12 }}>
                     <Text style={[styles.toggleLabel, { color: colors.text }]}>
-                      Public Profile Dossier
+                      Public Profile
                     </Text>
                     <Text style={[styles.toggleSub, { color: colors.textMuted }]}>
-                      When enabled, non-allies can view your Tier, Season Echo, and badges. When disabled, your dossier is classified to non-allies.
+                      When enabled, other players can view your tier, points, and badges. When disabled, your profile is only visible to friends.
                     </Text>
                   </View>
                   <Switch

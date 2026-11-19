@@ -278,11 +278,11 @@ BEGIN
         g2.mode_id,
         p2.team,
         ((p2.team = 'runner' AND g2.winner = 'runners') OR (p2.team = 'hunter' AND g2.winner = 'hunters')) AS won,
-        p2.created_at
+        g2.created_at
       FROM public.players p2
       JOIN public.games g2 ON g2.id = p2.game_id
       WHERE p2.user_id = p_target_id AND g2.status = 'ended'
-      ORDER BY p2.created_at DESC
+      ORDER BY g2.created_at DESC
       LIMIT 5
     ) sub;
   END IF;

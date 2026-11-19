@@ -996,10 +996,10 @@ export default function SettingsScreen() {
           <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
             <View style={{ flex: 1, paddingRight: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Public Profile Dossier
+                Public Profile
               </Text>
               <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Allow non-allies to view Tier, Season Echo, and badges
+                Allow other players to view tier, points, and badges
               </Text>
             </View>
             <Switch
