@@ -558,8 +558,13 @@ export function YouContent() {
                 pressed && { opacity: 0.8 },
               ]}
             >
-              <Ionicons name="person-outline" size={15} color={colors.text} />
-              <Text style={[styles.avatarActionBtnText, { color: colors.text }]}>
+              <Ionicons name="person-outline" size={14} color={colors.text} />
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                style={[styles.avatarActionBtnText, { color: colors.text }]}
+              >
                 Preview Profile
               </Text>
             </Pressable>
@@ -582,10 +587,15 @@ export function YouContent() {
             >
               <Ionicons
                 name={isEditing ? 'close' : 'create-outline'}
-                size={15}
+                size={14}
                 color={colors.text}
               />
-              <Text style={[styles.avatarActionBtnText, { color: colors.text }]}>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                style={[styles.avatarActionBtnText, { color: colors.text }]}
+              >
                 {isEditing ? 'Close Editor' : 'Edit Codename'}
               </Text>
             </Pressable>
@@ -1347,15 +1357,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 40,
-    borderRadius: 20,
+    gap: 5,
+    height: 38,
+    paddingHorizontal: 8,
+    borderRadius: 19,
     borderWidth: 1,
   },
   avatarActionBtnText: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
+    letterSpacing: 0.1,
   },
   editDrawer: {
     marginTop: 16,
