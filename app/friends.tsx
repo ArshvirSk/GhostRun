@@ -48,23 +48,13 @@ import {
   searchOperatives,
   getFriendsHosting,
 } from '../src/lib/friends';
-import {
-  FriendsBoardEntry,
-  HeadToHeadStats,
-  HOW_ECHO_WORKS_EXPLAINER,
-  getBoardEmptyStateMessage,
-} from '../src/lib/friendsBoardCore';
-import {
-  fetchFriendsBoard,
-  fetchHeadToHead,
-} from '../src/lib/friendsBoard';
 import { OperativeProfileModal } from '../src/components/OperativeProfileModal';
 import { OperativeBeaconModal } from '../src/components/OperativeBeaconModal';
 import { OperativeBeaconScannerModal } from '../src/components/OperativeBeaconScannerModal';
 import { listMyBlocks, unblockUser } from '../src/lib/moderation';
 import { BlockItem } from '../src/lib/moderationCore';
 
-type FriendsTabKey = 'standings' | 'friends' | 'requests' | 'add' | 'privacy';
+type FriendsTabKey = 'friends' | 'requests' | 'add' | 'privacy';
 
 export default function FriendsScreen() {
   const router = useRouter();
@@ -74,23 +64,14 @@ export default function FriendsScreen() {
   const { colors, spacing, radii, isDark } = useTheme();
   const userProfile = useUserStore((s) => s.profile);
 
-  const [activeTab, setActiveTab] = useState<FriendsTabKey>('standings');
+  const [activeTab, setActiveTab] = useState<FriendsTabKey>('friends');
   const [loading, setLoading] = useState(true);
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
   const [blocks, setBlocks] = useState<BlockItem[]>([]);
 
-  // Standings / Leaderboard state
-  const [boardEntries, setBoardEntries] = useState<FriendsBoardEntry[]>([]);
-  const [canViewBoard, setCanViewBoard] = useState(true);
-  const [selectedSeason, setSelectedSeason] = useState<'current' | 'previous'>('current');
-  const [enablingEcho, setEnablingEcho] = useState(false);
-  const [h2hStats, setH2hStats] = useState<HeadToHeadStats | null>(null);
-  const [loadingH2h, setLoadingH2h] = useState(false);
-  const [explainerVisible, setExplainerVisible] = useState(false);
-
-  // Filter in Tab 2 (Friends)
+  // Filter in Tab 0 (Friends)
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
 
   // Operative Profile Modal state
@@ -133,26 +114,6 @@ export default function FriendsScreen() {
     profileVisibility: 'public',
   });
 
-  const loadBoard = useCallback(async (seasonType: 'current' | 'previous') => {
-    try {
-      const now = new Date();
-      const currentMonth = now.toISOString().slice(0, 7);
-      const prevMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7);
-      const targetSeason = seasonType === 'previous' ? prevMonth : currentMonth;
-
-      const res = await fetchFriendsBoard(targetSeason);
-      if (res.reason === 'share_echo_disabled') {
-        setCanViewBoard(false);
-      } else {
-        setCanViewBoard(true);
-      }
-      setBoardEntries(res.board);
-    } catch {
-      setBoardEntries([]);
-      setCanViewBoard(true);
-    }
-  }, []);
-
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -169,29 +130,12 @@ export default function FriendsScreen() {
       setBlocks(blockList);
       setSettings(currentSettings);
       setHostingFriends(hostingList);
-      await loadBoard(selectedSeason);
     } catch {
       // offline fallback
     } finally {
       setLoading(false);
     }
-  }, [loadBoard, selectedSeason]);
-
-  const handleBeaconOperativeScanned = async (target: string): Promise<{ success: boolean; message: string }> => {
-    try {
-      const res = await sendFriendRequest(target);
-      if (!res.success) {
-        return { success: false, message: res.reason || res.error || 'Failed to dispatch request' };
-      }
-      await loadData();
-      return { success: true, message: `Ally request dispatched to ${target}!` };
-    } catch (err: unknown) {
-      return {
-        success: false,
-        message: err instanceof Error ? err.message : 'Failed to dispatch request',
-      };
-    }
-  };
+  }, []);
 
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
@@ -209,7 +153,23 @@ export default function FriendsScreen() {
     void loadData();
   }, [loadData]);
 
-  // Handle deep link / navigation parameter (e.g. ghost-run://friends?add=AlphaOP or ?tab=standings)
+  const handleBeaconOperativeScanned = async (target: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await sendFriendRequest(target);
+      if (!res.success) {
+        return { success: false, message: res.reason || res.error || 'Failed to dispatch request' };
+      }
+      await loadData();
+      return { success: true, message: `Ally request dispatched to ${target}!` };
+    } catch (err: unknown) {
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Failed to dispatch request',
+      };
+    }
+  };
+
+  // Handle deep link / navigation parameter (e.g. ghost-run://friends?add=AlphaOP or ?tab=add)
   useEffect(() => {
     if (params.add) {
       const decoded = decodeURIComponent(params.add).trim();
@@ -217,72 +177,13 @@ export default function FriendsScreen() {
         setTargetHandle(decoded);
         setActiveTab('add');
         setTimeout(() => {
-          pagerRef.current?.scrollTo({ x: 3 * screenWidth, animated: true });
+          pagerRef.current?.scrollTo({ x: 2 * screenWidth, animated: true });
         }, 100);
       }
-    } else if (params.tab && ['standings', 'friends', 'requests', 'add', 'privacy'].includes(params.tab)) {
+    } else if (params.tab && ['friends', 'requests', 'add', 'privacy'].includes(params.tab)) {
       handleTabChange(params.tab as FriendsTabKey);
     }
   }, [params.add, params.tab, screenWidth]);
-
-  const handleSeasonChange = (season: 'current' | 'previous') => {
-    triggerHaptic('buttonTap');
-    setSelectedSeason(season);
-    void loadBoard(season);
-  };
-
-  const handleInspectFriend = async (friendId: string) => {
-    triggerHaptic('buttonTap');
-    setLoadingH2h(true);
-    const stats = await fetchHeadToHead(friendId);
-    setLoadingH2h(false);
-    setH2hStats(stats);
-  };
-
-  const handleEnableShareEcho = async () => {
-    triggerHaptic('buttonTap');
-    setEnablingEcho(true);
-    try {
-      await updateFriendSettings({
-        allowFriendRequests: settings.allowFriendRequests,
-        showPresence: settings.showPresence,
-        shareEcho: true,
-        profileVisibility: settings.profileVisibility,
-      });
-      setSettings((s) => ({ ...s, shareEcho: true }));
-      setCanViewBoard(true);
-      await loadBoard(selectedSeason);
-    } catch (e) {
-      console.warn('Update friend settings error:', e);
-    } finally {
-      setEnablingEcho(false);
-    }
-  };
-
-  const getRankBadgeStyle = (rank: number) => {
-    if (rank === 1) {
-      return {
-        bg: isDark ? 'rgba(255, 215, 0, 0.20)' : 'rgba(217, 119, 6, 0.16)',
-        color: '#F59E0B',
-      };
-    }
-    if (rank === 2) {
-      return {
-        bg: isDark ? 'rgba(203, 213, 225, 0.20)' : 'rgba(100, 116, 139, 0.16)',
-        color: '#94A3B8',
-      };
-    }
-    if (rank === 3) {
-      return {
-        bg: isDark ? 'rgba(249, 115, 22, 0.20)' : 'rgba(194, 65, 12, 0.16)',
-        color: '#F97316',
-      };
-    }
-    return {
-      bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
-      color: colors.textMuted,
-    };
-  };
 
   // Live debounced search for operatives in registry
   useEffect(() => {
@@ -321,15 +222,13 @@ export default function FriendsScreen() {
     setActiveTab(tabKey);
     setStatusMessage('');
     const pageIndex =
-      tabKey === 'standings'
+      tabKey === 'friends'
         ? 0
-        : tabKey === 'friends'
-        ? 1
         : tabKey === 'requests'
-        ? 2
+        ? 1
         : tabKey === 'add'
-        ? 3
-        : 4;
+        ? 2
+        : 3;
     pagerRef.current?.scrollTo({ x: pageIndex * screenWidth, animated: true });
   };
 
@@ -338,12 +237,10 @@ export default function FriendsScreen() {
     const pageIndex = Math.round(offsetX / screenWidth);
     const newTab: FriendsTabKey =
       pageIndex === 0
-        ? 'standings'
-        : pageIndex === 1
         ? 'friends'
-        : pageIndex === 2
+        : pageIndex === 1
         ? 'requests'
-        : pageIndex === 3
+        : pageIndex === 2
         ? 'add'
         : 'privacy';
     if (newTab !== activeTab) {
@@ -505,10 +402,9 @@ export default function FriendsScreen() {
           FRIENDS
         </Text>
 
-        {/* 5-Tab Segment Bar with Animated Slider */}
+        {/* 4-Tab Segment Bar */}
         <SegmentBar
           items={[
-            { id: 'standings', label: 'STANDINGS' },
             { id: 'friends', label: 'FRIENDS', badge: friends.length > 0 ? friends.length : undefined },
             {
               id: 'requests',
@@ -540,7 +436,7 @@ export default function FriendsScreen() {
           style={styles.pager}
         >
           {/* ============================================================== */}
-          {/* TAB 0: STANDINGS / ECHO LEADERBOARD */}
+          {/* TAB 0: OPERATIVES (FRIENDS) LIST */}
           {/* ============================================================== */}
           <View style={{ width: screenWidth }}>
             <TacticalPullRefreshScrollView
@@ -552,249 +448,45 @@ export default function FriendsScreen() {
               ]}
               showsVerticalScrollIndicator={false}
             >
-              {/* Standings Sub-Header: Season toggle & Echo Guide */}
-              <View style={styles.standingsHeaderRow}>
+              {/* Shortcut Banner to Seasonal Leaderboard */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open Seasonal Leaderboard"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  router.push('/leaderboard');
+                }}
+                style={({ pressed }) => [
+                  styles.leaderboardShortcutBanner,
+                  {
+                    backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                    borderColor: colors.border,
+                  },
+                  pressed && { opacity: 0.85, transform: [{ scale: 0.985 }] },
+                ]}
+              >
                 <View
                   style={[
-                    styles.seasonToggleContainer,
+                    styles.shortcutIconWrap,
                     {
-                      backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                      borderColor: colors.border,
+                      backgroundColor: isDark
+                        ? 'rgba(245, 158, 11, 0.15)'
+                        : 'rgba(217, 119, 6, 0.12)',
                     },
                   ]}
                 >
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => handleSeasonChange('current')}
-                    style={[
-                      styles.seasonBtn,
-                      selectedSeason === 'current' && [
-                        styles.seasonBtnActive,
-                        { backgroundColor: colors.primary },
-                      ],
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.seasonBtnText,
-                        {
-                          color: selectedSeason === 'current' ? '#000000' : colors.textMuted,
-                        },
-                      ]}
-                    >
-                      CURRENT
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => handleSeasonChange('previous')}
-                    style={[
-                      styles.seasonBtn,
-                      selectedSeason === 'previous' && [
-                        styles.seasonBtnActive,
-                        { backgroundColor: colors.primary },
-                      ],
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.seasonBtnText,
-                        {
-                          color: selectedSeason === 'previous' ? '#000000' : colors.textMuted,
-                        },
-                      ]}
-                    >
-                      PREVIOUS
-                    </Text>
-                  </Pressable>
+                  <Ionicons name="trophy" size={20} color="#F59E0B" />
                 </View>
-
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    triggerHaptic('buttonTap');
-                    setExplainerVisible(true);
-                  }}
-                  style={[
-                    styles.explainerBtn,
-                    {
-                      backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
-                  <Text style={[styles.explainerBtnText, { color: colors.primary }]}>ECHO GUIDE</Text>
-                </Pressable>
-              </View>
-
-              {/* Share Echo Disabled Card */}
-              {!canViewBoard ? (
-                <Card
-                  variant="default"
-                  style={[
-                    styles.formCard,
-                    {
-                      backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                      borderColor: colors.border,
-                      marginTop: 8,
-                    },
-                  ]}
-                >
-                  <View style={styles.cardHeaderRow}>
-                    <Ionicons name="eye-off-outline" size={22} color={colors.accent || colors.primary} />
-                    <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>
-                      ECHO SHARING DISABLED
-                    </Text>
-                  </View>
-                  <Text style={[styles.cardHeaderSub, { color: colors.textMuted }]}>
-                    To access the Friends Standings and compare tactical metrics with allies, enable "Share Season Echo" in your privacy settings.
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.shortcutTitle, { color: colors.text }]}>
+                    Seasonal Echo Leaderboard
                   </Text>
-                  <Button
-                    title={enablingEcho ? 'Enabling…' : 'Enable Season Echo'}
-                    variant="primary"
-                    size="md"
-                    disabled={enablingEcho}
-                    onPress={() => void handleEnableShareEcho()}
-                    style={{ marginTop: 10 }}
-                  />
-                </Card>
-              ) : boardEntries.length === 0 ? (
-                (() => {
-                  const emptyInfo = getBoardEmptyStateMessage(friends.length);
-                  return (
-                    <Card
-                      variant="default"
-                      style={[
-                        styles.emptyCard,
-                        {
-                          backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                          borderColor: colors.border,
-                        },
-                      ]}
-                    >
-                      <Ionicons name="trophy-outline" size={48} color={colors.textMuted} />
-                      <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                        {emptyInfo.title.toUpperCase()}
-                      </Text>
-                      <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-                        {emptyInfo.subtitle}
-                      </Text>
-                      {friends.length === 0 && (
-                        <Button
-                          title="Add Operatives"
-                          variant="primary"
-                          size="sm"
-                          onPress={() => handleTabChange('add')}
-                          style={{ marginTop: 16 }}
-                        />
-                      )}
-                    </Card>
-                  );
-                })()
-              ) : (
-                boardEntries.map((entry) => {
-                  const badgeStyle = getRankBadgeStyle(entry.rank);
-                  const isCurrentUser = userProfile?.id === entry.userId || entry.isSelf;
-                  return (
-                    <Pressable
-                      key={entry.userId}
-                      accessibilityRole="button"
-                      onPress={() => {
-                        if (!isCurrentUser) {
-                          openOperativeProfile(entry.userId, entry.displayName);
-                        }
-                      }}
-                      style={({ pressed }) => [
-                        styles.entryCard,
-                        {
-                          backgroundColor: isCurrentUser
-                            ? isDark
-                              ? 'rgba(199, 243, 107, 0.08)'
-                              : 'rgba(85, 122, 34, 0.08)'
-                            : isDark
-                            ? colors.surfaceElevated
-                            : colors.surface,
-                          borderColor: isCurrentUser ? colors.primary : colors.border,
-                        },
-                        !isCurrentUser && pressed && { opacity: 0.85 },
-                      ]}
-                    >
-                      <View style={styles.entryRow}>
-                        {/* Rank Badge */}
-                        <View style={[styles.rankBadge, { backgroundColor: badgeStyle.bg }]}>
-                          <Text style={[styles.rankBadgeText, { color: badgeStyle.color }]}>
-                            #{entry.rank}
-                          </Text>
-                        </View>
-
-                        {/* Name and Tag */}
-                        <View style={styles.entryMeta}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text
-                              numberOfLines={1}
-                              style={[
-                                styles.entryName,
-                                { color: isCurrentUser ? colors.primary : colors.text },
-                              ]}
-                            >
-                              {entry.displayName}
-                            </Text>
-                            {isCurrentUser && (
-                              <View
-                                style={[
-                                  styles.youTag,
-                                  {
-                                    backgroundColor: isDark
-                                      ? 'rgba(199, 243, 107, 0.2)'
-                                      : 'rgba(85, 122, 34, 0.2)',
-                                  },
-                                ]}
-                              >
-                                <Text style={[styles.youTagText, { color: colors.primary }]}>YOU</Text>
-                              </View>
-                            )}
-                          </View>
-                          <Text style={[styles.entrySub, { color: colors.textMuted }]}>
-                            Tier {entry.tier} • {entry.roundsCounted} matches
-                          </Text>
-                        </View>
-
-                        {/* Echo Score & Rate */}
-                        <View style={{ alignItems: 'flex-end', marginRight: isCurrentUser ? 0 : 8 }}>
-                          <Text style={[styles.echoScore, { color: colors.accent || colors.primary }]}>
-                            {entry.seasonEcho} <Text style={{ fontSize: 11, fontWeight: '700' }}>PTS</Text>
-                          </Text>
-                          <Text style={[styles.ratesText, { color: colors.textMuted }]}>
-                            {Math.round(entry.avgGhost)}% Ghost • {Math.round(entry.avgCash)}% Cash
-                          </Text>
-                        </View>
-
-                        {/* Chevron for inspecting friend (head-to-head) */}
-                        {!isCurrentUser && (
-                          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-                        )}
-                      </View>
-                    </Pressable>
-                  );
-                })
-              )}
-            </TacticalPullRefreshScrollView>
-          </View>
-
-          {/* ============================================================== */}
-          {/* TAB 1: OPERATIVES LIST */}
-          {/* ============================================================== */}
-          <View style={{ width: screenWidth }}>
-            <TacticalPullRefreshScrollView
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              contentContainerStyle={[
-                styles.tabContent,
-                { paddingBottom: Math.max(insets.bottom, 16) + 80 },
-              ]}
-              showsVerticalScrollIndicator={false}
-            >
+                  <Text style={[styles.shortcutSub, { color: colors.textMuted }]}>
+                    Compare Season Echo, evasion & tag rates across the grid
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </Pressable>
               {/* LIVE SQUAD RADAR (Allies hosting active lobbies) */}
               {hostingFriends.length > 0 && (
                 <View style={styles.radarSection}>
@@ -1692,217 +1384,6 @@ export default function FriendsScreen() {
         </ScrollView>
       )}
 
-      {/* Head to Head Inspection Modal */}
-      <Modal
-        visible={!!h2hStats || loadingH2h}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setH2hStats(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setH2hStats(null)} />
-          <View
-            style={[
-              styles.modalContent,
-              {
-                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            {loadingH2h ? (
-              <View style={{ padding: 40, alignItems: 'center' }}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text
-                  style={{
-                    color: colors.textMuted,
-                    marginTop: 12,
-                    fontFamily: 'SegoeUI-Regular',
-                    fontSize: 13,
-                  }}
-                >
-                  Retrieving tactical telemetry…
-                </Text>
-              </View>
-            ) : h2hStats ? (
-              <>
-                <View style={styles.modalHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.modalTitle, { color: colors.text }]}>
-                      VS {(h2hStats.friendName || 'Operative').toUpperCase()}
-                    </Text>
-                    <Text style={[styles.modalSub, { color: colors.textMuted }]}>
-                      Head-to-head match history across all tactical deployments
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Close"
-                    onPress={() => setH2hStats(null)}
-                    style={styles.closeBtn}
-                  >
-                    <Ionicons name="close" size={20} color={colors.textMuted} />
-                  </Pressable>
-                </View>
-
-                {h2hStats.oppositeRounds === 0 ? (
-                  <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                    <Ionicons name="time-outline" size={40} color={colors.textMuted} />
-                    <Text
-                      style={{
-                        color: colors.textMuted,
-                        marginTop: 10,
-                        textAlign: 'center',
-                        fontFamily: 'SegoeUI-Regular',
-                        fontSize: 13,
-                      }}
-                    >
-                      No head-to-head rounds recorded with {h2hStats.friendName || 'this operative'} yet. Deploy in the same match to generate telemetry!
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    <View style={styles.statGrid}>
-                      <View
-                        style={[
-                          styles.statBox,
-                          {
-                            backgroundColor: isDark
-                              ? 'rgba(255,255,255,0.04)'
-                              : 'rgba(0,0,0,0.03)',
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.statValue, { color: colors.primary }]}>
-                          {h2hStats.myWins}
-                        </Text>
-                        <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                          YOUR WINS
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.statBox,
-                          {
-                            backgroundColor: isDark
-                              ? 'rgba(255,255,255,0.04)'
-                              : 'rgba(0,0,0,0.03)',
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.statValue, { color: colors.danger }]}>
-                          {h2hStats.friendWins}
-                        </Text>
-                        <Text style={[styles.statLabel, { color: colors.textMuted }]}>
-                          THEIR WINS
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={[styles.h2hRow, { borderBottomColor: colors.border }]}>
-                      <Text style={[styles.h2hLabel, { color: colors.textMuted }]}>
-                        Common Deployments
-                      </Text>
-                      <Text style={[styles.h2hVal, { color: colors.text }]}>
-                        {h2hStats.oppositeRounds}
-                      </Text>
-                    </View>
-                    <View style={[styles.h2hRow, { borderBottomColor: colors.border }]}>
-                      <Text style={[styles.h2hLabel, { color: colors.textMuted }]}>
-                        Times You Ghosted Them
-                      </Text>
-                      <Text style={[styles.h2hVal, { color: colors.success }]}>
-                        {h2hStats.timesGhostedThem}
-                      </Text>
-                    </View>
-                    <View style={styles.h2hRow}>
-                      <Text style={[styles.h2hLabel, { color: colors.textMuted }]}>
-                        Times They Cashed You
-                      </Text>
-                      <Text style={[styles.h2hVal, { color: colors.danger }]}>
-                        {h2hStats.timesTheyCashedMe}
-                      </Text>
-                    </View>
-                  </>
-                )}
-
-                <Button
-                  title="Close Telemetry"
-                  variant="secondary"
-                  size="md"
-                  onPress={() => setH2hStats(null)}
-                  style={{ marginTop: 18 }}
-                />
-              </>
-            ) : null}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Echo Guide Modal */}
-      <Modal
-        visible={explainerVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setExplainerVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setExplainerVisible(false)} />
-          <View
-            style={[
-              styles.modalContent,
-              {
-                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                borderColor: colors.border,
-                maxHeight: '80%',
-              },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  {HOW_ECHO_WORKS_EXPLAINER.title.toUpperCase()}
-                </Text>
-                <Text style={[styles.modalSub, { color: colors.textMuted }]}>
-                  {HOW_ECHO_WORKS_EXPLAINER.subtitle}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-                onPress={() => setExplainerVisible(false)}
-                style={styles.closeBtn}
-              >
-                <Ionicons name="close" size={20} color={colors.textMuted} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ marginVertical: 8 }}>
-              {HOW_ECHO_WORKS_EXPLAINER.sections.map((sec, idx) => (
-                <View key={idx} style={{ marginBottom: 14 }}>
-                  <Text style={[styles.explainerSecTitle, { color: colors.primary }]}>
-                    {sec.title}
-                  </Text>
-                  <Text style={[styles.explainerSecBody, { color: colors.textMuted }]}>
-                    {sec.body}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-
-            <Button
-              title="Acknowledge Briefing"
-              variant="primary"
-              size="md"
-              onPress={() => setExplainerVisible(false)}
-              style={{ marginTop: 8 }}
-            />
-          </View>
-        </View>
-      </Modal>
-
       {/* Universal Operative Profile Modal */}
       <OperativeProfileModal
         visible={profileModalVisible}
@@ -2496,6 +1977,33 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   beaconBtnSub: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  // Leaderboard shortcut banner
+  leaderboardShortcutBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12,
+    marginBottom: 14,
+  },
+  shortcutIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shortcutTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  shortcutSub: {
     fontFamily: 'SegoeUI-Regular',
     fontSize: 11,
     marginTop: 2,

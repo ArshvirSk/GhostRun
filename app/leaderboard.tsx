@@ -42,6 +42,7 @@ export default function LeaderboardScreen() {
   const { colors, spacing, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<LeaderboardTabKey>('current');
+  const [scope, setScope] = useState<'friends' | 'global'>('friends');
   const [loading, setLoading] = useState(true);
   const [boardEntries, setBoardEntries] = useState<FriendsBoardEntry[]>([]);
   const [canView, setCanView] = useState(true);
@@ -61,7 +62,7 @@ export default function LeaderboardScreen() {
 
   const pagerRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
-  const loadBoard = useCallback(async (tab: LeaderboardTabKey) => {
+  const loadBoard = useCallback(async (tab: LeaderboardTabKey, currentScope = scope) => {
     setLoading(true);
     try {
       const now = new Date();
@@ -70,7 +71,7 @@ export default function LeaderboardScreen() {
       const seasonToFetch = tab === 'previous' ? prevMonth : currentMonth;
       setCurrentSeason(seasonToFetch);
 
-      const res = await fetchFriendsBoard(seasonToFetch);
+      const res = await fetchFriendsBoard(seasonToFetch, currentScope);
       // Only lock the view if explicitly refused because share_echo is turned off by user
       if (res.reason === 'share_echo_disabled') {
         setCanView(false);
@@ -84,7 +85,14 @@ export default function LeaderboardScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scope]);
+
+  const handleScopeChange = (newScope: 'friends' | 'global') => {
+    if (newScope === scope) return;
+    triggerHaptic('buttonTap');
+    setScope(newScope);
+    void loadBoard(activeTab, newScope);
+  };
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -204,7 +212,6 @@ export default function LeaderboardScreen() {
     }
 
     if (boardEntries.length === 0) {
-      const msg = getBoardEmptyStateMessage(0);
       return (
         <Card
           variant="default"
@@ -217,15 +224,31 @@ export default function LeaderboardScreen() {
           ]}
         >
           <Ionicons name="trophy-outline" size={44} color={colors.textMuted} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>{msg.title}</Text>
-          <Text style={[styles.emptySub, { color: colors.textMuted }]}>{msg.subtitle}</Text>
-          <Button
-            title="Add an Operative"
-            variant="primary"
-            size="md"
-            onPress={() => router.push('/friends' as any)}
-            style={{ marginTop: 14 }}
-          />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            {scope === 'friends' ? 'No Friends on Leaderboard' : 'No Global Rankings Yet'}
+          </Text>
+          <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+            {scope === 'friends'
+              ? 'Connect with operatives and play rated matches to populate the Echo board.'
+              : 'Complete rated matches to establish grid rankings for this season.'}
+          </Text>
+          {scope === 'friends' ? (
+            <Button
+              title="Add an Operative"
+              variant="primary"
+              size="md"
+              onPress={() => router.push('/friends' as any)}
+              style={{ marginTop: 14 }}
+            />
+          ) : (
+            <Button
+              title="View Friends Leaderboard"
+              variant="primary"
+              size="md"
+              onPress={() => handleScopeChange('friends')}
+              style={{ marginTop: 14 }}
+            />
+          )}
         </Card>
       );
     }
@@ -264,8 +287,9 @@ export default function LeaderboardScreen() {
 
               {/* Operative Info */}
               <View style={styles.entryMeta}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
                   <Text
+                    numberOfLines={1}
                     style={[
                       styles.entryName,
                       { color: entry.isSelf ? colors.primary : colors.text },
@@ -279,8 +303,8 @@ export default function LeaderboardScreen() {
                         styles.youTag,
                         {
                           backgroundColor: isDark
-                            ? 'rgba(199, 243, 107, 0.18)'
-                            : 'rgba(85, 122, 34, 0.14)',
+                            ? 'rgba(199, 243, 107, 0.22)'
+                            : 'rgba(85, 122, 34, 0.18)',
                         },
                       ]}
                     >
@@ -288,23 +312,23 @@ export default function LeaderboardScreen() {
                     </View>
                   )}
                 </View>
-                <Text style={[styles.entrySub, { color: colors.textMuted }]}>
-                  {entry.handle ? `@${entry.handle}` : 'Operative'} • Tier: {entry.tier}
+                <Text numberOfLines={1} style={[styles.entrySub, { color: colors.textMuted }]}>
+                  Tier: {entry.tier} • {entry.roundsCounted} {entry.roundsCounted === 1 ? 'match' : 'matches'}
                 </Text>
               </View>
 
               {/* Season Echo Score */}
-              <View style={{ alignItems: 'flex-end' }}>
+              <View style={{ alignItems: 'flex-end', minWidth: 72 }}>
                 <Text
                   style={[
                     styles.echoScore,
                     { color: entry.isSelf ? colors.primary : colors.text },
                   ]}
                 >
-                  {entry.seasonEcho}
+                  {entry.seasonEcho} <Text style={{ fontSize: 11, fontWeight: '700' }}>PTS</Text>
                 </Text>
                 <Text style={[styles.ratesText, { color: colors.textMuted }]}>
-                  G: {entry.avgGhost}% • C: {entry.avgCash}%
+                  {Math.round(entry.avgGhost)}% Ghost • {Math.round(entry.avgCash)}% Cash
                 </Text>
               </View>
             </View>
@@ -341,6 +365,71 @@ export default function LeaderboardScreen() {
         <Text variant="display" style={{ color: colors.text, marginTop: spacing.xs, marginBottom: spacing.sm }}>
           LEADERBOARD
         </Text>
+
+        {/* Scope Selector: Friends vs Global */}
+        <View
+          style={[
+            styles.scopeSelectorContainer,
+            {
+              backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: scope === 'friends' }}
+            onPress={() => handleScopeChange('friends')}
+            style={[
+              styles.scopeTab,
+              scope === 'friends' && [
+                styles.scopeTabActive,
+                { backgroundColor: colors.primary },
+              ],
+            ]}
+          >
+            <Ionicons
+              name="people"
+              size={15}
+              color={scope === 'friends' ? '#000000' : colors.textMuted}
+            />
+            <Text
+              style={[
+                styles.scopeTabText,
+                { color: scope === 'friends' ? '#000000' : colors.textMuted },
+              ]}
+            >
+              FRIENDS
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: scope === 'global' }}
+            onPress={() => handleScopeChange('global')}
+            style={[
+              styles.scopeTab,
+              scope === 'global' && [
+                styles.scopeTabActive,
+                { backgroundColor: colors.primary },
+              ],
+            ]}
+          >
+            <Ionicons
+              name="globe-outline"
+              size={15}
+              color={scope === 'global' ? '#000000' : colors.textMuted}
+            />
+            <Text
+              style={[
+                styles.scopeTabText,
+                { color: scope === 'global' ? '#000000' : colors.textMuted },
+              ]}
+            >
+              GLOBAL GRID
+            </Text>
+          </Pressable>
+        </View>
 
         {/* 3-Tab Segment Bar with Animated Slider */}
         <SegmentBar
@@ -638,15 +727,42 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
+  scopeSelectorContainer: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: 10,
+  },
+  scopeTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 11,
+    gap: 6,
+  },
+  scopeTabActive: {},
+  scopeTabText: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
   youTag: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   youTagText: {
     fontFamily: 'Archivo-Black',
     fontSize: 9,
     fontWeight: '900',
+    letterSpacing: 0.5,
+    includeFontPadding: false,
   },
   entrySub: {
     fontFamily: 'SegoeUI-Regular',

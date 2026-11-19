@@ -11,6 +11,7 @@ import { EchoTier } from './echoCore';
 
 export async function fetchFriendsBoard(
   season?: string,
+  scope: 'friends' | 'global' = 'friends',
 ): Promise<FriendsBoardResponse> {
   if (!supabase) {
     return {
@@ -23,6 +24,7 @@ export async function fetchFriendsBoard(
   try {
     const { data, error } = await supabase.rpc('get_friends_board', {
       p_season: season ?? null,
+      p_scope: scope,
     });
 
     if (error || !data) {
