@@ -8,6 +8,7 @@ import {
   isDeclineCooldownActive,
   isPresenceExpired,
   formatFriendInviteUrl,
+  GHOSTRUN_WEB_URL,
   MAX_FRIEND_REQUESTS_PER_DAY,
   MAX_PENDING_REQUESTS,
   MAX_FRIENDS,
@@ -58,7 +59,11 @@ console.log('\n[4] Testing Friend Invite Token Formatting...');
 
 const sampleToken = 'token_abc123xyz456';
 const inviteUrl = formatFriendInviteUrl(sampleToken);
-assert.strictEqual(inviteUrl, 'https://ghostrun.app/join?friend_invite=token_abc123xyz456');
+assert.strictEqual(inviteUrl, `${GHOSTRUN_WEB_URL}/join?friend_invite=token_abc123xyz456`);
+assert.strictEqual(
+  formatFriendInviteUrl(sampleToken, 'https://ghostrun.app'),
+  'https://ghostrun.app/join?friend_invite=token_abc123xyz456',
+);
 console.log('  PASS: Invite token URL properly formatted');
 
 // 5. System Invariant Constants

@@ -39,6 +39,14 @@ import {
   type MiniMapCorner,
 } from '../src/components/MovableCornerMiniMap';
 import { useUserStore } from '../src/stores/userStore';
+import {
+  getColorblindPreference,
+  setColorblindPreference,
+  getHudScalePreference,
+  setHudScalePreference,
+  type ColorblindMode,
+  type HudScale,
+} from '../src/lib/accessibility';
 
 const DELETE_WORD = 'DELETE';
 
@@ -52,6 +60,8 @@ export default function SettingsScreen() {
   const [mapStyle, setMapStyle] = useState<'night' | 'standard'>('night');
   const [headstartMinimap, setHeadstartMinimap] = useState(true);
   const [minimapCorner, setMinimapCorner] = useState<MiniMapCorner>('top-right');
+  const [colorblindMode, setColorblindMode] = useState<ColorblindMode>('none');
+  const [hudScale, setHudScale] = useState<HudScale>('standard');
 
   // Audio & Telemetry
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -97,6 +107,8 @@ export default function SettingsScreen() {
           storedAnalytics,
           storedMinimap,
           storedMinimapCorner,
+          storedColorblind,
+          storedHudScale,
         ] = await Promise.all([
           AsyncStorage.getItem('@ghostrun:map_style'),
           AsyncStorage.getItem('@ghostrun:audio_enabled'),
@@ -111,7 +123,12 @@ export default function SettingsScreen() {
           getAnalyticsOptIn(),
           AsyncStorage.getItem(STORAGE_KEY_MINIMAP_ENABLED),
           AsyncStorage.getItem(STORAGE_KEY_MINIMAP_CORNER),
+          getColorblindPreference(),
+          getHudScalePreference(),
         ]);
+
+        setColorblindMode(storedColorblind);
+        setHudScale(storedHudScale);
 
         if (storedMap === 'standard' || storedMap === 'night') {
           setMapStyle(storedMap);
@@ -186,6 +203,18 @@ export default function SettingsScreen() {
     triggerHaptic('buttonTap');
     setMinimapCorner(corner);
     await AsyncStorage.setItem(STORAGE_KEY_MINIMAP_CORNER, corner);
+  };
+
+  const handleSelectColorblind = async (mode: ColorblindMode) => {
+    triggerHaptic('buttonTap');
+    setColorblindMode(mode);
+    await setColorblindPreference(mode);
+  };
+
+  const handleSelectHudScale = async (scale: HudScale) => {
+    triggerHaptic('buttonTap');
+    setHudScale(scale);
+    await setHudScalePreference(scale);
   };
 
   const toggleAudio = async (val: boolean) => {
@@ -741,7 +770,113 @@ export default function SettingsScreen() {
           )}
         </Card>
 
-        {/* 2. Units System */}
+        {/* 2. Accessibility & HUD */}
+        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
+          ACCESSIBILITY & HUD
+        </Text>
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark }]}>
+          <View style={{ marginBottom: spacing.sm }}>
+            <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+              Colorblind Palette Filter
+            </Text>
+            <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2, fontSize: 12 }}>
+              High-contrast tactical radar palettes for visual accessibility
+            </Text>
+          </View>
+
+          <View style={[styles.cornerGrid, { marginTop: spacing.xs }]}>
+            {(
+              [
+                { id: 'none', label: 'OFF / STANDARD' },
+                { id: 'protanopia', label: 'PROTANOPIA' },
+                { id: 'deuteranopia', label: 'DEUTERANOPIA' },
+                { id: 'tritanopia', label: 'TRITANOPIA' },
+              ] as const
+            ).map((item) => {
+              const active = colorblindMode === item.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Colorblind Mode ${item.label}`}
+                  onPress={() => void handleSelectColorblind(item.id)}
+                  style={[
+                    styles.cornerBtn,
+                    {
+                      borderColor: active ? colors.primary : colors.borderDark,
+                      backgroundColor: active ? colors.surfaceElevated : colors.surface,
+                    },
+                  ]}
+                >
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: active ? colors.text : colors.textMuted,
+                      fontWeight: '700',
+                      fontSize: 11,
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }}>
+            <View style={{ marginBottom: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Tactical HUD Scale
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2, fontSize: 12 }}>
+                Scale radar telemetry, distance markers, and countdown timers
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {(
+                [
+                  { id: 'standard', label: 'STANDARD (1.0x)' },
+                  { id: 'large', label: 'LARGE (1.25x)' },
+                  { id: 'extra_large', label: 'XL (1.5x)' },
+                ] as const
+              ).map((scaleItem) => {
+                const active = hudScale === scaleItem.id;
+                return (
+                  <Pressable
+                    key={scaleItem.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`HUD Scale ${scaleItem.label}`}
+                    onPress={() => void handleSelectHudScale(scaleItem.id)}
+                    style={[
+                      styles.cornerBtn,
+                      {
+                        flex: 1,
+                        minWidth: 0,
+                        borderColor: active ? colors.primary : colors.borderDark,
+                        backgroundColor: active ? colors.surfaceElevated : colors.surface,
+                      },
+                    ]}
+                  >
+                    <Text
+                      variant="caption"
+                      numberOfLines={1}
+                      style={{
+                        color: active ? colors.text : colors.textMuted,
+                        fontWeight: '700',
+                        fontSize: 11,
+                      }}
+                    >
+                      {scaleItem.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </Card>
+
+        {/* 3. Units System */}
         <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
           MEASUREMENT UNITS
         </Text>

@@ -171,10 +171,6 @@ DECLARE
   v_times_ghosted int := 0;
   v_times_cashed int := 0;
 BEGIN
-  IF v_caller_id IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
-  END IF;
-
   SELECT id, display_name, handle, color, profile_visibility, show_presence, share_echo, created_at
   INTO v_target
   FROM public.profiles
@@ -184,32 +180,38 @@ BEGIN
     RETURN jsonb_build_object('found', false);
   END IF;
 
-  v_is_self := (v_caller_id = p_target_id);
+  IF v_caller_id IS NOT NULL THEN
+    v_is_self := (v_caller_id = p_target_id);
 
-  -- Check friendship status
-  IF NOT v_is_self THEN
-    v_ua := least(v_caller_id, p_target_id);
-    v_ub := greatest(v_caller_id, p_target_id);
+    -- Check friendship status
+    IF NOT v_is_self THEN
+      v_ua := least(v_caller_id, p_target_id);
+      v_ub := greatest(v_caller_id, p_target_id);
 
-    SELECT status, requested_by INTO v_friendship
-    FROM public.friendships
-    WHERE user_a = v_ua AND user_b = v_ub;
+      SELECT status, requested_by INTO v_friendship
+      FROM public.friendships
+      WHERE user_a = v_ua AND user_b = v_ub;
 
-    IF FOUND THEN
-      IF v_friendship.status = 'accepted' THEN
-        v_is_friend := true;
-        v_friendship_status := 'friend';
-      ELSIF v_friendship.status = 'pending' THEN
-        IF v_friendship.requested_by = v_caller_id THEN
-          v_friendship_status := 'pending_outgoing';
-        ELSE
-          v_friendship_status := 'pending_incoming';
+      IF FOUND THEN
+        IF v_friendship.status = 'accepted' THEN
+          v_is_friend := true;
+          v_friendship_status := 'friend';
+        ELSIF v_friendship.status = 'pending' THEN
+          IF v_friendship.requested_by = v_caller_id THEN
+            v_friendship_status := 'pending_outgoing';
+          ELSE
+            v_friendship_status := 'pending_incoming';
+          END IF;
         END IF;
       END IF;
+    ELSE
+      v_is_friend := true;
+      v_friendship_status := 'self';
     END IF;
   ELSE
-    v_is_friend := true;
-    v_friendship_status := 'self';
+    v_is_self := false;
+    v_is_friend := false;
+    v_friendship_status := 'none';
   END IF;
 
   -- If not friends, not self, and profile is private: return redacted dossier
@@ -356,12 +358,12 @@ BEGIN
         'mode_id', g2.mode_id,
         'team', p2.team,
         'won', ((p2.team = 'runner' AND g2.winner = 'runners') OR (p2.team = 'hunter' AND g2.winner = 'hunters')),
-        'created_at', p2.created_at
+        'created_at', coalesce(p2.joined_at, g2.created_at)
       ) as m
       FROM public.players p2
       JOIN public.games g2 ON g2.id = p2.game_id
       WHERE p2.user_id = p_target_id AND g2.status = 'ended'
-      ORDER BY p2.created_at DESC
+      ORDER BY coalesce(p2.joined_at, g2.created_at) DESC
       LIMIT 5
     ) sub;
   END IF;
@@ -396,4 +398,4 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_operative_profile(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_operative_profile(uuid) TO authenticated, anon;

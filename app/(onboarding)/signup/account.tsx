@@ -27,8 +27,8 @@ import { Card } from '../../../src/ui/Card';
 import { Text } from '../../../src/ui/Text';
 
 const RESEND_COOLDOWN_S = 60;
-const PRIVACY_URL = 'https://ghostrun.app/privacy';
-const TERMS_URL = 'https://ghostrun.app/terms';
+const PRIVACY_URL = 'https://arshvirsk.github.io/GhostRun/privacy';
+const TERMS_URL = 'https://arshvirsk.github.io/GhostRun/safety';
 
 export default function SignupAccountScreen() {
   const router = useRouter();

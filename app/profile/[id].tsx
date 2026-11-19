@@ -28,10 +28,13 @@ import { useUnits } from '../../src/utils/units';
 
 export default function OperativeProfileScreen() {
   const { id, name, color } = useLocalSearchParams<{
-    id: string;
+    id: string | string[];
     name?: string;
     color?: string;
   }>();
+  const rawId = Array.isArray(id) ? id[0] : id;
+  const targetId = typeof rawId === 'string' ? rawId.trim() : '';
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
@@ -41,19 +44,31 @@ export default function OperativeProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [dossier, setDossier] = useState<OperativeProfileDossier | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [errorDetail, setErrorDetail] = useState('');
 
   const loadProfile = useCallback(async () => {
-    if (!id) return;
+    if (!targetId) {
+      setErrorDetail(`Invalid ID received: "${String(id)}"`);
+      setLoading(false);
+      return;
+    }
     try {
-      const data = await fetchOperativeProfile(id);
-      setDossier(data);
-    } catch {
+      const data = await fetchOperativeProfile(targetId);
+      if (!data) {
+        setErrorDetail(`Operative dossier returned null for "${targetId}"`);
+        setDossier(null);
+      } else {
+        setDossier(data);
+        setErrorDetail('');
+      }
+    } catch (err: any) {
+      setErrorDetail(err?.message || String(err));
       setDossier(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [id]);
+  }, [targetId, id]);
 
   useEffect(() => {
     void loadProfile();
@@ -323,6 +338,11 @@ export default function OperativeProfileScreen() {
             <Text style={[styles.stateText, { color: colors.textMuted, marginTop: 12 }]}>
               Could not load profile. Pull to retry.
             </Text>
+            {errorDetail ? (
+              <Text style={{ color: colors.danger, marginTop: 8, fontSize: 12, textAlign: 'center', paddingHorizontal: 20 }}>
+                {errorDetail}
+              </Text>
+            ) : null}
           </View>
         ) : dossier.isRedacted ? (
           /* ============================================================== */

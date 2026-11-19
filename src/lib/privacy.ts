@@ -1,17 +1,13 @@
 /**
  * Privacy policy versioning and copy.
- *
- * TODO(policy-url): set PRIVACY_POLICY_URL once the full policy page is hosted.
- * Until then the "Read full policy online" row is hidden. TODO(legal): the copy
- * below is a product draft, not a legally reviewed privacy policy.
  */
 
 export const PRIVACY_VERSION = 4;
 
 export const PRIVACY_CONTACT_EMAIL = 'arshvirsk26@gmail.com';
 
-/** TODO(policy-url): replace with the hosted public policy page URL. */
-export const PRIVACY_POLICY_URL: string | null = null;
+/** Hosted public policy page URL. */
+export const PRIVACY_POLICY_URL: string = 'https://arshvirsk.github.io/GhostRun/privacy';
 
 /** Shown on the "What changed" prompt when PRIVACY_VERSION is bumped. */
 export const PRIVACY_CHANGELOG: Record<number, string[]> = {

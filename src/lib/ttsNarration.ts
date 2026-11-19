@@ -2,7 +2,7 @@
  * NF-33: Spoken TTS Narration Client Module
  */
 
-import { Platform } from 'react-native';
+import { Platform, AccessibilityInfo } from 'react-native';
 import {
   NarrationCue,
   TacticalVoiceQueue,
@@ -57,7 +57,12 @@ async function processQueue(): Promise<void> {
         window.speechSynthesis.speak(utterance);
       });
     } else {
-      // In mobile environment or non-web, we simulate speech duration (~60ms per char)
+      // Native mobile speech output via OS Accessibility Speech Engine
+      try {
+        AccessibilityInfo.announceForAccessibility(nextCue.text);
+      } catch {
+        // Fallback
+      }
       const durationMs = Math.min(Math.max(nextCue.text.length * 60, 500), 4000);
       await new Promise((r) => setTimeout(r, durationMs));
     }

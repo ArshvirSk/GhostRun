@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Vibration,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +25,7 @@ import { triggerHaptic } from '../src/motion/haptics';
 import { playSound } from '../src/lib/audio';
 import { supabase } from '../src/lib/supabase';
 import { parseInviteUrl } from '../src/lib/invite';
+import { consumeFriendInvite } from '../src/lib/friends';
 
 const GHOSTRUN_MARK_MINT = require('../assets/ghostrun-mark-mint.png');
 const GHOSTRUN_MARK_OLIVE = require('../assets/ghostrun-mark-olive.png');
@@ -34,7 +36,11 @@ export default function JoinGameScreen() {
   const { colors, spacing, radii, isDark } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ code?: string }>();
+  const params = useLocalSearchParams<{
+    code?: string;
+    friend_invite?: string;
+    add?: string;
+  }>();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [torch, setTorch] = useState(false);
@@ -100,6 +106,47 @@ export default function JoinGameScreen() {
     }
   }, [params.code, code]);
 
+  // Handle incoming friend invite token (?friend_invite=XYZ)
+  useEffect(() => {
+    if (params.friend_invite) {
+      const token = params.friend_invite.trim();
+      if (!token) return;
+      setBusy(true);
+      void consumeFriendInvite(token).then((res) => {
+        setBusy(false);
+        if (res.success && res.owner) {
+          triggerHaptic('tagConfirmed');
+          Alert.alert(
+            'Operative Linked',
+            `You are now connected with operative ${res.owner.displayName}.`,
+            [
+              {
+                text: 'View Profile',
+                onPress: () =>
+                  router.push({
+                    pathname: '/profile/[id]',
+                    params: {
+                      id: res.owner!.ownerId,
+                      name: res.owner!.displayName,
+                      color: res.owner!.color,
+                    },
+                  }),
+              },
+              {
+                text: 'Allies Network',
+                onPress: () => router.push('/friends'),
+              },
+            ],
+          );
+        } else {
+          triggerHaptic('error');
+          setErrorMessage(res.error || 'Failed to accept friend invite.');
+          setHasError(true);
+        }
+      });
+    }
+  }, [params.friend_invite, router]);
+
   async function handleJoin(inputCode = code) {
     const normalized = inputCode.trim().toUpperCase();
     if (normalized.length !== CODE_LENGTH) {
@@ -150,7 +197,66 @@ export default function JoinGameScreen() {
     if (lastScannedRef.current === data) return;
     lastScannedRef.current = data;
 
-    // Check parsed invite URL or raw 4-char string
+    // 1. Check for friend invite token (?friend_invite=XYZ)
+    const friendInviteMatch = data.match(/friend_invite=([a-zA-Z0-9]+)/i);
+    if (friendInviteMatch) {
+      const token = friendInviteMatch[1];
+      setIsScanning(true);
+      playSound('scan_success');
+      Vibration.vibrate([0, 70, 30, 70]);
+      triggerHaptic('tagConfirmed');
+      setScanFeedback({ success: true, message: 'OPERATIVE BEACON DETECTED' });
+
+      try {
+        const res = await consumeFriendInvite(token);
+        if (res.success && res.owner) {
+          setScanFeedback({ success: true, message: `LINKED: ${res.owner.displayName}` });
+          setTimeout(() => {
+            router.push({
+              pathname: '/profile/[id]',
+              params: {
+                id: res.owner!.ownerId,
+                name: res.owner!.displayName,
+                color: res.owner!.color,
+              },
+            });
+          }, 800);
+          return;
+        } else {
+          setScanFeedback({ success: false, message: res.error || 'Failed to link operative' });
+        }
+      } catch {
+        setScanFeedback({ success: false, message: 'Network error linking operative' });
+      }
+
+      setTimeout(() => {
+        setIsScanning(false);
+        lastScannedRef.current = null;
+        setScanFeedback(null);
+      }, 2000);
+      return;
+    }
+
+    // 2. Check for operative handle beacon (?add=@handle)
+    const addMatch = data.match(/[?&]add=([^&]+)/i);
+    if (addMatch) {
+      const identifier = decodeURIComponent(addMatch[1]);
+      setIsScanning(true);
+      playSound('scan_success');
+      Vibration.vibrate([0, 70, 30, 70]);
+      triggerHaptic('tagConfirmed');
+      setScanFeedback({ success: true, message: `OPERATIVE BEACON: ${identifier}` });
+
+      setTimeout(() => {
+        router.push({
+          pathname: '/friends',
+          params: { add: identifier },
+        });
+      }, 700);
+      return;
+    }
+
+    // 3. Check parsed match lobby invite URL or raw 4-char string
     const parsed = parseInviteUrl(data);
     let extractedCode = parsed.isValid ? parsed.code : null;
 

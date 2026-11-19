@@ -131,10 +131,12 @@ export function isPresenceExpired(
   return new Date(expiresAt).getTime() <= nowMs;
 }
 
+export const GHOSTRUN_WEB_URL = 'https://arshvirsk.github.io/GhostRun';
+
 /**
  * Formats a friend invite shareable URL.
  */
-export function formatFriendInviteUrl(token: string, baseUrl: string = 'https://ghostrun.app'): string {
+export function formatFriendInviteUrl(token: string, baseUrl: string = GHOSTRUN_WEB_URL): string {
   return `${baseUrl}/join?friend_invite=${token}`;
 }
 
@@ -144,8 +146,6 @@ export function formatFriendInviteUrl(token: string, baseUrl: string = 'https://
 export function formatFriendDeepLink(identifier: string): string {
   return `ghost-run://friends?add=${encodeURIComponent(identifier)}`;
 }
-
-export const GHOSTRUN_WEB_URL = 'https://arshvirsk.github.io/GhostRun';
 
 /**
  * Formats a clickable HTTPS web link that opens in browsers and redirects to GhostRun.

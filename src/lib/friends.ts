@@ -254,15 +254,40 @@ export async function updateFriendSettings(
   }
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function fetchOperativeProfile(
-  targetId: string,
+  targetId: string | string[],
 ): Promise<OperativeProfileDossier | null> {
-  if (!supabase) return null;
+  if (!supabase) {
+    throw new Error('Supabase client is not initialized');
+  }
+  const cleanId = Array.isArray(targetId)
+    ? targetId[0]
+    : typeof targetId === 'string'
+    ? targetId.trim()
+    : '';
+
+  if (!cleanId) {
+    throw new Error('Operative ID is empty');
+  }
+  if (!UUID_REGEX.test(cleanId)) {
+    throw new Error(`Invalid operative ID format: "${cleanId}"`);
+  }
+
   try {
     const { data, error } = await supabase.rpc('get_operative_profile', {
-      p_target_id: targetId,
+      p_target_id: cleanId,
     });
-    if (error || !data || !data.found) return null;
+    if (error) {
+      throw new Error('RPC Error: ' + (error.message || JSON.stringify(error)));
+    }
+    if (!data) {
+      throw new Error('RPC returned null data');
+    }
+    if (!data.found) {
+      throw new Error('Operative not found in database');
+    }
 
     return {
       found: true,
@@ -306,8 +331,9 @@ export async function fetchOperativeProfile(
         : null,
       recentMatches: data.recent_matches,
     };
-  } catch {
-    return null;
+  } catch (err: any) {
+    console.error('[fetchOperativeProfile] error:', err);
+    throw err;
   }
 }
 
@@ -336,5 +362,83 @@ export async function searchOperatives(query: string): Promise<SearchedOperative
     }));
   } catch {
     return [];
+  }
+}
+
+export interface CreatedFriendInvite {
+  token: string;
+  expiresAt: string;
+  inviteUrl: string;
+}
+
+export interface ConsumedFriendInvite {
+  ownerId: string;
+  displayName: string;
+  handle: string | null;
+  color: string;
+}
+
+export async function createFriendInvite(): Promise<{
+  success: boolean;
+  invite?: CreatedFriendInvite;
+  error?: string;
+}> {
+  if (!supabase) return { success: false, error: 'Database unconfigured' };
+  try {
+    const { data, error } = await supabase.rpc('create_friend_invite');
+    if (error || !data) {
+      return { success: false, error: error?.message || 'Failed to create invite' };
+    }
+    const res = data as Record<string, unknown>;
+    return {
+      success: true,
+      invite: {
+        token: String(res.token),
+        expiresAt: String(res.expires_at),
+        inviteUrl: String(res.invite_url),
+      },
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Network error creating invite',
+    };
+  }
+}
+
+export async function consumeFriendInvite(token: string): Promise<{
+  success: boolean;
+  owner?: ConsumedFriendInvite;
+  error?: string;
+}> {
+  if (!supabase) return { success: false, error: 'Database unconfigured' };
+  const clean = token.trim();
+  if (!clean) return { success: false, error: 'Invite token is empty' };
+
+  try {
+    const { data, error } = await supabase.rpc('consume_friend_invite', {
+      p_token: clean,
+    });
+    if (error || !data) {
+      return { success: false, error: error?.message || 'Failed to accept invite' };
+    }
+    const res = data as Record<string, unknown>;
+    if (!res.success) {
+      return { success: false, error: String(res.error || 'Invalid invite') };
+    }
+    return {
+      success: true,
+      owner: {
+        ownerId: String(res.owner_id),
+        displayName: String(res.display_name),
+        handle: res.handle ? String(res.handle) : null,
+        color: String(res.color),
+      },
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Network error accepting invite',
+    };
   }
 }
