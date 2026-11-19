@@ -31,6 +31,7 @@ import {
   fetchHeadToHead,
 } from '../src/lib/friendsBoard';
 import { updateFriendSettings } from '../src/lib/friends';
+import { OperativeProfileModal } from '../src/components/OperativeProfileModal';
 
 type LeaderboardTabKey = 'current' | 'previous' | 'guide';
 
@@ -46,6 +47,11 @@ export default function LeaderboardScreen() {
   const [canView, setCanView] = useState(true);
   const [enablingEcho, setEnablingEcho] = useState(false);
   const [currentSeason, setCurrentSeason] = useState('2026-11');
+
+  // Operative Profile modal
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [selectedOperativeId, setSelectedOperativeId] = useState<string | null>(null);
+  const [selectedOperativeName, setSelectedOperativeName] = useState<string | undefined>();
 
   // Head-to-Head inspection modal
   const [h2hStats, setH2hStats] = useState<HeadToHeadStats | null>(null);
@@ -113,12 +119,11 @@ export default function LeaderboardScreen() {
     }
   };
 
-  const handleInspectFriend = async (friendId: string) => {
+  const handleInspectFriend = (friendId: string, displayName?: string) => {
     triggerHaptic('buttonTap');
-    setLoadingH2h(true);
-    const stats = await fetchHeadToHead(friendId);
-    setLoadingH2h(false);
-    setH2hStats(stats);
+    setSelectedOperativeId(friendId);
+    setSelectedOperativeName(displayName);
+    setProfileModalVisible(true);
   };
 
   const handleEnableShareEcho = async () => {
@@ -231,7 +236,7 @@ export default function LeaderboardScreen() {
         <Pressable
           key={entry.userId}
           accessibilityRole="button"
-          onPress={() => !entry.isSelf && void handleInspectFriend(entry.userId)}
+          onPress={() => !entry.isSelf && handleInspectFriend(entry.userId, entry.displayName)}
         >
           <Card
             variant="default"
@@ -566,6 +571,14 @@ export default function LeaderboardScreen() {
           <ActivityIndicator size="small" color={colors.primary} />
         </View>
       )}
+
+      {/* Universal Operative Profile Modal */}
+      <OperativeProfileModal
+        visible={profileModalVisible}
+        targetUserId={selectedOperativeId}
+        initialName={selectedOperativeName}
+        onClose={() => setProfileModalVisible(false)}
+      />
     </View>
   );
 }

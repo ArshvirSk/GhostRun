@@ -32,6 +32,7 @@ import {
   FriendRequest,
   FriendSettings,
   SearchedOperative,
+  HostPresence,
   formatFriendInviteUrl,
   formatFriendDeepLink,
   formatFriendWebInviteUrl,
@@ -45,6 +46,7 @@ import {
   updateFriendSettings,
   fetchFriendSettings,
   searchOperatives,
+  getFriendsHosting,
 } from '../src/lib/friends';
 import {
   FriendsBoardEntry,
@@ -57,6 +59,8 @@ import {
   fetchHeadToHead,
 } from '../src/lib/friendsBoard';
 import { OperativeProfileModal } from '../src/components/OperativeProfileModal';
+import { OperativeBeaconModal } from '../src/components/OperativeBeaconModal';
+import { OperativeBeaconScannerModal } from '../src/components/OperativeBeaconScannerModal';
 import { listMyBlocks, unblockUser } from '../src/lib/moderation';
 import { BlockItem } from '../src/lib/moderationCore';
 
@@ -114,6 +118,13 @@ export default function FriendsScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Live squad radar state
+  const [hostingFriends, setHostingFriends] = useState<HostPresence[]>([]);
+
+  // Operative Beacon QR modals
+  const [beaconModalVisible, setBeaconModalVisible] = useState(false);
+  const [scannerModalVisible, setScannerModalVisible] = useState(false);
+
   // Privacy settings state
   const [settings, setSettings] = useState<FriendSettings>({
     allowFriendRequests: true,
@@ -145,17 +156,19 @@ export default function FriendsScreen() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [friendsList, reqs, blockList, currentSettings] = await Promise.all([
+      const [friendsList, reqs, blockList, currentSettings, hostingList] = await Promise.all([
         listFriends(),
         listFriendRequests(),
         listMyBlocks(),
         fetchFriendSettings(),
+        getFriendsHosting(),
       ]);
       setFriends(friendsList);
       setIncomingRequests(reqs.incoming);
       setOutgoingRequests(reqs.outgoing);
       setBlocks(blockList);
       setSettings(currentSettings);
+      setHostingFriends(hostingList);
       await loadBoard(selectedSeason);
     } catch {
       // offline fallback
@@ -163,6 +176,22 @@ export default function FriendsScreen() {
       setLoading(false);
     }
   }, [loadBoard, selectedSeason]);
+
+  const handleBeaconOperativeScanned = async (target: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await sendFriendRequest(target);
+      if (!res.success) {
+        return { success: false, message: res.reason || res.error || 'Failed to dispatch request' };
+      }
+      await loadData();
+      return { success: true, message: `Ally request dispatched to ${target}!` };
+    } catch (err: unknown) {
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Failed to dispatch request',
+      };
+    }
+  };
 
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
@@ -766,6 +795,54 @@ export default function FriendsScreen() {
               ]}
               showsVerticalScrollIndicator={false}
             >
+              {/* LIVE SQUAD RADAR (Allies hosting active lobbies) */}
+              {hostingFriends.length > 0 && (
+                <View style={styles.radarSection}>
+                  <View style={styles.radarHeader}>
+                    <View style={[styles.liveDot, { backgroundColor: '#10B981' }]} />
+                    <Text style={[styles.radarTitle, { color: colors.text }]}>LIVE SQUAD RADAR</Text>
+                  </View>
+                  {hostingFriends.map((host) => (
+                    <Card
+                      key={host.gameId}
+                      variant="default"
+                      style={[
+                        styles.radarCard,
+                        {
+                          backgroundColor: isDark ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.06)',
+                          borderColor: '#10B981',
+                        },
+                      ]}
+                    >
+                      <View style={styles.radarRow}>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={[styles.radarHostName, { color: colors.text }]}>
+                              {host.hostName}
+                            </Text>
+                            <View style={styles.hostingBadge}>
+                              <Text style={styles.hostingBadgeText}>HOSTING</Text>
+                            </View>
+                          </View>
+                          <Text style={[styles.radarHostDetails, { color: colors.textMuted }]}>
+                            Mode: {host.modeId.toUpperCase()} • {host.playerCount} {host.playerCount === 1 ? 'Operative' : 'Operatives'} in Grid
+                          </Text>
+                        </View>
+                        <Button
+                          title="Quick Join"
+                          variant="primary"
+                          size="sm"
+                          onPress={() => {
+                            triggerHaptic('tagConfirmed');
+                            router.push({ pathname: '/lobby/[id]', params: { id: host.gameId } });
+                          }}
+                        />
+                      </View>
+                    </Card>
+                  ))}
+                </View>
+              )}
+
               {/* Share Invite Link Banner */}
               <Pressable
                 accessibilityRole="button"
@@ -1132,6 +1209,77 @@ export default function FriendsScreen() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
+              {/* ZERO-TYPING OPERATIVE BEACON (PEER-TO-PEER PAIRING) */}
+              <View style={styles.beaconPairCard}>
+                <View style={styles.beaconPairRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => {
+                      triggerHaptic('buttonTap');
+                      setBeaconModalVisible(true);
+                    }}
+                    style={({ pressed }) => [
+                      styles.beaconBtn,
+                      {
+                        backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                        borderColor: colors.border,
+                      },
+                      pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.beaconIconWrapper,
+                        {
+                          backgroundColor: isDark
+                            ? 'rgba(199, 243, 107, 0.15)'
+                            : 'rgba(85, 122, 34, 0.12)',
+                        },
+                      ]}
+                    >
+                      <Ionicons name="qr-code-outline" size={22} color={colors.primary} />
+                    </View>
+                    <Text style={[styles.beaconBtnTitle, { color: colors.text }]}>My Beacon</Text>
+                    <Text style={[styles.beaconBtnSub, { color: colors.textMuted }]}>
+                      Show QR Code
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => {
+                      triggerHaptic('buttonTap');
+                      setScannerModalVisible(true);
+                    }}
+                    style={({ pressed }) => [
+                      styles.beaconBtn,
+                      {
+                        backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                        borderColor: colors.border,
+                      },
+                      pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.beaconIconWrapper,
+                        {
+                          backgroundColor: isDark
+                            ? 'rgba(56, 189, 248, 0.15)'
+                            : 'rgba(2, 132, 199, 0.12)',
+                        },
+                      ]}
+                    >
+                      <Ionicons name="scan-outline" size={22} color="#38BDF8" />
+                    </View>
+                    <Text style={[styles.beaconBtnTitle, { color: colors.text }]}>Scan Beacon</Text>
+                    <Text style={[styles.beaconBtnSub, { color: colors.textMuted }]}>
+                      Auto-Pair Camera
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
               <Card
                 variant="default"
                 style={[
@@ -1764,6 +1912,23 @@ export default function FriendsScreen() {
         onClose={() => setProfileModalVisible(false)}
         onFriendshipChanged={() => void loadData()}
       />
+
+      {/* Operative Beacon Show QR Modal */}
+      <OperativeBeaconModal
+        visible={beaconModalVisible}
+        onClose={() => setBeaconModalVisible(false)}
+        displayName={userProfile?.display_name || 'Operative'}
+        handle={userProfile?.handle}
+        userId={userProfile?.id || ''}
+        avatarColor={userProfile?.color}
+      />
+
+      {/* Operative Beacon Live Camera Scanner Modal */}
+      <OperativeBeaconScannerModal
+        visible={scannerModalVisible}
+        onClose={() => setScannerModalVisible(false)}
+        onOperativeScanned={handleBeaconOperativeScanned}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -2250,5 +2415,89 @@ const styles = StyleSheet.create({
     fontFamily: 'SegoeUI-Regular',
     fontSize: 12,
     lineHeight: 18,
+  },
+  // Radar styles
+  radarSection: {
+    marginBottom: 16,
+  },
+  radarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  radarTitle: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  radarCard: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 8,
+  },
+  radarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  radarHostName: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  hostingBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  hostingBadgeText: {
+    color: '#000000',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  radarHostDetails: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  // Beacon Pairing styles
+  beaconPairCard: {
+    marginBottom: 14,
+  },
+  beaconPairRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  beaconBtn: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  beaconIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  beaconBtnTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  beaconBtnSub: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 11,
+    marginTop: 2,
   },
 });
