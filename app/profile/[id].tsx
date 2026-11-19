@@ -24,6 +24,7 @@ import {
 } from '../../src/lib/friends';
 import { OperativeProfileDossier } from '../../src/lib/friendsCore';
 import { BADGE_CATALOG } from '../../src/lib/badges';
+import { useUnits } from '../../src/utils/units';
 
 export default function OperativeProfileScreen() {
   const { id, name, color } = useLocalSearchParams<{
@@ -34,6 +35,7 @@ export default function OperativeProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { formatDistance } = useUnits();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -456,6 +458,40 @@ export default function OperativeProfileScreen() {
                   {dossier.neverCaught ?? 0}
                 </Text>
                 <Text style={[styles.statLbl, { color: colors.textMuted }]}>EVASIONS</Text>
+              </View>
+            </View>
+
+            {/* Tactical Personal Records */}
+            <View style={[styles.statGrid, { marginTop: 10 }]}>
+              <View
+                style={[
+                  styles.statBox,
+                  {
+                    flex: 1,
+                    backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.statVal, { color: colors.warning }]}>
+                  {dossier.bestEscape || '--'}
+                </Text>
+                <Text style={[styles.statLbl, { color: colors.textMuted }]}>BEST ESCAPE</Text>
+              </View>
+              <View
+                style={[
+                  styles.statBox,
+                  {
+                    flex: 1,
+                    backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.statVal, { color: colors.hunter }]}>
+                  {formatDistance(dossier.farthestMeters || 0)}
+                </Text>
+                <Text style={[styles.statLbl, { color: colors.textMuted }]}>FARTHEST RUN</Text>
               </View>
             </View>
 

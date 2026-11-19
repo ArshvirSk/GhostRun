@@ -75,6 +75,8 @@ export interface OperativeProfileDossier {
   won?: number;
   winRate?: number;
   neverCaught?: number;
+  bestEscape?: string;
+  farthestMeters?: number;
   badges?: string[];
   headToHead?: {
     oppositeRounds: number;

@@ -23,7 +23,7 @@ import { BADGE_CATALOG } from '../../src/lib/badges';
 import { SeasonRecapModal } from '../../src/components/SeasonRecapModal';
 import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
 import { useUserStore } from '../../src/stores/userStore';
-import { listFriends } from '../../src/lib/friends';
+import { listFriends, fetchOperativeProfile } from '../../src/lib/friends';
 import { getPlayerEchoProfile, PlayerEchoProfile } from '../../src/lib/echo';
 import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
 import { TACTICAL_GOLD } from '../../src/theme/tokens';
@@ -163,25 +163,36 @@ export function YouContent() {
         // non-blocking
       }
 
-      // 3. Fetch match history
+      // 3. Fetch operative dossier via fetchOperativeProfile for real career metrics
+      let opDossier: any = null;
+      try {
+        opDossier = await fetchOperativeProfile(authData.user.id);
+      } catch {
+        // non-blocking
+      }
+
+      // 4. Fetch match history
       setLoadingHistory(true);
       const { data: playersData } = await supabase
         .from('players')
-        .select('id, game_id, team, status, created_at, games(id, mode_id, winner, status)')
+        .select('id, game_id, team, status, created_at, games(id, mode_id, winner, status, duration_s, live_at, ended_at)')
         .eq('user_id', authData.user.id)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (playersData && Array.isArray(playersData)) {
-        const items: MatchHistoryItem[] = playersData.map((p: any) => ({
-          id: p.id,
-          game_id: p.game_id,
-          mode_id: p.games?.mode_id || 'classic_chase',
-          team: p.team,
-          status: p.status,
-          created_at: p.created_at,
-          winner: p.games?.winner,
-        }));
+        const items: MatchHistoryItem[] = playersData.map((p: any) => {
+          const g: any = Array.isArray(p.games) ? p.games[0] : p.games;
+          return {
+            id: p.id,
+            game_id: p.game_id,
+            mode_id: g?.mode_id || 'classic_chase',
+            team: p.team,
+            status: p.status,
+            created_at: p.created_at,
+            winner: g?.winner,
+          };
+        });
         setHistory(items);
 
         const total = items.length;
@@ -190,16 +201,49 @@ export function YouContent() {
           (m) => m.team === 'runner' && m.status === 'active' && m.winner === 'runners',
         ).length;
 
+        // Dynamic best escape calculation from actual runner victory matches
+        let fallbackEscapeStr = '--';
+        let maxEscapeSeconds = 0;
+        for (const p of (playersData as any[])) {
+          const g: any = Array.isArray(p.games) ? p.games[0] : p.games;
+          const isRunnerEscape = p.team === 'runner' && p.status === 'active' && g?.winner === 'runners';
+          if (isRunnerEscape && g) {
+            let dur = 0;
+            if (g.live_at && g.ended_at) {
+              dur = Math.max(0, Math.round((new Date(g.ended_at).getTime() - new Date(g.live_at).getTime()) / 1000));
+            } else if (g.duration_s) {
+              dur = g.duration_s;
+            }
+            if (dur > maxEscapeSeconds) {
+              maxEscapeSeconds = dur;
+            }
+          }
+        }
+        if (maxEscapeSeconds > 0) {
+          fallbackEscapeStr = `${Math.floor(maxEscapeSeconds / 60)}m ${(maxEscapeSeconds % 60).toString().padStart(2, '0')}s`;
+        }
+
+        const realBestEscape = opDossier?.bestEscape && opDossier.bestEscape !== '--'
+          ? opDossier.bestEscape
+          : fallbackEscapeStr;
+
+        const realFarthestMeters = typeof opDossier?.farthestMeters === 'number'
+          ? opDossier.farthestMeters
+          : 0;
+
         setStats({
-          rounds: total,
-          won,
-          winRate: total > 0 ? Math.round((won / total) * 100) : 0,
-          neverCaught: neverCaughtCount,
-          bestEscape: total > 0 ? '14m 20s' : '--',
-          farthestMeters: total > 0 ? 1420 : 0,
+          rounds: opDossier?.rounds ?? total,
+          won: opDossier?.won ?? won,
+          winRate: opDossier?.winRate ?? (total > 0 ? Math.round((won / total) * 100) : 0),
+          neverCaught: opDossier?.neverCaught ?? neverCaughtCount,
+          bestEscape: realBestEscape,
+          farthestMeters: realFarthestMeters,
         });
 
         const earned = new Set<string>();
+        if (opDossier?.badges && Array.isArray(opDossier.badges)) {
+          opDossier.badges.forEach((b: string) => earned.add(b));
+        }
         if (total >= 1) earned.add('first_deployment');
         if (total >= 10) earned.add('veteran_operative');
         if (neverCaughtCount > 0) earned.add('ghost_whisperer');

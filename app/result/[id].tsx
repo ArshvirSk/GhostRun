@@ -311,6 +311,12 @@ export default function ResultScreen() {
       return;
     }
 
+    // Trigger round score computation and badge awarding for completed round
+    void Promise.allSettled([
+      supabase.rpc('compute_round_scores', { p_game_id: gameId }),
+      supabase.rpc('award_match_badges', { p_game_id: gameId }),
+    ]);
+
     const isGhostDuel =
       snapshot.game.mode === 'ghost_duel' ||
       (snapshot.game as unknown as { mode_id?: string }).mode_id === 'ghost_duel';

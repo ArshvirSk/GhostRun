@@ -292,6 +292,8 @@ export async function fetchOperativeProfile(
       won: data.won,
       winRate: data.win_rate,
       neverCaught: data.never_caught,
+      bestEscape: data.best_escape,
+      farthestMeters: data.farthest_meters,
       badges: data.badges,
       headToHead: data.head_to_head
         ? {
