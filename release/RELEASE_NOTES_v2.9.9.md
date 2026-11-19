@@ -1,9 +1,9 @@
-# GhostRun v2.9.9 Release Notes — Join Room Restyling, Live Camera QR Viewfinder, Friends Live Search & Clickable HTTPS Tactical Invites
+# GhostRun v2.9.9 Release Notes — Friends Standings & Head-to-Head Telemetry, Join Room Restyling, Live Camera QR Viewfinder, Friends Live Search & Clickable HTTPS Tactical Invites
 
-**Release Date:** 2026-11-18  
+**Release Date:** 2026-11-19  
 **Artifact:** `release/GhostRun-v2.9.9.apk`  
-**Size:** 57,261,032 bytes (54.61 MB)  
-**SHA-256 Checksum:** `939B446B8DAAF7FD62405CD482820C4612274AA0DD49121DD1041FC941F6F739`  
+**Size:** 57,272,968 bytes (54.62 MB)  
+**SHA-256 Checksum:** `9083468EB950CF2D37F1022679FC8D2781FB34A57F4C75848B598C3FC8825AEC`  
 **Version:** `2.9.9`  
 **VersionCode:** `24`  
 **Architecture:** `arm64-v8a`  
@@ -13,7 +13,15 @@
 
 ## Overview
 
-GhostRun **v2.9.9** delivers critical improvements across the multiplayer onboarding flow, friends management system, live camera subsystem, and tactical share links:
+GhostRun **v2.9.9** delivers critical improvements across the multiplayer onboarding flow, friends management system, friends-only leaderboard, live camera subsystem, and tactical share links:
+
+- **Friends Standings & Echo Leaderboard (`app/friends.tsx`, `src/lib/friendsBoard.ts`)**:
+  - Integrated a dedicated **STANDINGS** tab directly inside the Friends screen (Tab 0 of 5: Standings, Friends, Requests, Add, Privacy).
+  - Operatives can now compare Season Echo scores, tier rankings, ghost survival rates, and hunter tag rates without leaving the Friends screen.
+  - Features current/previous season toggling, rank badges (#1 Gold, #2 Silver, #3 Bronze), high-contrast "(YOU)" self-indicator, and pull-to-refresh.
+  - Interactive **Head-to-Head Telemetry Modal**: Tap any connected friend's standing card to inspect bilateral match stats (Your Wins vs Their Wins, total shared deployments, times you ghosted them, and times they cashed you).
+  - Tactical **Echo Guide Modal**: Built-in reference explaining the delayed ping competitive metric, Ghost rate calculations, and Cash rate scoring.
+  - Privacy safeguards: Automatically respects the 60-minute match delay and the operative's "Share Season Echo" setting with a direct one-tap toggle if disabled.
 
 - **Clickable HTTPS Tactical Invites (`app/friends.tsx`, `docs/invite/index.html`)**:
   - Replaced non-linkified custom scheme URIs (`ghost-run://`) with a universally clickable, secure HTTPS web URL: `https://arshvirsk.github.io/GhostRun/invite?add=<identifier>`.
