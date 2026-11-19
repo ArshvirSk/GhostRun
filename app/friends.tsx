@@ -48,7 +48,6 @@ import {
   searchOperatives,
   getFriendsHosting,
 } from '../src/lib/friends';
-import { OperativeProfileModal } from '../src/components/OperativeProfileModal';
 import { OperativeBeaconModal } from '../src/components/OperativeBeaconModal';
 import { OperativeBeaconScannerModal } from '../src/components/OperativeBeaconScannerModal';
 import { listMyBlocks, unblockUser } from '../src/lib/moderation';
@@ -74,18 +73,12 @@ export default function FriendsScreen() {
   // Filter in Tab 0 (Friends)
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
 
-  // Operative Profile Modal state
-  const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const [inspectedUserId, setInspectedUserId] = useState<string | null>(null);
-  const [inspectedUserName, setInspectedUserName] = useState<string | undefined>(undefined);
-  const [inspectedUserColor, setInspectedUserColor] = useState<string | undefined>(undefined);
-
   const openOperativeProfile = (id: string, name?: string, color?: string) => {
     triggerHaptic('buttonTap');
-    setInspectedUserId(id);
-    setInspectedUserName(name);
-    setInspectedUserColor(color);
-    setProfileModalVisible(true);
+    router.push({
+      pathname: '/profile/[id]',
+      params: { id, name: name ?? '', color: color ?? '' },
+    });
   };
 
   // Add friend state
@@ -448,45 +441,48 @@ export default function FriendsScreen() {
               ]}
               showsVerticalScrollIndicator={false}
             >
-              {/* Shortcut Banner to Seasonal Leaderboard */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open Seasonal Leaderboard"
-                onPress={() => {
-                  triggerHaptic('buttonTap');
-                  router.push('/leaderboard');
-                }}
-                style={({ pressed }) => [
-                  styles.leaderboardShortcutBanner,
-                  {
-                    backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                    borderColor: colors.border,
-                  },
-                  pressed && { opacity: 0.85, transform: [{ scale: 0.985 }] },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.shortcutIconWrap,
+              {/* Minimal Action Row for Leaderboard and Invite */}
+              <View style={styles.minimalActionBar}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Leaderboard"
+                  onPress={() => {
+                    triggerHaptic('buttonTap');
+                    router.push('/leaderboard');
+                  }}
+                  style={({ pressed }) => [
+                    styles.minimalActionBtn,
                     {
-                      backgroundColor: isDark
-                        ? 'rgba(245, 158, 11, 0.15)'
-                        : 'rgba(217, 119, 6, 0.12)',
+                      backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                      borderColor: colors.border,
                     },
+                    pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
                   ]}
                 >
-                  <Ionicons name="trophy" size={20} color="#F59E0B" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.shortcutTitle, { color: colors.text }]}>
-                    Seasonal Echo Leaderboard
-                  </Text>
-                  <Text style={[styles.shortcutSub, { color: colors.textMuted }]}>
-                    Compare Season Echo, evasion & tag rates across the grid
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </Pressable>
+                  <Ionicons name="trophy" size={16} color="#F59E0B" />
+                  <Text style={[styles.minimalActionText, { color: colors.text }]}>Leaderboard</Text>
+                  <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Share Invite Link"
+                  onPress={() => void handleShareInvite()}
+                  style={({ pressed }) => [
+                    styles.minimalActionBtn,
+                    {
+                      backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                      borderColor: colors.border,
+                    },
+                    pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+                  ]}
+                >
+                  <Ionicons name="share-social-outline" size={16} color={colors.primary} />
+                  <Text style={[styles.minimalActionText, { color: colors.text }]}>Invite</Text>
+                  <Ionicons name="arrow-forward" size={13} color={colors.textMuted} />
+                </Pressable>
+              </View>
+
               {/* LIVE SQUAD RADAR (Allies hosting active lobbies) */}
               {hostingFriends.length > 0 && (
                 <View style={styles.radarSection}>
@@ -534,42 +530,6 @@ export default function FriendsScreen() {
                   ))}
                 </View>
               )}
-
-              {/* Share Invite Link Banner */}
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => void handleShareInvite()}
-                style={({ pressed }) => [
-                  styles.inviteBanner,
-                  {
-                    backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                    borderColor: colors.border,
-                  },
-                  pressed && { opacity: 0.85, transform: [{ scale: 0.985 }] },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.inviteBannerIcon,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(199, 243, 107, 0.12)'
-                        : 'rgba(85, 122, 34, 0.10)',
-                    },
-                  ]}
-                >
-                  <Ionicons name="share-social-outline" size={20} color={colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.inviteBannerTitle, { color: colors.text }]}>
-                    Share Friend Invite Link
-                  </Text>
-                  <Text style={[styles.inviteBannerSub, { color: colors.textMuted }]}>
-                    Invite friends via WhatsApp, Discord, or link
-                  </Text>
-                </View>
-                <Ionicons name="arrow-forward" size={16} color={colors.primary} />
-              </Pressable>
 
               {/* Filter Bar when friends exist */}
               {friends.length > 0 && (
@@ -1384,16 +1344,6 @@ export default function FriendsScreen() {
         </ScrollView>
       )}
 
-      {/* Universal Operative Profile Modal */}
-      <OperativeProfileModal
-        visible={profileModalVisible}
-        targetUserId={inspectedUserId}
-        initialName={inspectedUserName}
-        initialColor={inspectedUserColor}
-        onClose={() => setProfileModalVisible(false)}
-        onFriendshipChanged={() => void loadData()}
-      />
-
       {/* Operative Beacon Show QR Modal */}
       <OperativeBeaconModal
         visible={beaconModalVisible}
@@ -1981,31 +1931,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  // Leaderboard shortcut banner
-  leaderboardShortcutBanner: {
+  // Minimal Leaderboard & Invite action row
+  minimalActionBar: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  minimalActionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 12,
-    marginBottom: 14,
-  },
-  shortcutIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
   },
-  shortcutTitle: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 14,
+  minimalActionText: {
+    fontSize: 13,
     fontWeight: '800',
-  },
-  shortcutSub: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 11,
-    marginTop: 2,
+    fontFamily: 'Orbitron_700Bold',
+    letterSpacing: 0.5,
   },
 });

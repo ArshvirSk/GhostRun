@@ -75,6 +75,7 @@ function RootNavigator() {
         <Stack.Screen name="game/[id]" />
         <Stack.Screen name="result/[id]" />
         <Stack.Screen name="replay/[id]" />
+        <Stack.Screen name="profile/[id]" />
       </Stack>
     </View>
   );

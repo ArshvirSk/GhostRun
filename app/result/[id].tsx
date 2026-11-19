@@ -27,7 +27,6 @@ import { colors, radii, spacing } from '../../src/theme/tokens';
 import { Button, Card, Chip, Text } from '../../src/ui';
 import { formatDistance, useUnits } from '../../src/utils/units';
 import { ShareRoundCardModal } from '../../src/components/ShareRoundCardModal';
-import { OperativeProfileModal } from '../../src/components/OperativeProfileModal';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { getModeModule } from '../../src/modes/registry';
 
@@ -227,18 +226,12 @@ export default function ResultScreen() {
   const [shareRecapFeedback, setShareRecapFeedback] = useState(false);
   const [shareCardModalVisible, setShareCardModalVisible] = useState(false);
 
-  // Operative Profile Modal state
-  const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const [inspectedUserId, setInspectedUserId] = useState<string | null>(null);
-  const [inspectedUserName, setInspectedUserName] = useState<string | undefined>(undefined);
-  const [inspectedUserColor, setInspectedUserColor] = useState<string | undefined>(undefined);
-
   const handleInspectPlayer = (userId: string, name?: string, color?: string) => {
     triggerHaptic('buttonTap');
-    setInspectedUserId(userId);
-    setInspectedUserName(name);
-    setInspectedUserColor(color);
-    setProfileModalVisible(true);
+    router.push({
+      pathname: '/profile/[id]',
+      params: { id: userId, name: name ?? '', color: color ?? '' },
+    });
   };
 
   const mountedRef = useRef(true);
@@ -1507,14 +1500,6 @@ export default function ResultScreen() {
         }}
         rawTrailPoints={myTrailPoints}
         onClose={() => setShareCardModalVisible(false)}
-      />
-
-      <OperativeProfileModal
-        visible={profileModalVisible}
-        targetUserId={inspectedUserId}
-        initialName={inspectedUserName}
-        initialColor={inspectedUserColor}
-        onClose={() => setProfileModalVisible(false)}
       />
     </View>
   );

@@ -37,7 +37,6 @@ import { LobbyPrivacyModal } from '../../src/components/LobbyPrivacyModal';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { buildInvitePayload } from '../../src/lib/invite';
 import { pregenerateQrUri } from '../../src/lib/qrCache';
-import { OperativeProfileModal } from '../../src/components/OperativeProfileModal';
 import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from '../../src/lib/map';
 import { circleRing } from '../../src/lib/geo';
 import { getInstantLocation } from '../../src/lib/locationCache';
@@ -136,18 +135,12 @@ export default function LobbyScreen() {
   const [healthReport, setHealthReport] = useState<TrackingHealthReport | null>(null);
   const [isProbingHealth, setIsProbingHealth] = useState(false);
 
-  // Operative Profile Modal state
-  const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const [inspectedUserId, setInspectedUserId] = useState<string | null>(null);
-  const [inspectedUserName, setInspectedUserName] = useState<string | undefined>(undefined);
-  const [inspectedUserColor, setInspectedUserColor] = useState<string | undefined>(undefined);
-
   const handleInspectPlayer = (targetId: string, name?: string, color?: string) => {
     triggerHaptic('buttonTap');
-    setInspectedUserId(targetId);
-    setInspectedUserName(name);
-    setInspectedUserColor(color);
-    setProfileModalVisible(true);
+    router.push({
+      pathname: '/profile/[id]',
+      params: { id: targetId, name: name ?? '', color: color ?? '' },
+    });
   };
 
   const submitHealth = useCallback(
@@ -1877,14 +1870,6 @@ export default function LobbyScreen() {
         shareWithCrew={shareChoice === true}
         onSelectOption={handleSelectPrivacyOption}
         onClose={() => setPrivacyModalVisible(false)}
-      />
-
-      <OperativeProfileModal
-        visible={profileModalVisible}
-        targetUserId={inspectedUserId}
-        initialName={inspectedUserName}
-        initialColor={inspectedUserColor}
-        onClose={() => setProfileModalVisible(false)}
       />
     </View>
   );
