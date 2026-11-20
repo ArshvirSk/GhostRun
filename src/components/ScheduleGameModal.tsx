@@ -8,12 +8,14 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from '../ui/Text';
 import { Button } from '../ui/Button';
 import { triggerHaptic } from '../motion/haptics';
+import { useSheetModalAnimation } from '../motion';
 import {
   createScheduledGameOnServer,
   shareScheduledGameCalendar,
@@ -148,16 +150,40 @@ export function ScheduleGameModal({ visible, onClose, onGameCreated }: ScheduleG
     onClose();
   }
 
+  const { mounted, fadeAnim, slideAnim, handleClose } = useSheetModalAnimation(
+    visible,
+    handleResetAndClose,
+    { slideDistance: 550 },
+  );
+
   const targetDate = calculateTargetDate(selectedPresetIndex);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleResetAndClose}>
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={handleClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}
       >
-        <Pressable style={styles.backdrop} onPress={handleResetAndClose} />
-        <View style={[styles.sheet, { backgroundColor: colors.surface, borderRadius: radii.card }]}>
+        {/* Smooth Fading Backdrop */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0, 0, 0, 0.65)', opacity: fadeAnim },
+          ]}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: colors.surface,
+              borderRadius: radii.card,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
           <View style={[styles.header, { borderBottomColor: colors.borderLight }]}>
             <View>
               <Text variant="title" style={styles.title}>
@@ -168,7 +194,7 @@ export function ScheduleGameModal({ visible, onClose, onGameCreated }: ScheduleG
               </Text>
             </View>
             <Pressable
-              onPress={handleResetAndClose}
+              onPress={handleClose}
               hitSlop={8}
               style={[styles.closeBtn, { backgroundColor: colors.surfaceMuted }]}
             >
@@ -376,7 +402,7 @@ export function ScheduleGameModal({ visible, onClose, onGameCreated }: ScheduleG
               </>
             )}
           </ScrollView>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -386,10 +412,10 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
+    backgroundColor: 'transparent',
   },
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   sheet: {
     maxHeight: '90%',

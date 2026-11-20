@@ -10,6 +10,7 @@ import {
   Alert,
   Switch,
   Share,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
@@ -17,6 +18,7 @@ import { Text } from '../ui/Text';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { triggerHaptic } from '../motion/haptics';
+import { useSheetModalAnimation } from '../motion';
 import {
   FriendProfile,
   FriendRequest,
@@ -44,6 +46,7 @@ interface FriendsSheetProps {
 
 export function FriendsSheet({ visible, onClose }: FriendsSheetProps) {
   const { colors, spacing, radii } = useTheme();
+  const { mounted, fadeAnim, slideAnim, handleClose } = useSheetModalAnimation(visible, onClose, { slideDistance: 600 });
 
   const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'add' | 'privacy'>('friends');
   const [loading, setLoading] = useState(false);
@@ -182,12 +185,27 @@ export function FriendsSheet({ visible, onClose }: FriendsSheetProps) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={mounted} animationType="none" transparent onRequestClose={handleClose}>
       <View style={styles.overlay}>
-        <View
+        {/* Smooth Fading Backdrop */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0,0,0,0.65)', opacity: fadeAnim },
+          ]}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
+
+        <Animated.View
           style={[
             styles.container,
-            { backgroundColor: colors.surface, borderRadius: radii.lg, borderColor: colors.border },
+            {
+              backgroundColor: colors.surface,
+              borderRadius: radii.lg,
+              borderColor: colors.border,
+              transform: [{ translateY: slideAnim }],
+            },
           ]}
         >
           {/* Header */}
@@ -203,7 +221,7 @@ export function FriendsSheet({ visible, onClose }: FriendsSheetProps) {
             <Pressable
               onPress={() => {
                 triggerHaptic('buttonTap');
-                onClose();
+                handleClose();
               }}
               style={styles.closeBtn}
             >
@@ -515,7 +533,7 @@ export function FriendsSheet({ visible, onClose }: FriendsSheetProps) {
               )}
             </ScrollView>
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -524,7 +542,7 @@ export function FriendsSheet({ visible, onClose }: FriendsSheetProps) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'transparent',
     justifyContent: 'flex-end',
   },
   container: {

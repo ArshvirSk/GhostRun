@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
@@ -16,6 +17,7 @@ import { Text } from '../ui/Text';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { triggerHaptic } from '../motion/haptics';
+import { useSheetModalAnimation } from '../motion';
 import { supabase } from '../lib/supabase';
 import {
   RADIO_QUICK_CHIPS,
@@ -45,6 +47,7 @@ export function TeamRadioSheet({
   onUnreadChange,
 }: TeamRadioSheetProps) {
   const { colors, spacing, radii } = useTheme();
+  const { mounted, fadeAnim, slideAnim, handleClose } = useSheetModalAnimation(visible, onClose, { slideDistance: 500 });
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
   const [inputText, setInputText] = useState('');
@@ -200,41 +203,55 @@ export function TeamRadioSheet({
   const teamColor = myTeam === 'hunter' ? colors.danger : colors.primary;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={mounted} animationType="none" transparent onRequestClose={handleClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}
       >
-        <Card
-          variant="elevated"
+        {/* Smooth Fading Backdrop */}
+        <Animated.View
           style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.borderDark,
-              borderTopLeftRadius: radii.card,
-              borderTopRightRadius: radii.card,
-            },
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0,0,0,0.65)', opacity: fadeAnim },
           ]}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.titleWrap}>
-              <View style={[styles.signalDot, { backgroundColor: teamColor }]} />
-              <View>
-                <Text variant="label" style={{ color: teamColor, letterSpacing: 1.5 }}>
-                  {myTeam.toUpperCase()} RADIO CHANNEL
-                </Text>
-                <Text variant="caption" style={{ color: colors.textMuted }}>
-                  Team-encrypted field transmissions
-                </Text>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
+
+        <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
+          <Card
+            variant="elevated"
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.borderDark,
+                borderTopLeftRadius: radii.card,
+                borderTopRightRadius: radii.card,
+              },
+            ]}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.titleWrap}>
+                <View style={[styles.signalDot, { backgroundColor: teamColor }]} />
+                <View>
+                  <Text variant="label" style={{ color: teamColor, letterSpacing: 1.5 }}>
+                    {myTeam.toUpperCase()} RADIO CHANNEL
+                  </Text>
+                  <Text variant="caption" style={{ color: colors.textMuted }}>
+                    Team-encrypted field transmissions
+                  </Text>
+                </View>
               </View>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close Radio"
-              onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: colors.surfaceElevated }]}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close Radio"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  handleClose();
+                }}
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceElevated }]}
             >
               <Ionicons name="close" size={20} color={colors.textMuted} />
             </Pressable>
@@ -359,7 +376,8 @@ export function TeamRadioSheet({
             />
           </View>
         </Card>
-      </KeyboardAvoidingView>
+      </Animated.View>
+    </KeyboardAvoidingView>
 
       {/* Message Moderation Action Sheet */}
       {selectedMessage && (
@@ -476,7 +494,7 @@ export function TeamRadioSheet({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'transparent',
     justifyContent: 'flex-end',
   },
   sheet: {

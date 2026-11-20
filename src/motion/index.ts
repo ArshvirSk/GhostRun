@@ -17,3 +17,7 @@ export {
   getReducedMotionOverride,
   isReducedMotionActive,
 } from './reduced-motion';
+export {
+  useSheetModalAnimation,
+  type UseSheetModalAnimationOptions,
+} from './useSheetModalAnimation';

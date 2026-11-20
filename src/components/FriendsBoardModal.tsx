@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Animated,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
@@ -14,6 +15,7 @@ import { Text } from '../ui/Text';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { triggerHaptic } from '../motion/haptics';
+import { useSheetModalAnimation } from '../motion';
 import {
   FriendsBoardEntry,
   HeadToHeadStats,
@@ -33,6 +35,7 @@ interface FriendsBoardModalProps {
 
 export function FriendsBoardModal({ visible, onClose }: FriendsBoardModalProps) {
   const { colors, spacing, radii } = useTheme();
+  const { mounted, fadeAnim, slideAnim, handleClose } = useSheetModalAnimation(visible, onClose, { slideDistance: 650 });
 
   const [loading, setLoading] = useState(false);
   const [boardEntries, setBoardEntries] = useState<FriendsBoardEntry[]>([]);
@@ -92,12 +95,27 @@ export function FriendsBoardModal({ visible, onClose }: FriendsBoardModalProps) 
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={mounted} animationType="none" transparent onRequestClose={handleClose}>
       <View style={styles.overlay}>
-        <View
+        {/* Smooth Fading Backdrop */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0,0,0,0.65)', opacity: fadeAnim },
+          ]}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
+
+        <Animated.View
           style={[
             styles.container,
-            { backgroundColor: colors.surface, borderRadius: radii.lg, borderColor: colors.border },
+            {
+              backgroundColor: colors.surface,
+              borderRadius: radii.lg,
+              borderColor: colors.border,
+              transform: [{ translateY: slideAnim }],
+            },
           ]}
         >
           {/* Header */}
@@ -123,7 +141,7 @@ export function FriendsBoardModal({ visible, onClose }: FriendsBoardModalProps) 
               <Pressable
                 onPress={() => {
                   triggerHaptic('buttonTap');
-                  onClose();
+                  handleClose();
                 }}
                 style={styles.iconBtn}
               >
@@ -457,7 +475,7 @@ export function FriendsBoardModal({ visible, onClose }: FriendsBoardModalProps) 
               </View>
             </Modal>
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -466,7 +484,7 @@ export function FriendsBoardModal({ visible, onClose }: FriendsBoardModalProps) 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'transparent',
     justifyContent: 'flex-end',
   },
   container: {

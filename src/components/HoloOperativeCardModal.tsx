@@ -8,6 +8,7 @@ import {
   Dimensions,
   Share,
   Alert,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from '../ui/Text';
 import { triggerHaptic } from '../motion/haptics';
+import { useSheetModalAnimation } from '../motion';
 import { generateQrBmpDataUrl } from '../lib/qrCache';
 import { formatFriendWebInviteUrl } from '../lib/friendsCore';
 import { formatCodenameWithTag } from '../lib/codename';
@@ -51,6 +53,7 @@ export function HoloOperativeCardModal({
   const insets = useSafeAreaInsets();
   const cardRef = useRef<any>(null);
   const [sharing, setSharing] = useState(false);
+  const { mounted, fadeAnim, slideAnim, handleClose } = useSheetModalAnimation(visible, onClose);
 
   const cleanName = displayName.toUpperCase() || 'OPERATIVE';
   const cleanTag = tagline?.toUpperCase() || (userId ? userId.slice(0, 4).toUpperCase() : '10D1');
@@ -139,27 +142,39 @@ export function HoloOperativeCardModal({
 
   return (
     <Modal
-      visible={visible}
+      visible={mounted}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
       <View style={styles.modalOverlay}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss share sheet"
-          style={styles.backdropPressable}
-          onPress={onClose}
-        />
+        {/* Smooth Fading Backdrop */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              opacity: fadeAnim,
+            },
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss share sheet"
+            style={StyleSheet.absoluteFill}
+            onPress={handleClose}
+          />
+        </Animated.View>
 
-        {/* Bottom Sheet Modal Container */}
-        <View
+        {/* Sliding Bottom Sheet Modal Container */}
+        <Animated.View
           style={[
             styles.bottomSheet,
             {
               backgroundColor: isDark ? '#11141B' : '#FFFFFF',
               borderTopColor: isDark ? '#1F2430' : '#E5E7EB',
               paddingBottom: Math.max(insets.bottom + 16, 28),
+              transform: [{ translateY: slideAnim }],
             },
           ]}
         >
@@ -169,10 +184,7 @@ export function HoloOperativeCardModal({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close share card"
-              onPress={() => {
-                triggerHaptic('buttonTap');
-                onClose();
-              }}
+              onPress={handleClose}
               style={styles.closeBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
@@ -354,7 +366,7 @@ export function HoloOperativeCardModal({
               </Pressable>
             </View>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -364,7 +376,7 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: 'transparent',
   },
   backdropPressable: {
     flex: 1,
