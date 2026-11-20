@@ -797,7 +797,7 @@ export default function LobbyScreen() {
           },
         ]}
       >
-        {/* Row 1: Back | Mode Title & Pulse | Room Code & QR Actions */}
+        {/* Row 1: Back | Mode Title (Full Width) | Live Status Chip */}
         <View style={styles.topNavRow}>
           <Pressable
             accessibilityRole="button"
@@ -809,39 +809,94 @@ export default function LobbyScreen() {
           </Pressable>
 
           <View style={styles.navTitleWrap}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text variant="caption" numberOfLines={1} style={{ color: colors.accent, fontWeight: '800', letterSpacing: 1.2, fontSize: 10 }}>
-                MISSION LOBBY
-              </Text>
-              <View style={[styles.statusPulseDot, { backgroundColor: everyoneReady ? colors.accent : colors.radarScan }]} />
-            </View>
-            <Text variant="title" numberOfLines={1} style={{ color: colors.text, fontSize: 17, fontWeight: '800' }}>
+            <Text
+              variant="caption"
+              numberOfLines={1}
+              style={{ color: colors.textMuted, fontWeight: '800', letterSpacing: 1.2, fontSize: 10 }}
+            >
+              MISSION LOBBY
+            </Text>
+            <Text
+              variant="title"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}
+            >
               {activeModule?.name || 'Classic Chase'}
             </Text>
           </View>
 
-          {/* Tactical Code Pill & Direct Action Buttons */}
           <View style={styles.headerRightActions}>
-            <Pressable
-              onPress={() => void shareCode()}
-              accessibilityRole="button"
-              accessibilityLabel={`Room code ${state.game.code}`}
-              style={[styles.headerCodePill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-            >
-              <Text style={[styles.headerCodePrefix, { color: colors.textMuted }]}>CODE</Text>
-              <Text style={[styles.headerCodeValue, { color: colors.text }]}>{state.game.code}</Text>
-              <Ionicons name="share-outline" size={13} color={colors.accent} style={{ marginLeft: 3 }} />
-            </Pressable>
-
-            <Pressable
-              onPress={() => setInviteModalVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Show QR invite"
-              style={[styles.headerQrBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-            >
-              <Ionicons name="qr-code-outline" size={16} color={colors.accent} />
-            </Pressable>
+            <Chip
+              label={everyoneReady ? 'READY' : 'PREPARING'}
+              variant={everyoneReady ? 'accent' : 'muted'}
+              size="sm"
+            />
           </View>
+        </View>
+
+        {/* Row 2: Unified Tactical Bar (Room Code, QR, Privacy, GPS) */}
+        <View style={styles.tacticalUtilityBar}>
+          <Pressable
+            onPress={() => void shareCode()}
+            accessibilityRole="button"
+            accessibilityLabel={`Room code ${state.game.code}`}
+            style={[styles.tacticalPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
+          >
+            <Text style={[styles.tacticalPillPrefix, { color: colors.textMuted }]}>CODE</Text>
+            <Text style={[styles.tacticalPillCode, { color: colors.accent }]}>{state.game.code}</Text>
+            <Ionicons name="share-outline" size={12} color={colors.accent} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => setInviteModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Show QR invite"
+            style={[styles.tacticalPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
+          >
+            <Ionicons name="qr-code-outline" size={13} color={colors.accent} />
+            <Text style={[styles.tacticalPillText, { color: colors.text }]}>QR</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleTogglePrivacy}
+            style={[styles.tacticalPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
+            accessibilityRole="button"
+            accessibilityLabel="Configure route privacy"
+          >
+            <Ionicons
+              name={shareChoice === true ? 'eye-outline' : 'lock-closed-outline'}
+              size={12}
+              color={shareChoice === true ? colors.accent : colors.textMuted}
+            />
+            <Text style={[styles.tacticalPillText, { color: colors.textSecondary }]}>
+              {shareChoice === true ? 'Shared' : 'Private'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              setReadyCheckVisible(true);
+              void handleRunDiagnostic();
+            }}
+            style={[styles.tacticalPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
+            accessibilityRole="button"
+            accessibilityLabel="Check Sensors and GPS"
+          >
+            <Ionicons
+              name={healthReport?.overall === 'healthy' ? 'radio' : 'radio-outline'}
+              size={12}
+              color={healthReport?.overall === 'healthy' ? colors.accent : colors.warning}
+            />
+            <Text
+              style={[
+                styles.tacticalPillText,
+                { color: healthReport?.overall === 'healthy' ? colors.accent : colors.textSecondary },
+              ]}
+            >
+              GPS
+            </Text>
+          </Pressable>
         </View>
 
         {/* Banners (Errors or notices) */}
@@ -876,7 +931,7 @@ export default function LobbyScreen() {
           ]}
           activeId={activeSegment}
           onChange={(id) => handleTabPress(id as 'roster' | 'rules' | 'map')}
-          style={{ marginBottom: 8, marginTop: 4 }}
+          style={{ marginBottom: 6, marginTop: 4 }}
         />
       </View>
 
@@ -907,179 +962,48 @@ export default function LobbyScreen() {
             ]}
           >
             <View style={{ gap: 14 }}>
-              {/* Quick Status & Matchmaking Pill Strip */}
-              <View style={styles.quickStatusRow}>
-                <Pressable
-                  onPress={handleTogglePrivacy}
-                  style={[styles.quickStatusBadge, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Configure route privacy"
-                >
-                  <Ionicons
-                    name={shareChoice === true ? 'eye-outline' : 'lock-closed-outline'}
-                    size={13}
-                    color={shareChoice === true ? colors.accent : colors.textMuted}
-                  />
-                  <Text style={[styles.quickStatusText, { color: colors.textSecondary }]}>
-                    {shareChoice === true ? 'Trail Shared' : 'Keep Private'}
+              {/* 2+ Players Warning Banner (if active) */}
+              {activePlayers.length < 2 && !isSoloMode && (
+                <View style={styles.warningPillBanner}>
+                  <Ionicons name="warning-outline" size={15} color={colors.warning} />
+                  <Text style={[styles.warningPillText, { color: colors.warning }]}>
+                    At least 2 players needed to launch. Share room code or QR to invite operatives.
                   </Text>
-                </Pressable>
+                </View>
+              )}
 
-                <Pressable
-                  onPress={() => {
-                    setReadyCheckVisible(true);
-                    void handleRunDiagnostic();
-                  }}
-                  style={[styles.quickStatusBadge, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Check Sensors and GPS"
-                >
-                  <Ionicons
-                    name={healthReport?.overall === 'healthy' ? 'radio' : 'radio-outline'}
-                    size={13}
-                    color={healthReport?.overall === 'healthy' ? colors.accent : colors.warning}
-                  />
-                  <Text style={[styles.quickStatusText, { color: healthReport?.overall === 'healthy' ? colors.accent : colors.textSecondary }]}>
-                    GPS Ready
-                  </Text>
-                </Pressable>
-
-                {activePlayers.length < 2 && !isSoloMode && (
-                  <View style={[styles.quickStatusBadge, { backgroundColor: 'rgba(234, 179, 8, 0.12)', borderColor: 'rgba(234, 179, 8, 0.3)' }]}>
-                    <Ionicons name="warning-outline" size={13} color={colors.warning} />
-                    <Text style={[styles.quickStatusText, { color: colors.warning }]}>
-                      2+ Players Needed
+              {/* Unassigned Operative Prompt (if local player has no squad yet) */}
+              {!isSoloMode && ownPlayer?.team === 'unassigned' && (
+                <View style={[styles.unassignedPromptCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.accent }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <Ionicons name="shield-outline" size={16} color={colors.accent} />
+                    <Text style={[styles.unassignedPromptTitle, { color: colors.accent }]}>
+                      DEPLOYMENT REQUIRED
                     </Text>
                   </View>
-                )}
-              </View>
-
-              {/* HERO CARD: YOUR OPERATIVE DOSSIER */}
-              {ownPlayer && (
-                <View
-                  style={[
-                    styles.heroDossierCard,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: ownPlayer.is_ready ? colors.accent : colors.borderDark,
-                    },
-                  ]}
-                >
-                  <View style={styles.heroDossierHeader}>
-                    <View style={styles.heroAvatarWrap}>
-                      <View style={[styles.heroAvatarDot, { backgroundColor: ownPlayer.color || colors.accent }]} />
-                      <View style={{ flex: 1, marginLeft: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text variant="title" style={styles.heroPlayerName} numberOfLines={1}>
-                            {ownPlayer.display_name.toUpperCase()} (YOU)
-                          </Text>
-                          {isHost && (
-                            <View style={styles.hostCrownBadge}>
-                              <MaterialCommunityIcons name="crown" size={12} color="#000000" />
-                              <Text style={styles.hostCrownText}>HOST</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                          {isSoloMode
-                            ? 'Solo Competitor'
-                            : ownPlayer.team === 'runner'
-                            ? 'Assigned to Runners Squad'
-                            : ownPlayer.team === 'hunter'
-                            ? 'Assigned to Hunters Squad'
-                            : 'Unassigned • Choose your squad below'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <Chip
-                      label={ownPlayer.is_ready ? 'READY' : 'PREPARING'}
-                      variant={ownPlayer.is_ready ? 'accent' : 'muted'}
-                      size="sm"
-                    />
-                  </View>
-
-                  {/* 1-Tap Quick Squad Selector for Team Modes */}
-                  {!isSoloMode && (
-                    <View style={styles.squadSelectorSection}>
-                      <Text style={[styles.squadSelectorLabel, { color: colors.textMuted }]}>
-                        SELECT YOUR SQUAD
+                  <Text style={[styles.unassignedPromptSubtitle, { color: colors.textMuted }]}>
+                    Choose a squad to join before readying up for the operation.
+                  </Text>
+                  <View style={styles.unassignedPromptButtons}>
+                    <Pressable
+                      onPress={() => void setTeam(ownPlayer, 'runner')}
+                      style={[styles.unassignedSquadBtn, { backgroundColor: 'rgba(52, 199, 89, 0.15)', borderColor: colors.runner }]}
+                    >
+                      <Ionicons name="walk" size={16} color={colors.runner} />
+                      <Text style={[styles.unassignedSquadBtnText, { color: colors.runner }]}>
+                        JOIN RUNNERS
                       </Text>
-                      <View style={styles.squadSwitcherRow}>
-                        <Pressable
-                          onPress={() => void setTeam(ownPlayer, 'runner')}
-                          style={[
-                            styles.squadSwitchBtn,
-                            ownPlayer.team === 'runner'
-                              ? { backgroundColor: colors.runner, borderColor: colors.runner }
-                              : { backgroundColor: colors.surface, borderColor: colors.borderDark },
-                          ]}
-                        >
-                          <Ionicons
-                            name="walk"
-                            size={14}
-                            color={ownPlayer.team === 'runner' ? '#000000' : colors.runner}
-                          />
-                          <Text
-                            style={[
-                              styles.squadSwitchText,
-                              { color: ownPlayer.team === 'runner' ? '#000000' : colors.runner },
-                            ]}
-                          >
-                            RUNNER
-                          </Text>
-                        </Pressable>
-
-                        <Pressable
-                          onPress={() => void setTeam(ownPlayer, 'hunter')}
-                          style={[
-                            styles.squadSwitchBtn,
-                            ownPlayer.team === 'hunter'
-                              ? { backgroundColor: colors.hunter, borderColor: colors.hunter }
-                              : { backgroundColor: colors.surface, borderColor: colors.borderDark },
-                          ]}
-                        >
-                          <Ionicons
-                            name="skull"
-                            size={14}
-                            color={ownPlayer.team === 'hunter' ? '#FFFFFF' : colors.hunter}
-                          />
-                          <Text
-                            style={[
-                              styles.squadSwitchText,
-                              { color: ownPlayer.team === 'hunter' ? '#FFFFFF' : colors.hunter },
-                            ]}
-                          >
-                            HUNTER
-                          </Text>
-                        </Pressable>
-
-                        <Pressable
-                          onPress={() => void setTeam(ownPlayer, 'unassigned')}
-                          style={[
-                            styles.squadSwitchBtn,
-                            ownPlayer.team === 'unassigned'
-                              ? { backgroundColor: colors.surfaceMuted, borderColor: colors.accent }
-                              : { backgroundColor: colors.surface, borderColor: colors.borderDark },
-                          ]}
-                        >
-                          <Ionicons
-                            name="pause-outline"
-                            size={14}
-                            color={ownPlayer.team === 'unassigned' ? colors.accent : colors.textMuted}
-                          />
-                          <Text
-                            style={[
-                              styles.squadSwitchText,
-                              { color: ownPlayer.team === 'unassigned' ? colors.accent : colors.textMuted },
-                            ]}
-                          >
-                            BENCH
-                          </Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  )}
+                    </Pressable>
+                    <Pressable
+                      onPress={() => void setTeam(ownPlayer, 'hunter')}
+                      style={[styles.unassignedSquadBtn, { backgroundColor: 'rgba(255, 69, 58, 0.15)', borderColor: colors.hunter }]}
+                    >
+                      <Ionicons name="skull" size={16} color={colors.hunter} />
+                      <Text style={[styles.unassignedSquadBtnText, { color: colors.hunter }]}>
+                        JOIN HUNTERS
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
               )}
 
@@ -1109,10 +1033,10 @@ export default function LobbyScreen() {
                   ))}
                 </View>
               ) : (
-                <View style={{ gap: 12 }}>
+                <View style={{ gap: 14 }}>
                   <TacticalDivider
                     label="SQUAD DEPLOYMENT"
-                    sublabel={`${activePlayers.length} OPERATIVES`}
+                    sublabel={`${activePlayers.length} OPERATIVE${activePlayers.length === 1 ? '' : 'S'}`}
                     variant="bracket"
                   />
 
@@ -1137,28 +1061,51 @@ export default function LobbyScreen() {
                         onPress={() => ownPlayer && void setTeam(ownPlayer, 'runner')}
                         style={[styles.emptySquadSlot, { borderColor: colors.borderDark }]}
                       >
-                        <Ionicons name="add-circle-outline" size={18} color={colors.runner} />
+                        <Ionicons name="add" size={16} color={colors.runner} />
                         <Text style={[styles.emptySquadText, { color: colors.runner }]}>
-                          No operatives assigned • Tap to join Runners
+                          + Tap to join Runners Squad
                         </Text>
                       </Pressable>
                     ) : (
                       <View style={{ gap: 8, marginTop: 4 }}>
                         {runners.map((p) => (
-                          <PlayerRow
-                            key={p.id}
-                            player={p}
-                            isHost={isHost}
-                            isSelf={p.id === state.my_player_id}
-                            isGameHost={p.user_id === state.game.host_id}
-                            kickingId={kickingPlayerId}
-                            colors={colors}
-                            radii={radii}
-                            onStartKick={setKickingPlayerId}
-                            onConfirmKick={() => void confirmKick(p)}
-                            onCancelKick={() => setKickingPlayerId(null)}
-                            onInspectPlayer={handleInspectPlayer}
-                          />
+                          <View key={p.id}>
+                            <PlayerRow
+                              player={p}
+                              isHost={isHost}
+                              isSelf={p.id === state.my_player_id}
+                              isGameHost={p.user_id === state.game.host_id}
+                              kickingId={kickingPlayerId}
+                              colors={colors}
+                              radii={radii}
+                              onStartKick={setKickingPlayerId}
+                              onConfirmKick={() => void confirmKick(p)}
+                              onCancelKick={() => setKickingPlayerId(null)}
+                              onInspectPlayer={handleInspectPlayer}
+                            />
+                            {p.id === state.my_player_id && (
+                              <View style={styles.selfSquadActionsRow}>
+                                <Pressable
+                                  onPress={() => void setTeam(p, 'hunter')}
+                                  style={[styles.switchSquadLink, { borderColor: colors.hunter }]}
+                                >
+                                  <Ionicons name="skull-outline" size={12} color={colors.hunter} />
+                                  <Text style={[styles.switchSquadLinkText, { color: colors.hunter }]}>
+                                    Switch to Hunters
+                                  </Text>
+                                </Pressable>
+                                <Pressable
+                                  onPress={() => void setTeam(p, 'unassigned')}
+                                  style={styles.benchLink}
+                                >
+                                  <Ionicons name="pause-outline" size={12} color={colors.textMuted} />
+                                  <Text style={[styles.benchLinkText, { color: colors.textMuted }]}>
+                                    Bench
+                                  </Text>
+                                </Pressable>
+                              </View>
+                            )}
+                          </View>
                         ))}
                       </View>
                     )}
@@ -1185,28 +1132,51 @@ export default function LobbyScreen() {
                         onPress={() => ownPlayer && void setTeam(ownPlayer, 'hunter')}
                         style={[styles.emptySquadSlot, { borderColor: colors.borderDark }]}
                       >
-                        <Ionicons name="add-circle-outline" size={18} color={colors.hunter} />
+                        <Ionicons name="add" size={16} color={colors.hunter} />
                         <Text style={[styles.emptySquadText, { color: colors.hunter }]}>
-                          No operatives assigned • Tap to join Hunters
+                          + Tap to join Hunters Squad
                         </Text>
                       </Pressable>
                     ) : (
                       <View style={{ gap: 8, marginTop: 4 }}>
                         {hunters.map((p) => (
-                          <PlayerRow
-                            key={p.id}
-                            player={p}
-                            isHost={isHost}
-                            isSelf={p.id === state.my_player_id}
-                            isGameHost={p.user_id === state.game.host_id}
-                            kickingId={kickingPlayerId}
-                            colors={colors}
-                            radii={radii}
-                            onStartKick={setKickingPlayerId}
-                            onConfirmKick={() => void confirmKick(p)}
-                            onCancelKick={() => setKickingPlayerId(null)}
-                            onInspectPlayer={handleInspectPlayer}
-                          />
+                          <View key={p.id}>
+                            <PlayerRow
+                              player={p}
+                              isHost={isHost}
+                              isSelf={p.id === state.my_player_id}
+                              isGameHost={p.user_id === state.game.host_id}
+                              kickingId={kickingPlayerId}
+                              colors={colors}
+                              radii={radii}
+                              onStartKick={setKickingPlayerId}
+                              onConfirmKick={() => void confirmKick(p)}
+                              onCancelKick={() => setKickingPlayerId(null)}
+                              onInspectPlayer={handleInspectPlayer}
+                            />
+                            {p.id === state.my_player_id && (
+                              <View style={styles.selfSquadActionsRow}>
+                                <Pressable
+                                  onPress={() => void setTeam(p, 'runner')}
+                                  style={[styles.switchSquadLink, { borderColor: colors.runner }]}
+                                >
+                                  <Ionicons name="walk-outline" size={12} color={colors.runner} />
+                                  <Text style={[styles.switchSquadLinkText, { color: colors.runner }]}>
+                                    Switch to Runners
+                                  </Text>
+                                </Pressable>
+                                <Pressable
+                                  onPress={() => void setTeam(p, 'unassigned')}
+                                  style={styles.benchLink}
+                                >
+                                  <Ionicons name="pause-outline" size={12} color={colors.textMuted} />
+                                  <Text style={[styles.benchLinkText, { color: colors.textMuted }]}>
+                                    Bench
+                                  </Text>
+                                </Pressable>
+                              </View>
+                            )}
+                          </View>
                         ))}
                       </View>
                     )}
@@ -1859,7 +1829,7 @@ function PlayerRow({
         styles.playerRow,
         {
           backgroundColor: isSelf ? colors.surfaceElevated : colors.surface,
-          borderColor: isSelf ? colors.borderAccent : colors.borderDark,
+          borderColor: isSelf ? colors.accent : colors.borderDark,
         },
       ]}
     >
@@ -1873,31 +1843,42 @@ function PlayerRow({
         style={styles.playerInfo}
       >
         <View style={[styles.avatarDot, { backgroundColor: player.color || colors.primary, borderRadius: radii.pill }]} />
-        <View style={{ flex: 1, marginLeft: 10 }}>
+        <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
           <View style={styles.nameRow}>
-            <Text variant="title" style={{ color: colors.text, fontSize: 15 }}>
-              {player.display_name.toUpperCase()} {isSelf && '(YOU)'}
+            <Text
+              variant="title"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={{ color: colors.text, fontSize: 14, fontWeight: '800', flexShrink: 1 }}
+            >
+              {player.display_name.toUpperCase()}
             </Text>
-            {isGameHost && (
-              <MaterialCommunityIcons name="crown" size={16} color={colors.warning} style={{ marginLeft: 4 }} />
+            {isSelf && (
+              <View style={styles.youBadge}>
+                <Text style={styles.youBadgeText}>YOU</Text>
+              </View>
             )}
-            {!isSelf && (
-              <Ionicons name="person-circle-outline" size={15} color={colors.textMuted} style={{ marginLeft: 4 }} />
+            {isGameHost && (
+              <View style={styles.hostBadge}>
+                <MaterialCommunityIcons name="crown" size={12} color="#000000" />
+                <Text style={styles.hostBadgeText}>HOST</Text>
+              </View>
             )}
           </View>
           {player.is_remote && (
-            <Text variant="caption" style={{ color: colors.radarScan }}>
+            <Text variant="caption" style={{ color: colors.radarScan, marginTop: 2 }}>
               REMOTE OPERATIVE
             </Text>
           )}
         </View>
+
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {player.tracking_health && player.tracking_health !== 'unknown' && (
             <View
               accessibilityLabel={`Tracking health: ${player.tracking_health}`}
               style={{
-                width: 8,
-                height: 8,
+                width: 7,
+                height: 7,
                 borderRadius: 4,
                 backgroundColor:
                   player.tracking_health === 'healthy'
@@ -1908,9 +1889,9 @@ function PlayerRow({
               }}
             />
           )}
-          <TacticalMetricChip
-            value={player.is_ready ? 'READY' : 'PREPARING'}
-            variant={player.is_ready ? 'success' : 'muted'}
+          <Chip
+            label={player.is_ready ? 'READY' : 'PREPARING'}
+            variant={player.is_ready ? 'accent' : 'muted'}
             size="sm"
           />
         </View>
@@ -1978,46 +1959,46 @@ const styles = StyleSheet.create({
   },
   navTitleWrap: {
     flex: 1,
-    marginHorizontal: 10,
+    marginHorizontal: 12,
   },
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  headerCodePill: {
+  tacticalUtilityBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    gap: 8,
+    marginBottom: 8,
+  },
+  tacticalPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 6,
+    paddingHorizontal: 8,
     borderRadius: 10,
     borderWidth: 1,
     gap: 4,
   },
-  headerCodePrefix: {
+  tacticalPillPrefix: {
     fontSize: 9,
     fontFamily: 'Archivo-Bold',
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
-  headerCodeValue: {
-    fontSize: 14,
+  tacticalPillCode: {
+    fontSize: 13,
     fontFamily: 'Archivo-Bold',
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
   },
-  headerQrBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusPulseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+  tacticalPillText: {
+    fontSize: 11,
+    fontFamily: 'Archivo-Bold',
+    fontWeight: '700',
   },
   fixedTopHeader: {
     borderBottomWidth: 1,
@@ -2036,98 +2017,57 @@ const styles = StyleSheet.create({
   tabContentScroll: {
     paddingTop: 12,
   },
-  quickStatusRow: {
+  warningPillBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flexWrap: 'wrap',
-  },
-  quickStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(234, 179, 8, 0.1)',
     borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.3)',
   },
-  quickStatusText: {
+  warningPillText: {
     fontSize: 11,
     fontFamily: 'Archivo-Bold',
-    fontWeight: '700',
-  },
-  heroDossierCard: {
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
-  },
-  heroDossierHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  heroAvatarWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    fontWeight: '600',
     flex: 1,
   },
-  heroAvatarDot: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  unassignedPromptCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
   },
-  heroPlayerName: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontFamily: 'Archivo-Bold',
-    fontWeight: '800',
-  },
-  hostCrownBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    gap: 3,
-  },
-  hostCrownText: {
-    color: '#000000',
-    fontSize: 9,
+  unassignedPromptTitle: {
+    fontSize: 12,
     fontFamily: 'Archivo-Bold',
     fontWeight: '900',
-  },
-  squadSelectorSection: {
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  squadSelectorLabel: {
-    fontSize: 10,
-    fontFamily: 'Archivo-Bold',
-    fontWeight: '800',
     letterSpacing: 1,
-    marginBottom: 8,
   },
-  squadSwitcherRow: {
+  unassignedPromptSubtitle: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  unassignedPromptButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
-  squadSwitchBtn: {
+  unassignedSquadBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 9,
+    gap: 6,
+    paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1.5,
   },
-  squadSwitchText: {
+  unassignedSquadBtnText: {
     fontSize: 11,
     fontFamily: 'Archivo-Bold',
-    fontWeight: '800',
+    fontWeight: '900',
     letterSpacing: 0.5,
   },
   squadSectionCard: {
@@ -2158,15 +2098,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 12,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderStyle: 'dashed',
-    marginTop: 4,
+    gap: 8,
+    marginTop: 6,
   },
   emptySquadText: {
     fontSize: 12,
+    fontFamily: 'Archivo-Bold',
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  selfSquadActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 6,
+    paddingRight: 4,
+  },
+  switchSquadLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  switchSquadLinkText: {
+    fontSize: 10,
+    fontFamily: 'Archivo-Bold',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  benchLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  benchLinkText: {
+    fontSize: 10,
     fontFamily: 'Archivo-Bold',
     fontWeight: '700',
   },
@@ -2434,6 +2415,39 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  youBadge: {
+    backgroundColor: 'rgba(167, 139, 250, 0.2)',
+    borderColor: '#A78BFA',
+    borderWidth: 1,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    marginLeft: 6,
+  },
+  youBadgeText: {
+    color: '#A78BFA',
+    fontSize: 9,
+    fontFamily: 'Archivo-Bold',
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  hostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    marginLeft: 6,
+    gap: 2,
+  },
+  hostBadgeText: {
+    color: '#000000',
+    fontSize: 9,
+    fontFamily: 'Archivo-Bold',
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   playerActionsRow: {
     flexDirection: 'row',
