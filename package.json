@@ -87,6 +87,7 @@
     "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "~4.30.0",
     "react-native-url-polyfill": "^3.0.0",
+    "react-native-view-shot": "^6.2.1",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

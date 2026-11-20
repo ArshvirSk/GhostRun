@@ -166,6 +166,7 @@ export default function OperativeProfileScreen() {
   };
 
   const displayName = (dossier?.displayName || name || 'OPERATIVE').toUpperCase();
+  const profileTitle = dossier?.isSelf ? 'YOUR PROFILE' : `${displayName}'S PROFILE`;
   const displayHandle = dossier?.handle ? `@${dossier.handle}` : null;
   const avatarColor = dossier?.color || color || colors.primary;
   const firstLetter = displayName.charAt(0).toUpperCase();
@@ -186,18 +187,35 @@ export default function OperativeProfileScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.text} />
           <Text style={[styles.backText, { color: colors.text }]}>BACK</Text>
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>OPERATIVE DOSSIER</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Share Operative Dossier"
-          onPress={() => {
-            triggerHaptic('buttonTap');
-            setShareModalVisible(true);
-          }}
-          style={styles.headerShareButton}
-        >
-          <Ionicons name="share-social-outline" size={22} color={colors.primary} />
-        </Pressable>
+        <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.text }]}>
+          {profileTitle}
+        </Text>
+        <View style={styles.headerRightActions}>
+          {dossier?.isFriend && !dossier.isSelf && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Remove Friend"
+              onPress={handleRemoveOperative}
+              disabled={actionLoading}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              style={styles.headerIconBtn}
+            >
+              <Ionicons name="person-remove-outline" size={20} color={colors.danger} />
+            </Pressable>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Share Profile"
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              setShareModalVisible(true);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            style={styles.headerIconBtn}
+          >
+            <Ionicons name="share-social-outline" size={20} color={colors.primary} />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
@@ -337,31 +355,6 @@ export default function OperativeProfileScreen() {
                   </View>
                 )}
               </View>
-
-              {/* Share Operative Card Action */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Share Operative Card"
-                onPress={() => {
-                  triggerHaptic('buttonTap');
-                  setShareModalVisible(true);
-                }}
-                style={({ pressed }) => [
-                  styles.shareCardRowBtn,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(199, 243, 107, 0.12)'
-                      : 'rgba(85, 122, 34, 0.12)',
-                    borderColor: colors.primary,
-                  },
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <Ionicons name="share-social-outline" size={14} color={colors.primary} />
-                <Text style={[styles.shareCardRowBtnText, { color: colors.primary }]}>
-                  SHARE OPERATIVE CARD
-                </Text>
-              </Pressable>
             </View>
           </View>
         </Card>
@@ -702,22 +695,14 @@ export default function OperativeProfileScreen() {
               </View>
             )}
 
-            {/* Friendship Action Area at Bottom */}
-            <View style={{ marginTop: 30 }}>
-              {dossier.isFriend && !dossier.isSelf ? (
-                <Button
-                  title={actionLoading ? 'Removing…' : 'Remove Friend'}
-                  variant="ghost"
-                  size="md"
-                  disabled={actionLoading}
-                  onPress={handleRemoveOperative}
-                />
-              ) : !dossier.isSelf && dossier.friendshipStatus ? (
-                dossier.friendshipStatus === 'pending_outgoing' ? (
+            {/* Friendship Action Area at Bottom (Only if not already friends) */}
+            {!dossier.isSelf && !dossier.isFriend && dossier.friendshipStatus ? (
+              <View style={{ marginTop: 24 }}>
+                {dossier.friendshipStatus === 'pending_outgoing' ? (
                   <Button title="Friend Request Sent" variant="secondary" size="lg" disabled />
                 ) : dossier.friendshipStatus === 'pending_incoming' ? (
                   <Button
-                    title={actionLoading ? 'Accepting…' : 'Accept Request'}
+                    title={actionLoading ? 'Accepting...' : 'Accept Request'}
                     variant="primary"
                     size="lg"
                     disabled={actionLoading}
@@ -725,15 +710,15 @@ export default function OperativeProfileScreen() {
                   />
                 ) : dossier.friendshipStatus === 'none' ? (
                   <Button
-                    title={actionLoading ? 'Sending…' : '+ Add Friend'}
+                    title={actionLoading ? 'Sending...' : '+ Add Friend'}
                     variant="primary"
                     size="lg"
                     disabled={actionLoading}
                     onPress={() => void handleSendRequest()}
                   />
-                ) : null
-              ) : null}
-            </View>
+                ) : null}
+              </View>
+            ) : null}
           </View>
         )}
       </ScrollView>
@@ -797,13 +782,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontFamily: 'Orbitron_700Bold',
     letterSpacing: 1,
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 8,
   },
-  headerShareButton: {
-    width: 60,
-    alignItems: 'flex-end',
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerIconBtn: {
+    padding: 6,
+    borderRadius: 8,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 4,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -813,23 +805,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 20,
     borderWidth: 1,
-  },
-  shareCardRowBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 10,
-  },
-  shareCardRowBtnText: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
   },
   identityRow: {
     flexDirection: 'row',
