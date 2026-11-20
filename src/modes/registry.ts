@@ -6,6 +6,7 @@ import { assassinRingMode } from './assassin_ring';
 import { relayHeistMode } from './relay_heist';
 import { territoryPulseMode } from './territory_pulse';
 import { ghostDuelMode } from './ghost_duel';
+import { outbreakHordeMode } from './outbreak_horde';
 import { noiseMeterModifier } from './noise_meter';
 import { deadDropsModifier } from './dead_drops';
 import { hotColdModifier } from './hot_cold';
@@ -40,6 +41,7 @@ const ALL_BASE_MODES: ModeModule[] = [
   relayHeistMode,
   territoryPulseMode,
   ghostDuelMode,
+  outbreakHordeMode,
 ];
 
 const ALL_MODIFIERS: ModeModule[] = [

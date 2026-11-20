@@ -6,6 +6,7 @@ import { assassinRingWidgets } from './assassin_ring/hud';
 import { relayHeistWidgets } from './relay_heist/hud';
 import { territoryPulseWidgets } from './territory_pulse/hud';
 import { ghostDuelWidgets } from './ghost_duel/hud';
+import { outbreakHordeWidgets } from './outbreak_horde/hud';
 import { noiseMeterWidgets } from './noise_meter/hud';
 import { deadDropsWidgets } from './dead_drops/hud';
 import { hotColdWidgets } from './hot_cold/hud';
@@ -24,6 +25,7 @@ export const HUD_WIDGETS_BY_MODE: Record<string, HudWidget[]> = {
   relay_heist: relayHeistWidgets,
   territory_pulse: territoryPulseWidgets,
   ghost_duel: ghostDuelWidgets,
+  outbreak_horde: outbreakHordeWidgets,
 
   // Modifiers
   noise_meter: noiseMeterWidgets,

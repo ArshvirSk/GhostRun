@@ -188,6 +188,21 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
       },
       enabled: true,
     },
+    {
+      id: 'outbreak_horde',
+      layer: 'base',
+      name: 'Outbreak Horde',
+      teams: ['runner', 'hunter'],
+      min_players: 3,
+      compatible_roles: [],
+      compatible_modifiers: ['noise_meter', 'dead_drops', 'hot_cold', 'shrinking_zone', 'ai_gm'],
+      parameters: {
+        initial_health_s: 360,
+        antidote_boost_hp: 65,
+        drift_velocity_mps: 0.6,
+      },
+      enabled: true,
+    },
   ],
   modifiers: [
     { id: 'noise_meter', layer: 'modifier', name: 'Noise Meter', parameters: {}, enabled: true },
