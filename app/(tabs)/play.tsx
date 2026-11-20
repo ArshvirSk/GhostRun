@@ -491,8 +491,8 @@ export function PlayContent() {
                   </Text>
                 </View>
               </View>
-              <Text style={[styles.cipherSubText, { color: colors.textMuted }]} numberOfLines={1}>
-                PvP Infection Swarm · 1 Patient Zero vs Survivors
+              <Text style={[styles.cipherSubText, { color: colors.textMuted }]}>
+                PvP Infection Swarm • 1 Patient Zero vs Survivors
               </Text>
             </View>
 
@@ -543,8 +543,8 @@ export function PlayContent() {
               <Text style={[styles.cipherTitleText, { color: colors.text }]} numberOfLines={1}>
                 CIPHER PROTOCOL
               </Text>
-              <Text style={[styles.cipherSubText, { color: colors.textMuted }]} numberOfLines={1}>
-                Classified gold radar pulse · 14 days left
+              <Text style={[styles.cipherSubText, { color: colors.textMuted }]}>
+                Classified gold radar pulse • 14 days left
               </Text>
             </View>
 

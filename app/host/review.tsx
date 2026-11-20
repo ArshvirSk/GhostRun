@@ -9,7 +9,6 @@ import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
 import { MatchDurationTimeline } from '../../src/ui/MatchDurationTimeline';
-import { AreaCompatibilityBadge } from '../../src/ui/AreaCompatibilityBadge';
 import { getModeModule } from '../../src/modes/registry';
 import { useHostStore } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
@@ -143,22 +142,43 @@ export default function HostReviewScreen() {
             {modeModule?.tagline}
           </Text>
 
-          <View style={[styles.metricGrid, { marginTop: spacing.md, paddingTop: spacing.md, borderTopColor: colors.border, borderTopWidth: 1 }]}>
-            <View style={styles.metricItem}>
-              <Text variant="label" numberOfLines={1} style={[styles.metricLabel, { color: colors.textMuted }]}>DURATION</Text>
-              <Text variant="title" numberOfLines={1} style={{ color: colors.text }}>{Math.round(rules.durationS / 60)}m</Text>
+          <View style={[styles.metricGrid2x2, { marginTop: spacing.md, paddingTop: spacing.md, borderTopColor: colors.border, borderTopWidth: 1 }]}>
+            <View style={styles.metricRow}>
+              <View style={[styles.metricCell, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}>
+                <Text variant="label" style={[styles.metricLabel, { color: colors.textMuted }]}>
+                  DURATION
+                </Text>
+                <Text variant="title" style={[styles.metricValue, { color: colors.text }]}>
+                  {Math.round(rules.durationS / 60)} min
+                </Text>
+              </View>
+              <View style={[styles.metricCell, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}>
+                <Text variant="label" style={[styles.metricLabel, { color: colors.textMuted }]}>
+                  RADAR PING
+                </Text>
+                <Text variant="title" style={[styles.metricValue, { color: colors.radarScan }]}>
+                  {rules.pingIntervalS}s
+                </Text>
+              </View>
             </View>
-            <View style={styles.metricItem}>
-              <Text variant="label" numberOfLines={1} style={[styles.metricLabel, { color: colors.textMuted }]}>RADAR PING</Text>
-              <Text variant="title" numberOfLines={1} style={{ color: colors.radarScan }}>{rules.pingIntervalS}s</Text>
-            </View>
-            <View style={styles.metricItem}>
-              <Text variant="label" numberOfLines={1} style={[styles.metricLabel, { color: colors.textMuted }]}>TAG RADIUS</Text>
-              <Text variant="title" numberOfLines={1} style={{ color: colors.warning }}>{rules.tagRadiusM}m</Text>
-            </View>
-            <View style={styles.metricItem}>
-              <Text variant="label" numberOfLines={1} style={[styles.metricLabel, { color: colors.textMuted }]}>BOUNDARY</Text>
-              <Text variant="title" numberOfLines={1} style={{ color: colors.text }}>{radius}m</Text>
+
+            <View style={[styles.metricRow, { marginTop: spacing.sm }]}>
+              <View style={[styles.metricCell, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}>
+                <Text variant="label" style={[styles.metricLabel, { color: colors.textMuted }]}>
+                  TAG RADIUS
+                </Text>
+                <Text variant="title" style={[styles.metricValue, { color: colors.warning }]}>
+                  {rules.tagRadiusM}m
+                </Text>
+              </View>
+              <View style={[styles.metricCell, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}>
+                <Text variant="label" style={[styles.metricLabel, { color: colors.textMuted }]}>
+                  ARENA BOUNDARY
+                </Text>
+                <Text variant="title" style={[styles.metricValue, { color: colors.text }]}>
+                  {radius}m
+                </Text>
+              </View>
             </View>
           </View>
         </Card>
@@ -168,14 +188,6 @@ export default function HostReviewScreen() {
           headStartS={rules.headStartS}
           durationMinutes={Math.round(rules.durationS / 60)}
           regroupMinutes={2}
-          style={{ marginBottom: spacing.sm }}
-        />
-
-        {/* Area & Duration Compatibility Validator */}
-        <AreaCompatibilityBadge
-          radiusM={radius}
-          durationMinutes={Math.round(rules.durationS / 60)}
-          showDetail
           style={{ marginBottom: spacing.md }}
         />
 
@@ -287,22 +299,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  metricGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
+  metricGrid2x2: {
+    gap: 8,
   },
-  metricItem: {
+  metricRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  metricCell: {
     flex: 1,
-    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'flex-start',
     justifyContent: 'center',
-    paddingHorizontal: 2,
   },
   metricLabel: {
-    fontSize: 9.5,
-    letterSpacing: 0.5,
-    textAlign: 'center',
-    marginBottom: 2,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: '800',
   },
   chipsWrap: {
     flexDirection: 'row',
