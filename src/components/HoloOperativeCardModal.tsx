@@ -482,8 +482,11 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     fontFamily: 'Archivo-Black',
-    fontSize: 48,
-    fontWeight: '900',
+    fontSize: 40,
+    lineHeight: 50,
+    includeFontPadding: false,
+    textAlign: 'center',
+    textAlignVertical: 'center',
     color: '#0F172A',
   },
   cardBottomRow: {

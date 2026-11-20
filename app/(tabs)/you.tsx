@@ -378,69 +378,12 @@ export function YouContent() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Header Row with Social & Settings Actions */}
+        {/* Top Header Row with Settings Action */}
         <View style={styles.topRow}>
           <Text style={[styles.pageTitle, { color: colors.text }]}>
             PROFILE
           </Text>
           <View style={styles.headerActions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Share Operative ID Card"
-              onPress={() => {
-                triggerHaptic('buttonTap');
-                setShareCardVisible(true);
-              }}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-              style={[
-                styles.headerIconButton,
-                {
-                  backgroundColor: isDark ? 'rgba(199, 243, 107, 0.12)' : 'rgba(85, 122, 34, 0.12)',
-                  borderColor: colors.primary,
-                },
-              ]}
-            >
-              <Ionicons name="share-social-outline" size={19} color={colors.primary} />
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Friends Hub"
-              onPress={() => {
-                triggerHaptic('buttonTap');
-                router.push('/friends' as any);
-              }}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-              style={[
-                styles.headerIconButton,
-                {
-                  backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <Ionicons name="people-outline" size={19} color={colors.primary} />
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Leaderboard"
-              onPress={() => {
-                triggerHaptic('buttonTap');
-                router.push('/leaderboard' as any);
-              }}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-              style={[
-                styles.headerIconButton,
-                {
-                  backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <Ionicons name="trophy-outline" size={19} color={colors.accent || '#F59E0B'} />
-            </Pressable>
-
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Settings"
