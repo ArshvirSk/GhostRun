@@ -215,7 +215,7 @@ export function ModesContent() {
 
                   <Text
                     variant="body"
-                    numberOfLines={2}
+                    numberOfLines={3}
                     style={{
                       color: colors.textMuted,
                       marginTop: 4,
@@ -366,7 +366,7 @@ export function ModesContent() {
                       </Text>
                       <Text
                         variant="caption"
-                        numberOfLines={2}
+                        numberOfLines={3}
                         style={{ color: colors.textMuted, marginTop: 2, lineHeight: 16 }}
                       >
                         {mod.tagline}
@@ -473,7 +473,7 @@ export function ModesContent() {
                       </Text>
                       <Text
                         variant="caption"
-                        numberOfLines={2}
+                        numberOfLines={3}
                         style={{ color: colors.textMuted, marginTop: 2, lineHeight: 16 }}
                       >
                         {role.tagline}
