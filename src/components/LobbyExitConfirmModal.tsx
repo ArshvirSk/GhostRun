@@ -1,7 +1,8 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { triggerHaptic } from '../motion/haptics';
+import { useDialogModalAnimation } from '../motion';
 
 interface LobbyExitConfirmModalProps {
   visible: boolean;
@@ -18,7 +19,7 @@ export function LobbyExitConfirmModal({
   onCancel,
   busy = false,
 }: LobbyExitConfirmModalProps) {
-  if (!visible) return null;
+  const { mounted, fadeAnim, scaleAnim, handleClose } = useDialogModalAnimation(visible, onCancel);
 
   const title = isHost ? 'Cancel Mission?' : 'Leave Mission?';
   const description = isHost
@@ -31,13 +32,24 @@ export function LobbyExitConfirmModal({
   return (
     <Modal
       transparent
-      animationType="fade"
-      visible={visible}
-      onRequestClose={onCancel}
+      animationType="none"
+      visible={mounted}
+      onRequestClose={handleClose}
     >
       <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-        <View style={styles.dialogCard}>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(5, 7, 10, 0.82)', opacity: fadeAnim },
+          ]}
+        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View
+          style={[
+            styles.dialogCard,
+            { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
+          ]}
+        >
           {/* Tactical Badge Row */}
           <View style={styles.topRow}>
             <View
@@ -69,7 +81,7 @@ export function LobbyExitConfirmModal({
               accessibilityLabel="Close"
               onPress={() => {
                 triggerHaptic('buttonTap');
-                onCancel();
+                handleClose();
               }}
               style={styles.closeBtn}
             >
@@ -104,14 +116,14 @@ export function LobbyExitConfirmModal({
               accessibilityRole="button"
               onPress={() => {
                 triggerHaptic('buttonTap');
-                onCancel();
+                handleClose();
               }}
               style={styles.cancelBtn}
             >
               <Text style={styles.cancelBtnText}>{cancelText}</Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -120,7 +132,7 @@ export function LobbyExitConfirmModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(5, 7, 10, 0.82)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,

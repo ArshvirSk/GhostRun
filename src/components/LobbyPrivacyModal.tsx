@@ -1,7 +1,8 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { triggerHaptic } from '../motion/haptics';
+import { useDialogModalAnimation } from '../motion';
 
 interface LobbyPrivacyModalProps {
   visible: boolean;
@@ -16,18 +17,29 @@ export function LobbyPrivacyModal({
   onSelectOption,
   onClose,
 }: LobbyPrivacyModalProps) {
-  if (!visible) return null;
+  const { mounted, fadeAnim, scaleAnim, handleClose } = useDialogModalAnimation(visible, onClose);
 
   return (
     <Modal
       transparent
-      animationType="fade"
-      visible={visible}
-      onRequestClose={onClose}
+      animationType="none"
+      visible={mounted}
+      onRequestClose={handleClose}
     >
       <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={styles.dialogCard}>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(5, 7, 10, 0.82)', opacity: fadeAnim },
+          ]}
+        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View
+          style={[
+            styles.dialogCard,
+            { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
+          ]}
+        >
           {/* Top Badge & Close */}
           <View style={styles.topRow}>
             <View style={styles.badge}>
@@ -39,7 +51,7 @@ export function LobbyPrivacyModal({
               accessibilityLabel="Close"
               onPress={() => {
                 triggerHaptic('buttonTap');
-                onClose();
+                handleClose();
               }}
               style={styles.closeBtn}
             >
@@ -146,13 +158,13 @@ export function LobbyPrivacyModal({
             accessibilityRole="button"
             onPress={() => {
               triggerHaptic('buttonTap');
-              onClose();
+              handleClose();
             }}
             style={styles.closeBottomBtn}
           >
             <Text style={styles.closeBottomBtnText}>DONE</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -161,7 +173,7 @@ export function LobbyPrivacyModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(5, 7, 10, 0.82)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,

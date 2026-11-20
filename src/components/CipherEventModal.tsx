@@ -6,12 +6,14 @@ import {
   StyleSheet,
   Text,
   View,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
 import { useUserStore } from '../stores/userStore';
 import { triggerHaptic } from '../motion/haptics';
+import { useSheetModalAnimation } from '../motion';
 import { TACTICAL_GOLD } from '../theme/tokens';
 
 interface CipherEventModalProps {
@@ -24,6 +26,7 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
   const { colors, isDark } = useTheme();
   const profile = useUserStore((s) => s.profile);
   const setProfile = useUserStore((s) => s.setProfile);
+  const { mounted, fadeAnim, slideAnim, handleClose } = useSheetModalAnimation(visible, onClose);
 
   const [activating, setActivating] = useState(false);
   const isCipher = Boolean(profile?.is_cipher || profile?.is_vanguard);
@@ -53,19 +56,35 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
 
   return (
     <Modal
-      visible={visible}
-      animationType="slide"
+      visible={mounted}
+      animationType="none"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.backdrop}>
-        <View
+        {/* Smooth Fading Backdrop */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0, 0, 0, 0.75)', opacity: fadeAnim },
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss briefing"
+            style={StyleSheet.absoluteFill}
+            onPress={handleClose}
+          />
+        </Animated.View>
+
+        <Animated.View
           style={[
             styles.sheetContainer,
             {
               backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
               borderColor: colors.borderDark,
               paddingBottom: Math.max(insets.bottom, 16) + 10,
+              transform: [{ translateY: slideAnim }],
             },
           ]}
         >
@@ -88,7 +107,7 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               onPress={() => {
                 triggerHaptic('buttonTap');
-                onClose();
+                handleClose();
               }}
               style={[
                 styles.closeBtn,
@@ -358,7 +377,7 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
               </Text>
             </View>
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -367,7 +386,7 @@ export function CipherEventModal({ visible, onClose }: CipherEventModalProps) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'transparent',
     justifyContent: 'flex-end',
   },
   sheetContainer: {

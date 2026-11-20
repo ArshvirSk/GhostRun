@@ -462,6 +462,7 @@ export default function FriendsScreen() {
                               {host.hostName}
                             </Text>
                             <View style={styles.hostingBadge}>
+                              <View style={styles.livePulseDot} />
                               <Text style={styles.hostingBadgeText}>HOSTING</Text>
                             </View>
                           </View>
@@ -1062,11 +1063,39 @@ export default function FriendsScreen() {
                 )}
 
                 {!isSearching && targetHandle.trim().length >= 2 && searchResults.length === 0 && (
-                  <View style={[styles.searchEmptyNote, { borderColor: colors.border }]}>
-                    <Text style={[styles.searchEmptyNoteText, { color: colors.textMuted }]}>
-                      No players match "{targetHandle.trim()}". You can still send a request below.
-                    </Text>
-                  </View>
+                  <Card
+                    variant="default"
+                    style={[
+                      styles.searchEmptyCard,
+                      {
+                        backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.searchEmptyHeader}>
+                      <Ionicons name="search-outline" size={22} color={colors.textMuted} />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>
+                          No Operatives Found
+                        </Text>
+                        <Text style={[styles.searchEmptySub, { color: colors.textMuted }]}>
+                          No players match "{targetHandle.trim()}". You can send an invite link below or scan their Beacon QR code directly.
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ marginTop: 12 }}>
+                      <Button
+                        title="Scan QR Beacon"
+                        variant="secondary"
+                        size="sm"
+                        onPress={() => {
+                          triggerHaptic('buttonTap');
+                          setScannerModalVisible(true);
+                        }}
+                      />
+                    </View>
+                  </Card>
                 )}
 
                 {statusMessage !== '' && (
@@ -1470,6 +1499,28 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
+  searchEmptyCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  searchEmptyHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  searchEmptyTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 3,
+  },
+  searchEmptySub: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 12,
+    lineHeight: 16,
+  },
   searchEmptyNote: {
     padding: 12,
     borderRadius: 10,
@@ -1699,9 +1750,18 @@ const styles = StyleSheet.create({
   },
   hostingBadge: {
     backgroundColor: '#10B981',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
+  },
+  livePulseDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#000000',
   },
   hostingBadgeText: {
     color: '#000000',

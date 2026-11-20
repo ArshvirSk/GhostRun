@@ -30,7 +30,7 @@ export const darkColors = {
   textPrimary: '#F1EEE8',
   textMuted: '#B7B2BF',
   textSecondary: '#B7B2BF',
-  textSubtle: '#7E7988',
+  textSubtle: '#9CA3AF',
 
   // Primary & Team Actions
   primary: '#C7F36B',

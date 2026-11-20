@@ -403,6 +403,7 @@ export function PlayContent() {
                         {host.hostName}
                       </Text>
                       <View style={styles.hostingBadge}>
+                        <View style={styles.livePulseDot} />
                         <Text style={styles.hostingBadgeText}>HOSTING</Text>
                       </View>
                     </View>
@@ -881,9 +882,18 @@ const styles = StyleSheet.create({
   },
   hostingBadge: {
     backgroundColor: '#10B981',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
+  },
+  livePulseDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#000000',
   },
   hostingBadgeText: {
     color: '#000000',

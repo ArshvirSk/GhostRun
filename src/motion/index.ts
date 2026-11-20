@@ -19,5 +19,7 @@ export {
 } from './reduced-motion';
 export {
   useSheetModalAnimation,
+  useDialogModalAnimation,
   type UseSheetModalAnimationOptions,
+  type UseDialogModalAnimationOptions,
 } from './useSheetModalAnimation';

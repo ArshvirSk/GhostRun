@@ -74,3 +74,73 @@ export function useSheetModalAnimation(
 
   return { mounted, fadeAnim, slideAnim, handleClose };
 }
+
+export interface UseDialogModalAnimationOptions {
+  fadeInDuration?: number;
+  fadeOutDuration?: number;
+}
+
+export function useDialogModalAnimation(
+  visible: boolean,
+  onClose: () => void,
+  options?: UseDialogModalAnimationOptions
+) {
+  const fadeInDuration = options?.fadeInDuration ?? 220;
+  const fadeOutDuration = options?.fadeOutDuration ?? 180;
+
+  const [mounted, setMounted] = useState(visible);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.92)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: fadeInDuration,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          damping: 24,
+          stiffness: 240,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: fadeOutDuration,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.94,
+          duration: fadeOutDuration,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setMounted(false));
+    }
+  }, [visible, fadeInDuration, fadeOutDuration, fadeAnim, scaleAnim]);
+
+  const handleClose = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: fadeOutDuration,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.94,
+        duration: fadeOutDuration,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setMounted(false);
+      onClose();
+    });
+  }, [fadeOutDuration, onClose, fadeAnim, scaleAnim]);
+
+  return { mounted, fadeAnim, scaleAnim, handleClose };
+}

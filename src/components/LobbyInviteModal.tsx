@@ -8,6 +8,7 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
@@ -15,6 +16,7 @@ import { Text } from '../ui/Text';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { triggerHaptic } from '../motion/haptics';
+import { useDialogModalAnimation } from '../motion';
 import { buildInvitePayload, normalizeRoomCode } from '../lib/invite';
 import { getCachedQrUri, getOrCreateQrUri, pregenerateQrUri } from '../lib/qrCache';
 
@@ -36,6 +38,7 @@ export function LobbyInviteModal({
   onClose,
 }: LobbyInviteModalProps) {
   const { colors, spacing, radii } = useTheme();
+  const { mounted, fadeAnim, scaleAnim, handleClose } = useDialogModalAnimation(visible, onClose);
   const cleanCode = normalizeRoomCode(code);
 
   const payload = buildInvitePayload({
@@ -108,38 +111,53 @@ export function LobbyInviteModal({
 
   return (
     <Modal
-      visible={visible}
+      visible={mounted}
       transparent
-      animationType="fade"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
-        <Card
-          variant="elevated"
+        <Animated.View
           style={[
-            styles.container,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.borderDark,
-              borderRadius: radii.card,
-              padding: spacing.xl,
-            },
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0, 0, 0, 0.75)', opacity: fadeAnim },
           ]}
+        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View
+          style={{
+            width: '100%',
+            maxWidth: 380,
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }],
+          }}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <View>
-              <Text variant="label" style={{ color: colors.accent, letterSpacing: 1.5 }}>
-                TACTICAL DEPLOYMENT
-              </Text>
-              <Text variant="title" style={{ color: colors.text, marginTop: 2 }}>
-                Invite Operatives
-              </Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close invite modal"
-              onPress={onClose}
+          <Card
+            variant="elevated"
+            style={[
+              styles.container,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.borderDark,
+                borderRadius: radii.card,
+                padding: spacing.xl,
+              },
+            ]}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <View>
+                <Text variant="label" style={{ color: colors.accent, letterSpacing: 1.5 }}>
+                  TACTICAL DEPLOYMENT
+                </Text>
+                <Text variant="title" style={{ color: colors.text, marginTop: 2 }}>
+                  Invite Operatives
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close invite modal"
+                onPress={handleClose}
               style={[styles.closeBtn, { backgroundColor: colors.surfaceElevated }]}
             >
               <Ionicons name="close" size={20} color={colors.textMuted} />
@@ -231,6 +249,7 @@ export function LobbyInviteModal({
             />
           </View>
         </Card>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -239,7 +258,7 @@ export function LobbyInviteModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

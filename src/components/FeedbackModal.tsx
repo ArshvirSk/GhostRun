@@ -9,6 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
@@ -16,6 +17,7 @@ import { Text } from '../ui/Text';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { triggerHaptic } from '../motion/haptics';
+import { useDialogModalAnimation } from '../motion';
 import { supabase } from '../lib/supabase';
 import { buildDiagnosticBundle } from '../lib/diagnostics';
 
@@ -28,6 +30,7 @@ type FeedbackCategory = 'bug' | 'suggestion' | 'safety' | 'other';
 
 export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
   const { colors, spacing, radii } = useTheme();
+  const { mounted, fadeAnim, scaleAnim, handleClose } = useDialogModalAnimation(visible, onClose);
   const [category, setCategory] = useState<FeedbackCategory>('bug');
   const [message, setMessage] = useState('');
   const [includeDiagnostics, setIncludeDiagnostics] = useState(true);
@@ -69,42 +72,50 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={handleClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}
       >
-        <Card
-          variant="elevated"
+        <Animated.View
           style={[
-            styles.container,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.borderDark,
-              borderRadius: radii.card,
-              padding: spacing.xl,
-            },
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0,0,0,0.75)', opacity: fadeAnim },
           ]}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View>
-              <Text variant="label" style={{ color: colors.accent, letterSpacing: 1.5 }}>
-                FIELD INTELLIGENCE
-              </Text>
-              <Text variant="title" style={{ color: colors.text, marginTop: 2 }}>
-                Report Bug / Feedback
-              </Text>
+        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View style={{ width: '100%', maxWidth: 400, opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
+          <Card
+            variant="elevated"
+            style={[
+              styles.container,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.borderDark,
+                borderRadius: radii.card,
+                padding: spacing.xl,
+              },
+            ]}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <View>
+                <Text variant="label" style={{ color: colors.accent, letterSpacing: 1.5 }}>
+                  FIELD INTELLIGENCE
+                </Text>
+                <Text variant="title" style={{ color: colors.text, marginTop: 2 }}>
+                  Report Bug / Feedback
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close feedback modal"
+                onPress={handleClose}
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceElevated }]}
+              >
+                <Ionicons name="close" size={20} color={colors.textMuted} />
+              </Pressable>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close feedback modal"
-              onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: colors.surfaceElevated }]}
-            >
-              <Ionicons name="close" size={20} color={colors.textMuted} />
-            </Pressable>
-          </View>
 
           {/* Category Chips */}
           <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.md, marginBottom: 6, fontSize: 11 }}>
@@ -205,10 +216,11 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
               title="Cancel"
               variant="secondary"
               size="md"
-              onPress={onClose}
+              onPress={handleClose}
             />
           </View>
         </Card>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -217,7 +229,7 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

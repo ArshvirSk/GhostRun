@@ -386,12 +386,12 @@ export default function LeaderboardScreen() {
             <Ionicons
               name="people"
               size={15}
-              color={scope === 'friends' ? '#000000' : colors.textMuted}
+              color={scope === 'friends' ? colors.primaryText : colors.textMuted}
             />
             <Text
               style={[
                 styles.scopeTabText,
-                { color: scope === 'friends' ? '#000000' : colors.textMuted },
+                { color: scope === 'friends' ? colors.primaryText : colors.textMuted },
               ]}
             >
               FRIENDS
@@ -413,12 +413,12 @@ export default function LeaderboardScreen() {
             <Ionicons
               name="globe-outline"
               size={15}
-              color={scope === 'global' ? '#000000' : colors.textMuted}
+              color={scope === 'global' ? colors.primaryText : colors.textMuted}
             />
             <Text
               style={[
                 styles.scopeTabText,
-                { color: scope === 'global' ? '#000000' : colors.textMuted },
+                { color: scope === 'global' ? colors.primaryText : colors.textMuted },
               ]}
             >
               GLOBAL GRID

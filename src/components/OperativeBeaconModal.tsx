@@ -6,6 +6,7 @@ import {
   Pressable,
   Image,
   Share,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
@@ -13,6 +14,7 @@ import { Text } from '../ui/Text';
 import { Button } from '../ui/Button';
 import { generateQrBmpDataUrl } from '../lib/qrCache';
 import { triggerHaptic } from '../motion/haptics';
+import { useDialogModalAnimation } from '../motion';
 
 interface OperativeBeaconModalProps {
   visible: boolean;
@@ -32,6 +34,7 @@ export function OperativeBeaconModal({
   avatarColor,
 }: OperativeBeaconModalProps) {
   const { colors, isDark } = useTheme();
+  const { mounted, fadeAnim, scaleAnim, handleClose } = useDialogModalAnimation(visible, onClose);
 
   const beaconPayload = useMemo(() => {
     const identifier = handle ? `@${handle}` : userId;
@@ -63,18 +66,27 @@ export function OperativeBeaconModal({
 
   return (
     <Modal
-      visible={visible}
+      visible={mounted}
       transparent
-      animationType="fade"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
       <View style={styles.backdrop}>
-        <View
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0, 0, 0, 0.75)', opacity: fadeAnim },
+          ]}
+        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View
           style={[
             styles.dialog,
             {
               backgroundColor: isDark ? '#121216' : '#FFFFFF',
               borderColor: colors.borderDark || colors.border,
+              opacity: fadeAnim,
+              transform: [{ scale: scaleAnim }],
             },
           ]}
         >
@@ -89,7 +101,7 @@ export function OperativeBeaconModal({
               accessibilityLabel="Close Beacon"
               onPress={() => {
                 triggerHaptic('buttonTap');
-                onClose();
+                handleClose();
               }}
               style={[
                 styles.closeBtn,
@@ -159,7 +171,7 @@ export function OperativeBeaconModal({
               style={{ flex: 1 }}
             />
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -168,7 +180,7 @@ export function OperativeBeaconModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
