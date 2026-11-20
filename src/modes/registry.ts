@@ -34,6 +34,7 @@ export const CLIENT_DENY_LIST: ReadonlySet<string> = new Set([
 ]);
 
 const ALL_BASE_MODES: ModeModule[] = [
+  outbreakHordeMode,
   classicChaseMode,
   tagHuntMode,
   jailbreakMode,
@@ -41,7 +42,6 @@ const ALL_BASE_MODES: ModeModule[] = [
   relayHeistMode,
   territoryPulseMode,
   ghostDuelMode,
-  outbreakHordeMode,
 ];
 
 const ALL_MODIFIERS: ModeModule[] = [

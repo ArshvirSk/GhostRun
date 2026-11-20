@@ -111,10 +111,16 @@ export const PRESET_VALUES: Record<'casual' | 'standard' | 'hardcore' | 'blackou
 const DEFAULT_CENTER: [number, number] = [77.2090, 28.6139];
 
 export const useHostStore = create<HostState>((set, get) => ({
-  mode: 'classic_chase',
+  mode: 'outbreak_horde',
   preset: 'standard',
   rules: { ...PRESET_VALUES.standard },
-  modeParams: {},
+  modeParams: {
+    outbreak_horde: {
+      initial_health_s: 360,
+      antidote_boost_hp: 65,
+      drift_velocity_mps: 0.6,
+    },
+  },
   selectedModifiers: [],
   selectedRoles: [],
   center: DEFAULT_CENTER,
@@ -140,7 +146,13 @@ export const useHostStore = create<HostState>((set, get) => ({
 
     // Default mode params for special modes
     const nextModeParams: Record<string, any> = {};
-    if (modeId === 'ghost_duel') {
+    if (modeId === 'outbreak_horde') {
+      nextModeParams.outbreak_horde = {
+        initial_health_s: 360,
+        antidote_boost_hp: 65,
+        drift_velocity_mps: 0.6,
+      };
+    } else if (modeId === 'ghost_duel') {
       nextModeParams.ghost_duel = { variant: 'time_trial' };
     } else if (modeId === 'territory_pulse') {
       nextModeParams.territory_pulse = { pulse_interval_s: 90, dominance_pct: 70 };

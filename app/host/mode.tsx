@@ -160,9 +160,14 @@ export default function HostModeScreen() {
             >
               <View style={styles.cardHeader}>
                 <View style={{ flex: 1, marginRight: spacing.sm }}>
-                  <Text variant="title" style={{ color: colors.text }}>
-                    {m.name}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text variant="title" style={{ color: colors.text }}>
+                      {m.name}
+                    </Text>
+                    {m.id === 'outbreak_horde' && (
+                      <Chip label="NEW" variant="accent" size="sm" />
+                    )}
+                  </View>
                   <Text
                     variant="label"
                     numberOfLines={1}

@@ -202,6 +202,15 @@ export function ModesContent() {
                     <Text variant="title" style={{ color: colors.text, fontSize: 17, flex: 1 }}>
                       {mode.name}
                     </Text>
+                    {mode.id === 'outbreak_horde' && (
+                      <Chip
+                        icon={<Ionicons name="sparkles" size={11} color={colors.accent} />}
+                        label="NEW"
+                        variant="accent"
+                        size="sm"
+                        style={{ paddingHorizontal: 6 }}
+                      />
+                    )}
                   </View>
 
                   <Text

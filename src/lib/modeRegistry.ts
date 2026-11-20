@@ -43,6 +43,21 @@ export type ModeRegistry = {
 export const FALLBACK_REGISTRY: ModeRegistry = {
   modes: [
     {
+      id: 'outbreak_horde',
+      layer: 'base',
+      name: 'Outbreak Horde',
+      teams: ['runner', 'hunter'],
+      min_players: 3,
+      compatible_roles: [],
+      compatible_modifiers: ['noise_meter', 'dead_drops', 'hot_cold', 'shrinking_zone', 'ai_gm'],
+      parameters: {
+        initial_health_s: 360,
+        antidote_boost_hp: 65,
+        drift_velocity_mps: 0.6,
+      },
+      enabled: true,
+    },
+    {
       id: 'classic_chase',
       layer: 'base',
       name: 'Classic Chase',
@@ -185,21 +200,6 @@ export const FALLBACK_REGISTRY: ModeRegistry = {
         zone_count: 7,
         dominance_pct: 70,
         zone_radius_m: 60,
-      },
-      enabled: true,
-    },
-    {
-      id: 'outbreak_horde',
-      layer: 'base',
-      name: 'Outbreak Horde',
-      teams: ['runner', 'hunter'],
-      min_players: 3,
-      compatible_roles: [],
-      compatible_modifiers: ['noise_meter', 'dead_drops', 'hot_cold', 'shrinking_zone', 'ai_gm'],
-      parameters: {
-        initial_health_s: 360,
-        antidote_boost_hp: 65,
-        drift_velocity_mps: 0.6,
       },
       enabled: true,
     },

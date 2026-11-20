@@ -20,6 +20,7 @@ import { fetchActiveSeasonAndBanners, ActiveSeasonData } from '../../src/lib/sea
 import { getFriendsHosting, listFriends, listFriendRequests } from '../../src/lib/friends';
 import { HostPresence } from '../../src/lib/friendsCore';
 import { useUserStore } from '../../src/stores/userStore';
+import { useHostStore } from '../../src/stores/hostStore';
 import { startLocationPrewarm } from '../../src/lib/locationCache';
 import { CipherEventModal } from '../../src/components/CipherEventModal';
 import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
@@ -430,6 +431,79 @@ export function PlayContent() {
             ))}
           </View>
         )}
+
+        {/* Outbreak Horde Flagship Mode Card */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Outbreak Horde Mode"
+          onPress={() => {
+            triggerHaptic('buttonTap');
+            useHostStore.getState().setMode('outbreak_horde');
+            router.push({
+              pathname: '/modes/[id]',
+              params: { id: 'outbreak_horde' },
+            } as any);
+          }}
+          style={({ pressed }) => [
+            styles.cipherCard,
+            {
+              backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+              borderColor: colors.accent,
+              marginBottom: 12,
+            },
+            pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+          ]}
+        >
+          <View style={styles.cipherCardInner}>
+            {/* Iconic 2-Letter Emerald [OB] Tag */}
+            <View
+              style={[
+                styles.cpTagBox,
+                {
+                  borderColor: colors.accent,
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                },
+              ]}
+            >
+              <Text style={[styles.cpTagText, { color: colors.accent }]}>
+                OB
+              </Text>
+            </View>
+
+            {/* Clean Middle Column */}
+            <View style={styles.cipherTextCol}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.cipherTitleText, { color: colors.text }]} numberOfLines={1}>
+                  OUTBREAK HORDE
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                    borderColor: colors.accent,
+                    borderWidth: 1,
+                    paddingHorizontal: 5,
+                    paddingVertical: 1,
+                    borderRadius: 4,
+                  }}
+                >
+                  <Text style={{ color: colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 }}>
+                    NEW
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.cipherSubText, { color: colors.textMuted }]} numberOfLines={1}>
+                PvP Infection Swarm · 1 Patient Zero vs Survivors
+              </Text>
+            </View>
+
+            {/* Trailing Navigation Chevron */}
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={colors.textMuted}
+            />
+          </View>
+        </Pressable>
 
         {/* Tactical Cipher Protocol Event Card with Iconic [CP] Tag */}
         <Pressable
