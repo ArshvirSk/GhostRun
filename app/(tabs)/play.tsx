@@ -17,7 +17,7 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { supabase } from '../../src/lib/supabase';
 import { fetchActiveSeasonAndBanners, ActiveSeasonData } from '../../src/lib/seasons';
-import { getFriendsHosting } from '../../src/lib/friends';
+import { getFriendsHosting, listFriends, listFriendRequests } from '../../src/lib/friends';
 import { HostPresence } from '../../src/lib/friendsCore';
 import { useUserStore } from '../../src/stores/userStore';
 import { startLocationPrewarm } from '../../src/lib/locationCache';
@@ -48,6 +48,8 @@ export function PlayContent() {
   const [refreshing, setRefreshing] = useState(false);
   const [seasonData, setSeasonData] = useState<ActiveSeasonData | null>(null);
   const [friendsHosting, setFriendsHosting] = useState<HostPresence[]>([]);
+  const [friendCount, setFriendCount] = useState<number>(0);
+  const [pendingRequestCount, setPendingRequestCount] = useState<number>(0);
   const [cipherModalVisible, setCipherModalVisible] = useState(false);
 
   // Keep displayName synced instantly whenever userStore updates
@@ -132,9 +134,19 @@ export function PlayContent() {
         setSeasonData(seasonRes.data);
       }
 
-      // Fetch friends presence (FL-P1)
-      const hosts = await getFriendsHosting();
-      setFriendsHosting(hosts);
+      // Fetch friends list, incoming requests and hosting presence (FL-P1)
+      const [friendsList, requestsData, hosts] = await Promise.all([
+        listFriends().catch(() => []),
+        listFriendRequests().catch(() => ({ incoming: [], outgoing: [] })),
+        getFriendsHosting().catch(() => []),
+      ]);
+      if (Array.isArray(friendsList)) {
+        setFriendCount(friendsList.length);
+      }
+      if (requestsData?.incoming) {
+        setPendingRequestCount(requestsData.incoming.length);
+      }
+      setFriendsHosting(hosts || []);
     } catch {
       // Offline fallback
     }
@@ -144,9 +156,15 @@ export function PlayContent() {
     useCallback(() => {
       void loadProfileAndActiveGame();
       const interval = setInterval(() => {
-        void getFriendsHosting()
-          .then((hosts) => {
-            setFriendsHosting(hosts);
+        void Promise.all([
+          listFriends().catch(() => []),
+          listFriendRequests().catch(() => ({ incoming: [], outgoing: [] })),
+          getFriendsHosting().catch(() => []),
+        ])
+          .then(([friendsList, requestsData, hosts]) => {
+            if (Array.isArray(friendsList)) setFriendCount(friendsList.length);
+            if (requestsData?.incoming) setPendingRequestCount(requestsData.incoming.length);
+            setFriendsHosting(hosts || []);
           })
           .catch(() => {});
       }, 15000);
@@ -202,7 +220,11 @@ export function PlayContent() {
           <View style={styles.headerActions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Friends Hub"
+              accessibilityLabel={
+                pendingRequestCount > 0
+                  ? `Friends Hub, ${pendingRequestCount} new friend request${pendingRequestCount > 1 ? 's' : ''}`
+                  : `Friends Hub, ${friendCount} friend${friendCount === 1 ? '' : 's'}`
+              }
               onPress={() => {
                 triggerHaptic('buttonTap');
                 router.push('/friends' as any);
@@ -212,11 +234,35 @@ export function PlayContent() {
                 styles.headerIconButton,
                 {
                   backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                  borderColor: colors.border,
+                  borderColor: pendingRequestCount > 0 ? (colors.accent || '#F59E0B') : colors.border,
                 },
               ]}
             >
               <Ionicons name="people-outline" size={19} color={colors.primary} />
+              {(pendingRequestCount > 0 || friendCount > 0) && (
+                <View
+                  style={[
+                    styles.friendsBadgeBlob,
+                    {
+                      backgroundColor: pendingRequestCount > 0
+                        ? (colors.accent || '#F59E0B')
+                        : colors.primary,
+                      borderColor: isDark ? '#0C0E14' : '#FFFFFF',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.friendsBadgeBlobText,
+                      {
+                        color: pendingRequestCount > 0 ? '#000000' : colors.primaryText,
+                      },
+                    ]}
+                  >
+                    {pendingRequestCount > 0 ? `+${pendingRequestCount}` : friendCount}
+                  </Text>
+                </View>
+              )}
             </Pressable>
 
             <Pressable
@@ -612,6 +658,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  friendsBadgeBlob: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+  },
+  friendsBadgeBlobText: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 10,
+    fontWeight: '900',
+    includeFontPadding: false,
+    textAlign: 'center',
   },
   statusPill: {
     flexDirection: 'row',

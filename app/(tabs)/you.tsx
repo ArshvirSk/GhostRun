@@ -515,7 +515,7 @@ export function YouContent() {
             </View>
           </View>
 
-          {/* Operative Action Triggers (Share Card, Edit Codename, Preview Dossier) */}
+          {/* Operative Action Triggers (Share, Edit, Preview) */}
           <View style={styles.avatarActionsRow}>
             <Pressable
               accessibilityRole="button"
@@ -529,7 +529,7 @@ export function YouContent() {
                 {
                   backgroundColor: isDark ? 'rgba(199, 243, 107, 0.12)' : 'rgba(85, 122, 34, 0.12)',
                   borderColor: colors.primary,
-                  flex: 1.15,
+                  flex: 1,
                 },
                 pressed && { opacity: 0.8 },
               ]}
@@ -538,10 +538,10 @@ export function YouContent() {
               <Text
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.8}
                 style={[styles.avatarActionBtnText, { color: colors.primary }]}
               >
-                Share Card
+                Share
               </Text>
             </Pressable>
 
@@ -570,7 +570,7 @@ export function YouContent() {
               <Text
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.8}
                 style={[styles.avatarActionBtnText, { color: colors.text }]}
               >
                 {isEditing ? 'Close' : 'Edit'}
@@ -594,7 +594,7 @@ export function YouContent() {
                 {
                   backgroundColor: isDark ? colors.surfaceMuted : colors.surfaceElevated,
                   borderColor: colors.border,
-                  flex: 0.95,
+                  flex: 1,
                 },
                 pressed && { opacity: 0.8 },
               ]}
@@ -603,7 +603,7 @@ export function YouContent() {
               <Text
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.8}
                 style={[styles.avatarActionBtnText, { color: colors.textSecondary }]}
               >
                 Preview
@@ -1439,9 +1439,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 4,
     height: 38,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     borderRadius: 19,
     borderWidth: 1,
   },
@@ -1449,7 +1449,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Bold',
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 0.1,
+    letterSpacing: -0.1,
   },
   editDrawer: {
     marginTop: 16,
