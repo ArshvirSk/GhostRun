@@ -25,7 +25,8 @@ import { formatFriendWebInviteUrl } from '../lib/friendsCore';
 import { formatCodenameWithTag } from '../lib/codename';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = Math.min(SCREEN_WIDTH - 64, 310);
+const CARD_WIDTH = Math.min(SCREEN_WIDTH - 90, 275);
+const CARD_HEIGHT = Math.round(CARD_WIDTH * 1.38);
 
 export interface HoloOperativeCardModalProps {
   visible: boolean;
@@ -60,6 +61,19 @@ export function HoloOperativeCardModal({
   const fullIdentifier = formatCodenameWithTag(cleanName, cleanTag);
   const signatureColor = avatarColor || colors.primary;
   const initial = cleanName.charAt(0) || 'A';
+
+  const initialTextColor = useMemo(() => {
+    if (!signatureColor) return '#FFFFFF';
+    const hex = signatureColor.replace('#', '');
+    if (hex.length === 6) {
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+      return yiq >= 160 ? '#0F172A' : '#FFFFFF';
+    }
+    return '#FFFFFF';
+  }, [signatureColor]);
 
   const webInviteUrl = useMemo(() => {
     return formatFriendWebInviteUrl(fullIdentifier);
@@ -192,56 +206,61 @@ export function HoloOperativeCardModal({
             </Pressable>
           </View>
 
-          {/* Minimal Floating Holographic Card (Duolingo Style) */}
+          {/* Minimal Floating Holographic Portrait Card (Duolingo Contrast Style) */}
           <View style={styles.cardCenterWrapper}>
             <LinearGradient
               colors={['#00f5ff', '#7928ca', '#ff0080', '#c7f36b', '#fbbf24', '#00f5ff']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.holoBorder, { width: CARD_WIDTH }]}
+              style={[styles.holoBorder, { width: CARD_WIDTH + 5, height: CARD_HEIGHT + 5 }]}
             >
               <View
                 ref={cardRef}
                 collapsable={false}
                 style={[
                   styles.cardBody,
-                  { backgroundColor: isDark ? '#0C0E14' : '#FFFFFF' },
+                  { width: CARD_WIDTH, height: CARD_HEIGHT, backgroundColor: '#FFFFFF' },
                 ]}
               >
-                {/* Hero Avatar Banner Area */}
+                {/* Hero Avatar Banner Area (Top Portrait Canvas) */}
                 <View
                   style={[
                     styles.avatarHeroBox,
                     {
-                      backgroundColor: isDark
-                        ? 'rgba(255, 255, 255, 0.04)'
-                        : 'rgba(0, 0, 0, 0.03)',
+                      backgroundColor: signatureColor ? `${signatureColor}18` : '#F1F5F9',
                     },
                   ]}
                 >
                   <View
                     style={[
-                      styles.avatarCircle,
-                      {
-                        backgroundColor: signatureColor,
-                        shadowColor: signatureColor,
-                      },
+                      styles.avatarRadarRing,
+                      { borderColor: signatureColor ? `${signatureColor}33` : 'rgba(0,0,0,0.06)' },
                     ]}
                   >
-                    <Text style={styles.avatarInitial}>{initial}</Text>
+                    <View
+                      style={[
+                        styles.avatarCircle,
+                        {
+                          backgroundColor: signatureColor,
+                          shadowColor: signatureColor,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.avatarInitial, { color: initialTextColor }]}>{initial}</Text>
+                    </View>
                   </View>
                 </View>
 
                 {/* Bottom Row: Name, Tag & Brand on Left, QR on Right */}
                 <View style={styles.cardBottomRow}>
                   <View style={styles.identityCol}>
-                    <Text numberOfLines={1} style={[styles.nameText, { color: colors.text }]}>
+                    <Text numberOfLines={1} style={styles.nameText}>
                       @{cleanName}
                     </Text>
-                    <Text style={[styles.tagText, { color: colors.textMuted }]}>
+                    <Text style={styles.tagText}>
                       #{cleanTag}
                     </Text>
-                    <Text style={[styles.brandWordmark, { color: colors.primary }]}>
+                    <Text style={styles.brandWordmark}>
                       ghostrun
                     </Text>
                   </View>
@@ -418,31 +437,40 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   holoBorder: {
-    borderRadius: 24,
+    borderRadius: 26,
     padding: 2.5,
     shadowColor: '#00f5ff',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 12,
   },
   cardBody: {
-    borderRadius: 22,
+    borderRadius: 24,
     overflow: 'hidden',
-    padding: 16,
+    padding: 14,
+    justifyContent: 'space-between',
   },
   avatarHeroBox: {
+    flex: 1,
     width: '100%',
-    height: 140,
-    borderRadius: 16,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  avatarRadarRing: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     alignItems: 'center',
     justifyContent: 'center',
     shadowOffset: { width: 0, height: 4 },
@@ -452,53 +480,59 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     fontFamily: 'Archivo-Black',
-    fontSize: 40,
+    fontSize: 46,
     fontWeight: '900',
-    color: '#000000',
+    color: '#FFFFFF',
   },
   cardBottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
+    paddingBottom: 2,
   },
   identityCol: {
     flex: 1,
     justifyContent: 'center',
-    paddingRight: 10,
+    paddingRight: 8,
   },
   nameText: {
     fontFamily: 'Archivo-Black',
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '900',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
+    color: '#0F172A',
   },
   tagText: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     marginTop: 2,
-    marginBottom: 8,
+    marginBottom: 6,
+    color: '#64748B',
   },
   brandWordmark: {
     fontFamily: 'Archivo-Black',
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: -0.5,
+    color: '#16A34A',
   },
   qrWrapper: {
     width: 68,
     height: 68,
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
-    padding: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 3,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   qrImage: {
     width: '100%',
