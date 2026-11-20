@@ -23,6 +23,7 @@ import { BADGE_CATALOG } from '../../src/lib/badges';
 import { SeasonRecapModal } from '../../src/components/SeasonRecapModal';
 import { fetchSeasonRecap, SeasonRecapData } from '../../src/lib/seasonRecap';
 import { useUserStore } from '../../src/stores/userStore';
+import { HoloOperativeCardModal } from '../../src/components/HoloOperativeCardModal';
 import { listFriends, fetchOperativeProfile } from '../../src/lib/friends';
 import { getPlayerEchoProfile, PlayerEchoProfile } from '../../src/lib/echo';
 import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
@@ -74,6 +75,7 @@ export function YouContent() {
     }
   }, [storedProfile, isEditing]);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [shareCardVisible, setShareCardVisible] = useState(false);
   const [history, setHistory] = useState<MatchHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [earnedBadges, setEarnedBadges] = useState<Set<string>>(new Set());
@@ -384,6 +386,25 @@ export function YouContent() {
           <View style={styles.headerActions}>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Share Operative ID Card"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                setShareCardVisible(true);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              style={[
+                styles.headerIconButton,
+                {
+                  backgroundColor: isDark ? 'rgba(199, 243, 107, 0.12)' : 'rgba(85, 122, 34, 0.12)',
+                  borderColor: colors.primary,
+                },
+              ]}
+            >
+              <Ionicons name="share-social-outline" size={19} color={colors.primary} />
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
               accessibilityLabel="Friends Hub"
               onPress={() => {
                 triggerHaptic('buttonTap');
@@ -551,8 +572,68 @@ export function YouContent() {
             </View>
           </View>
 
-          {/* Operative Action Triggers (Preview Profile & Edit Callsign) */}
+          {/* Operative Action Triggers (Share Card, Edit Codename, Preview Dossier) */}
           <View style={styles.avatarActionsRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Share Operative ID Card"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                setShareCardVisible(true);
+              }}
+              style={({ pressed }) => [
+                styles.avatarActionBtn,
+                {
+                  backgroundColor: isDark ? 'rgba(199, 243, 107, 0.12)' : 'rgba(85, 122, 34, 0.12)',
+                  borderColor: colors.primary,
+                  flex: 1.15,
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Ionicons name="share-social-outline" size={14} color={colors.primary} />
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+                style={[styles.avatarActionBtnText, { color: colors.primary }]}
+              >
+                Share Card
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit Codename"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                setIsEditing(!isEditing);
+              }}
+              style={({ pressed }) => [
+                styles.avatarActionBtn,
+                {
+                  backgroundColor: isDark ? colors.surfaceMuted : colors.surfaceElevated,
+                  borderColor: colors.border,
+                  flex: 1,
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Ionicons
+                name={isEditing ? 'close' : 'create-outline'}
+                size={14}
+                color={colors.text}
+              />
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+                style={[styles.avatarActionBtnText, { color: colors.text }]}
+              >
+                {isEditing ? 'Close' : 'Edit'}
+              </Text>
+            </Pressable>
+
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Preview Public Profile"
@@ -570,49 +651,19 @@ export function YouContent() {
                 {
                   backgroundColor: isDark ? colors.surfaceMuted : colors.surfaceElevated,
                   borderColor: colors.border,
+                  flex: 0.95,
                 },
                 pressed && { opacity: 0.8 },
               ]}
             >
-              <Ionicons name="person-outline" size={14} color={colors.text} />
+              <Ionicons name="eye-outline" size={14} color={colors.textSecondary} />
               <Text
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                style={[styles.avatarActionBtnText, { color: colors.text }]}
+                minimumFontScale={0.75}
+                style={[styles.avatarActionBtnText, { color: colors.textSecondary }]}
               >
-                Preview Profile
-              </Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Edit Codename"
-              onPress={() => {
-                triggerHaptic('buttonTap');
-                setIsEditing(!isEditing);
-              }}
-              style={({ pressed }) => [
-                styles.avatarActionBtn,
-                {
-                  backgroundColor: isDark ? colors.surfaceMuted : colors.surfaceElevated,
-                  borderColor: colors.border,
-                },
-                pressed && { opacity: 0.8 },
-              ]}
-            >
-              <Ionicons
-                name={isEditing ? 'close' : 'create-outline'}
-                size={14}
-                color={colors.text}
-              />
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                style={[styles.avatarActionBtnText, { color: colors.text }]}
-              >
-                {isEditing ? 'Close Editor' : 'Edit Codename'}
+                Preview
               </Text>
             </Pressable>
           </View>
@@ -1211,6 +1262,21 @@ export function YouContent() {
         visible={recapVisible}
         recap={recapData}
         onClose={() => setRecapVisible(false)}
+      />
+
+      {/* Holo Operative Share Card Modal */}
+      <HoloOperativeCardModal
+        visible={shareCardVisible}
+        onClose={() => setShareCardVisible(false)}
+        displayName={profile?.display_name || 'OPERATIVE'}
+        tagline={profile?.tagline}
+        handle={storedProfile?.handle}
+        userId={userId || ''}
+        avatarColor={profile?.color}
+        tier={echoProfile?.tier || 'Whisper'}
+        echoPts={echoProfile?.echoTotal ?? 0}
+        stats={stats}
+        isCipher={Boolean(profile?.is_cipher || profile?.is_vanguard)}
       />
     </View>
   );

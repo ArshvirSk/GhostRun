@@ -25,6 +25,7 @@ import {
 import { OperativeProfileDossier } from '../../src/lib/friendsCore';
 import { BADGE_CATALOG } from '../../src/lib/badges';
 import { useUnits } from '../../src/utils/units';
+import { HoloOperativeCardModal } from '../../src/components/HoloOperativeCardModal';
 
 export default function OperativeProfileScreen() {
   const { id, name, color } = useLocalSearchParams<{
@@ -45,6 +46,7 @@ export default function OperativeProfileScreen() {
   const [dossier, setDossier] = useState<OperativeProfileDossier | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [errorDetail, setErrorDetail] = useState('');
+  const [shareModalVisible, setShareModalVisible] = useState(false);
 
   const loadProfile = useCallback(async () => {
     if (!targetId) {
@@ -185,7 +187,17 @@ export default function OperativeProfileScreen() {
           <Text style={[styles.backText, { color: colors.text }]}>BACK</Text>
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text }]}>OPERATIVE DOSSIER</Text>
-        <View style={{ width: 60 }} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Share Operative Dossier"
+          onPress={() => {
+            triggerHaptic('buttonTap');
+            setShareModalVisible(true);
+          }}
+          style={styles.headerShareButton}
+        >
+          <Ionicons name="share-social-outline" size={22} color={colors.primary} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -325,6 +337,31 @@ export default function OperativeProfileScreen() {
                   </View>
                 )}
               </View>
+
+              {/* Share Operative Card Action */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Share Operative Card"
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  setShareModalVisible(true);
+                }}
+                style={({ pressed }) => [
+                  styles.shareCardRowBtn,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(199, 243, 107, 0.12)'
+                      : 'rgba(85, 122, 34, 0.12)',
+                    borderColor: colors.primary,
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Ionicons name="share-social-outline" size={14} color={colors.primary} />
+                <Text style={[styles.shareCardRowBtnText, { color: colors.primary }]}>
+                  SHARE OPERATIVE CARD
+                </Text>
+              </Pressable>
             </View>
           </View>
         </Card>
@@ -700,6 +737,32 @@ export default function OperativeProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Holographic Operative Share Card Modal */}
+      <HoloOperativeCardModal
+        visible={shareModalVisible}
+        onClose={() => setShareModalVisible(false)}
+        displayName={dossier?.displayName || name || 'OPERATIVE'}
+        tagline={dossier?.tagline}
+        handle={dossier?.handle}
+        userId={targetId}
+        avatarColor={avatarColor}
+        tier={dossier?.tier || 'Whisper'}
+        echoPts={dossier?.seasonEcho ?? 0}
+        stats={
+          dossier
+            ? {
+                rounds: dossier.rounds,
+                won: dossier.won,
+                winRate: dossier.winRate,
+                bestEscape: dossier.bestEscape,
+                neverCaught: dossier.neverCaught,
+                farthestMeters: dossier.farthestMeters,
+              }
+            : undefined
+        }
+        isCipher={false}
+      />
     </View>
   );
 }
@@ -735,6 +798,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Orbitron_700Bold',
     letterSpacing: 1,
   },
+  headerShareButton: {
+    width: 60,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
@@ -743,6 +813,23 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 20,
     borderWidth: 1,
+  },
+  shareCardRowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 10,
+  },
+  shareCardRowBtnText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   identityRow: {
     flexDirection: 'row',
