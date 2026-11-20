@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   Linking,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { fetchFriendSettings, updateFriendSettings } from '../src/lib/friends';
+import { FriendSettings } from '../src/lib/friendsCore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -50,6 +52,19 @@ import {
 
 const DELETE_WORD = 'DELETE';
 
+type SettingsCategory = 'display' | 'alerts' | 'privacy' | 'account';
+
+const CATEGORIES: Array<{
+  id: SettingsCategory;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}> = [
+  { id: 'display', label: 'Display', icon: 'color-palette-outline' },
+  { id: 'alerts', label: 'Alerts', icon: 'volume-high-outline' },
+  { id: 'privacy', label: 'Privacy', icon: 'shield-checkmark-outline' },
+  { id: 'account', label: 'Account', icon: 'person-outline' },
+];
+
 export default function SettingsScreen() {
   const { colors, spacing, radii, themeMode, setThemeMode, accentColor, setAccentColor } = useTheme();
   const router = useRouter();
@@ -74,12 +89,22 @@ export default function SettingsScreen() {
   const [proximityAlertsEnabled, setProximityAlertsEnabled] = useState(true);
   const [safetyCheckinEnabled, setSafetyCheckinEnabled] = useState(true);
 
-  // Privacy Consents
+  type SettingsCategory = 'display' | 'alerts' | 'privacy' | 'account';
+  const { category, tab } = useLocalSearchParams<{ category?: string; tab?: string }>();
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>(
+    (category as SettingsCategory) || (tab as SettingsCategory) || 'display'
+  );
+
+  // Privacy Consents & Network Settings
   const currentProfile = useUserStore((s) => s.profile);
+  const [allowFriendRequests, setAllowFriendRequests] = useState(true);
   const [presenceConsent, setPresenceConsent] = useState(true);
   const [echoConsent, setEchoConsent] = useState(true);
   const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>('public');
+  const [ghostConsent, setGhostConsent] = useState(true);
+  const [leaderboardNameConsent, setLeaderboardNameConsent] = useState(false);
   const [analyticsOptIn, setLocalAnalyticsOptIn] = useState(false);
+  const [toastNotice, setToastNotice] = useState('');
 
   // User session & UI state
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
@@ -163,8 +188,18 @@ export default function SettingsScreen() {
         if (storedSafety !== null) setSafetyCheckinEnabled(storedSafety !== 'false');
         if (storedPresence !== null) setPresenceConsent(storedPresence !== 'false');
         if (storedEcho !== null) setEchoConsent(storedEcho !== 'false');
-
         setLocalAnalyticsOptIn(storedAnalytics);
+
+        // Fetch canonical FriendSettings from Supabase/cache
+        try {
+          const fs = await fetchFriendSettings();
+          setAllowFriendRequests(fs.allowFriendRequests !== false);
+          setPresenceConsent(Boolean(fs.showPresence));
+          setEchoConsent(fs.shareEcho !== false);
+          setProfileVisibility(fs.profileVisibility || 'public');
+        } catch {
+          // offline fallback
+        }
 
         if (supabase) {
           const { data } = await supabase.auth.getUser();
@@ -174,8 +209,8 @@ export default function SettingsScreen() {
           const { data: serverConsents } = await supabase.rpc('get_my_consents');
           if (serverConsents && typeof serverConsents === 'object') {
             const sc = serverConsents as Record<string, { granted?: boolean }>;
-            if (sc.show_presence?.granted !== undefined) setPresenceConsent(sc.show_presence.granted);
-            if (sc.share_echo?.granted !== undefined) setEchoConsent(sc.share_echo.granted);
+            if (sc.ghost?.granted !== undefined) setGhostConsent(sc.ghost.granted);
+            if (sc.leaderboard_name?.granted !== undefined) setLeaderboardNameConsent(sc.leaderboard_name.granted);
             if (sc.diagnostics?.granted !== undefined) setLocalAnalyticsOptIn(sc.diagnostics.granted);
           }
         }
@@ -268,47 +303,81 @@ export default function SettingsScreen() {
     await AsyncStorage.setItem('@ghostrun:safety_checkin_enabled', String(val));
   };
 
-  const togglePresence = async (val: boolean) => {
-    triggerHaptic('buttonTap');
-    setPresenceConsent(val);
-    await AsyncStorage.setItem('@ghostrun:consent_presence', String(val));
-    if (supabase) {
-      void supabase.rpc('set_consent', { consent_type: 'show_presence', granted: val });
-    }
-  };
-
-  const toggleEcho = async (val: boolean) => {
-    triggerHaptic('buttonTap');
-    setEchoConsent(val);
-    await AsyncStorage.setItem('@ghostrun:consent_echo', String(val));
-    if (supabase) {
-      void supabase.rpc('set_consent', { consent_type: 'share_echo', granted: val });
-    }
-  };
-
   useEffect(() => {
     if (currentProfile?.profile_visibility) {
       setProfileVisibility(currentProfile.profile_visibility);
     }
   }, [currentProfile?.profile_visibility]);
 
-  const toggleProfileVisibility = async (isPub: boolean) => {
+  const handleToggleFriendSetting = async <K extends keyof FriendSettings>(
+    key: K,
+    val: FriendSettings[K]
+  ) => {
     triggerHaptic('buttonTap');
-    const nextVal: 'public' | 'private' = isPub ? 'public' : 'private';
-    setProfileVisibility(nextVal);
-    useUserStore.getState().setProfile({
-      display_name: currentProfile?.display_name || 'Operative',
-      profile_visibility: nextVal,
-    });
+    const updated: FriendSettings = {
+      allowFriendRequests: key === 'allowFriendRequests' ? (val as boolean) : allowFriendRequests,
+      showPresence: key === 'showPresence' ? (val as boolean) : presenceConsent,
+      shareEcho: key === 'shareEcho' ? (val as boolean) : echoConsent,
+      profileVisibility: key === 'profileVisibility' ? (val as 'public' | 'private') : profileVisibility,
+    };
+
+    if (key === 'allowFriendRequests') setAllowFriendRequests(val as boolean);
+    if (key === 'showPresence') {
+      setPresenceConsent(val as boolean);
+      await AsyncStorage.setItem('@ghostrun:consent_presence', String(val));
+    }
+    if (key === 'shareEcho') {
+      setEchoConsent(val as boolean);
+      await AsyncStorage.setItem('@ghostrun:consent_echo', String(val));
+    }
+    if (key === 'profileVisibility') {
+      setProfileVisibility(val as 'public' | 'private');
+      useUserStore.getState().setProfile({
+        display_name: currentProfile?.display_name || 'Operative',
+        profile_visibility: val as 'public' | 'private',
+      });
+    }
+
+    const res = await updateFriendSettings(updated);
+    if (res.success) {
+      setToastNotice('Privacy choice saved.');
+      setTimeout(() => setToastNotice(''), 2000);
+    } else {
+      setError(res.error || 'Failed to update privacy choice.');
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
+  const toggleGhostConsent = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setGhostConsent(val);
+    await AsyncStorage.setItem('@ghostrun:consent_ghost', String(val));
     if (supabase) {
-      const { data: auth } = await supabase.auth.getUser();
-      if (auth.user) {
-        await supabase
-          .from('profiles')
-          .update({ profile_visibility: nextVal })
-          .eq('id', auth.user.id);
+      const { error } = await supabase.rpc('set_consent', { consent_type: 'ghost', granted: val });
+      if (error) {
+        setError(error.message);
+        setTimeout(() => setError(''), 3000);
+        return;
       }
     }
+    setToastNotice('Ghost contribution preference saved.');
+    setTimeout(() => setToastNotice(''), 2000);
+  };
+
+  const toggleLeaderboardName = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setLeaderboardNameConsent(val);
+    await AsyncStorage.setItem('@ghostrun:consent_leaderboard_name', String(val));
+    if (supabase) {
+      const { error } = await supabase.rpc('set_consent', { consent_type: 'leaderboard_name', granted: val });
+      if (error) {
+        setError(error.message);
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
+    }
+    setToastNotice('Leaderboard name preference saved.');
+    setTimeout(() => setToastNotice(''), 2000);
   };
 
   const toggleAnalytics = async (val: boolean) => {
@@ -316,8 +385,10 @@ export default function SettingsScreen() {
     setLocalAnalyticsOptIn(val);
     await setAnalyticsOptIn(val);
     if (supabase) {
-      void supabase.rpc('set_consent', { consent_type: 'diagnostics', granted: val });
+      await supabase.rpc('set_consent', { consent_type: 'diagnostics', granted: val });
     }
+    setToastNotice('Diagnostics preference saved.');
+    setTimeout(() => setToastNotice(''), 2000);
   };
 
   const handleSignOut = async () => {
@@ -423,11 +494,78 @@ export default function SettingsScreen() {
           </Text>
         </Pressable>
 
-        <Text variant="display" style={{ color: colors.text, marginTop: spacing.md, marginBottom: spacing.lg }}>
+        <Text variant="display" style={{ color: colors.text, marginTop: spacing.md, marginBottom: spacing.md }}>
           SETTINGS
         </Text>
 
-        {/* 1. Tactical Display */}
+        {/* Top Category Segmented Bar */}
+        <View style={styles.categoryBar}>
+          {CATEGORIES.map((cat) => {
+            const active = activeCategory === cat.id;
+            return (
+              <Pressable
+                key={cat.id}
+                accessibilityRole="tab"
+                accessibilityLabel={`${cat.label} settings tab`}
+                accessibilityState={{ selected: active }}
+                onPress={() => {
+                  triggerHaptic('buttonTap');
+                  setActiveCategory(cat.id);
+                }}
+                style={[
+                  styles.categoryTab,
+                  {
+                    backgroundColor: active
+                      ? (colors.surfaceElevated)
+                      : 'transparent',
+                    borderColor: active ? colors.primary : colors.borderDark,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={cat.icon}
+                  size={15}
+                  color={active ? colors.primary : colors.textMuted}
+                />
+                <Text
+                  variant="label"
+                  style={[
+                    styles.categoryTabText,
+                    { color: active ? colors.text : colors.textMuted },
+                  ]}
+                >
+                  {cat.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Toast confirmation banner */}
+        {toastNotice ? (
+          <View
+            style={[
+              styles.statusBanner,
+              {
+                backgroundColor: 'rgba(199, 243, 107, 0.15)',
+                borderColor: colors.primary,
+              },
+            ]}
+          >
+            <Ionicons name="checkmark-circle-outline" size={16} color={colors.primary} />
+            <Text
+              variant="caption"
+              style={{ color: colors.primary, fontWeight: '700', marginLeft: 6 }}
+            >
+              {toastNotice}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* DISPLAY CATEGORY */}
+        {activeCategory === 'display' && (
+          <View>
+            {/* 1. Tactical Display */}
         <Text variant="label" style={{ color: colors.textMuted, marginBottom: spacing.xs }}>
           TACTICAL DISPLAY
         </Text>
@@ -972,7 +1110,13 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
-        {/* 3. Audio & Voice Narration Telemetry */}
+                  </View>
+        )}
+
+        {/* ALERTS CATEGORY */}
+        {activeCategory === 'alerts' && (
+          <View>
+            {/* 3. Audio & Voice Narration Telemetry */}
         <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
           AUDIO & VOICE TELEMETRY
         </Text>
@@ -1082,103 +1226,368 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
-        {/* 5. Operative Privacy & Consents */}
-        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
-          OPERATIVE PRIVACY & DATA
-        </Text>
-        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, padding: 0 }]}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/privacy' as any)}
-            style={[styles.settingRow, { padding: spacing.md }]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Privacy Policy & Consent Matrix
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
+                  </View>
+        )}
 
-          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
-            <View style={{ flex: 1, paddingRight: spacing.sm }}>
-              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Squad Lobby Presence
-              </Text>
-            </View>
-            <Switch
-              value={presenceConsent}
-              onValueChange={togglePresence}
-              trackColor={{ false: colors.borderDark, true: colors.primary }}
-              thumbColor={colors.textLight}
-            />
+        {/* PRIVACY & NETWORK CATEGORY */}
+        {activeCategory === 'privacy' && (
+          <View>
+            {/* Header info banner */}
+            <Card
+              variant="default"
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.borderDark,
+                  marginBottom: spacing.md,
+                },
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View
+                  style={[
+                    styles.privacyIconBadge,
+                    {
+                      backgroundColor: 'rgba(199, 243, 107, 0.15)',
+                    },
+                  ]}
+                >
+                  <Ionicons name="shield-checkmark" size={20} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                    Operative Privacy Center
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: colors.textMuted, marginTop: 2, fontSize: 12, lineHeight: 16 }}
+                  >
+                    Granular control over how other operatives discover your profile, track your
+                    presence, and interact with your tactical telemetry.
+                  </Text>
+                </View>
+              </View>
+            </Card>
+
+            {/* 1. Identity & Network Visibility */}
+            <Text
+              variant="label"
+              style={{ color: colors.textMuted, marginBottom: spacing.xs, letterSpacing: 1 }}
+            >
+              OPERATIVE VISIBILITY & NETWORK
+            </Text>
+            <Card
+              variant="default"
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderDark,
+                  padding: 0,
+                  marginBottom: spacing.md,
+                },
+              ]}
+            >
+              {/* Public Profile */}
+              <View style={[styles.settingRow, { padding: spacing.md }]}>
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                    Public Profile
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: colors.textMuted, marginTop: 2, fontSize: 12, lineHeight: 16 }}
+                  >
+                    Allow other operatives to view tier, points, and badges. When disabled, your
+                    profile dossier is visible only to confirmed friends.
+                  </Text>
+                </View>
+                <Switch
+                  value={profileVisibility === 'public'}
+                  onValueChange={(val) =>
+                    void handleToggleFriendSetting('profileVisibility', val ? 'public' : 'private')
+                  }
+                  trackColor={{ false: colors.borderDark, true: colors.primary }}
+                  thumbColor={colors.textLight}
+                />
+              </View>
+
+              {/* Squad Lobby Presence */}
+              <View
+                style={[
+                  styles.settingRow,
+                  {
+                    padding: spacing.md,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.borderDark,
+                  },
+                ]}
+              >
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                    Squad Lobby Presence
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: colors.textMuted, marginTop: 2, fontSize: 12, lineHeight: 16 }}
+                  >
+                    Show friends when you are actively hosting a match lobby or ready for
+                    deployment.
+                  </Text>
+                </View>
+                <Switch
+                  value={presenceConsent}
+                  onValueChange={(val) => void handleToggleFriendSetting('showPresence', val)}
+                  trackColor={{ false: colors.borderDark, true: colors.primary }}
+                  thumbColor={colors.textLight}
+                />
+              </View>
+
+              {/* Echo Rating Broadcast */}
+              <View
+                style={[
+                  styles.settingRow,
+                  {
+                    padding: spacing.md,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.borderDark,
+                  },
+                ]}
+              >
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                    Echo Rating Broadcast
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: colors.textMuted, marginTop: 2, fontSize: 12, lineHeight: 16 }}
+                  >
+                    Display your rank, echo points, and win rates on global and friends leaderboards.
+                  </Text>
+                </View>
+                <Switch
+                  value={echoConsent}
+                  onValueChange={(val) => void handleToggleFriendSetting('shareEcho', val)}
+                  trackColor={{ false: colors.borderDark, true: colors.primary }}
+                  thumbColor={colors.textLight}
+                />
+              </View>
+
+              {/* Allow Friend Requests */}
+              <View
+                style={[
+                  styles.settingRow,
+                  {
+                    padding: spacing.md,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.borderDark,
+                  },
+                ]}
+              >
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                    Allow Friend Requests
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: colors.textMuted, marginTop: 2, fontSize: 12, lineHeight: 16 }}
+                  >
+                    Permit other operatives to search your codename and send tactical ally invites.
+                  </Text>
+                </View>
+                <Switch
+                  value={allowFriendRequests}
+                  onValueChange={(val) =>
+                    void handleToggleFriendSetting('allowFriendRequests', val)
+                  }
+                  trackColor={{ false: colors.borderDark, true: colors.primary }}
+                  thumbColor={colors.textLight}
+                />
+              </View>
+            </Card>
+
+            {/* 2. Data & Telemetry Choices */}
+            <Text
+              variant="label"
+              style={{ color: colors.textMuted, marginBottom: spacing.xs, letterSpacing: 1 }}
+            >
+              DATA & TELEMETRY CHOICES
+            </Text>
+            <Card
+              variant="default"
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderDark,
+                  padding: 0,
+                  marginBottom: spacing.md,
+                },
+              ]}
+            >
+              {/* Ghost Library Contributions */}
+              <View style={[styles.settingRow, { padding: spacing.md }]}>
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                    Ghost Library Route Contributions
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: colors.textMuted, marginTop: 2, fontSize: 12, lineHeight: 16 }}
+                  >
+                    Contribute anonymous, trimmed routes (origin and destination clipped by 150m)
+                    for solo and community training runs.
+                  </Text>
+                </View>
+                <Switch
+                  value={ghostConsent}
+                  onValueChange={(val) => void toggleGhostConsent(val)}
+                  trackColor={{ false: colors.borderDark, true: colors.primary }}
+                  thumbColor={colors.textLight}
+                />
+              </View>
+
+              {/* Public Leaderboard Handle */}
+              <View
+                style={[
+                  styles.settingRow,
+                  {
+                    padding: spacing.md,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.borderDark,
+                  },
+                ]}
+              >
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                    Public Leaderboard Handle
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: colors.textMuted, marginTop: 2, fontSize: 12, lineHeight: 16 }}
+                  >
+                    Display your verified codename on public boards instead of Anonymous Operative.
+                  </Text>
+                </View>
+                <Switch
+                  value={leaderboardNameConsent}
+                  onValueChange={(val) => void toggleLeaderboardName(val)}
+                  trackColor={{ false: colors.borderDark, true: colors.primary }}
+                  thumbColor={colors.textLight}
+                />
+              </View>
+
+              {/* Privacy-Safe Diagnostics */}
+              <View
+                style={[
+                  styles.settingRow,
+                  {
+                    padding: spacing.md,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.borderDark,
+                  },
+                ]}
+              >
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                    Privacy-Safe Diagnostics
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: colors.textMuted, marginTop: 2, fontSize: 12, lineHeight: 16 }}
+                  >
+                    Share anonymous sensor performance and crash metrics to help optimize GPS radar
+                    accuracy. No raw coordinates are ever logged.
+                  </Text>
+                </View>
+                <Switch
+                  value={analyticsOptIn}
+                  onValueChange={(val) => void toggleAnalytics(val)}
+                  trackColor={{ false: colors.borderDark, true: colors.primary }}
+                  thumbColor={colors.textLight}
+                />
+              </View>
+            </Card>
+
+            {/* 3. Tactical Data Rights */}
+            <Text
+              variant="label"
+              style={{ color: colors.textMuted, marginBottom: spacing.xs, letterSpacing: 1 }}
+            >
+              DATA RIGHTS & POLICY
+            </Text>
+            <Card
+              variant="default"
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderDark,
+                  padding: 0,
+                  marginBottom: spacing.md,
+                },
+              ]}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Export tactical data archive"
+                disabled={busy !== ''}
+                onPress={() => void exportData()}
+                style={[styles.settingRow, { padding: spacing.md }]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                    Export My Tactical Data
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: colors.textMuted, marginTop: 2, fontSize: 12 }}
+                  >
+                    Download a full JSON archive of your matches, connections, and consent logs.
+                  </Text>
+                </View>
+                {busy === 'export' ? (
+                  <ActivityIndicator color={colors.primary} size="small" />
+                ) : (
+                  <Ionicons name="download-outline" size={20} color={colors.primary} />
+                )}
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="View Privacy Policy and Consent Matrix"
+                onPress={() => router.push('/privacy' as any)}
+                style={[
+                  styles.settingRow,
+                  {
+                    padding: spacing.md,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.borderDark,
+                  },
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                    Privacy Policy & Legal Disclosures
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{ color: colors.textMuted, marginTop: 2, fontSize: 12 }}
+                  >
+                    Read data retention terms, anti-stalking protections, and contact information.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </Pressable>
+            </Card>
           </View>
+        )}
 
-          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
-            <View style={{ flex: 1, paddingRight: spacing.sm }}>
-              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Echo Rating Broadcast
-              </Text>
-            </View>
-            <Switch
-              value={echoConsent}
-              onValueChange={toggleEcho}
-              trackColor={{ false: colors.borderDark, true: colors.primary }}
-              thumbColor={colors.textLight}
-            />
-          </View>
-
-          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
-            <View style={{ flex: 1, paddingRight: spacing.sm }}>
-              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Public Profile
-              </Text>
-              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
-                Allow other players to view tier, points, and badges
-              </Text>
-            </View>
-            <Switch
-              value={profileVisibility === 'public'}
-              onValueChange={(val) => void toggleProfileVisibility(val)}
-              trackColor={{ false: colors.borderDark, true: colors.primary }}
-              thumbColor={colors.textLight}
-            />
-          </View>
-
-          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
-            <View style={{ flex: 1, paddingRight: spacing.sm }}>
-              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Privacy-Safe Diagnostics
-              </Text>
-            </View>
-            <Switch
-              value={analyticsOptIn}
-              onValueChange={(val) => void toggleAnalytics(val)}
-              trackColor={{ false: colors.borderDark, true: colors.primary }}
-              thumbColor={colors.textLight}
-            />
-          </View>
-
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy !== ''}
-            onPress={() => void exportData()}
-            style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
-                Export My Tactical Data
-              </Text>
-            </View>
-            {busy === 'export' ? (
-              <ActivityIndicator color={colors.primary} size="small" />
-            ) : (
-              <MaterialCommunityIcons name="download-outline" size={20} color={colors.textMuted} />
-            )}
-          </Pressable>
-        </Card>
-
-        {/* 6. Battery & GPS Advice */}
+        {/* ACCOUNT & SYSTEM CATEGORY */}
+        {activeCategory === 'account' && (
+          <View>
+            {/* 6. Battery & GPS Advice */}
         <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
           HARDWARE & BATTERY
         </Text>
@@ -1339,6 +1748,9 @@ export default function SettingsScreen() {
           )}
         </Card>
 
+                  </View>
+        )}
+
         {/* Notices and errors */}
         {notice !== '' && (
           <Text variant="body" style={{ color: colors.primary, marginTop: spacing.md, textAlign: 'center' }}>
@@ -1381,6 +1793,44 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 48,
+  },
+  categoryBar: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 20,
+  },
+  categoryTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  categoryTabText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  privacyIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backRow: {
     flexDirection: 'row',

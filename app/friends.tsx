@@ -16,7 +16,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../src/theme/ThemeProvider';
@@ -146,6 +146,12 @@ export default function FriendsScreen() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadData();
+    }, [loadData])
+  );
 
   const handleBeaconOperativeScanned = async (target: string): Promise<{ success: boolean; message: string }> => {
     try {
@@ -1222,81 +1228,63 @@ export default function FriendsScreen() {
                   },
                 ]}
               >
-                <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>
-                  OPERATIVE VISIBILITY
-                </Text>
-                <Text style={[styles.cardHeaderSub, { color: colors.textMuted }]}>
-                  Control how other operatives discover and interact with you.
-                </Text>
-
-                {/* Allow Friend Requests Toggle */}
-                <View style={[styles.toggleRow, { borderBottomColor: colors.border }]}>
-                  <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={[styles.toggleLabel, { color: colors.text }]}>
-                      Allow Friend Requests
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>
+                      OPERATIVE PRIVACY & NETWORK
                     </Text>
-                    <Text style={[styles.toggleSub, { color: colors.textMuted }]}>
-                      Permit other players to send you tactical invitations.
+                    <Text style={[styles.cardHeaderSub, { color: colors.textMuted }]}>
+                      All visibility rules, lobby radar broadcast, telemetry, and friend request controls are consolidated in the Privacy Center.
                     </Text>
                   </View>
-                  <Switch
-                    value={settings.allowFriendRequests}
-                    onValueChange={(val) => void handleToggleSetting('allowFriendRequests', val)}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Open Privacy Settings"
+                    onPress={() => {
+                      triggerHaptic('buttonTap');
+                      router.push({ pathname: '/settings', params: { category: 'privacy' } });
+                    }}
+                    style={({ pressed }) => [
+                      styles.settingsJumpBtn,
+                      {
+                        backgroundColor: colors.primary,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    <Ionicons name="shield-checkmark" size={14} color={colors.primaryText} />
+                    <Text style={[styles.settingsJumpBtnText, { color: colors.primaryText }]}>
+                      Manage
+                    </Text>
+                  </Pressable>
                 </View>
 
-                {/* Show Presence Toggle */}
-                <View style={[styles.toggleRow, { borderBottomColor: colors.border }]}>
-                  <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={[styles.toggleLabel, { color: colors.text }]}>
-                      Share Lobby Presence
-                    </Text>
-                    <Text style={[styles.toggleSub, { color: colors.textMuted }]}>
-                      Show friends when you are hosting an active match lobby.
+                {/* Quick Status Pills Overview */}
+                <View style={styles.privacyPillsRow}>
+                  <View style={[styles.privacyPill, { backgroundColor: isDark ? '#1F2430' : '#E8EDF5', borderColor: colors.border }]}>
+                    <Text style={[styles.privacyPillLabel, { color: colors.textMuted }]}>PROFILE</Text>
+                    <Text style={[styles.privacyPillValue, { color: settings.profileVisibility === 'public' ? colors.primary : colors.accent }]}>
+                      {settings.profileVisibility === 'public' ? 'Public' : 'Friends Only'}
                     </Text>
                   </View>
-                  <Switch
-                    value={settings.showPresence}
-                    onValueChange={(val) => void handleToggleSetting('showPresence', val)}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                  />
-                </View>
-
-                {/* Share Echo Toggle */}
-                <View style={[styles.toggleRow, { borderBottomColor: colors.border }]}>
-                  <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={[styles.toggleLabel, { color: colors.text }]}>
-                      Share Season Echo
-                    </Text>
-                    <Text style={[styles.toggleSub, { color: colors.textMuted }]}>
-                      Display your ranking and stats on the Friends Leaderboard.
+                  <View style={[styles.privacyPill, { backgroundColor: isDark ? '#1F2430' : '#E8EDF5', borderColor: colors.border }]}>
+                    <Text style={[styles.privacyPillLabel, { color: colors.textMuted }]}>LOBBY</Text>
+                    <Text style={[styles.privacyPillValue, { color: settings.showPresence ? colors.primary : colors.textMuted }]}>
+                      {settings.showPresence ? 'Broadcasting' : 'Hidden'}
                     </Text>
                   </View>
-                  <Switch
-                    value={settings.shareEcho}
-                    onValueChange={(val) => void handleToggleSetting('shareEcho', val)}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                  />
-                </View>
-
-                {/* Profile Visibility Toggle */}
-                <View style={styles.toggleRow}>
-                  <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={[styles.toggleLabel, { color: colors.text }]}>
-                      Public Profile
-                    </Text>
-                    <Text style={[styles.toggleSub, { color: colors.textMuted }]}>
-                      When enabled, other players can view your tier, points, and badges. When disabled, your profile is only visible to friends.
+                  <View style={[styles.privacyPill, { backgroundColor: isDark ? '#1F2430' : '#E8EDF5', borderColor: colors.border }]}>
+                    <Text style={[styles.privacyPillLabel, { color: colors.textMuted }]}>ECHO</Text>
+                    <Text style={[styles.privacyPillValue, { color: settings.shareEcho !== false ? colors.primary : colors.textMuted }]}>
+                      {settings.shareEcho !== false ? 'Shared' : 'Hidden'}
                     </Text>
                   </View>
-                  <Switch
-                    value={settings.profileVisibility === 'public'}
-                    onValueChange={(isPub) =>
-                      void handleToggleSetting('profileVisibility', isPub ? 'public' : 'private')
-                    }
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                  />
+                  <View style={[styles.privacyPill, { backgroundColor: isDark ? '#1F2430' : '#E8EDF5', borderColor: colors.border }]}>
+                    <Text style={[styles.privacyPillLabel, { color: colors.textMuted }]}>INVITES</Text>
+                    <Text style={[styles.privacyPillValue, { color: settings.allowFriendRequests !== false ? colors.primary : colors.danger }]}>
+                      {settings.allowFriendRequests !== false ? 'Allowed' : 'Blocked'}
+                    </Text>
+                  </View>
                 </View>
               </Card>
 
@@ -1972,5 +1960,46 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontFamily: 'Orbitron_700Bold',
     letterSpacing: 0.5,
+  },
+  settingsJumpBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  settingsJumpBtnText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  privacyPillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
+  },
+  privacyPill: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  privacyPillLabel: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  privacyPillValue: {
+    fontFamily: 'SegoeUI-SemiBold',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
