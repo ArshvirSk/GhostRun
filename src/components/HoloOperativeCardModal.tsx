@@ -62,17 +62,17 @@ export function HoloOperativeCardModal({
   const signatureColor = avatarColor || colors.primary;
   const initial = cleanName.charAt(0) || 'A';
 
-  const initialTextColor = useMemo(() => {
-    if (!signatureColor) return '#FFFFFF';
+  const isLightColor = useMemo(() => {
+    if (!signatureColor) return false;
     const hex = signatureColor.replace('#', '');
     if (hex.length === 6) {
       const r = parseInt(hex.substring(0, 2), 16);
       const g = parseInt(hex.substring(2, 4), 16);
       const b = parseInt(hex.substring(4, 6), 16);
       const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-      return yiq >= 160 ? '#0F172A' : '#FFFFFF';
+      return yiq >= 160;
     }
-    return '#FFFFFF';
+    return false;
   }, [signatureColor]);
 
   const webInviteUrl = useMemo(() => {
@@ -194,7 +194,12 @@ export function HoloOperativeCardModal({
         >
           {/* Top Sheet Header Row */}
           <View style={styles.sheetHeader}>
-            <View style={styles.sheetHandle} />
+            <View
+              style={[
+                styles.sheetHandle,
+                { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.28)' : 'rgba(0, 0, 0, 0.2)' },
+              ]}
+            />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close share card"
@@ -227,26 +232,22 @@ export function HoloOperativeCardModal({
                   style={[
                     styles.avatarHeroBox,
                     {
-                      backgroundColor: signatureColor ? `${signatureColor}18` : '#F1F5F9',
+                      backgroundColor: signatureColor || colors.primary,
                     },
                   ]}
                 >
                   <View
                     style={[
                       styles.avatarRadarRing,
-                      { borderColor: signatureColor ? `${signatureColor}33` : 'rgba(0,0,0,0.06)' },
+                      {
+                        borderColor: isLightColor
+                          ? 'rgba(0, 0, 0, 0.12)'
+                          : 'rgba(255, 255, 255, 0.38)',
+                      },
                     ]}
                   >
-                    <View
-                      style={[
-                        styles.avatarCircle,
-                        {
-                          backgroundColor: signatureColor,
-                          shadowColor: signatureColor,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.avatarInitial, { color: initialTextColor }]}>{initial}</Text>
+                    <View style={styles.avatarCircle}>
+                      <Text style={styles.avatarInitial}>{initial}</Text>
                     </View>
                   </View>
                 </View>
@@ -410,21 +411,20 @@ const styles = StyleSheet.create({
   },
   sheetHeader: {
     width: '100%',
-    flexDirection: 'row',
+    height: 32,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
+    justifyContent: 'center',
     marginBottom: 12,
   },
   sheetHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignSelf: 'center',
-    marginLeft: 32,
+    width: 38,
+    height: 4.5,
+    borderRadius: 3,
   },
   closeBtn: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -460,29 +460,31 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   avatarRadarRing: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 126,
+    height: 126,
+    borderRadius: 63,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarCircle: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 6,
   },
   avatarInitial: {
     fontFamily: 'Archivo-Black',
-    fontSize: 46,
+    fontSize: 48,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: '#0F172A',
   },
   cardBottomRow: {
     flexDirection: 'row',
