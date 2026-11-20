@@ -30,7 +30,6 @@ import { TacticalPullRefreshScrollView } from '../src/components/TacticalPullRef
 import {
   FriendProfile,
   FriendRequest,
-  FriendSettings,
   SearchedOperative,
   HostPresence,
   formatFriendInviteUrl,
@@ -43,18 +42,14 @@ import {
   sendFriendRequest,
   respondFriendRequest,
   removeFriend,
-  updateFriendSettings,
-  fetchFriendSettings,
   searchOperatives,
   getFriendsHosting,
 } from '../src/lib/friends';
 import { OperativeBeaconModal } from '../src/components/OperativeBeaconModal';
 import { OperativeBeaconScannerModal } from '../src/components/OperativeBeaconScannerModal';
-import { listMyBlocks, unblockUser } from '../src/lib/moderation';
-import { BlockItem } from '../src/lib/moderationCore';
 import { normalizeForSearch, matchesSearchQuery } from '../src/lib/codename';
 
-type FriendsTabKey = 'friends' | 'requests' | 'add' | 'privacy';
+type FriendsTabKey = 'friends' | 'requests' | 'add';
 
 export default function FriendsScreen() {
   const router = useRouter();
@@ -69,7 +64,6 @@ export default function FriendsScreen() {
   const [friends, setFriends] = useState<FriendProfile[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
-  const [blocks, setBlocks] = useState<BlockItem[]>([]);
 
   // Filter in Tab 0 (Friends)
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
@@ -100,29 +94,17 @@ export default function FriendsScreen() {
   const [beaconModalVisible, setBeaconModalVisible] = useState(false);
   const [scannerModalVisible, setScannerModalVisible] = useState(false);
 
-  // Privacy settings state
-  const [settings, setSettings] = useState<FriendSettings>({
-    allowFriendRequests: true,
-    showPresence: false,
-    shareEcho: true,
-    profileVisibility: 'public',
-  });
-
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [friendsList, reqs, blockList, currentSettings, hostingList] = await Promise.all([
+      const [friendsList, reqs, hostingList] = await Promise.all([
         listFriends(),
         listFriendRequests(),
-        listMyBlocks(),
-        fetchFriendSettings(),
         getFriendsHosting(),
       ]);
       setFriends(friendsList);
       setIncomingRequests(reqs.incoming);
       setOutgoingRequests(reqs.outgoing);
-      setBlocks(blockList);
-      setSettings(currentSettings);
       setHostingFriends(hostingList);
     } catch {
       // offline fallback
@@ -180,7 +162,7 @@ export default function FriendsScreen() {
           pagerRef.current?.scrollTo({ x: 2 * screenWidth, animated: true });
         }, 100);
       }
-    } else if (params.tab && ['friends', 'requests', 'add', 'privacy'].includes(params.tab)) {
+    } else if (params.tab && ['friends', 'requests', 'add'].includes(params.tab)) {
       handleTabChange(params.tab as FriendsTabKey);
     }
   }, [params.add, params.tab, screenWidth]);
@@ -221,14 +203,7 @@ export default function FriendsScreen() {
     const tabKey = id as FriendsTabKey;
     setActiveTab(tabKey);
     setStatusMessage('');
-    const pageIndex =
-      tabKey === 'friends'
-        ? 0
-        : tabKey === 'requests'
-        ? 1
-        : tabKey === 'add'
-        ? 2
-        : 3;
+    const pageIndex = tabKey === 'friends' ? 0 : tabKey === 'requests' ? 1 : 2;
     pagerRef.current?.scrollTo({ x: pageIndex * screenWidth, animated: true });
   };
 
@@ -240,9 +215,7 @@ export default function FriendsScreen() {
         ? 'friends'
         : pageIndex === 1
         ? 'requests'
-        : pageIndex === 2
-        ? 'add'
-        : 'privacy';
+        : 'add';
     if (newTab !== activeTab) {
       triggerHaptic('buttonTap');
       setActiveTab(newTab);
@@ -344,32 +317,6 @@ export default function FriendsScreen() {
     }
   };
 
-  const handleToggleSetting = async <K extends keyof FriendSettings>(
-    key: K,
-    val: FriendSettings[K],
-  ) => {
-    triggerHaptic('buttonTap');
-    const updated = { ...settings, [key]: val };
-    setSettings(updated);
-    await updateFriendSettings(updated);
-    if (key === 'profileVisibility') {
-      useUserStore.getState().setProfile({
-        display_name: userProfile?.display_name || 'Operative',
-        profile_visibility: val as 'public' | 'private',
-      });
-    }
-  };
-
-  const handleUnblock = async (blockedId: string, name: string) => {
-    triggerHaptic('buttonTap');
-    const ok = await unblockUser(blockedId);
-    if (ok) {
-      triggerHaptic('tagConfirmed');
-      void loadData();
-    } else {
-      Alert.alert('Error', `Failed to unblock ${name}`);
-    }
-  };
 
   return (
     <KeyboardAvoidingView
@@ -402,7 +349,7 @@ export default function FriendsScreen() {
           FRIENDS
         </Text>
 
-        {/* 4-Tab Segment Bar */}
+        {/* 3-Tab Segment Bar */}
         <SegmentBar
           items={[
             { id: 'friends', label: 'FRIENDS', badge: friends.length > 0 ? friends.length : undefined },
@@ -412,7 +359,6 @@ export default function FriendsScreen() {
               badge: incomingRequests.length > 0 ? incomingRequests.length : undefined,
             },
             { id: 'add', label: 'ADD' },
-            { id: 'privacy', label: 'PRIVACY' },
           ]}
           activeId={activeTab}
           onChange={handleTabChange}
@@ -1206,142 +1152,6 @@ export default function FriendsScreen() {
               </Card>
             </ScrollView>
           </View>
-
-          {/* ============================================================== */}
-          {/* TAB 4: PRIVACY & MODERATION */}
-          {/* ============================================================== */}
-          <View style={{ width: screenWidth }}>
-            <ScrollView
-              contentContainerStyle={[
-                styles.tabContent,
-                { paddingBottom: Math.max(insets.bottom, 16) + 80 },
-              ]}
-              showsVerticalScrollIndicator={false}
-            >
-              <Card
-                variant="default"
-                style={[
-                  styles.formCard,
-                  {
-                    backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>
-                      OPERATIVE PRIVACY & NETWORK
-                    </Text>
-                    <Text style={[styles.cardHeaderSub, { color: colors.textMuted }]}>
-                      All visibility rules, lobby radar broadcast, telemetry, and friend request controls are consolidated in the Privacy Center.
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Open Privacy Settings"
-                    onPress={() => {
-                      triggerHaptic('buttonTap');
-                      router.push({ pathname: '/settings', params: { category: 'privacy' } });
-                    }}
-                    style={({ pressed }) => [
-                      styles.settingsJumpBtn,
-                      {
-                        backgroundColor: colors.primary,
-                        opacity: pressed ? 0.85 : 1,
-                      },
-                    ]}
-                  >
-                    <Ionicons name="shield-checkmark" size={14} color={colors.primaryText} />
-                    <Text style={[styles.settingsJumpBtnText, { color: colors.primaryText }]}>
-                      Manage
-                    </Text>
-                  </Pressable>
-                </View>
-
-                {/* Quick Status Pills Overview */}
-                <View style={styles.privacyPillsRow}>
-                  <View style={[styles.privacyPill, { backgroundColor: isDark ? '#1F2430' : '#E8EDF5', borderColor: colors.border }]}>
-                    <Text style={[styles.privacyPillLabel, { color: colors.textMuted }]}>PROFILE</Text>
-                    <Text style={[styles.privacyPillValue, { color: settings.profileVisibility === 'public' ? colors.primary : colors.accent }]}>
-                      {settings.profileVisibility === 'public' ? 'Public' : 'Friends Only'}
-                    </Text>
-                  </View>
-                  <View style={[styles.privacyPill, { backgroundColor: isDark ? '#1F2430' : '#E8EDF5', borderColor: colors.border }]}>
-                    <Text style={[styles.privacyPillLabel, { color: colors.textMuted }]}>LOBBY</Text>
-                    <Text style={[styles.privacyPillValue, { color: settings.showPresence ? colors.primary : colors.textMuted }]}>
-                      {settings.showPresence ? 'Broadcasting' : 'Hidden'}
-                    </Text>
-                  </View>
-                  <View style={[styles.privacyPill, { backgroundColor: isDark ? '#1F2430' : '#E8EDF5', borderColor: colors.border }]}>
-                    <Text style={[styles.privacyPillLabel, { color: colors.textMuted }]}>ECHO</Text>
-                    <Text style={[styles.privacyPillValue, { color: settings.shareEcho !== false ? colors.primary : colors.textMuted }]}>
-                      {settings.shareEcho !== false ? 'Shared' : 'Hidden'}
-                    </Text>
-                  </View>
-                  <View style={[styles.privacyPill, { backgroundColor: isDark ? '#1F2430' : '#E8EDF5', borderColor: colors.border }]}>
-                    <Text style={[styles.privacyPillLabel, { color: colors.textMuted }]}>INVITES</Text>
-                    <Text style={[styles.privacyPillValue, { color: settings.allowFriendRequests !== false ? colors.primary : colors.danger }]}>
-                      {settings.allowFriendRequests !== false ? 'Allowed' : 'Blocked'}
-                    </Text>
-                  </View>
-                </View>
-              </Card>
-
-              {/* Blocked Operatives */}
-              <Text style={[styles.sectionTitle, { color: colors.textMuted, marginTop: 24 }]}>
-                BLOCKED OPERATIVES ({blocks.length})
-              </Text>
-
-              {blocks.length === 0 ? (
-                <Card
-                  variant="default"
-                  style={[
-                    styles.emptySubCard,
-                    {
-                      backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.emptySubText, { color: colors.textMuted }]}>
-                    Your blocked operatives roster is empty.
-                  </Text>
-                </Card>
-              ) : (
-                blocks.map((b) => (
-                  <Card
-                    key={b.blockedUserId}
-                    variant="default"
-                    style={[
-                      styles.friendCard,
-                      {
-                        backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <View style={styles.friendRow}>
-                      <View style={styles.friendMeta}>
-                        <Text style={[styles.friendName, { color: colors.text }]}>
-                          {b.displayName}
-                        </Text>
-                        <Text style={[styles.friendHandle, { color: colors.textMuted }]}>
-                          {b.handle ? `@${b.handle} • ` : ''}Blocked on {new Date(b.blockedAt).toLocaleDateString()}
-                        </Text>
-                      </View>
-                      <Button
-                        title="Unblock"
-                        variant="secondary"
-                        size="sm"
-                        onPress={() => void handleUnblock(b.blockedUserId, b.displayName)}
-                      />
-                    </View>
-                  </Card>
-                ))
-              )}
-            </ScrollView>
-          </View>
         </ScrollView>
       )}
 
@@ -1960,46 +1770,5 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontFamily: 'Orbitron_700Bold',
     letterSpacing: 0.5,
-  },
-  settingsJumpBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-  },
-  settingsJumpBtnText: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  privacyPillsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 14,
-  },
-  privacyPill: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  privacyPillLabel: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  privacyPillValue: {
-    fontFamily: 'SegoeUI-SemiBold',
-    fontSize: 11,
-    fontWeight: '700',
-    textAlign: 'center',
   },
 });

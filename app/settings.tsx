@@ -22,6 +22,9 @@ import { useTheme } from '../src/theme/ThemeProvider';
 import { Text } from '../src/ui/Text';
 import { Card } from '../src/ui/Card';
 import { Button } from '../src/ui/Button';
+import { SegmentBar } from '../src/ui/SegmentBar';
+import { listMyBlocks, unblockUser } from '../src/lib/moderation';
+import { BlockItem } from '../src/lib/moderationCore';
 import { PRIVACY_CONTACT_EMAIL } from '../src/lib/privacy';
 import { supabase } from '../src/lib/supabase';
 import { triggerHaptic, setHapticsEnabled } from '../src/motion/haptics';
@@ -53,17 +56,6 @@ import {
 const DELETE_WORD = 'DELETE';
 
 type SettingsCategory = 'display' | 'alerts' | 'privacy' | 'account';
-
-const CATEGORIES: Array<{
-  id: SettingsCategory;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}> = [
-  { id: 'display', label: 'Display', icon: 'color-palette-outline' },
-  { id: 'alerts', label: 'Alerts', icon: 'volume-high-outline' },
-  { id: 'privacy', label: 'Privacy', icon: 'shield-checkmark-outline' },
-  { id: 'account', label: 'Account', icon: 'person-outline' },
-];
 
 export default function SettingsScreen() {
   const { colors, spacing, radii, themeMode, setThemeMode, accentColor, setAccentColor } = useTheme();
@@ -105,6 +97,7 @@ export default function SettingsScreen() {
   const [leaderboardNameConsent, setLeaderboardNameConsent] = useState(false);
   const [analyticsOptIn, setLocalAnalyticsOptIn] = useState(false);
   const [toastNotice, setToastNotice] = useState('');
+  const [blocks, setBlocks] = useState<BlockItem[]>([]);
 
   // User session & UI state
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
@@ -190,13 +183,17 @@ export default function SettingsScreen() {
         if (storedEcho !== null) setEchoConsent(storedEcho !== 'false');
         setLocalAnalyticsOptIn(storedAnalytics);
 
-        // Fetch canonical FriendSettings from Supabase/cache
+        // Fetch canonical FriendSettings and Blocked Operatives
         try {
-          const fs = await fetchFriendSettings();
+          const [fs, blockList] = await Promise.all([
+            fetchFriendSettings(),
+            listMyBlocks(),
+          ]);
           setAllowFriendRequests(fs.allowFriendRequests !== false);
           setPresenceConsent(Boolean(fs.showPresence));
           setEchoConsent(fs.shareEcho !== false);
           setProfileVisibility(fs.profileVisibility || 'public');
+          setBlocks(blockList || []);
         } catch {
           // offline fallback
         }
@@ -391,6 +388,20 @@ export default function SettingsScreen() {
     setTimeout(() => setToastNotice(''), 2000);
   };
 
+  const handleUnblock = async (blockedId: string, name: string) => {
+    triggerHaptic('buttonTap');
+    const ok = await unblockUser(blockedId);
+    if (ok) {
+      triggerHaptic('tagConfirmed');
+      setBlocks((prev) => prev.filter((b) => b.blockedUserId !== blockedId));
+      setToastNotice(`Unblocked @${name}`);
+      setTimeout(() => setToastNotice(''), 2000);
+    } else {
+      setError(`Failed to unblock ${name}`);
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
   const handleSignOut = async () => {
     if (!supabase) return;
     setBusy('signout');
@@ -499,47 +510,20 @@ export default function SettingsScreen() {
         </Text>
 
         {/* Top Category Segmented Bar */}
-        <View style={styles.categoryBar}>
-          {CATEGORIES.map((cat) => {
-            const active = activeCategory === cat.id;
-            return (
-              <Pressable
-                key={cat.id}
-                accessibilityRole="tab"
-                accessibilityLabel={`${cat.label} settings tab`}
-                accessibilityState={{ selected: active }}
-                onPress={() => {
-                  triggerHaptic('buttonTap');
-                  setActiveCategory(cat.id);
-                }}
-                style={[
-                  styles.categoryTab,
-                  {
-                    backgroundColor: active
-                      ? (colors.surfaceElevated)
-                      : 'transparent',
-                    borderColor: active ? colors.primary : colors.borderDark,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={cat.icon}
-                  size={15}
-                  color={active ? colors.primary : colors.textMuted}
-                />
-                <Text
-                  variant="label"
-                  style={[
-                    styles.categoryTabText,
-                    { color: active ? colors.text : colors.textMuted },
-                  ]}
-                >
-                  {cat.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <SegmentBar
+          items={[
+            { id: 'display', label: 'DISPLAY' },
+            { id: 'alerts', label: 'ALERTS' },
+            { id: 'privacy', label: 'PRIVACY' },
+            { id: 'account', label: 'ACCOUNT' },
+          ]}
+          activeId={activeCategory}
+          onChange={(id) => {
+            triggerHaptic('buttonTap');
+            setActiveCategory(id as SettingsCategory);
+          }}
+          style={{ marginBottom: 18 }}
+        />
 
         {/* Toast confirmation banner */}
         {toastNotice ? (
@@ -1407,7 +1391,64 @@ export default function SettingsScreen() {
               </View>
             </Card>
 
-            {/* 2. Data & Telemetry Choices */}
+            {/* 2. Blocked Operatives Section */}
+            <Text
+              variant="label"
+              style={{ color: colors.textMuted, marginBottom: spacing.xs, letterSpacing: 1 }}
+            >
+              BLOCKED OPERATIVES ({blocks.length})
+            </Text>
+            <Card
+              variant="default"
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderDark,
+                  padding: 0,
+                  marginBottom: spacing.md,
+                },
+              ]}
+            >
+              {blocks.length === 0 ? (
+                <View style={{ padding: spacing.md, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text variant="caption" style={{ color: colors.textMuted, fontSize: 13 }}>
+                    Your blocked operatives roster is empty.
+                  </Text>
+                </View>
+              ) : (
+                blocks.map((b, idx) => (
+                  <View
+                    key={b.blockedUserId}
+                    style={[
+                      styles.settingRow,
+                      {
+                        padding: spacing.md,
+                        borderTopWidth: idx > 0 ? 1 : 0,
+                        borderTopColor: colors.borderDark,
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                      <Text variant="title" style={{ color: colors.text, fontSize: 15 }}>
+                        @{b.displayName}
+                      </Text>
+                      <Text variant="caption" style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                        {b.handle ? `@${b.handle} • ` : ''}Blocked on {new Date(b.blockedAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <Button
+                      title="Unblock"
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => void handleUnblock(b.blockedUserId, b.displayName)}
+                    />
+                  </View>
+                ))
+              )}
+            </Card>
+
+            {/* 3. Data & Telemetry Choices */}
             <Text
               variant="label"
               style={{ color: colors.textMuted, marginBottom: spacing.xs, letterSpacing: 1 }}
@@ -1793,28 +1834,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 48,
-  },
-  categoryBar: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 20,
-  },
-  categoryTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 9,
-    paddingHorizontal: 4,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  categoryTabText: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: -0.2,
   },
   statusBanner: {
     flexDirection: 'row',
