@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
@@ -14,6 +15,7 @@ import { Text } from '../ui/Text';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { triggerHaptic } from '../motion/haptics';
+import { useDialogModalAnimation } from '../motion';
 import {
   fetchOperativeProfile,
   sendFriendRequest,
@@ -41,6 +43,7 @@ export function OperativeProfileModal({
   onFriendshipChanged,
 }: OperativeProfileModalProps) {
   const { colors, isDark } = useTheme();
+  const { mounted, fadeAnim, scaleAnim, handleClose } = useDialogModalAnimation(visible, onClose);
   const [loading, setLoading] = useState(false);
   const [dossier, setDossier] = useState<OperativeProfileDossier | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -162,18 +165,32 @@ export function OperativeProfileModal({
   const firstLetter = displayName.charAt(0).toUpperCase();
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View
+        <Animated.View
           style={[
-            styles.modalCard,
-            {
-              backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
-              borderColor: colors.border,
-            },
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0,0,0,0.72)', opacity: fadeAnim },
           ]}
+        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View
+          style={{
+            width: '100%',
+            maxWidth: 440,
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }],
+          }}
         >
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
           {/* Header Bar */}
           <View style={styles.headerBar}>
             <View style={styles.headerLeft}>
@@ -211,7 +228,7 @@ export function OperativeProfileModal({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close"
-              onPress={onClose}
+              onPress={handleClose}
               style={styles.closeBtn}
             >
               <Ionicons name="close" size={20} color={colors.textMuted} />
@@ -570,6 +587,7 @@ export function OperativeProfileModal({
             </ScrollView>
           )}
         </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -578,7 +596,7 @@ export function OperativeProfileModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
@@ -15,6 +16,7 @@ import { Text } from '../ui/Text';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { triggerHaptic } from '../motion/haptics';
+import { useDialogModalAnimation } from '../motion';
 import {
   Crew,
   fetchMyCrews,
@@ -31,6 +33,7 @@ interface CrewManagementModalProps {
 
 export function CrewManagementModal({ visible, onClose }: CrewManagementModalProps) {
   const { colors, spacing, radii } = useTheme();
+  const { mounted, fadeAnim, scaleAnim, handleClose } = useDialogModalAnimation(visible, onClose);
 
   const [crews, setCrews] = useState<Crew[]>([]);
   const [loading, setLoading] = useState(false);
@@ -136,33 +139,47 @@ export function CrewManagementModal({ visible, onClose }: CrewManagementModalPro
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={handleClose}>
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View
+        <Animated.View
           style={[
-            styles.container,
-            { backgroundColor: colors.surface, borderRadius: radii.card, borderColor: colors.borderLight },
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0, 0, 0, 0.75)', opacity: fadeAnim },
           ]}
+        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View
+          style={{
+            width: '100%',
+            maxWidth: 420,
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }],
+          }}
         >
-          {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.borderLight }]}>
-            <View>
-              <Text variant="caption" style={{ color: colors.primary, fontWeight: '700' }}>
-                PERSISTENT SQUADS // CREWS
-              </Text>
-              <Text variant="title" style={styles.title}>
-                Squad Roster
-              </Text>
+          <View
+            style={[
+              styles.container,
+              { backgroundColor: colors.surface, borderRadius: radii.card, borderColor: colors.borderLight },
+            ]}
+          >
+            {/* Header */}
+            <View style={[styles.header, { borderBottomColor: colors.borderLight }]}>
+              <View>
+                <Text variant="caption" style={{ color: colors.primary, fontWeight: '700' }}>
+                  PERSISTENT SQUADS // CREWS
+                </Text>
+                <Text variant="title" style={styles.title}>
+                  Squad Roster
+                </Text>
+              </View>
+              <Pressable
+                onPress={handleClose}
+                hitSlop={8}
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceMuted }]}
+              >
+                <Ionicons name="close" size={20} color={colors.textPrimary} />
+              </Pressable>
             </View>
-            <Pressable
-              onPress={onClose}
-              hitSlop={8}
-              style={[styles.closeBtn, { backgroundColor: colors.surfaceMuted }]}
-            >
-              <Ionicons name="close" size={20} color={colors.textPrimary} />
-            </Pressable>
-          </View>
 
           {/* Sub-nav tabs */}
           <View style={[styles.navBar, { borderBottomColor: colors.borderLight }]}>
@@ -436,6 +453,7 @@ export function CrewManagementModal({ visible, onClose }: CrewManagementModalPro
             )}
           </ScrollView>
         </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -444,7 +462,7 @@ export function CrewManagementModal({ visible, onClose }: CrewManagementModalPro
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

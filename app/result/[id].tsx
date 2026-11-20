@@ -1105,7 +1105,7 @@ export default function ResultScreen() {
 
               <Text style={styles.echoFooterText}>
                 {roundScore?.counted
-                  ? '✓ Recorded toward your Seasonal Leaderboard Division rank.'
+                  ? 'Recorded toward your Seasonal Leaderboard Division rank.'
                   : roundScore?.excluded_reason || 'Casual round — competitive scoring requires multi-operative grid presence.'}
               </Text>
             </Card>

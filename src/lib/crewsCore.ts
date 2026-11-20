@@ -67,7 +67,7 @@ export function validateCrewCode(code: string): CrewValidationResult {
  */
 export function formatCrewInviteText(crewName: string, crewCode: string): string {
   return [
-    `⚡ Join my GhostRun Crew: [${crewName.toUpperCase()}]`,
+    `Join my GhostRun Crew: [${crewName.toUpperCase()}]`,
     `Crew Code: ${crewCode.toUpperCase()}`,
     `--------------------------------`,
     `Enter this code in GhostRun to deploy together on upcoming patrols.`,

@@ -70,7 +70,7 @@ export function buildMatchCreationDiscordPayload(params: {
   const joinLink = params.joinUrl || `https://ghostrun.app/join?code=${params.code.toUpperCase()}`;
 
   const embed: DiscordEmbed = {
-    title: '🚨 GhostRun Operation Mobilized',
+    title: 'GhostRun Operation Mobilized',
     description: `A new match is assembling. Tap below or enter code **${params.code.toUpperCase()}** in the GhostRun app to deploy.`,
     url: joinLink,
     color: DISCORD_COLORS.primaryLime,
@@ -117,7 +117,7 @@ export function buildMatchRecapDiscordPayload(params: {
   }
 
   const embed: DiscordEmbed = {
-    title: `🏁 Debrief: Operation ${params.code.toUpperCase()}`,
+    title: `Debrief: Operation ${params.code.toUpperCase()}`,
     description: `Mission completed. ${isRunnerWin ? 'The ghosts evaded hunter radar.' : 'All runners were intercepted.'}`,
     color: isRunnerWin ? DISCORD_COLORS.primaryLime : DISCORD_COLORS.hunterCoral,
     fields,

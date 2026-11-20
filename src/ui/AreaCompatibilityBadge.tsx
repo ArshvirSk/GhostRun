@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { evaluateAreaCompatibility } from '../lib/areaCompatibility';
 import { Text } from './Text';
@@ -41,9 +42,17 @@ export function AreaCompatibilityBadge({
             borderRadius: radii.sm,
             paddingVertical: spacing.xs,
             paddingHorizontal: spacing.sm,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
           },
         ]}
       >
+        <Ionicons
+          name={isOptimal ? 'checkmark-circle' : 'alert-circle'}
+          size={13}
+          color={badgeColor}
+        />
         <Text variant="caption" weight="bold" style={{ color: badgeColor, fontSize: 11, letterSpacing: 0.5 }}>
           {evaluation.badgeLabel}
         </Text>

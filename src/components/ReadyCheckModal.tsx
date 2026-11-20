@@ -7,12 +7,14 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Text } from '../ui/Text';
+import { useSheetModalAnimation } from '../motion';
 import {
   READY_CHECK_STRINGS,
   type TrackingHealthReport,
@@ -36,8 +38,7 @@ export function ReadyCheckModal({
   onClose,
 }: ReadyCheckModalProps) {
   const { colors, spacing, radii } = useTheme();
-
-  if (!visible) return null;
+  const { mounted, fadeAnim, slideAnim, handleClose } = useSheetModalAnimation(visible, onClose);
 
   const overall = report?.overall ?? 'unknown';
   const isHealthy = overall === 'healthy';
@@ -53,13 +54,20 @@ export function ReadyCheckModal({
 
   return (
     <Modal
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
       transparent
-      visible={visible}
+      visible={mounted}
     >
-      <View style={[styles.backdrop, { backgroundColor: 'rgba(5,7,9,0.85)' }]}>
-        <View style={styles.sheetContainer}>
+      <View style={styles.backdrop}>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(5,7,9,0.85)', opacity: fadeAnim },
+          ]}
+        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View style={[styles.sheetContainer, { transform: [{ translateY: slideAnim }] }]}>
           <Card
             style={[
               styles.card,
@@ -100,7 +108,7 @@ export function ReadyCheckModal({
 
               <Pressable
                 accessibilityLabel="Close check"
-                onPress={onClose}
+                onPress={handleClose}
                 style={styles.closeButton}
               >
                 <Ionicons color={colors.textSecondary} name="close" size={24} />
@@ -256,7 +264,7 @@ export function ReadyCheckModal({
               />
             </View>
           </Card>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -265,6 +273,7 @@ export function ReadyCheckModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
+    backgroundColor: 'transparent',
     justifyContent: 'flex-end',
   },
   sheetContainer: {

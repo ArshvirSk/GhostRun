@@ -60,7 +60,7 @@ export function buildInvitePayload(options: BuildInviteOptions): InvitePayload {
   const title = `GhostRun: Join ${modeName}`;
 
   const message = [
-    `👻 GhostRun Match Invite: ${modeName}`,
+    `GhostRun Match Invite: ${modeName}`,
     `Lobby Code: ${code}`,
     '',
     `Tap to join match:`,

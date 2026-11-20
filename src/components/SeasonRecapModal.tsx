@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   Platform,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
@@ -13,6 +14,7 @@ import { Text } from '../ui/Text';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { triggerHaptic } from '../motion/haptics';
+import { useDialogModalAnimation } from '../motion';
 import { SeasonRecapData, shareSeasonRecap } from '../lib/seasonRecap';
 import { BADGE_CATALOG } from '../lib/badges';
 
@@ -24,6 +26,7 @@ interface SeasonRecapModalProps {
 
 export function SeasonRecapModal({ visible, recap, onClose }: SeasonRecapModalProps) {
   const { colors, spacing, radii } = useTheme();
+  const { mounted, fadeAnim, scaleAnim, handleClose } = useDialogModalAnimation(visible, onClose);
 
   if (!recap) return null;
 
@@ -36,33 +39,47 @@ export function SeasonRecapModal({ visible, recap, onClose }: SeasonRecapModalPr
   const distanceKm = (recap.totalDistanceMeters / 1000).toFixed(1);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={handleClose}>
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View
+        <Animated.View
           style={[
-            styles.container,
-            { backgroundColor: colors.surface, borderRadius: radii.card, borderColor: colors.borderLight },
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(0, 0, 0, 0.75)', opacity: fadeAnim },
           ]}
+        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View
+          style={{
+            width: '100%',
+            maxWidth: 420,
+            opacity: fadeAnim,
+            transform: [{ scale: scaleAnim }],
+          }}
         >
-          {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.borderLight }]}>
-            <View>
-              <Text variant="caption" style={{ color: colors.primary, fontWeight: '700' }}>
-                TACTICAL DOSSIER // DEBRIEF
-              </Text>
-              <Text variant="title" style={styles.title}>
-                {recap.periodName}
-              </Text>
+          <View
+            style={[
+              styles.container,
+              { backgroundColor: colors.surface, borderRadius: radii.card, borderColor: colors.borderLight },
+            ]}
+          >
+            {/* Header */}
+            <View style={[styles.header, { borderBottomColor: colors.borderLight }]}>
+              <View>
+                <Text variant="caption" style={{ color: colors.primary, fontWeight: '700' }}>
+                  TACTICAL DOSSIER // DEBRIEF
+                </Text>
+                <Text variant="title" style={styles.title}>
+                  {recap.periodName}
+                </Text>
+              </View>
+              <Pressable
+                onPress={handleClose}
+                hitSlop={8}
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceMuted }]}
+              >
+                <Ionicons name="close" size={20} color={colors.textPrimary} />
+              </Pressable>
             </View>
-            <Pressable
-              onPress={onClose}
-              hitSlop={8}
-              style={[styles.closeBtn, { backgroundColor: colors.surfaceMuted }]}
-            >
-              <Ionicons name="close" size={20} color={colors.textPrimary} />
-            </Pressable>
-          </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={{ padding: spacing.md }}>
             {/* Rank Tier Banner */}
@@ -188,9 +205,12 @@ export function SeasonRecapModal({ visible, recap, onClose }: SeasonRecapModalPr
                           },
                         ]}
                       >
-                        <Text variant="caption" style={{ fontWeight: '700', color: colors.primary }}>
-                          ★ {meta ? meta.title : badgeId}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="star" size={12} color={colors.primary} />
+                          <Text variant="caption" style={{ fontWeight: '700', color: colors.primary }}>
+                            {meta ? meta.title : badgeId}
+                          </Text>
+                        </View>
                       </View>
                     );
                   })}
@@ -201,10 +221,11 @@ export function SeasonRecapModal({ visible, recap, onClose }: SeasonRecapModalPr
             {/* Action Buttons */}
             <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
               <Button title="Share Tactical Dossier" onPress={handleShare} variant="primary" />
-              <Button title="Dismiss" onPress={onClose} variant="ghost" />
+              <Button title="Dismiss" onPress={handleClose} variant="ghost" />
             </View>
           </ScrollView>
         </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -213,7 +234,7 @@ export function SeasonRecapModal({ visible, recap, onClose }: SeasonRecapModalPr
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

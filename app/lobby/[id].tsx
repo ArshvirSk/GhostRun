@@ -955,7 +955,7 @@ export default function LobbyScreen() {
             ]}
           >
             <View style={{ gap: 8 }}>
-            {/* Quick Status Row: 🔒 Privacy: Keep Private • 📡 GPS Ready */}
+            {/* Quick Status Row: Privacy: Keep Private • GPS Ready */}
             <View style={styles.quickStatusRow}>
               <Pressable
                 onPress={handleTogglePrivacy}

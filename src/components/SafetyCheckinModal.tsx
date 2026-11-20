@@ -3,12 +3,14 @@ import {
   Modal,
   StyleSheet,
   View,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Text } from '../ui/Text';
+import { useDialogModalAnimation } from '../motion';
 
 interface SafetyCheckinModalProps {
   visible: boolean;
@@ -24,19 +26,24 @@ export function SafetyCheckinModal({
   onTriggerSos,
 }: SafetyCheckinModalProps) {
   const { colors, spacing, radii } = useTheme();
-
-  if (!visible) return null;
+  const { mounted, fadeAnim, scaleAnim } = useDialogModalAnimation(visible, onConfirmOk);
 
   const progressPercent = Math.max(0, Math.min(100, (countdownSeconds / 60) * 100));
 
   return (
     <Modal
-      animationType="fade"
+      animationType="none"
       transparent
-      visible={visible}
+      visible={mounted}
     >
-      <View style={[styles.backdrop, { backgroundColor: 'rgba(5,7,9,0.92)' }]}>
-        <View style={styles.container}>
+      <View style={styles.backdrop}>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: 'rgba(5,7,9,0.92)', opacity: fadeAnim },
+          ]}
+        />
+        <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
           <Card
             style={[
               styles.card,
@@ -116,7 +123,7 @@ export function SafetyCheckinModal({
               />
             </View>
           </Card>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

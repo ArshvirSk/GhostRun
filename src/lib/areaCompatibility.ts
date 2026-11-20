@@ -39,7 +39,7 @@ export function evaluateAreaCompatibility(
     return {
       isCompatible: false,
       status: 'too_large',
-      badgeLabel: '⚠ ARENA TOO LARGE FOR DURATION',
+      badgeLabel: 'ARENA TOO LARGE FOR DURATION',
       detail: `Traversing ${Math.round(diameterM)}m in ${safeDurationMin}m requires >${(requiredSpeedMps * 3.6).toFixed(1)} km/h. Increase duration or shrink arena radius.`,
       requiredSpeedMps,
     };
@@ -50,7 +50,7 @@ export function evaluateAreaCompatibility(
     return {
       isCompatible: false,
       status: 'too_cramped',
-      badgeLabel: '⚠ ARENA CRAMPED FOR LONG MATCH',
+      badgeLabel: 'ARENA CRAMPED FOR LONG MATCH',
       detail: `A ${Math.round(safeRadius)}m radius for ${safeDurationMin}m provides minimal territory to evade hunters. Expand radius for better stealth.`,
       requiredSpeedMps,
     };
@@ -59,7 +59,7 @@ export function evaluateAreaCompatibility(
   return {
     isCompatible: true,
     status: 'optimal',
-    badgeLabel: '✓ ARENA & DURATION COMPATIBLE',
+    badgeLabel: 'ARENA & DURATION COMPATIBLE',
     detail: `Optimal ${Math.round(safeRadius)}m perimeter allows balanced evasion and intercept pacing over ${safeDurationMin} minutes.`,
     requiredSpeedMps,
   };

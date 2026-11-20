@@ -83,7 +83,7 @@ export function formatRoundCardShareText(metrics: RoundCardMetrics): string {
   const distKm = (metrics.distanceMeters / 1000).toFixed(1);
 
   const lines = [
-    `👻 GhostRun Mission Recap — ${metrics.modeName}`,
+    `GhostRun Mission Recap — ${metrics.modeName}`,
     `Outcome: ${metrics.outcome.toUpperCase()}`,
     `Role: ${metrics.role.toUpperCase()}`,
     `Distance: ${distKm} km | Time: ${timeStr}`,

@@ -54,7 +54,7 @@ export const HeatResultOverlay = memo(function HeatResultOverlay({
   return (
     <View pointerEvents="none" style={[styles.overlay, { backgroundColor: color }]}>
       <Text variant="title" style={styles.overlayText}>
-        {isHot ? '🔥 HOT — RUNNER WITHIN PROXIMITY!' : '❄️ COLD — NO RUNNERS DETECTED'}
+        {isHot ? 'HOT // RUNNER WITHIN PROXIMITY' : 'COLD // NO RUNNERS DETECTED'}
       </Text>
     </View>
   );
