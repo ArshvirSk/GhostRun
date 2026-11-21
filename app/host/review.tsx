@@ -75,13 +75,25 @@ export default function HostReviewScreen() {
       } else if (modeId === 'jailbreak' && placements.jail) {
         try {
           await supabase.rpc('set_jail_location', {
-            p_game_id: created.game_id,
-            p_lat: placements.jail[1],
-            p_lng: placements.jail[0],
-            p_radius_m: 10,
+            game_id: created.game_id,
+            lat: placements.jail[1],
+            lng: placements.jail[0],
           });
         } catch {
           // Non-blocking: jail can be placed in lobby
+        }
+      } else if (modeId === 'relay_heist') {
+        try {
+          const lat = placements.extraction ? placements.extraction[1] : areaCenter[1];
+          const lng = placements.extraction ? placements.extraction[0] : areaCenter[0];
+          await supabase.rpc('set_extraction_location', {
+            p_game_id: created.game_id,
+            p_lat: lat,
+            p_lng: lng,
+            p_radius_m: 25,
+          });
+        } catch {
+          // Non-blocking: extraction can be placed in lobby
         }
       }
 

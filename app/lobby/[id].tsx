@@ -328,6 +328,10 @@ export default function LobbyScreen() {
   const [mapZoom, setMapZoom] = useState(14.2);
 
   const centerCoords = useMemo<[number, number]>(() => {
+    const area = state?.game?.area;
+    if (area && typeof area.longitude === 'number' && typeof area.latitude === 'number') {
+      return [area.longitude, area.latitude];
+    }
     if (state?.game?.area_center) {
       if (Array.isArray(state.game.area_center)) {
         return [state.game.area_center[0], state.game.area_center[1]];
@@ -339,14 +343,14 @@ export default function LobbyScreen() {
     const instant = getInstantLocation();
     if (instant) return instant;
     return [0, 0];
-  }, [state?.game?.area_center]);
+  }, [state?.game?.area, state?.game?.area_center]);
 
   const boundaryGeoJSON = useMemo(() => {
     return circleRing(
       { longitude: centerCoords[0], latitude: centerCoords[1] },
-      state?.game?.area_radius_m || 500,
+      state?.game?.area?.radius_m || state?.game?.area_radius_m || 500,
     );
-  }, [centerCoords, state?.game?.area_radius_m]);
+  }, [centerCoords, state?.game?.area?.radius_m, state?.game?.area_radius_m]);
 
   const targetCoords = useMemo<[number, number]>(() => {
     if (state?.game?.extraction) {
@@ -655,7 +659,7 @@ export default function LobbyScreen() {
 
   async function placeJail() {
     if (!supabase || !gameId) return;
-    const center = state?.game.area_center;
+    const center = state?.game.area || state?.game.area_center;
     let targetLat = 0;
     let targetLng = 0;
     if (center) {
@@ -679,7 +683,7 @@ export default function LobbyScreen() {
 
   async function placeExtraction() {
     if (!supabase || !gameId) return;
-    const center = state?.game.area_center;
+    const center = state?.game.area || state?.game.area_center;
     let targetLat = 0;
     let targetLng = 0;
     if (center) {
