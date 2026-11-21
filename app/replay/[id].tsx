@@ -14,6 +14,7 @@ import {
 
 import {
   circleRing,
+  distanceM,
   type CircleFeature,
   type LngLat,
   type PointCollection,
@@ -23,6 +24,12 @@ import { stopLocationSharing } from '../../src/lib/location';
 import { supabase } from '../../src/lib/supabase';
 import { colors, radii, spacing } from '../../src/theme/tokens';
 import { Button, Card, Chip, Text } from '../../src/ui';
+import { StoryCardExportModal } from '../../src/components/StoryCardExportModal';
+import {
+  cycleReplaySpeed,
+  findNextTagTime,
+  findPrevTagTime,
+} from '../../src/lib/storyCardCore';
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
@@ -291,6 +298,8 @@ export default function ReplayScreen() {
   const [cursor, setCursor] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(10);
+  const [storyModalVisible, setStoryModalVisible] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [visibleLayers, setVisibleLayers] = useState({
     trails: true,
     pings: true,
@@ -305,6 +314,13 @@ export default function ReplayScreen() {
 
   useEffect(() => {
     mountedRef.current = true;
+    if (supabase) {
+      void supabase.auth.getUser().then(({ data }) => {
+        if (mountedRef.current) {
+          setCurrentUserId(data.user?.id ?? null);
+        }
+      });
+    }
     return () => {
       mountedRef.current = false;
     };
@@ -403,6 +419,21 @@ export default function ReplayScreen() {
     seek(cursorRef.current + 15);
   }, [seek]);
 
+  // Jump to Next / Prev Tag Climaxes (Pillar 4)
+  const jumpToPrevTag = useCallback(() => {
+    if (!hasTimeline || !replay?.tags) return;
+    const targetTime = findPrevTagTime(replay.tags, cursorRef.current, liveAtMs);
+    seek(targetTime);
+  }, [hasTimeline, replay?.tags, liveAtMs, seek]);
+
+  const jumpToNextTag = useCallback(() => {
+    if (!hasTimeline || !replay?.tags) return;
+    const targetTime = findNextTagTime(replay.tags, cursorRef.current, liveAtMs, durationS);
+    if (targetTime !== null) {
+      seek(targetTime);
+    }
+  }, [hasTimeline, replay?.tags, liveAtMs, durationS, seek]);
+
   useEffect(() => {
     if (!playing || durationS <= 0) return;
     const tick = setInterval(() => {
@@ -426,6 +457,29 @@ export default function ReplayScreen() {
     }
     return grouped;
   }, [trails]);
+
+  const myPlayer = useMemo(() => {
+    if (!state?.players || state.players.length === 0) return null;
+    if (currentUserId) {
+      const found = state.players.find((p) => p.user_id === currentUserId);
+      if (found) return found;
+    }
+    return state.players[0] ?? null;
+  }, [state?.players, currentUserId]);
+
+  const myTrailPoints = useMemo(() => {
+    if (!myPlayer) return [];
+    const pts = trailsByPlayer.get(myPlayer.id) ?? [];
+    return pts.map((p) => ({ longitude: p.longitude, latitude: p.latitude }));
+  }, [myPlayer, trailsByPlayer]);
+
+  const myDistanceMeters = useMemo(() => {
+    let dist = 0;
+    for (let i = 1; i < myTrailPoints.length; i++) {
+      dist += distanceM(myTrailPoints[i - 1], myTrailPoints[i]);
+    }
+    return dist;
+  }, [myTrailPoints]);
 
   const trailFeatures = useMemo(() => {
     const features: TrailFeature[] = [];
@@ -1316,10 +1370,51 @@ export default function ReplayScreen() {
             <Pressable
               accessibilityRole="button"
               disabled={!hasTimeline}
-              onPress={() => setSpeed((val) => (val === 1 ? 10 : 1))}
+              onPress={() => setSpeed((cur) => cycleReplaySpeed(cur))}
               style={[styles.controlPill, !hasTimeline && styles.disabled]}
             >
               <Text variant="caption" weight="bold" color={colors.primary}>{speed}×</Text>
+            </Pressable>
+          </View>
+
+          {/* Tag Climaxes & Story Export Row (Pillar 4) */}
+          <View style={styles.climaxNavRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Jump to previous tag climax"
+              disabled={!hasTimeline || tagCount === 0}
+              onPress={jumpToPrevTag}
+              style={[styles.climaxPill, (!hasTimeline || tagCount === 0) && styles.disabled]}
+            >
+              <Ionicons color={colors.danger} name="arrow-back" size={12} />
+              <Text color={colors.danger} style={{ marginLeft: 4 }} variant="caption" weight="bold">
+                Prev Tag
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Export 9:16 vertical story card"
+              onPress={() => setStoryModalVisible(true)}
+              style={styles.storyExportPill}
+            >
+              <Ionicons color={colors.accent} name="share-social-outline" size={13} />
+              <Text color={colors.accent} style={{ marginLeft: 4 }} variant="caption" weight="bold">
+                Story (9:16)
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Jump to next tag climax"
+              disabled={!hasTimeline || tagCount === 0}
+              onPress={jumpToNextTag}
+              style={[styles.climaxPill, (!hasTimeline || tagCount === 0) && styles.disabled]}
+            >
+              <Text color={colors.danger} style={{ marginRight: 4 }} variant="caption" weight="bold">
+                Next Tag
+              </Text>
+              <Ionicons color={colors.danger} name="arrow-forward" size={12} />
             </Pressable>
           </View>
 
@@ -1368,6 +1463,37 @@ export default function ReplayScreen() {
           </View>
         </ScrollView>
       </View>
+
+      <StoryCardExportModal
+        visible={storyModalVisible}
+        onClose={() => setStoryModalVisible(false)}
+        gameId={gameId || ''}
+        gameCode={state?.game?.code || ''}
+        modeName={state?.game?.mode === 'tag_hunt' ? 'Tag Hunt' : 'Classic Chase'}
+        role={myPlayer?.team || 'runner'}
+        outcome={
+          state?.game?.winner === 'runners'
+            ? myPlayer?.team === 'runner'
+              ? 'victorious'
+              : 'completed'
+            : state?.game?.winner === 'hunters'
+              ? myPlayer?.team === 'hunter'
+                ? 'victorious'
+                : 'completed'
+              : 'completed'
+        }
+        durationSeconds={durationS}
+        distanceMeters={Math.round(myDistanceMeters)}
+        opponentCount={state?.players?.filter((p) => p.team !== myPlayer?.team).length || 1}
+        capturesCount={
+          myPlayer?.team === 'hunter'
+            ? replay?.tags?.filter((t) => t.hunter_id === myPlayer.id).length || 0
+            : 0
+        }
+        rawTrailPoints={myTrailPoints}
+        shareTrailConsent={true}
+        displayName={myPlayer?.display_name || 'Operative'}
+      />
     </View>
   );
 }
@@ -1508,5 +1634,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: spacing.xs,
     padding: spacing.md,
+  },
+  climaxNavRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: spacing.xs,
+    gap: spacing.xs,
+  },
+  climaxPill: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    height: 32,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  storyExportPill: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 240, 255, 0.12)',
+    borderColor: 'rgba(0, 240, 255, 0.35)',
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    height: 32,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
   },
 });

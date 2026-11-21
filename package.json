@@ -1,6 +1,6 @@
 {
   "name": "ghostrun",
-  "version": "2.9.13",
+  "version": "2.9.16",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -9,6 +9,7 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "format:check": "prettier --check \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\" \"*.{json,js}\"",
+    "test:audio": "node --import tsx scripts/test-tactical-audio.ts",
     "test:cooldown": "node --env-file=.env --import tsx scripts/test-resend-cooldown.ts",
     "test:registry": "node --env-file=.env --import tsx scripts/registry-drift.ts",
     "test:tour": "node --import tsx scripts/test-tour-engine.ts",
@@ -21,6 +22,8 @@
     "test:radio": "node --import tsx scripts/test-team-radio.ts",
     "test:boundary": "node --import tsx scripts/test-boundary-rules.ts",
     "test:card": "node --import tsx scripts/test-share-card.ts",
+    "test:story": "node --import tsx scripts/test-story-export.ts",
+    "test:audio": "node --import tsx scripts/test-tactical-audio.ts",
     "test:badges": "node --import tsx scripts/test-badges.ts",
     "test:diagnostics": "node --import tsx scripts/test-diagnostics.ts",
     "test:push": "node --import tsx scripts/test-push-notifications.ts",

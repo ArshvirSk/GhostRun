@@ -72,6 +72,7 @@ export default function SettingsScreen() {
 
   // Audio & Telemetry
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [proximityAudioEnabled, setProximityAudioEnabled] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [hapticsEnabledState, setHapticsEnabledState] = useState(true);
 
@@ -254,6 +255,12 @@ export default function SettingsScreen() {
     setAudioEnabled(val);
     await setAudioMuted(!val);
     await AsyncStorage.setItem('@ghostrun:audio_enabled', String(val));
+  };
+
+  const toggleProximityAudio = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setProximityAudioEnabled(val);
+    await AsyncStorage.setItem('@ghostrun:proximity_audio_enabled', String(val));
   };
 
   const toggleTts = async (val: boolean) => {
@@ -1122,6 +1129,23 @@ export default function SettingsScreen() {
           <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
             <View style={{ flex: 1, paddingRight: spacing.sm }}>
               <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Escalating Proximity Heartbeat
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Audio pulses accelerate as opponents enter 50m, 25m, and 10m danger perimeters.
+              </Text>
+            </View>
+            <Switch
+              value={proximityAudioEnabled}
+              onValueChange={toggleProximityAudio}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
                 AI Tactical Voice Narration
               </Text>
             </View>
@@ -1145,6 +1169,18 @@ export default function SettingsScreen() {
               trackColor={{ false: colors.borderDark, true: colors.primary }}
               thumbColor={colors.textLight}
             />
+          </View>
+
+          <View style={{ padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark, backgroundColor: colors.surfaceElevated }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="volume-high-outline" size={14} color={colors.accent} />
+              <Text variant="label" style={{ color: colors.accent, fontSize: 11 }}>
+                OUTDOOR LOUDSPEAKER AUDIO
+              </Text>
+            </View>
+            <Text variant="caption" style={{ color: colors.textMuted, marginTop: 4, lineHeight: 16 }}>
+              GhostRun audio cues are calibrated for your device loudspeaker so your ears stay open to real-world traffic and hazards. In-ear earbuds are discouraged during outdoor sprinting.
+            </Text>
           </View>
         </Card>
 

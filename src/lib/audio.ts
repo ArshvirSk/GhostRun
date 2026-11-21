@@ -1,21 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import {
+  calculateProximityTier,
+  LOUDSPEAKER_SAFETY_MANDATE,
+  STORAGE_KEY_MUTED,
+  STORAGE_KEY_PROXIMITY_AUDIO,
+  type ProximityTier,
+  type SoundName,
+} from './audioCore';
 
-export type SoundName =
-  | 'ping'
-  | 'heat_hot'
-  | 'heat_cold'
-  | 'tag'
-  | 'whisper'
-  | 'victory'
-  | 'defeat'
-  | 'countdown'
-  | 'scan_success';
-
-const STORAGE_KEY_MUTED = '@ghostrun:sfx_muted';
+export {
+  calculateProximityTier,
+  LOUDSPEAKER_SAFETY_MANDATE,
+  STORAGE_KEY_MUTED,
+  STORAGE_KEY_PROXIMITY_AUDIO,
+  type ProximityTier,
+  type SoundName,
+};
 
 let isMutedState: boolean = false;
 let isInitialized: boolean = false;
+let currentProximityTier: ProximityTier = 'none';
+let proximityInterval: ReturnType<typeof setInterval> | null = null;
 
 const SOUND_SOURCES: Record<SoundName, any> = {
   ping: require('../../assets/sounds/ping.wav'),
@@ -27,6 +33,11 @@ const SOUND_SOURCES: Record<SoundName, any> = {
   defeat: require('../../assets/sounds/defeat.wav'),
   countdown: require('../../assets/sounds/countdown.wav'),
   scan_success: require('../../assets/sounds/scan_success.wav'),
+  heartbeat_slow: require('../../assets/sounds/heartbeat_slow.wav'),
+  heartbeat_fast: require('../../assets/sounds/heartbeat_fast.wav'),
+  alarm_danger: require('../../assets/sounds/alarm_danger.wav'),
+  siren_release: require('../../assets/sounds/siren_release.wav'),
+  infection_screech: require('../../assets/sounds/infection_screech.wav'),
 };
 
 const players: Partial<Record<SoundName, AudioPlayer>> = {};
@@ -52,6 +63,9 @@ export function isAudioMuted(): boolean {
 /** Sets master audio SFX mute state. */
 export async function setAudioMuted(muted: boolean): Promise<void> {
   isMutedState = muted;
+  if (muted) {
+    stopProximityHeartbeat();
+  }
   try {
     await AsyncStorage.setItem(STORAGE_KEY_MUTED, muted ? 'true' : 'false');
   } catch {
@@ -85,4 +99,50 @@ export function playSound(name: SoundName): void {
       console.warn(`[audio] Failed to play sound "${name}":`, err);
     }
   }
+}
+
+/** Returns the active proximity tier. */
+export function getActiveProximityTier(): ProximityTier {
+  return currentProximityTier;
+}
+
+/**
+ * Updates proximity heartbeat tempo.
+ * Automatically coordinates repeating playback loop without overlapping players.
+ */
+export function setProximityTier(tier: ProximityTier): void {
+  if (currentProximityTier === tier) return;
+  currentProximityTier = tier;
+
+  if (proximityInterval) {
+    clearInterval(proximityInterval);
+    proximityInterval = null;
+  }
+
+  if (isMutedState || tier === 'none') {
+    return;
+  }
+
+  // Trigger initial beat immediately, then repeat at target cadence
+  if (tier === 'slow') {
+    playSound('heartbeat_slow');
+    proximityInterval = setInterval(() => {
+      if (!isMutedState) playSound('heartbeat_slow');
+    }, 1000);
+  } else if (tier === 'fast') {
+    playSound('heartbeat_fast');
+    proximityInterval = setInterval(() => {
+      if (!isMutedState) playSound('heartbeat_fast');
+    }, 500);
+  } else if (tier === 'danger') {
+    playSound('alarm_danger');
+    proximityInterval = setInterval(() => {
+      if (!isMutedState) playSound('alarm_danger');
+    }, 750);
+  }
+}
+
+/** Stops any running proximity heartbeat loop. */
+export function stopProximityHeartbeat(): void {
+  setProximityTier('none');
 }

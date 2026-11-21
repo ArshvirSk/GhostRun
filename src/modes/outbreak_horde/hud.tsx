@@ -20,6 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../ui/Text';
 import { useTheme } from '../../theme/ThemeProvider';
 import { triggerHaptic } from '../../motion/haptics';
+import { GeoJSONSource, Layer } from '../../lib/map';
+import { circleRing, type PointCollection } from '../../lib/geo';
 import type { HudWidget, HudWidgetProps } from '../types';
 import { AbilityType, OUTBREAK_ABILITIES } from './types';
 
@@ -116,6 +118,7 @@ export const BioHealthBarWidget = memo(function BioHealthBarWidget({
  */
 export const AbilityDrawerWidget = memo(function AbilityDrawerWidget({
   state,
+  actions,
 }: HudWidgetProps) {
   const { colors, radii } = useTheme();
   const [activeAbility, setActiveAbility] = useState<AbilityType | null>(null);
@@ -131,6 +134,9 @@ export const AbilityDrawerWidget = memo(function AbilityDrawerWidget({
     }
 
     triggerHaptic('buttonTap');
+    if (typeof (actions as any)?.deductBioHealth === 'function') {
+      (actions as any).deductBioHealth(ability.costHp);
+    }
     setActiveAbility(abilityType);
     setTimeout(() => {
       setActiveAbility(null);
@@ -343,6 +349,69 @@ export const AntidoteNearbyBannerWidget = memo(function AntidoteNearbyBannerWidg
   );
 });
 
+/**
+ * 5. OutbreakZonesMapLayer (MapLayer Slot)
+ * Renders procedural Antidote and Drop Pod zones on the MapLibre tactical canvas.
+ */
+export const OutbreakZonesMapLayer = memo(function OutbreakZonesMapLayer({
+  state,
+}: HudWidgetProps) {
+  const dynamicZones: any[] = (state?.game as any)?.mode_data?.dynamic_zones || [];
+  if (dynamicZones.length === 0) return null;
+
+  return (
+    <>
+      {dynamicZones.map((z, idx) => {
+        const ring = circleRing({ longitude: z.longitude, latitude: z.latitude }, z.radius_m || 20);
+        const point: PointCollection = {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: [z.longitude, z.latitude],
+              },
+              properties: {},
+            },
+          ],
+        };
+        const color = z.type === 'antidote' ? '#10B981' : '#00F0FF';
+        const keyPrefix = `outbreak-zone-${z.id || idx}`;
+
+        return (
+          <React.Fragment key={keyPrefix}>
+            <GeoJSONSource id={`${keyPrefix}-ring`} data={ring}>
+              <Layer
+                id={`${keyPrefix}-fill`}
+                type="fill"
+                paint={{ 'fill-color': color, 'fill-opacity': 0.15 }}
+              />
+              <Layer
+                id={`${keyPrefix}-line`}
+                type="line"
+                paint={{ 'line-color': color, 'line-width': 2, 'line-dasharray': [2, 2] }}
+              />
+            </GeoJSONSource>
+            <GeoJSONSource id={`${keyPrefix}-point`} data={point}>
+              <Layer
+                id={`${keyPrefix}-circle`}
+                type="circle"
+                paint={{
+                  'circle-radius': 7,
+                  'circle-color': color,
+                  'circle-stroke-width': 2,
+                  'circle-stroke-color': '#FFFFFF',
+                }}
+              />
+            </GeoJSONSource>
+          </React.Fragment>
+        );
+      })}
+    </>
+  );
+});
+
 export const outbreakHordeWidgets: HudWidget[] = [
   {
     id: 'outbreak_bio_health',
@@ -375,6 +444,14 @@ export const outbreakHordeWidgets: HudWidget[] = [
     phases: ['live'],
     priority: 2,
     Component: AntidoteNearbyBannerWidget,
+  },
+  {
+    id: 'outbreak_zones_map_layer',
+    slot: 'mapLayer',
+    roles: ['runner', 'hunter'],
+    phases: ['head_start', 'live'],
+    priority: 1,
+    Component: OutbreakZonesMapLayer,
   },
 ];
 

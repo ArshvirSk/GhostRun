@@ -27,6 +27,7 @@ import { colors, radii, spacing } from '../../src/theme/tokens';
 import { Button, Card, Chip, Text } from '../../src/ui';
 import { formatDistance, useUnits } from '../../src/utils/units';
 import { ShareRoundCardModal } from '../../src/components/ShareRoundCardModal';
+import { StoryCardExportModal } from '../../src/components/StoryCardExportModal';
 import { triggerHaptic } from '../../src/motion/haptics';
 import { getModeModule } from '../../src/modes/registry';
 import { listFriends, listFriendRequests, sendFriendRequest } from '../../src/lib/friends';
@@ -247,6 +248,7 @@ export default function ResultScreen() {
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [shareRecapFeedback, setShareRecapFeedback] = useState(false);
   const [shareCardModalVisible, setShareCardModalVisible] = useState(false);
+  const [storyCardModalVisible, setStoryCardModalVisible] = useState(false);
 
   const handleQuickAddFriend = async (targetUserId: string, targetName: string) => {
     triggerHaptic('buttonTap');
@@ -1595,15 +1597,21 @@ export default function ResultScreen() {
                 </View>
               </View>
 
-              <View style={{ marginTop: spacing.md }}>
+              <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
+                <Button
+                  title="Export Story Card (9:16)"
+                  variant="primary"
+                  size="md"
+                  onPress={() => setStoryCardModalVisible(true)}
+                />
                 <Button
                   title="Share Mission Recap Card"
-                  variant="primary"
+                  variant="secondary"
                   size="md"
                   onPress={() => setShareCardModalVisible(true)}
                 />
                 <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', marginTop: spacing.xs }}>
-                  Generates privacy-guarded mission scorecard with 150m boundary trim (NF-10).
+                  Generates 9:16 vertical story card with 150m boundary trim for social dispatches.
                 </Text>
               </View>
             </Card>
@@ -1673,6 +1681,31 @@ export default function ResultScreen() {
         }}
         rawTrailPoints={myTrailPoints}
         onClose={() => setShareCardModalVisible(false)}
+      />
+
+      <StoryCardExportModal
+        visible={storyCardModalVisible}
+        onClose={() => setStoryCardModalVisible(false)}
+        gameId={gameId || ''}
+        gameCode={state?.game?.code || ''}
+        modeName={activeModule?.name || state?.game?.mode || 'Classic Chase'}
+        role={myPlayer?.team || 'runner'}
+        outcome={isVictory ? 'victorious' : 'completed'}
+        durationSeconds={gameStats?.duration_s || 0}
+        distanceMeters={Math.round(myDistanceMeters)}
+        peakSpeedMps={myPlayerStats?.peak_speed_mps}
+        opponentCount={state?.players?.filter((p) => p.team !== myPlayer?.team).length || 1}
+        capturesCount={
+          myPlayer?.team === 'hunter'
+            ? state?.players?.filter((p) => p.team === 'runner' && p.status === 'tagged').length || 0
+            : 0
+        }
+        isPatientZero={
+          activeModule?.name?.toLowerCase().includes('outbreak') && myPlayer?.team === 'hunter'
+        }
+        rawTrailPoints={myTrailPoints}
+        shareTrailConsent={myPlayerStats?.share_trail !== false}
+        displayName={myPlayer?.display_name || 'Operative'}
       />
     </View>
   );

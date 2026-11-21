@@ -9,7 +9,9 @@ export type HapticEvent =
   | 'buttonTap'
   | 'error'
   | 'sosTrigger'
-  | 'noiseWarning';
+  | 'noiseWarning'
+  | 'heartbeat'
+  | 'dangerAlert';
 
 const HAPTIC_PATTERNS: Record<HapticEvent, number[]> = {
   pingArrival: [0, 150, 100, 150],
@@ -21,6 +23,8 @@ const HAPTIC_PATTERNS: Record<HapticEvent, number[]> = {
   error: [0, 80, 50, 80],
   sosTrigger: [0, 500, 150, 500],
   noiseWarning: [0, 40],
+  heartbeat: [0, 45, 60, 35],
+  dangerAlert: [0, 100, 50, 100, 50, 100],
 };
 
 let hapticsEnabled = true;

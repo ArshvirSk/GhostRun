@@ -23,7 +23,7 @@ import {
   STORAGE_KEY_MINIMAP_ENABLED,
   type MiniMapCorner,
 } from '../components/MovableCornerMiniMap';
-import type { LngLat } from '../lib/geo';
+import { distanceM, type LngLat } from '../lib/geo';
 import {
   openLocationSettings,
   startLocationSharing,
@@ -33,7 +33,14 @@ import {
   type GeoFix,
   type StartLocationResult,
 } from '../lib/location';
-import { initAudio, toggleAudioMuted } from '../lib/audio';
+import {
+  calculateProximityTier,
+  initAudio,
+  playSound,
+  setProximityTier,
+  stopProximityHeartbeat,
+  toggleAudioMuted,
+} from '../lib/audio';
 import { initTacticalNotificationChannels } from '../lib/notifications';
 
 import type { RoundState, ShellActions } from './types';
@@ -65,6 +72,9 @@ import { OperatorLayout } from './layouts/OperatorLayout';
 import { SpectatorLayout } from './layouts/SpectatorLayout';
 import { SprintLayout } from './layouts/SprintLayout';
 import { getActiveHudWidgets } from '../modes/hud-registry';
+import { triggerHaptic } from '../motion/haptics';
+import { generateProceduralZones, haversineDistanceM, updateZonePhysics } from '../modes/outbreak_horde/zoneEngine';
+import { OUTBREAK_PRESETS, type DynamicZone } from '../modes/outbreak_horde/types';
 
 interface GameShellProps {
   gameId: string;
@@ -166,7 +176,11 @@ export function GameShell({ gameId }: GameShellProps) {
   }, [gameId]);
 
   const actions: ShellActions = useMemo(() => {
-    return createShellActions(gameId, loadState);
+    const base = createShellActions(gameId, loadState);
+    return {
+      ...base,
+      deductBioHealth: (hp: number) => setBioHealth((prev) => Math.max(0, prev - hp)),
+    } as any;
   }, [gameId, loadState]);
 
   // Audio initialization
@@ -325,6 +339,214 @@ export function GameShell({ gameId }: GameShellProps) {
     return null;
   }, [fixLat, fixLng, posLat, posLng]);
 
+  const isOutbreakHorde = modeId === 'outbreak_horde';
+
+  // Outbreak Horde state
+  const [dynamicZones, setDynamicZones] = useState<DynamicZone[]>([]);
+  const [bioHealth, setBioHealth] = useState<number>(300);
+  const [nearestAntidoteDistM, setNearestAntidoteDistM] = useState<number | null>(null);
+  const [lastHealAt, setLastHealAt] = useState<number>(0);
+
+  // Outbreak Horde: Dynamic zone drift & procedural generation
+  useEffect(() => {
+    if (!isOutbreakHorde || !state?.game?.area) return;
+    const area = state.game.area;
+
+    if (dynamicZones.length === 0) {
+      const initialZones = generateProceduralZones(
+        { latitude: area.latitude, longitude: area.longitude },
+        area.radius_m,
+        3,
+        OUTBREAK_PRESETS.standard
+      );
+      setDynamicZones(initialZones);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const nowMs = Date.now();
+      setDynamicZones((prevZones) => {
+        const nextZones: DynamicZone[] = [];
+        let activeAntidotes = 0;
+
+        for (const zone of prevZones) {
+          const { updatedZone, isDepleted } = updateZonePhysics(
+            zone,
+            { latitude: area.latitude, longitude: area.longitude },
+            area.radius_m,
+            1.0,
+            nowMs
+          );
+          if (!isDepleted && updatedZone.radius_m > 0) {
+            nextZones.push(updatedZone);
+            if (updatedZone.type === 'antidote') activeAntidotes++;
+          }
+        }
+
+        if (activeAntidotes < 2) {
+          const fresh = generateProceduralZones(
+            { latitude: area.latitude, longitude: area.longitude },
+            area.radius_m,
+            2 - activeAntidotes,
+            OUTBREAK_PRESETS.standard,
+            nowMs
+          );
+          nextZones.push(...fresh);
+        }
+
+        return nextZones;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isOutbreakHorde, state?.game?.area, dynamicZones.length]);
+
+  // Outbreak Horde: Biological health decay loop
+  useEffect(() => {
+    if (!isOutbreakHorde || state?.game?.status !== 'live' || myRole !== 'runner') return;
+
+    const interval = setInterval(() => {
+      setBioHealth((currHealth) => {
+        const nextHealth = Math.max(0, currHealth - 1);
+        if (nextHealth <= 0 && currHealth > 0) {
+          triggerHaptic('error');
+          void actions.attemptTag();
+        }
+        return nextHealth;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isOutbreakHorde, state?.game?.status, myRole, actions]);
+
+  // Outbreak Horde: Antidote proximity detection & decontamination
+  useEffect(() => {
+    if (!isOutbreakHorde || !ownFix || dynamicZones.length === 0) return;
+
+    let nearestM: number | null = null;
+    let didHeal = false;
+
+    setDynamicZones((prev) => {
+      let modified = false;
+      const updated = prev.map((zone) => {
+        if (zone.type === 'antidote' && zone.remaining_charges > 0) {
+          const dist = haversineDistanceM(ownFix, { latitude: zone.latitude, longitude: zone.longitude });
+          if (nearestM === null || dist < nearestM) {
+            nearestM = dist;
+          }
+
+          if (dist <= zone.radius_m && Date.now() - lastHealAt > 10000 && myRole === 'runner') {
+            didHeal = true;
+            modified = true;
+            return {
+              ...zone,
+              remaining_charges: zone.remaining_charges - 1,
+            };
+          }
+        }
+        return zone;
+      });
+
+      return modified ? updated : prev;
+    });
+
+    setNearestAntidoteDistM(nearestM);
+
+    if (didHeal) {
+      setLastHealAt(Date.now());
+      setBioHealth((h) => Math.min(360, h + 65));
+      triggerHaptic('tagConfirmed');
+    }
+  }, [isOutbreakHorde, ownFix, dynamicZones, lastHealAt, myRole]);
+
+  // Tactical Proximity Heartbeat & Audio Engine (Pillar 2)
+  const nearestOpponentDistM = useMemo(() => {
+    if (!ownFix || !state || state.game.status !== 'live') return null;
+    const myPlayer = state.players?.find(
+      (p) => p.user_id === state.my_player_id || p.id === state.my_player_id
+    );
+    if (myPlayer?.status !== 'active') return null;
+
+    let minD: number | null = null;
+
+    // Check confirmed opponent positions
+    if (state.positions && state.positions.length > 0) {
+      for (const pos of state.positions) {
+        if (pos.player_id !== state.my_player_id && pos.team !== state.my_team) {
+          const d = distanceM(ownFix, { latitude: pos.latitude, longitude: pos.longitude });
+          if (minD === null || d < minD) minD = d;
+        }
+      }
+    }
+
+    // Fallback to recent radar pings
+    if (minD === null && pings && pings.length > 0) {
+      for (const ping of pings) {
+        if (ping.latitude != null && ping.longitude != null) {
+          const d = distanceM(ownFix, { latitude: ping.latitude, longitude: ping.longitude });
+          if (minD === null || d < minD) minD = d;
+        }
+      }
+    }
+
+    return minD;
+  }, [ownFix, state, pings]);
+
+  useEffect(() => {
+    if (!state || state.game.status !== 'live' || sfxMuted || muted) {
+      stopProximityHeartbeat();
+      return;
+    }
+
+    const tier = calculateProximityTier(nearestOpponentDistM);
+    setProximityTier(tier);
+
+    if (tier === 'danger') {
+      triggerHaptic('dangerAlert');
+    } else if (tier === 'fast' || tier === 'slow') {
+      triggerHaptic('heartbeat');
+    }
+  }, [nearestOpponentDistM, state?.game?.status, sfxMuted, muted]);
+
+  // Release siren blast when transitioning from head_start to live
+  const prevPhaseRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!state?.game?.status) return;
+    const currentPhase = state.game.status;
+    if (prevPhaseRef.current === 'head_start' && currentPhase === 'live' && !sfxMuted && !muted) {
+      playSound('siren_release');
+      triggerHaptic('tagConfirmed');
+    }
+    prevPhaseRef.current = currentPhase;
+  }, [state?.game?.status, sfxMuted, muted]);
+
+  // Radar ping acoustic chirp
+  const prevPingsCountRef = useRef(0);
+  useEffect(() => {
+    if (pings.length > prevPingsCountRef.current && state?.game?.status === 'live' && !sfxMuted && !muted) {
+      playSound('ping');
+    }
+    prevPingsCountRef.current = pings.length;
+  }, [pings.length, state?.game?.status, sfxMuted, muted]);
+
+  // Outbreak Horde infection audio cue when operative is infected
+  const prevTeamRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!state?.my_team) return;
+    if (prevTeamRef.current === 'runner' && state.my_team === 'hunter' && isOutbreakHorde && !sfxMuted && !muted) {
+      playSound('infection_screech');
+      triggerHaptic('error');
+    }
+    prevTeamRef.current = state.my_team;
+  }, [state?.my_team, isOutbreakHorde, sfxMuted, muted]);
+
+  // Teardown heartbeat on unmount
+  useEffect(() => {
+    return () => {
+      stopProximityHeartbeat();
+    };
+  }, []);
+
   const isOutOfBounds = selectIsOutOfBounds(state, ownFix);
 
   // Out of bounds grace period calculation
@@ -410,19 +632,36 @@ export function GameShell({ gameId }: GameShellProps) {
     return Math.max(0, Math.ceil((Date.parse(state.game.live_at) - serverNow) / 1000));
   }, [state, isHeadStart, serverNow]);
 
-  const widgetProps = useMemo(() => {
+  const enrichedState = useMemo(() => {
     if (!state) return null;
+    if (!isOutbreakHorde) return state;
+    return {
+      ...state,
+      game: {
+        ...state.game,
+        mode_data: {
+          bio_health_seconds: bioHealth,
+          max_health_seconds: 360,
+          nearest_antidote_m: nearestAntidoteDistM,
+          dynamic_zones: dynamicZones,
+        },
+      },
+    };
+  }, [state, isOutbreakHorde, bioHealth, nearestAntidoteDistM, dynamicZones]);
+
+  const widgetProps = useMemo(() => {
+    if (!enrichedState) return null;
     return {
       gameId,
-      state,
+      state: enrichedState,
       actions,
       ownFix,
       serverNow,
       myRole,
-      phase: state.game.status,
+      phase: enrichedState.game.status,
       isCompact,
     };
-  }, [actions, gameId, isCompact, myRole, ownFix, serverNow, state]);
+  }, [actions, gameId, isCompact, myRole, ownFix, serverNow, enrichedState]);
 
   // Slot distribution
   const { topWidgets, bannerWidgets, actionWidgets, overlayWidgets, mapLayerWidgets, sheetWidgets } =
@@ -563,6 +802,7 @@ export function GameShell({ gameId }: GameShellProps) {
           pings={pings}
           players={state.players}
           safeZones={(state.game as any).safe_zones || []}
+          dynamicZones={dynamicZones}
           tagRadiusM={state.game.tag_radius_m || 20}
           target={target}
           teammates={teammates}

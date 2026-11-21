@@ -28,6 +28,7 @@ interface TacticalRadarCanvasProps {
   jail?: { latitude: number; longitude: number; radius_m: number } | null;
   extraction?: { latitude: number; longitude: number; radius_m: number } | null;
   safeZones?: { latitude: number; longitude: number; radius_m: number }[];
+  dynamicZones?: { id: string; type: 'antidote' | 'drop_pod' | 'safe_zone'; latitude: number; longitude: number; radius_m: number; remaining_charges?: number }[];
   myRole?: Role;
   tagRadiusM?: number;
 }
@@ -45,6 +46,7 @@ export function TacticalRadarCanvas({
   jail = null,
   extraction = null,
   safeZones = [],
+  dynamicZones = [],
   myRole = 'runner',
   tagRadiusM = 20,
 }: TacticalRadarCanvasProps) {
@@ -162,8 +164,38 @@ export function TacticalRadarCanvas({
       });
     });
 
+    if (dynamicZones && dynamicZones.length > 0) {
+      dynamicZones.forEach((dz, idx) => {
+        if (dz.type === 'antidote') {
+          list.push({
+            id: dz.id || `antidote-${idx}`,
+            label: dz.remaining_charges !== undefined ? `ANTIDOTE (${dz.remaining_charges})` : 'ANTIDOTE',
+            icon: 'medkit',
+            color: '#10B981',
+            coords: { latitude: dz.latitude, longitude: dz.longitude },
+          });
+        } else if (dz.type === 'drop_pod') {
+          list.push({
+            id: dz.id || `drop-pod-${idx}`,
+            label: 'DROP POD',
+            icon: 'cube',
+            color: '#00F0FF',
+            coords: { latitude: dz.latitude, longitude: dz.longitude },
+          });
+        } else {
+          list.push({
+            id: dz.id || `dynamic-safe-${idx}`,
+            label: 'SAFE ZONE',
+            icon: 'shield-checkmark',
+            color: colors.accent,
+            coords: { latitude: dz.latitude, longitude: dz.longitude },
+          });
+        }
+      });
+    }
+
     return list;
-  }, [target, jail, extraction, safeZones, colors]);
+  }, [target, jail, extraction, safeZones, dynamicZones, colors]);
 
   // Project contacts (pings & teammates)
   const projectedContacts = useMemo(() => {
