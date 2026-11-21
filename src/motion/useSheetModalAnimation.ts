@@ -19,10 +19,20 @@ export function useSheetModalAnimation(
   const slideOutDuration = options?.slideOutDuration ?? 200;
 
   const [mounted, setMounted] = useState(visible);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(slideDistance)).current;
+  const fadeAnim = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const slideAnim = useRef(new Animated.Value(visible ? 0 : slideDistance)).current;
+  const isFirstRender = useRef(true);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
 
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      if (!visible) {
+        return;
+      }
+    }
+
     if (visible) {
       setMounted(true);
       Animated.parallel([
@@ -50,7 +60,11 @@ export function useSheetModalAnimation(
           duration: slideOutDuration,
           useNativeDriver: true,
         }),
-      ]).start(() => setMounted(false));
+      ]).start(({ finished }) => {
+        if (finished && !visibleRef.current) {
+          setMounted(false);
+        }
+      });
     }
   }, [visible, slideDistance, fadeInDuration, fadeOutDuration, slideOutDuration, fadeAnim, slideAnim]);
 
@@ -66,9 +80,11 @@ export function useSheetModalAnimation(
         duration: slideOutDuration,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      setMounted(false);
-      onClose();
+    ]).start(({ finished }) => {
+      if (finished) {
+        setMounted(false);
+        onClose();
+      }
     });
   }, [fadeOutDuration, slideOutDuration, slideDistance, onClose, fadeAnim, slideAnim]);
 
@@ -89,10 +105,20 @@ export function useDialogModalAnimation(
   const fadeOutDuration = options?.fadeOutDuration ?? 180;
 
   const [mounted, setMounted] = useState(visible);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.92)).current;
+  const fadeAnim = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const scaleAnim = useRef(new Animated.Value(visible ? 1 : 0.92)).current;
+  const isFirstRender = useRef(true);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
 
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      if (!visible) {
+        return;
+      }
+    }
+
     if (visible) {
       setMounted(true);
       Animated.parallel([
@@ -120,7 +146,11 @@ export function useDialogModalAnimation(
           duration: fadeOutDuration,
           useNativeDriver: true,
         }),
-      ]).start(() => setMounted(false));
+      ]).start(({ finished }) => {
+        if (finished && !visibleRef.current) {
+          setMounted(false);
+        }
+      });
     }
   }, [visible, fadeInDuration, fadeOutDuration, fadeAnim, scaleAnim]);
 
@@ -136,9 +166,11 @@ export function useDialogModalAnimation(
         duration: fadeOutDuration,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      setMounted(false);
-      onClose();
+    ]).start(({ finished }) => {
+      if (finished) {
+        setMounted(false);
+        onClose();
+      }
     });
   }, [fadeOutDuration, onClose, fadeAnim, scaleAnim]);
 

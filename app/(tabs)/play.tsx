@@ -23,6 +23,7 @@ import { useUserStore } from '../../src/stores/userStore';
 import { useHostStore } from '../../src/stores/hostStore';
 import { startLocationPrewarm } from '../../src/lib/locationCache';
 import { CipherEventModal } from '../../src/components/CipherEventModal';
+import { PrivacyDefaultsModal, PRIVACY_DEFAULTS_ACK_KEY } from '../../src/components/PrivacyDefaultsModal';
 import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
 import { TACTICAL_GOLD } from '../../src/theme/tokens';
 
@@ -52,6 +53,23 @@ export function PlayContent() {
   const [friendCount, setFriendCount] = useState<number>(0);
   const [pendingRequestCount, setPendingRequestCount] = useState<number>(0);
   const [cipherModalVisible, setCipherModalVisible] = useState(false);
+  const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+
+  const checkPrivacyDefaultsAck = useCallback(async () => {
+    try {
+      const acknowledged = await AsyncStorage.getItem(PRIVACY_DEFAULTS_ACK_KEY);
+      if (!acknowledged) {
+        setPrivacyModalVisible(true);
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+  }, []);
+
+  // Check whether operative has acknowledged privacy defaults directive
+  useEffect(() => {
+    void checkPrivacyDefaultsAck();
+  }, [checkPrivacyDefaultsAck]);
 
   // Keep displayName synced instantly whenever userStore updates
   useEffect(() => {
@@ -156,6 +174,7 @@ export function PlayContent() {
   useFocusEffect(
     useCallback(() => {
       void loadProfileAndActiveGame();
+      void checkPrivacyDefaultsAck();
       const interval = setInterval(() => {
         void Promise.all([
           listFriends().catch(() => []),
@@ -686,6 +705,12 @@ export function PlayContent() {
       <CipherEventModal
         visible={cipherModalVisible}
         onClose={() => setCipherModalVisible(false)}
+      />
+
+      {/* GhostRun Tactical Privacy Defaults Modal */}
+      <PrivacyDefaultsModal
+        visible={privacyModalVisible}
+        onClose={() => setPrivacyModalVisible(false)}
       />
     </View>
   );

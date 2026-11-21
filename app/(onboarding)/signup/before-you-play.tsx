@@ -165,17 +165,49 @@ export default function SignupBeforeYouPlayScreen() {
             }
           }
 
-          // Record mandatory policy acknowledgement consent
-          await client.rpc('set_consent', {
-            consent_type: 'policy_ack',
-            granted: true,
-            policy_version: PRIVACY_VERSION,
-          });
+          // Record mandatory policy acknowledgement and all tactical privacy consents (ON by default)
+          const defaultConsentTypes = [
+            'policy_ack',
+            'ghost',
+            'leaderboard_name',
+            'diagnostics',
+            'show_presence',
+            'share_echo',
+          ] as const;
+
+          await Promise.all(
+            defaultConsentTypes.map((type) =>
+              client.rpc('set_consent', {
+                consent_type: type,
+                granted: true,
+                policy_version: PRIVACY_VERSION,
+              })
+            )
+          );
+
+          // Update profile privacy columns to active defaults
+          await client
+            .from('profiles')
+            .update({
+              show_presence: true,
+              allow_friend_requests: true,
+              share_echo: true,
+              profile_visibility: 'public',
+            })
+            .eq('id', currentSession.user.id);
         }
       }
 
-      // Mark onboarding completed in AsyncStorage
-      await AsyncStorage.setItem('@ghostrun:onboarded', 'true');
+      // Mark onboarding completed & set all local privacy preference keys to true
+      await AsyncStorage.multiSet([
+        ['@ghostrun:onboarded', 'true'],
+        ['@ghostrun:consent_presence', 'true'],
+        ['@ghostrun:consent_echo', 'true'],
+        ['@ghostrun:consent_ghost', 'true'],
+        ['@ghostrun:consent_leaderboard_name', 'true'],
+        ['@ghostrun:consent_diagnostics', 'true'],
+        ['@ghostrun:allow_friend_requests', 'true'],
+      ]);
 
       // Prewarm GPS coordinates immediately now that permissions are set
       void startLocationPrewarm();
