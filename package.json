@@ -1,6 +1,6 @@
 {
   "name": "ghostrun",
-  "version": "2.9.11",
+  "version": "2.9.12",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {

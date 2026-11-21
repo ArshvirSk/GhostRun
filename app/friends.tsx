@@ -27,6 +27,7 @@ import { Button } from '../src/ui/Button';
 import { SegmentBar } from '../src/ui/SegmentBar';
 import { triggerHaptic } from '../src/motion/haptics';
 import { TacticalPullRefreshScrollView } from '../src/components/TacticalPullRefresh';
+import { supabase } from '../src/lib/supabase';
 import {
   FriendProfile,
   FriendRequest,
@@ -94,8 +95,10 @@ export default function FriendsScreen() {
   const [beaconModalVisible, setBeaconModalVisible] = useState(false);
   const [scannerModalVisible, setScannerModalVisible] = useState(false);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent: boolean = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const [friendsList, reqs, hostingList] = await Promise.all([
         listFriends(),
@@ -109,7 +112,9 @@ export default function FriendsScreen() {
     } catch {
       // offline fallback
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -117,7 +122,7 @@ export default function FriendsScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadData();
+      await loadData(true);
     } finally {
       setRefreshing(false);
     }
@@ -125,13 +130,43 @@ export default function FriendsScreen() {
 
   const pagerRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
+  // Initial load
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
+  // Real-time synchronization for instant friend requests, acceptances, and presence updates
+  useEffect(() => {
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel('friends-realtime-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'friendships' },
+        () => {
+          void loadData(true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'host_presence' },
+        () => {
+          void loadData(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (supabase) {
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, [loadData]);
+
   useFocusEffect(
     useCallback(() => {
-      void loadData();
+      void loadData(true);
     }, [loadData])
   );
 
@@ -141,7 +176,7 @@ export default function FriendsScreen() {
       if (!res.success) {
         return { success: false, message: res.reason || res.error || 'Failed to send friend request' };
       }
-      await loadData();
+      await loadData(true);
       return { success: true, message: `Friend request sent to ${target}!` };
     } catch (err: unknown) {
       return {
@@ -205,6 +240,7 @@ export default function FriendsScreen() {
     setStatusMessage('');
     const pageIndex = tabKey === 'friends' ? 0 : tabKey === 'requests' ? 1 : 2;
     pagerRef.current?.scrollTo({ x: pageIndex * screenWidth, animated: true });
+    void loadData(true);
   };
 
   const handlePagerScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -220,6 +256,7 @@ export default function FriendsScreen() {
       triggerHaptic('buttonTap');
       setActiveTab(newTab);
       setStatusMessage('');
+      void loadData(true);
     }
   };
 
@@ -651,7 +688,9 @@ export default function FriendsScreen() {
           {/* TAB 2: REQUESTS */}
           {/* ============================================================== */}
           <View style={{ width: screenWidth }}>
-            <ScrollView
+            <TacticalPullRefreshScrollView
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
               contentContainerStyle={[
                 styles.tabContent,
                 { paddingBottom: Math.max(insets.bottom, 16) + 80 },
@@ -805,14 +844,16 @@ export default function FriendsScreen() {
                   </Card>
                 ))
               )}
-            </ScrollView>
+            </TacticalPullRefreshScrollView>
           </View>
 
           {/* ============================================================== */}
           {/* TAB 3: ADD OPERATIVE */}
           {/* ============================================================== */}
           <View style={{ width: screenWidth }}>
-            <ScrollView
+            <TacticalPullRefreshScrollView
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
               contentContainerStyle={[
                 styles.tabContent,
                 { paddingBottom: Math.max(insets.bottom, 16) + 80 },
@@ -1179,7 +1220,7 @@ export default function FriendsScreen() {
                   style={{ marginTop: 10 }}
                 />
               </Card>
-            </ScrollView>
+            </TacticalPullRefreshScrollView>
           </View>
         </ScrollView>
       )}
