@@ -1,6 +1,6 @@
 {
   "name": "ghostrun",
-  "version": "2.9.16",
+  "version": "2.9.17",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -24,6 +24,7 @@
     "test:card": "node --import tsx scripts/test-share-card.ts",
     "test:story": "node --import tsx scripts/test-story-export.ts",
     "test:audio": "node --import tsx scripts/test-tactical-audio.ts",
+    "test:resilience": "node --import tsx scripts/test-battery-resilience.ts",
     "test:badges": "node --import tsx scripts/test-badges.ts",
     "test:diagnostics": "node --import tsx scripts/test-diagnostics.ts",
     "test:push": "node --import tsx scripts/test-push-notifications.ts",

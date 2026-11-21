@@ -52,6 +52,14 @@ import {
   type ColorblindMode,
   type HudScale,
 } from '../src/lib/accessibility';
+import {
+  isBatteryGuardEnabled,
+  setBatteryGuardEnabled,
+  isOfflineQueueEnabled,
+  setOfflineQueueEnabled,
+  getDeadZoneQueueCount,
+  clearDeadZoneQueue,
+} from '../src/lib/offlineTelemetryQueue';
 
 const DELETE_WORD = 'DELETE';
 
@@ -75,6 +83,11 @@ export default function SettingsScreen() {
   const [proximityAudioEnabled, setProximityAudioEnabled] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [hapticsEnabledState, setHapticsEnabledState] = useState(true);
+
+  // Outdoor Battery & Field Resilience (Pillar 5)
+  const [batteryGuardEnabled, setBatteryGuardEnabledState] = useState(true);
+  const [offlineQueueEnabled, setOfflineQueueEnabledState] = useState(true);
+  const [deadZoneFixCount, setDeadZoneFixCount] = useState(0);
 
   // Notifications & Alerts
   const [pushEnabled, setPushEnabled] = useState(true);
@@ -212,12 +225,40 @@ export default function SettingsScreen() {
             if (sc.diagnostics?.granted !== undefined) setLocalAnalyticsOptIn(sc.diagnostics.granted);
           }
         }
+
+        const [guardVal, queueVal, countVal] = await Promise.all([
+          isBatteryGuardEnabled(),
+          isOfflineQueueEnabled(),
+          getDeadZoneQueueCount(),
+        ]);
+        setBatteryGuardEnabledState(guardVal);
+        setOfflineQueueEnabledState(queueVal);
+        setDeadZoneFixCount(countVal);
       } catch {
         // ignore load errors
       }
     }
     void loadPreferences();
   }, []);
+
+  const toggleBatteryGuard = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setBatteryGuardEnabledState(val);
+    await setBatteryGuardEnabled(val);
+  };
+
+  const toggleOfflineQueue = async (val: boolean) => {
+    triggerHaptic('buttonTap');
+    setOfflineQueueEnabledState(val);
+    await setOfflineQueueEnabled(val);
+  };
+
+  const handleClearDeadZoneQueue = async () => {
+    triggerHaptic('buttonTap');
+    await clearDeadZoneQueue();
+    setDeadZoneFixCount(0);
+    setToastNotice('Dead-zone telemetry buffer cleared.');
+  };
 
   const toggleMapStyle = async (val: boolean) => {
     triggerHaptic('buttonTap');
@@ -1180,6 +1221,72 @@ export default function SettingsScreen() {
             </View>
             <Text variant="caption" style={{ color: colors.textMuted, marginTop: 4, lineHeight: 16 }}>
               GhostRun audio cues are calibrated for your device loudspeaker so your ears stay open to real-world traffic and hazards. In-ear earbuds are discouraged during outdoor sprinting.
+            </Text>
+          </View>
+        </Card>
+
+        {/* Outdoor Battery & Field Resilience (Pillar 5) */}
+        <Text variant="label" style={{ color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.xs }}>
+          FIELD ENDURANCE & BATTERY RESILIENCE
+        </Text>
+        <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, padding: 0 }]}>
+          <View style={[styles.settingRow, { padding: spacing.md }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Adaptive GPS Battery Guard
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Dynamically scales GPS polling: 1Hz sprints, 2.5s stalking, and 6s ambush camping to extend endurance over 60-minute matches.
+              </Text>
+            </View>
+            <Switch
+              value={batteryGuardEnabled}
+              onValueChange={toggleBatteryGuard}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark }]}>
+            <View style={{ flex: 1, paddingRight: spacing.sm }}>
+              <Text variant="title" style={{ color: colors.text, fontSize: 16 }}>
+                Offline Dead-Zone Queue
+              </Text>
+              <Text variant="caption" style={{ color: colors.textMuted, marginTop: 2 }}>
+                Buffers GPS fixes locally during cellular dead zones and automatically flushes to the server on reconnect.
+              </Text>
+            </View>
+            <Switch
+              value={offlineQueueEnabled}
+              onValueChange={toggleOfflineQueue}
+              trackColor={{ false: colors.borderDark, true: colors.primary }}
+              thumbColor={colors.textLight}
+            />
+          </View>
+
+          <View style={{ padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderDark, backgroundColor: colors.surfaceElevated }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="battery-charging-outline" size={14} color={colors.primary} />
+                <Text variant="label" style={{ color: colors.primary, fontSize: 11 }}>
+                  DEAD-ZONE BUFFER: {deadZoneFixCount} FIXES QUEUED
+                </Text>
+              </View>
+              {deadZoneFixCount > 0 && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear dead-zone buffer"
+                  onPress={handleClearDeadZoneQueue}
+                  style={{ paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: 4, backgroundColor: colors.surface }}
+                >
+                  <Text variant="caption" style={{ color: colors.danger, fontWeight: '700', fontSize: 11 }}>
+                    Clear
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+            <Text variant="caption" style={{ color: colors.textMuted, marginTop: 4, lineHeight: 16 }}>
+              Critical Battery Sentinel: Below 15% charge, GhostRun locks into power-saving telemetry and limits HUD rendering overhead to prevent device shutdown.
             </Text>
           </View>
         </Card>

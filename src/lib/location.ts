@@ -4,6 +4,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Linking } from 'react-native';
 
 import { supabase } from './supabase';
+import { enqueueDeadZoneFix, drainDeadZoneQueue } from './offlineTelemetryQueue';
 
 /**
  * Location sharing for a live round.
@@ -80,31 +81,55 @@ export async function uploadLocation(fix: GeoFix): Promise<void> {
   if (now - lastUploadAt < UPLOAD_THROTTLE_MS) return;
   lastUploadAt = now;
 
-  const { data, error } = await supabase.rpc('submit_position', {
-    game_id: gameId,
-    lat: fix.latitude,
-    lng: fix.longitude,
-    accuracy: fix.accuracy,
-    speed: fix.speed,
-    heading: fix.heading,
-    is_mock: fix.isMock ?? false,
-    recorded_at: new Date(fix.timestamp).toISOString(),
-  });
+  try {
+    const { data, error } = await supabase.rpc('submit_position', {
+      game_id: gameId,
+      lat: fix.latitude,
+      lng: fix.longitude,
+      accuracy: fix.accuracy,
+      speed: fix.speed,
+      heading: fix.heading,
+      is_mock: fix.isMock ?? false,
+      recorded_at: new Date(fix.timestamp).toISOString(),
+    });
 
-  if (error) {
-    if (/not a member|not a player|game not found/i.test(error.message)) {
+    if (error) {
+      if (/not a member|not a player|game not found/i.test(error.message)) {
+        await stopTracking();
+      } else {
+        // Enqueue into offline dead-zone buffer (Pillar 5)
+        void enqueueDeadZoneFix(gameId, fix);
+      }
+      return;
+    }
+
+    // Success: asynchronously drain queued dead-zone fixes
+    void drainDeadZoneQueue(async (item) => {
+      if (!supabase) return false;
+      const res = await supabase.rpc('submit_position', {
+        game_id: item.gameId,
+        lat: item.latitude,
+        lng: item.longitude,
+        accuracy: item.accuracy,
+        speed: item.speed,
+        heading: item.heading,
+        is_mock: false,
+        recorded_at: item.recordedAt,
+      });
+      return !res.error;
+    });
+
+    const state = data as { phase?: string; my_status?: string } | null;
+    if (
+      state?.phase === 'ended' ||
+      state?.phase === 'cancelled' ||
+      (state?.my_status && state.my_status !== 'active')
+    ) {
       await stopTracking();
     }
-    return;
-  }
-
-  const state = data as { phase?: string; my_status?: string } | null;
-  if (
-    state?.phase === 'ended' ||
-    state?.phase === 'cancelled' ||
-    (state?.my_status && state.my_status !== 'active')
-  ) {
-    await stopTracking();
+  } catch {
+    // Network drop or timeout in cellular dead-zone -> buffer fix
+    void enqueueDeadZoneFix(gameId, fix);
   }
 }
 
@@ -211,15 +236,18 @@ export async function stopLocationSharing(): Promise<void> {
 }
 
 /** Smooth own-position marker for the map; the task remains the uploader. */
-export function watchLocation(onFix: (fix: GeoFix) => void): () => void {
+export function watchLocation(
+  onFix: (fix: GeoFix) => void,
+  options?: { timeInterval?: number; distanceInterval?: number; accuracy?: Location.Accuracy }
+): () => void {
   let subscription: Location.LocationSubscription | null = null;
   let cancelled = false;
 
   void Location.watchPositionAsync(
     {
-      accuracy: Location.Accuracy.High,
-      timeInterval: 2_500,
-      distanceInterval: 2,
+      accuracy: options?.accuracy ?? Location.Accuracy.High,
+      timeInterval: options?.timeInterval ?? 2_500,
+      distanceInterval: options?.distanceInterval ?? 2,
     },
     (location) => {
       if (!cancelled) onFix(toFix(location));

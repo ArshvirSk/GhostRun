@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../ui/Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { colors } from '../theme/tokens';
+import type { PowerTier } from '../lib/batteryResilienceCore';
 
 export type SharingState = 'idle' | 'starting' | 'on' | 'error' | 'denied';
 
@@ -11,6 +12,8 @@ interface TrackingStatusProps {
   sharing: SharingState;
   backgroundSharing: boolean;
   accuracyM: number | null;
+  deadZoneQueueCount?: number;
+  powerTier?: PowerTier;
   onRetry: () => void;
   onOpenSettings: () => void;
 }
@@ -19,6 +22,8 @@ export const TrackingStatus = memo(function TrackingStatus({
   sharing,
   backgroundSharing,
   accuracyM,
+  deadZoneQueueCount = 0,
+  powerTier,
   onRetry,
   onOpenSettings,
 }: TrackingStatusProps) {
@@ -54,6 +59,58 @@ export const TrackingStatus = memo(function TrackingStatus({
             {sharing === 'denied' ? 'Settings' : 'Retry'}
           </Text>
         </Pressable>
+      </View>
+    );
+  }
+
+  // Dead-Zone Telemetry Buffer Warning (Pillar 5)
+  if (deadZoneQueueCount > 0) {
+    return (
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: tokens.colors.surface,
+            borderColor: tokens.colors.warning,
+            borderRadius: tokens.radii.card,
+          },
+        ]}
+      >
+        <Ionicons color={tokens.colors.warning} name="cloud-offline-outline" size={16} />
+        <View style={{ flex: 1 }}>
+          <Text variant="label" style={{ color: tokens.colors.warning, fontSize: 10 }}>
+            DEAD-ZONE BUFFER ACTIVE ({deadZoneQueueCount} FIXES QUEUED)
+          </Text>
+          <Text variant="body" style={styles.subtext}>
+            Cellular link weak. Telemetry is safely buffered locally and flushes automatically on reconnect.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Critical Battery Guard Mode Warning (Pillar 5)
+  if (powerTier === 'critical_battery') {
+    return (
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: tokens.colors.surface,
+            borderColor: tokens.colors.danger,
+            borderRadius: tokens.radii.card,
+          },
+        ]}
+      >
+        <Ionicons color={tokens.colors.danger} name="battery-dead-outline" size={16} />
+        <View style={{ flex: 1 }}>
+          <Text variant="label" style={{ color: tokens.colors.danger, fontSize: 10 }}>
+            BATTERY GUARD ENGAGED (&lt;= 15%)
+          </Text>
+          <Text variant="body" style={styles.subtext}>
+            Low-power GPS interval active to preserve device life and prevent shutdown.
+          </Text>
+        </View>
       </View>
     );
   }

@@ -66,6 +66,14 @@ import { TeamRadioSheet } from '../components/TeamRadioSheet';
 import { useSafetyCheckin } from './useSafetyCheckin';
 import { EventFeed } from './EventFeed';
 import { TrackingStatus, type SharingState } from './TrackingStatus';
+import {
+  calculateAdaptiveGpsConfig,
+  type PowerTier,
+} from '../lib/batteryResilienceCore';
+import {
+  getDeadZoneQueueCount,
+  isBatteryGuardEnabled,
+} from '../lib/offlineTelemetryQueue';
 import { RunnerLayout } from './layouts/RunnerLayout';
 import { HunterLayout } from './layouts/HunterLayout';
 import { OperatorLayout } from './layouts/OperatorLayout';
@@ -308,6 +316,27 @@ export function GameShell({ gameId }: GameShellProps) {
     };
   }, [sharing, startSharing, state, state?.game?.status, state?.my_player_id, state?.players]);
 
+  // Tactical resilience & battery guard state (Pillar 5)
+  const [deadZoneQueueCount, setDeadZoneQueueCount] = useState<number>(0);
+  const [powerTier, setPowerTier] = useState<PowerTier>('stalking');
+  const [lastMovedAt, setLastMovedAt] = useState<number>(Date.now());
+  const [batteryGuardOn, setBatteryGuardOn] = useState<boolean>(true);
+
+  useEffect(() => {
+    void isBatteryGuardEnabled().then(setBatteryGuardOn);
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        const count = await getDeadZoneQueueCount();
+        if (active) setDeadZoneQueueCount(count);
+      } catch {}
+    }, 4000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   // Local location watcher: when phone is locked/backgrounded with background sharing enabled,
   // skip local React state marker updates to conserve CPU & battery.
   useEffect(() => {
@@ -315,9 +344,23 @@ export function GameShell({ gameId }: GameShellProps) {
     return watchLocation((nextFix) => {
       if (AppState.currentState !== 'active' && backgroundSharing) return;
       setFix(nextFix);
+
+      const now = Date.now();
+      const currentSpeed = nextFix.speed ?? 0;
+      if (currentSpeed >= 0.5) {
+        setLastMovedAt(now);
+      }
+      const stationarySec = Math.max(0, (now - lastMovedAt) / 1000);
+      const adaptive = calculateAdaptiveGpsConfig({
+        speedMps: currentSpeed,
+        stationaryDurationSec: stationarySec,
+        batteryGuardEnabled: batteryGuardOn,
+      });
+      setPowerTier(adaptive.powerTier);
+
       if (!backgroundSharing) void uploadLocation(nextFix);
     });
-  }, [backgroundSharing, sharing]);
+  }, [backgroundSharing, batteryGuardOn, lastMovedAt, sharing]);
 
   // Derived state & selectors
   const myRole = selectMyRole(state);
@@ -780,6 +823,8 @@ export function GameShell({ gameId }: GameShellProps) {
         <TrackingStatus
           accuracyM={fix?.accuracy ?? null}
           backgroundSharing={backgroundSharing}
+          deadZoneQueueCount={deadZoneQueueCount}
+          powerTier={powerTier}
           onOpenSettings={() => void openLocationSettings()}
           onRetry={() => void startSharing()}
           sharing={sharing}
