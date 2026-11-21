@@ -2,7 +2,7 @@
   "expo": {
     "name": "GhostRun",
     "slug": "ghostrun",
-    "version": "2.9.10",
+    "version": "2.9.11",
     "orientation": "portrait",
     "scheme": "ghost-run",
     "icon": "./assets/icon.png",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.ghostrun.app",
-      "versionCode": 25,
+      "versionCode": 26,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
