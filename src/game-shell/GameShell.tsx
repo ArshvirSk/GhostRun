@@ -248,12 +248,20 @@ export function GameShell({ gameId }: GameShellProps) {
     };
   }, []);
 
-  // AppState resync
+  // AppState resync & periodic heartbeat fallback (NF-04 / Pillar 5)
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'active') void loadState();
     });
-    return () => sub.remove();
+    const heartbeat = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        void loadState();
+      }
+    }, 4000);
+    return () => {
+      sub.remove();
+      clearInterval(heartbeat);
+    };
   }, [loadState]);
 
   // Phase transition routing
@@ -302,7 +310,7 @@ export function GameShell({ gameId }: GameShellProps) {
     mountedRef.current = true;
     if (!state) return;
     const isLiveOrHeadStart = ['head_start', 'live'].includes(state.game.status);
-    const isRemote = state.players.find((p) => p.id === state.my_player_id)?.is_remote;
+    const isRemote = (state.players ?? []).find((p) => p.id === state.my_player_id)?.is_remote;
 
     let timer: ReturnType<typeof setTimeout> | undefined;
     if (isLiveOrHeadStart && !isRemote && sharing === 'idle') {

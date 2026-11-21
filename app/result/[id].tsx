@@ -520,7 +520,7 @@ export default function ResultScreen() {
 
   const activeModule = getModeModule(state?.game.mode || 'classic_chase');
   const myPlayer = useMemo(() => {
-    return state?.players.find((p) => p.id === state.my_player_id) || null;
+    return (state?.players ?? []).find((p) => p.id === state?.my_player_id) || null;
   }, [state]);
 
   const myTrailPoints = useMemo<LngLat[]>(() => {
@@ -542,7 +542,7 @@ export default function ResultScreen() {
   const trailFeatures = useMemo(() => {
     if (!state) return [];
     const features: TrailFeature[] = [];
-    for (const player of state.players) {
+    for (const player of state.players ?? []) {
       const points = trailsByPlayer.get(player.id) ?? [];
       if (points.length < 2) continue;
       features.push({
@@ -560,7 +560,7 @@ export default function ResultScreen() {
   const winnerId = useMemo(() => {
     if (!state || state.game.end_reason !== 'target_reached' || !state.target) return null;
     const target = state.target;
-    const winner = state.positions.find(
+    const winner = (state.positions ?? []).find(
       (position) =>
         position.team === 'runner' && distanceM(position, target) <= state.game.target_radius_m,
     );
@@ -645,8 +645,8 @@ export default function ResultScreen() {
 
   const game = state.game;
   const target = state.target;
-  const players = state.players;
-  const positions = state.positions;
+  const players = state.players ?? [];
+  const positions = state.positions ?? [];
   const zoom = Math.max(10, Math.min(16, 15 - Math.log2(game.area.radius_m / 200)));
 
   const isGhostDuel =

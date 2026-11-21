@@ -278,11 +278,7 @@ export default function LobbyScreen() {
   // Phase follow
   useEffect(() => {
     if (!state || !gameId) return;
-    if (state.game.status === 'target_selection') {
-      router.replace({ pathname: '/target/[id]', params: { id: gameId } });
-    } else if (
-      ['countdown', 'head_start', 'live', 'ended', 'cancelled'].includes(state.game.status)
-    ) {
+    if (['countdown', 'head_start', 'live', 'ended', 'cancelled'].includes(state.game.status)) {
       router.replace({ pathname: '/game/[id]', params: { id: gameId } });
     }
   }, [gameId, router, state]);
@@ -841,10 +837,10 @@ export default function LobbyScreen() {
             onPress={() => void shareCode()}
             accessibilityRole="button"
             accessibilityLabel={`Room code ${state.game.code}`}
-            style={[styles.tacticalPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
+            style={[styles.tacticalCodePill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
           >
-            <Text style={[styles.tacticalPillPrefix, { color: colors.textMuted }]}>CODE</Text>
-            <Text style={[styles.tacticalPillCode, { color: colors.accent }]}>{state.game.code}</Text>
+            <Text numberOfLines={1} style={[styles.tacticalPillPrefix, { color: colors.textMuted }]}>CODE</Text>
+            <Text numberOfLines={1} style={[styles.tacticalPillCode, { color: colors.accent }]}>{state.game.code}</Text>
             <Ionicons name="share-outline" size={12} color={colors.accent} />
           </Pressable>
 
@@ -852,10 +848,10 @@ export default function LobbyScreen() {
             onPress={() => setInviteModalVisible(true)}
             accessibilityRole="button"
             accessibilityLabel="Show QR invite"
-            style={[styles.tacticalPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
+            style={[styles.tacticalCompactPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
           >
             <Ionicons name="qr-code-outline" size={13} color={colors.accent} />
-            <Text style={[styles.tacticalPillText, { color: colors.text }]}>QR</Text>
+            <Text numberOfLines={1} style={[styles.tacticalPillText, { color: colors.text }]}>QR</Text>
           </Pressable>
 
           <Pressable
@@ -869,7 +865,7 @@ export default function LobbyScreen() {
               size={12}
               color={shareChoice === true ? colors.accent : colors.textMuted}
             />
-            <Text style={[styles.tacticalPillText, { color: colors.textSecondary }]}>
+            <Text numberOfLines={1} style={[styles.tacticalPillText, { color: colors.textSecondary }]}>
               {shareChoice === true ? 'Shared' : 'Private'}
             </Text>
           </Pressable>
@@ -879,7 +875,7 @@ export default function LobbyScreen() {
               setReadyCheckVisible(true);
               void handleRunDiagnostic();
             }}
-            style={[styles.tacticalPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
+            style={[styles.tacticalCompactPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDark }]}
             accessibilityRole="button"
             accessibilityLabel="Check Sensors and GPS"
           >
@@ -889,6 +885,7 @@ export default function LobbyScreen() {
               color={healthReport?.overall === 'healthy' ? colors.accent : colors.warning}
             />
             <Text
+              numberOfLines={1}
               style={[
                 styles.tacticalPillText,
                 { color: healthReport?.overall === 'healthy' ? colors.accent : colors.textSecondary },
@@ -1063,7 +1060,7 @@ export default function LobbyScreen() {
                       >
                         <Ionicons name="add" size={16} color={colors.runner} />
                         <Text style={[styles.emptySquadText, { color: colors.runner }]}>
-                          + Tap to join Runners Squad
+                          Tap to join Runners Squad
                         </Text>
                       </Pressable>
                     ) : (
@@ -1134,7 +1131,7 @@ export default function LobbyScreen() {
                       >
                         <Ionicons name="add" size={16} color={colors.hunter} />
                         <Text style={[styles.emptySquadText, { color: colors.hunter }]}>
-                          + Tap to join Hunters Squad
+                          Tap to join Hunters Squad
                         </Text>
                       </Pressable>
                     ) : (
@@ -1702,11 +1699,7 @@ export default function LobbyScreen() {
             }
             onPress={() => {
               if (canStart && everyoneReady && isHost) {
-                if (state.game.mode === 'classic_chase') {
-                  void continueLobby();
-                } else {
-                  void startRound();
-                }
+                void startRound();
               } else {
                 void toggleReady();
               }
@@ -1843,27 +1836,32 @@ function PlayerRow({
         style={styles.playerInfo}
       >
         <View style={[styles.avatarDot, { backgroundColor: player.color || colors.primary, borderRadius: radii.pill }]} />
-        <View style={{ flex: 1, marginLeft: 10, marginRight: 8 }}>
+        <View style={{ flex: 1, marginLeft: 8, marginRight: 6, justifyContent: 'center' }}>
           <View style={styles.nameRow}>
             <Text
               variant="title"
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={{ color: colors.text, fontSize: 14, fontWeight: '800', flexShrink: 1 }}
+              style={{
+                color: colors.text,
+                fontSize: 12.5,
+                fontWeight: '800',
+                letterSpacing: 0.2,
+                flexShrink: 1,
+              }}
             >
               {player.display_name.toUpperCase()}
             </Text>
-            {isSelf && (
+            {isGameHost ? (
+              <View style={styles.hostBadge}>
+                <MaterialCommunityIcons name="crown" size={10} color="#000000" />
+                <Text style={styles.hostBadgeText}>HOST</Text>
+              </View>
+            ) : isSelf ? (
               <View style={styles.youBadge}>
                 <Text style={styles.youBadgeText}>YOU</Text>
               </View>
-            )}
-            {isGameHost && (
-              <View style={styles.hostBadge}>
-                <MaterialCommunityIcons name="crown" size={12} color="#000000" />
-                <Text style={styles.hostBadgeText}>HOST</Text>
-              </View>
-            )}
+            ) : null}
           </View>
           {player.is_remote && (
             <Text variant="caption" style={{ color: colors.radarScan, marginTop: 2 }}>
@@ -1969,31 +1967,56 @@ const styles = StyleSheet.create({
   tacticalUtilityBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     marginBottom: 8,
   },
   tacticalPill: {
-    flex: 1,
+    flex: 0.95,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 5,
     borderRadius: 10,
     borderWidth: 1,
     gap: 4,
+    minHeight: 36,
+  },
+  tacticalCodePill: {
+    flex: 1.9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 5,
+    minHeight: 36,
+  },
+  tacticalCompactPill: {
+    flex: 0.65,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 3,
+    minHeight: 36,
   },
   tacticalPillPrefix: {
-    fontSize: 9,
+    fontSize: 8.5,
     fontFamily: 'Archivo-Bold',
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   tacticalPillCode: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontFamily: 'Archivo-Bold',
     fontWeight: '900',
-    letterSpacing: 1.2,
+    letterSpacing: 0.8,
   },
   tacticalPillText: {
     fontSize: 11,
@@ -2059,16 +2082,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
+    gap: 5,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
     borderRadius: 10,
     borderWidth: 1.5,
   },
   unassignedSquadBtnText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: 'Archivo-Bold',
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   squadSectionCard: {
     padding: 14,
@@ -2415,6 +2439,7 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   youBadge: {
     backgroundColor: 'rgba(167, 139, 250, 0.2)',
@@ -2424,6 +2449,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1.5,
     borderRadius: 5,
     marginLeft: 6,
+    flexShrink: 0,
   },
   youBadgeText: {
     color: '#A78BFA',
@@ -2436,18 +2462,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F59E0B',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 5,
-    marginLeft: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 5,
     gap: 2,
+    flexShrink: 0,
   },
   hostBadgeText: {
     color: '#000000',
-    fontSize: 9,
+    fontSize: 8.5,
     fontFamily: 'Archivo-Bold',
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   playerActionsRow: {
     flexDirection: 'row',

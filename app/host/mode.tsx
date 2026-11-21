@@ -160,28 +160,27 @@ export default function HostModeScreen() {
             >
               <View style={styles.cardHeader}>
                 <View style={{ flex: 1, marginRight: spacing.sm }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text variant="title" style={{ color: colors.text }}>
-                      {m.name}
-                    </Text>
+                  <Text variant="title" style={{ color: colors.text }}>
+                    {m.name}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
                     {m.id === 'outbreak_horde' && (
                       <Chip label="NEW" variant="accent" size="sm" />
                     )}
+                    <Text
+                      variant="label"
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                      style={{
+                        color: colors.accent,
+                        fontSize: 11,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {m.idealPlayers} • {m.complexity === 'high' ? 'COMPLEX' : 'STANDARD'}
+                    </Text>
                   </View>
-                  <Text
-                    variant="label"
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
-                    style={{
-                      color: colors.accent,
-                      marginTop: 4,
-                      fontSize: 11,
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {m.idealPlayers} • {m.complexity === 'high' ? 'COMPLEX' : 'STANDARD'}
-                  </Text>
                 </View>
                 <Chip
                   label={isSelected ? 'SELECTED' : 'SELECT'}

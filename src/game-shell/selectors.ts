@@ -15,7 +15,7 @@ export function selectMyPlayerId(state: RoundState | null) {
 
 export function selectMyPlayer(state: RoundState | null): GamePlayer | null {
   if (!state) return null;
-  return state.players.find((p) => p.id === state.my_player_id) ?? null;
+  return (state.players ?? []).find((p) => p.id === state.my_player_id) ?? null;
 }
 
 export function selectMyTeam(state: RoundState | null) {
@@ -58,12 +58,12 @@ export function selectJailedPlayers(state: RoundState | null) {
 
 export function selectRunnersRemaining(state: RoundState | null) {
   if (!state) return 0;
-  return state.players.filter((p) => p.team === 'runner' && p.status === 'active').length;
+  return (state.players ?? []).filter((p) => p.team === 'runner' && p.status === 'active').length;
 }
 
 export function selectHuntersCount(state: RoundState | null) {
   if (!state) return 0;
-  return state.players.filter((p) => p.team === 'hunter' && p.status === 'active').length;
+  return (state.players ?? []).filter((p) => p.team === 'hunter' && p.status === 'active').length;
 }
 
 export function selectArea(state: RoundState | null) {
@@ -81,7 +81,7 @@ export function selectPings(state: RoundState | null) {
 export function selectTeammates(state: RoundState | null) {
   if (!state) return [];
   const myTeam = state.my_team;
-  return state.positions.filter(
+  return (state.positions ?? []).filter(
     (pos) => pos.player_id !== state.my_player_id && pos.team === myTeam
   );
 }

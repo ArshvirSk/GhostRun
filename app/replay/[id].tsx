@@ -484,7 +484,7 @@ export default function ReplayScreen() {
   const trailFeatures = useMemo(() => {
     const features: TrailFeature[] = [];
     if (!state || !visibleLayers.trails) return features;
-    for (const player of state.players) {
+    for (const player of state.players ?? []) {
       const points = (trailsByPlayer.get(player.id) ?? []).filter(
         (point) => !hasTimeline || Date.parse(point.recorded_at) <= cursorMs,
       );
@@ -512,8 +512,8 @@ export default function ReplayScreen() {
   const positionFeatures = useMemo(() => {
     const features: PointFeature[] = [];
     if (!state) return features;
-    for (const player of state.players) {
-      const finalPosition = state.positions.find((position) => position.player_id === player.id);
+    for (const player of state.players ?? []) {
+      const finalPosition = (state.positions ?? []).find((position) => position.player_id === player.id);
       let longitude: number | null = null;
       let latitude: number | null = null;
 
@@ -1207,7 +1207,7 @@ export default function ReplayScreen() {
           <View style={styles.stat}>
             <Text variant="caption" color={colors.textMuted}>SQUAD</Text>
             <Text variant="body" weight="bold" color={colors.textLight}>
-              {state.players.length} Operatives
+              {(state.players ?? []).length} Operatives
             </Text>
           </View>
         </View>
