@@ -213,6 +213,17 @@ function formatDuration(totalSeconds: number) {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
+function formatClockDuration(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const minutes = Math.floor(seconds / 60);
+  const remSec = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remSec).padStart(2, '0')}`;
+}
+
+function formatKilometers(meters: number): string {
+  return `${(Math.max(0, meters) / 1000).toFixed(1)} km`;
+}
+
 function teamLabel(team: Team) {
   return team === 'runner' ? 'Runner' : team === 'hunter' ? 'Hunter' : 'No team';
 }
@@ -711,7 +722,7 @@ export default function ResultScreen() {
 
   const formattedDistanceDisplay =
     myDistanceMeters > 0
-      ? formatDistance(myDistanceMeters, unitSystem)
+      ? formatKilometers(myDistanceMeters)
       : '0.4 km';
 
   const endReasonLabel =
@@ -911,12 +922,16 @@ export default function ResultScreen() {
               {myPlayer?.team === 'hunter' ? (
                 <>
                   <View style={styles.statStripCol}>
-                    <Text style={styles.statStripLabel}>TAGS</Text>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>TAGS</Text>
+                    </View>
                     <Text style={styles.statStripValue}>{taggedCount}</Text>
                   </View>
                   <View style={styles.statStripDivider} />
                   <View style={styles.statStripCol}>
-                    <Text style={styles.statStripLabel}>CLOSEST PING</Text>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>CLOSEST PING</Text>
+                    </View>
                     <Text style={styles.statStripValue}>
                       {myPlayerStat?.closest_call_m !== null && myPlayerStat?.closest_call_m !== undefined
                         ? formatDistance(myPlayerStat.closest_call_m, unitSystem)
@@ -925,24 +940,32 @@ export default function ResultScreen() {
                   </View>
                   <View style={styles.statStripDivider} />
                   <View style={styles.statStripCol}>
-                    <Text style={styles.statStripLabel}>HUNT TIME</Text>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>HUNT TIME</Text>
+                    </View>
                     <Text style={styles.statStripValue}>{formatDuration(roundSeconds ?? 0)}</Text>
                   </View>
                 </>
               ) : (
                 <>
                   <View style={styles.statStripCol}>
-                    <Text style={styles.statStripLabel}>SURVIVED</Text>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>SURVIVED</Text>
+                    </View>
                     <Text style={styles.statStripValue}>{formatDuration(roundSeconds ?? 0)}</Text>
                   </View>
                   <View style={styles.statStripDivider} />
                   <View style={styles.statStripCol}>
-                    <Text style={styles.statStripLabel}>DISTANCE</Text>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>DISTANCE</Text>
+                    </View>
                     <Text style={styles.statStripValue}>{formattedDistanceDisplay}</Text>
                   </View>
                   <View style={styles.statStripDivider} />
                   <View style={styles.statStripCol}>
-                    <Text style={styles.statStripLabel}>UNSEEN STREAK</Text>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>UNSEEN STREAK</Text>
+                    </View>
                     <Text style={styles.statStripValue}>
                       {myPlayerStat?.longest_unseen_s ? `${myPlayerStat.longest_unseen_s}s` : '42s'}
                     </Text>
@@ -1024,7 +1047,7 @@ export default function ResultScreen() {
                   </View>
                   <View style={styles.rosterColHeaderRow}>
                     <Text style={[styles.rosterColHeader, { width: 32 }]}>TAGS</Text>
-                    <Text style={[styles.rosterColHeader, { width: 44 }]}>DIST</Text>
+                    <Text style={[styles.rosterColHeader, { width: 48 }]}>DIST</Text>
                     <Text style={[styles.rosterColHeader, { width: 40 }]}>XP</Text>
                     <View style={{ width: 18 }} />
                   </View>
@@ -1034,8 +1057,8 @@ export default function ResultScreen() {
                   const isCurrent = p.id === state.my_player_id;
                   const isExpanded = expandedPlayerId === p.id;
                   const pStat = gameStats?.players.find((item) => item.player_id === p.id);
-                  const pDistM = getPlayerDistanceMeters(p.id);
-                  const distDisplay = pDistM > 0 ? formatDistance(pDistM, unitSystem) : '0.2km';
+                  const pDistM = getPlayerDistanceMeters(p.id) || (isCurrent ? myDistanceMeters : 200);
+                  const distDisplay = formatKilometers(pDistM > 0 ? pDistM : 200);
                   const pXp = roundScore && isCurrent ? Math.round(roundScore.echo) : 70;
 
                   return (
@@ -1073,13 +1096,13 @@ export default function ResultScreen() {
                         </View>
 
                         <View style={styles.operativeMetricsRow}>
-                          <Text style={[styles.operativeMetricVal, { width: 32 }]}>
+                          <Text style={[styles.operativeMetricVal, { width: 32 }]} numberOfLines={1}>
                             {taggedCount}
                           </Text>
-                          <Text style={[styles.operativeMetricValMuted, { width: 44 }]}>
+                          <Text style={[styles.operativeMetricValMuted, { width: 48 }]} numberOfLines={1}>
                             {distDisplay}
                           </Text>
-                          <Text style={[styles.operativeMetricValXp, { width: 40 }]}>
+                          <Text style={[styles.operativeMetricValXp, { width: 40 }]} numberOfLines={1}>
                             +{pXp}
                           </Text>
                           <Ionicons
@@ -1162,7 +1185,7 @@ export default function ResultScreen() {
                   </View>
                   <View style={styles.rosterColHeaderRow}>
                     <Text style={[styles.rosterColHeader, { width: 44 }]}>TIME</Text>
-                    <Text style={[styles.rosterColHeader, { width: 44 }]}>DIST</Text>
+                    <Text style={[styles.rosterColHeader, { width: 48 }]}>DIST</Text>
                     <Text style={[styles.rosterColHeader, { width: 36 }]}>XP</Text>
                     <View style={{ width: 18 }} />
                   </View>
@@ -1173,7 +1196,7 @@ export default function ResultScreen() {
                   const isExpanded = expandedPlayerId === p.id;
                   const pStat = gameStats?.players.find((item) => item.player_id === p.id);
                   const pDistM = getPlayerDistanceMeters(p.id) || (isCurrent ? myDistanceMeters : 400);
-                  const distDisplay = pDistM > 0 ? formatDistance(pDistM, unitSystem) : '0.4km';
+                  const distDisplay = formatKilometers(pDistM > 0 ? pDistM : 400);
                   const pXp = roundScore && isCurrent ? Math.round(roundScore.echo) : 51;
 
                   return (
@@ -1212,13 +1235,13 @@ export default function ResultScreen() {
                         </View>
 
                         <View style={styles.operativeMetricsRow}>
-                          <Text style={[styles.operativeMetricVal, { width: 44 }]}>
-                            {formatDuration(roundSeconds ?? 0)}
+                          <Text style={[styles.operativeMetricVal, { width: 44 }]} numberOfLines={1}>
+                            {formatClockDuration(roundSeconds ?? 0)}
                           </Text>
-                          <Text style={[styles.operativeMetricValMuted, { width: 44 }]}>
+                          <Text style={[styles.operativeMetricValMuted, { width: 48 }]} numberOfLines={1}>
                             {distDisplay}
                           </Text>
-                          <Text style={[styles.operativeMetricValXp, { width: 36, color: '#94A3B8' }]}>
+                          <Text style={[styles.operativeMetricValXp, { width: 36, color: '#94A3B8' }]} numberOfLines={1}>
                             +{pXp}
                           </Text>
                           <Ionicons
@@ -1550,9 +1573,11 @@ export default function ResultScreen() {
         <Pressable style={styles.modalBackdrop} onPress={() => setShowFormulaModal(false)}>
           <Pressable style={styles.formulaModalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.formulaModalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={styles.formulaModalTitleBox}>
                 <View style={[styles.progressionDot, { backgroundColor: outcomeAccent }]} />
-                <Text style={styles.formulaModalTitle}>SEASON ECHO MATH BREAKDOWN</Text>
+                <Text style={styles.formulaModalTitle} numberOfLines={1}>
+                  SEASON ECHO MATH BREAKDOWN
+                </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
@@ -1760,26 +1785,30 @@ const styles = StyleSheet.create({
   bannerSubtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
     marginTop: 2,
   },
   bannerSubtitleBold: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 11,
+    fontSize: 10,
+    letterSpacing: 0.2,
     color: '#E2E8F0',
   },
   bannerSubtitleDot: {
     color: '#475569',
-    fontSize: 10,
+    fontSize: 9,
   },
   bannerSubtitleMuted: {
     fontFamily: 'SegoeUI-Regular',
-    fontSize: 11,
+    fontSize: 10,
+    letterSpacing: 0.2,
     color: '#94A3B8',
   },
   bannerSubtitleDuration: {
     fontFamily: 'SegoeUI-Bold',
-    fontSize: 11,
+    fontSize: 10,
+    letterSpacing: 0.2,
     color: '#F8FAFC',
   },
 
@@ -1916,18 +1945,25 @@ const styles = StyleSheet.create({
   statStripCol: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   statStripDivider: {
     width: 1,
-    height: 24,
+    height: 32,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  statStripLabelBox: {
+    minHeight: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   statStripLabel: {
     fontFamily: 'SegoeUI-Bold',
     fontSize: 9,
     letterSpacing: 0.8,
     color: '#64748B',
-    marginBottom: 2,
+    textAlign: 'center',
     textTransform: 'uppercase',
   },
   statStripValue: {
@@ -2457,11 +2493,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: 10,
+    gap: 8,
+  },
+  formulaModalTitleBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   formulaModalTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 11,
-    letterSpacing: 0.8,
+    fontSize: 9.5,
+    letterSpacing: 0.2,
     color: '#F8FAFC',
   },
   formulaCloseBtn: {
@@ -2471,6 +2514,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1B2334',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   formulaItemList: {
     gap: 6,
