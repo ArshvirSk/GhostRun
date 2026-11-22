@@ -229,6 +229,12 @@ export const HudFrame = memo(function HudFrame({
               </View>
             )}
           </View>
+
+          {extraChips && (
+            <View style={{ marginTop: 8 }}>
+              {extraChips}
+            </View>
+          )}
         </View>
       )}
     </Pressable>

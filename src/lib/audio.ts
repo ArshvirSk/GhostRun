@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { triggerHaptic } from '../motion/haptics';
 import {
   calculateProximityTier,
   LOUDSPEAKER_SAFETY_MANDATE,
@@ -126,18 +127,24 @@ export function setProximityTier(tier: ProximityTier): void {
   // Trigger initial beat immediately, then repeat at target cadence
   if (tier === 'slow') {
     playSound('heartbeat_slow');
+    triggerHaptic('heartbeat');
     proximityInterval = setInterval(() => {
       if (!isMutedState) playSound('heartbeat_slow');
-    }, 1000);
+      triggerHaptic('heartbeat');
+    }, 1200);
   } else if (tier === 'fast') {
     playSound('heartbeat_fast');
+    triggerHaptic('heartbeat');
     proximityInterval = setInterval(() => {
       if (!isMutedState) playSound('heartbeat_fast');
-    }, 500);
+      triggerHaptic('heartbeat');
+    }, 600);
   } else if (tier === 'danger') {
     playSound('alarm_danger');
+    triggerHaptic('dangerAlert');
     proximityInterval = setInterval(() => {
       if (!isMutedState) playSound('alarm_danger');
+      triggerHaptic('dangerAlert');
     }, 750);
   }
 }

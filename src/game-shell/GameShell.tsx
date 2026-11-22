@@ -58,6 +58,10 @@ import {
 } from './selectors';
 import { MapView } from './MapView';
 import { TacticalRadarCanvas } from './TacticalRadarCanvas';
+import {
+  OffScreenObjectiveReticles,
+  type TacticalObjective,
+} from '../components/map';
 import { HudFrame } from './HudFrame';
 import { PhaseBanner } from './PhaseBanner';
 import { SosSheet } from './SosSheet';
@@ -543,6 +547,129 @@ export function GameShell({ gameId }: GameShellProps) {
     return minD;
   }, [ownFix, state, pings]);
 
+  // Derived tactical objectives for off-screen compass reticles
+  const tacticalObjectives = useMemo<TacticalObjective[]>(() => {
+    if (!ownFix || !state) return [];
+    const list: TacticalObjective[] = [];
+
+    // Target / VIP
+    if (target?.latitude != null && target?.longitude != null) {
+      list.push({
+        id: 'obj-target',
+        title: myRole === 'hunter' ? 'TARGET' : 'VIP',
+        type: 'target',
+        location: { latitude: target.latitude, longitude: target.longitude },
+        color: colors.primary,
+        icon: 'radio-button-on',
+      });
+    }
+
+    // Extraction Point
+    const extraction =
+      (state.game as any)?.extraction ||
+      (state as any)?.relay_heist?.extraction ||
+      (state.game?.mode_params as any)?.extraction;
+    if (extraction?.latitude != null && extraction?.longitude != null) {
+      list.push({
+        id: 'obj-extraction',
+        title: 'EXTRACTION',
+        type: 'extraction',
+        location: { latitude: extraction.latitude, longitude: extraction.longitude },
+        color: '#00E5FF',
+        icon: 'exit-outline',
+      });
+    }
+
+    // Jail Zone
+    const jail = state.game?.jail || (state.game?.mode_params as any)?.jail;
+    if (jail?.latitude != null && jail?.longitude != null) {
+      list.push({
+        id: 'obj-jail',
+        title: 'JAIL',
+        type: 'jail',
+        location: { latitude: jail.latitude, longitude: jail.longitude },
+        color: '#FFB800',
+        icon: 'lock-closed-outline',
+      });
+    }
+
+    // Outbreak Horde Antidote Zones
+    if (isOutbreakHorde && dynamicZones.length > 0) {
+      const antidotes = dynamicZones.filter((z) => z.type === 'antidote' && z.remaining_charges > 0);
+      for (const [idx, z] of antidotes.slice(0, 2).entries()) {
+        list.push({
+          id: `obj-antidote-${z.id || idx}`,
+          title: 'ANTIDOTE',
+          type: 'antidote',
+          location: { latitude: z.latitude, longitude: z.longitude },
+          color: '#00FF66',
+          icon: 'medkit-outline',
+        });
+      }
+    }
+
+    // Territory Pulse Sectors
+    const tpSectors =
+      (state.game as any)?.territory_pulse?.sectors ||
+      (state.game as any)?.territory_pulse?.zones ||
+      (state as any)?.territory_pulse?.sectors ||
+      (state as any)?.territory_pulse?.zones ||
+      (state.game?.mode_params as any)?.sectors;
+    if (Array.isArray(tpSectors) && tpSectors.length > 0) {
+      for (const sec of tpSectors.slice(0, 4)) {
+        if (sec.latitude != null && sec.longitude != null) {
+          list.push({
+            id: `obj-sec-${sec.id}`,
+            title: (sec.name || 'SECTOR').toUpperCase(),
+            type: 'sector',
+            location: { latitude: sec.latitude, longitude: sec.longitude },
+            color:
+              (sec.controller || sec.controlled_by) === 'runner'
+                ? colors.runner
+                : (sec.controller || sec.controlled_by) === 'hunter'
+                ? colors.hunter
+                : '#F59E0B',
+            icon: 'flag-outline',
+          });
+        }
+      }
+    }
+
+    // Opponents / Hostiles
+    if (state.positions && state.positions.length > 0) {
+      for (const pos of state.positions) {
+        if (pos.player_id !== state.my_player_id && pos.team !== state.my_team) {
+          list.push({
+            id: `obj-hostile-${pos.player_id}`,
+            title: 'HOSTILE',
+            type: 'threat',
+            location: { latitude: pos.latitude, longitude: pos.longitude },
+            color: '#FF3366',
+            icon: 'skull-outline',
+          });
+          break;
+        }
+      }
+    }
+
+    // Last Contact / Radar Pings
+    if (pings && pings.length > 0) {
+      const latestPing = pings[pings.length - 1];
+      if (latestPing?.latitude != null && latestPing?.longitude != null) {
+        list.push({
+          id: `obj-ping-${latestPing.id || 'last'}`,
+          title: 'LAST CONTACT',
+          type: 'threat',
+          location: { latitude: latestPing.latitude, longitude: latestPing.longitude },
+          color: colors.danger,
+          icon: 'warning-outline',
+        });
+      }
+    }
+
+    return list;
+  }, [ownFix, state, target, myRole, colors, isOutbreakHorde, dynamicZones, pings]);
+
   useEffect(() => {
     if (!state || state.game.status !== 'live' || sfxMuted || muted) {
       stopProximityHeartbeat();
@@ -908,6 +1035,33 @@ export function GameShell({ gameId }: GameShellProps) {
         />
       )}
 
+      {/* Off-Screen Edge Reticles for Tactical Objectives */}
+      {!showHeadStartMiniMap && (
+        <OffScreenObjectiveReticles
+          ownFix={ownFix}
+          userHeading={userHeading}
+          isMapLocked={isMapLocked}
+          objectives={tacticalObjectives}
+        />
+      )}
+
+      {/* Proximity Threat Edge Glow Vignette (Escalating Warning) */}
+      {nearestOpponentDistM !== null && nearestOpponentDistM < 30 && (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.threatVignette,
+            {
+              borderColor:
+                nearestOpponentDistM < 15
+                  ? 'rgba(255, 59, 48, 0.75)'
+                  : 'rgba(255, 184, 0, 0.55)',
+              borderWidth: nearestOpponentDistM < 15 ? 5 : 3,
+            },
+          ]}
+        />
+      )}
+
       {/* Runner Headstart Directives Overlay Or Normal Role Layout */}
       {showHeadStartMiniMap ? (
         <View
@@ -1195,5 +1349,14 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 14,
     borderWidth: 1,
+  },
+  threatVignette: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 45,
+    backgroundColor: 'transparent',
   },
 });

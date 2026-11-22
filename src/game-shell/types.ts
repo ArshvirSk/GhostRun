@@ -117,6 +117,18 @@ export interface TerritoryPulseState {
     runner_count?: number;
     hunter_count?: number;
   }[];
+  zones?: {
+    id: string;
+    name: string;
+    zone_index: number;
+    longitude: number;
+    latitude: number;
+    radius_m: number;
+    controller: 'neutral' | 'runner' | 'hunter';
+    contender: 'neutral' | 'runner' | 'hunter' | null;
+    runner_count?: number;
+    hunter_count?: number;
+  }[];
 }
 
 export interface GhostDuelState {
@@ -260,6 +272,7 @@ export interface RoundState {
   assassin_ring?: AssassinRingState | null;
   ghost_duel?: GhostDuelState | null;
   relay_heist?: RelayHeistState | null;
+  territory_pulse?: TerritoryPulseState | null;
   operator?: OperatorState | null;
   ai_gm?: AiGmState | null;
   safety?: SafetyState | null;
