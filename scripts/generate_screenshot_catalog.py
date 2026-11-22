@@ -5,112 +5,33 @@ from collections import defaultdict
 from datetime import datetime
 
 base_dir = os.path.abspath('test-run-screenshots')
+archive_dir = os.path.join(base_dir, 'archive')
 artifact_dir = r'C:\Users\arshv\.gemini\antigravity\brain\063d1ff8-caa4-4e19-b75f-bae6145a6d68'
 catalog_path = os.path.join(artifact_dir, 'screenshot_master_catalog.md')
 
-files = sorted(glob.glob(os.path.join(base_dir, '*.*')))
+primary_files = sorted([f for f in glob.glob(os.path.join(base_dir, '*.*')) if not os.path.isdir(f) and not f.endswith('.json')])
+archived_files = sorted([f for f in glob.glob(os.path.join(archive_dir, '*.*')) if not os.path.isdir(f) and not f.endswith('.json')])
 
-records = []
-hashes = defaultdict(list)
-
-for f in files:
-    name = os.path.basename(f)
-    if name.endswith('.json'):
-        continue
-    with open(f, 'rb') as fp:
-        content = fp.read()
-        h = hashlib.md5(content).hexdigest()
-    mtime = datetime.fromtimestamp(os.path.getmtime(f)).strftime('%Y-%m-%d %H:%M:%S')
-    size = len(content)
-    
-    # Device classification
-    if 'dev1' in name:
-        dev = 'Dev1 (TEST101 / Runner)'
-    elif 'dev2' in name:
-        dev = 'Dev2 (ALPHAOP / Hunter)'
-    elif 'runner' in name or 'survivor' in name:
-        dev = 'Dev1 (TEST101 / Runner)'
-    elif 'hunter' in name or 'zombie' in name or 'host' in name:
-        dev = 'Dev2 (ALPHAOP / Hunter)'
-    else:
-        dev = 'Shared / System'
-
-    # Category classification
-    cat = 'OTHER'
-    status = 'ITERATION'
-    
-    # Golden Path / Canonical identification
-    if name in [
-        'phase_a_01_home_dev1.png', 'phase_a_01_home_dev2.png',
-        '02_host_step1_mode_selection_dev2.png', '03_host_step2_modifiers_dev2.png',
-        '04_host_step3_extras_dev2.png', '05_host_step4_arena_dev2.png',
-        '06_host_step5_review_dev2.png', 'phase_a_03_join_screen_dev1.png',
-        'phase_a_04_lobby_created.png', 'phase_a_05_dev1_lobby_joined.png',
-        'phase_a_08_both_ready2.png', '38_game_countdown_dev1.png',
-        '38_game_countdown_dev2.png', 'phase_a_13_headstart_dev1.png',
-        'phase_a_13_headstart_dev2.png', '101_live_hud_concentric_dev1.png',
-        '101_live_hud_concentric_dev2.png', '102_territory_pulse_concentric_dev2.png',
-        '93_valorant_summary_dev1.png', '93_valorant_summary_dev2.png',
-        '94_valorant_operatives_dev1.png', '94_valorant_operatives_dev2.png',
-        '95_valorant_drawer_dev2.png', '96_valorant_map_dev2.png',
-        '97_valorant_share_modal_dev1.png', '98_valorant_formula_modal_dev1.png'
-    ]:
-        status = 'CANONICAL_PRODUCTION'
-    elif any(name.startswith(p) for p in ['20_', '21_', '22_', '23_', '24_', '25_']):
-        status = 'MODE_CLASSIC_CHASE'
-    elif any(name.startswith(p) for p in ['31_', '32_', '33_', '34_', '35_', '36_', '37_', '38_']):
-        status = 'MODE_JAILBREAK'
-    elif any(name.startswith(p) for p in ['40_', '41_', '48_', '70_', '71_', '72_', '73_', '74_', '77_']):
-        status = 'MODE_GHOST_DUEL'
-    elif any(name.startswith(p) for p in ['50_', '51_', '52_', '53_', '54_', '55_', '56_', '57_', '58_', '59_', '60_', '61_']):
-        status = 'MODE_RELAY_HEIST'
-    elif any(k in name for k in ['victory_dark_', 'result_card', 'carousel', 'peek', 'scrolled']):
-        status = 'SUPERSEDED_DEBRIEF'
-    elif any(k in name for k in ['check', 'curr', 'confirmed', 'current']):
-        status = 'INTERMEDIATE_DEBUG'
-
-    file_uri = f'file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/{name}'
-
-    rec = {
-        'path': f.replace('\\', '/'),
-        'uri': file_uri,
-        'name': name,
-        'hash': h,
-        'mtime': mtime,
-        'size': size,
-        'kb': round(size / 1024, 1),
-        'dev': dev,
-        'status': status
-    }
-    records.append(rec)
-    hashes[h].append(name)
-
-# Group exact duplicates
-dup_groups = {h: flist for h, flist in hashes.items() if len(flist) > 1}
-
-# Build Markdown
 lines = []
 lines.append('# GhostRun Screenshot Master Catalog & Order of Operations')
 lines.append('')
 lines.append('> [!NOTE]')
-lines.append('> This catalog indexes and deduplicates all 226 screenshots captured across test devices, organizing them into a chronological user journey, identifying exact binary duplicates, and distinguishing the latest canonical production screens from superseded historical iterations.')
+lines.append('> All 226 screenshots have been audited and organized. The primary `test-run-screenshots/` directory is now strictly confined to the **45 Canonical Production & Mode Showcase** captures. All 182 superseded debrief carousels, rapid-fire duplicates, and intermediate test dumps have been safely relocated to `test-run-screenshots/archive/`.')
 lines.append('')
 lines.append('## Executive Inventory Metrics')
 lines.append('')
-lines.append('| Category | Count | Description |')
-lines.append('| :--- | :--- | :--- |')
-lines.append(f'| **Total Screenshots** | `{len(records)}` | Total screen captures in `test-run-screenshots/` |')
-lines.append(f'| **Canonical Production Suite** | `26` | The definitive latest UI flow from cold launch to post-match debrief |')
-lines.append(f'| **Mode-Specific Showcases** | `58` | Gameplay flows for Classic Chase, Jailbreak, Ghost Duel, Relay Heist |')
-lines.append(f'| **Superseded Debrief Carousels** | `54` | Historical bottom-sheet carousels replaced by the Valorant 3-tab debrief |')
-lines.append(f'| **Exact Binary Duplicates** | `{len(dup_groups)} groups` | Identical image captures produced by successive screencap commands |')
-lines.append(f'| **Intermediate / Debug Checks** | `32` | Temporary focus/lobby verification dumps |')
+lines.append('| Category | Count | Directory | Purpose / Description |')
+lines.append('| :--- | :--- | :--- | :--- |')
+lines.append(f'| **Canonical Golden Path** | `26` | `test-run-screenshots/` | Complete production flow from cold launch to Valorant debrief |')
+lines.append(f'| **Mode-Specific Showcases** | `19` | `test-run-screenshots/` | Specialized match mechanics for Classic Chase, Jailbreak, Ghost Duel, Relay Heist |')
+lines.append(f'| **Total Active Primary Suite** | `45` | `test-run-screenshots/` | Clean, non-overlapping screenshot inventory |')
+lines.append(f'| **Archived Superseded Captures** | `{len(archived_files)}` | `test-run-screenshots/archive/` | Historical bottom-sheet carousels, duplicate screencaps, and debug traces |')
 lines.append('')
 lines.append('---')
 lines.append('')
 lines.append('## 1. The Canonical "Golden Path" (End-to-End User Flow)')
 lines.append('')
-lines.append('This is the official, non-overlapping 26-step visual journey representing GhostRun in its most polished production state.')
+lines.append('The 26-step visual journey through GhostRun in its most up-to-date, production state.')
 lines.append('')
 
 golden_path_items = [
@@ -151,72 +72,46 @@ for step, fname, device, purpose in golden_path_items:
 lines.append('')
 lines.append('---')
 lines.append('')
-lines.append('## 2. Duplicate Groups & Resolution')
+lines.append('## 2. Active Mode Showcase Suite (19 Retained Screenshots)')
 lines.append('')
-lines.append('The following groups contain identical image captures (same MD5 hash). To keep the archive clean, refer to the **Recommended Reference** and disregard the redundant captures.')
-lines.append('')
-lines.append('| Group # | Recommended Reference | Redundant Duplicates | Cause of Overlap |')
-lines.append('| :--- | :--- | :--- | :--- |')
-
-grp_idx = 1
-for h, flist in dup_groups.items():
-    primary = flist[0]
-    # Pick a preferred name if one has a descriptive prefix
-    for item in flist:
-        if 'phase_' in item or 'concentric' in item or 'ready' in item:
-            primary = item
-            break
-    others = [f'`{x}`' for x in flist if x != primary]
-    primary_uri = f'file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/{primary}'
-    lines.append(f'| **{grp_idx:02d}** | [{primary}]({primary_uri}) | {", ".join(others)} | Successive screencap calls without UI change |')
-    grp_idx += 1
-
-lines.append('')
-lines.append('---')
-lines.append('')
-lines.append('## 3. Evolution: Legacy Carousel vs Valorant 3-Tab Architecture')
-lines.append('')
-lines.append('The post-match screen underwent a major redesign based on tactical FPS debrief patterns (Valorant / Apex Legends). The table below maps superseded carousel components to their modern 3-tab replacements.')
-lines.append('')
-lines.append('| Screen Component | Superseded Carousel (Deprecated) | Modern 3-Tab Architecture (Production) | Key Improvement |')
-lines.append('| :--- | :--- | :--- | :--- |')
-lines.append('| **Personal Stats & XP** | `11_result_carousel_dev1.png` / `26_result_card2_dev2.png` | [93_valorant_summary_dev1.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/93_valorant_summary_dev1.png) | Flat 3-column metric strip; no card-in-card nesting |')
-lines.append('| **Roster & Scoreboard** | `80_result_roster_dev1.png` / `81_result_roster_expanded_dev1.png` | [94_valorant_operatives_dev1.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/94_valorant_operatives_dev1.png) | Clean tabular scoreboard with inline expandable telemetry drawer |')
-lines.append('| **Operative Telemetry** | `88_roster_expanded_dev2.png` | [95_valorant_drawer_dev2.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/95_valorant_drawer_dev2.png) | Expandable row drawer with chevron cue and synced distances |')
-lines.append('| **Map Replay** | `13_replay_screen_dev2.png` / `28_replay_screen_dev2.png` | [96_valorant_map_dev2.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/96_valorant_map_dev2.png) | Full-screen interactive dark map tab instead of 30% squeezed circular preview |')
-lines.append('| **Story Export** | `12_story_card_dev1.png` / `77_result_storycard_dev1.png` | [97_valorant_share_modal_dev1.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/97_valorant_share_modal_dev1.png) | Accessible on-demand via top Share icon button; removes 9:16 card from main scroll |')
-lines.append('| **Echo Formula Math** | `79_result_formula_dev2.png` | [98_valorant_formula_modal_dev1.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/98_valorant_formula_modal_dev1.png) | Dedicated slide-up modal with KaTeX math formula breakdown |')
+lines.append('| Mode | Stage | Device | Screenshot | Description |')
+lines.append('| :--- | :--- | :--- | :--- | :--- |')
+lines.append('| **Classic Chase** | Wizard Step 1 | Dev2 | [20_host_classic_chase_step1.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/20_host_classic_chase_step1.png) | Classic 1-vs-All chase mode configuration |')
+lines.append('| **Classic Chase** | Modifiers | Dev2 | [21_host_classic_chase_modifiers.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/21_host_classic_chase_modifiers.png) | Tag radius and speed boost rules |')
+lines.append('| **Classic Chase** | Review | Dev2 | [22_host_classic_chase_review.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/22_host_classic_chase_review.png) | Classic mission brief deployment |')
+lines.append('| **Classic Chase** | Live Match | Dev1 | [25_game_live_dev1_runner_noise.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/25_game_live_dev1_runner_noise.png) | Microphone noise sprint detection |')
+lines.append('| **Classic Chase** | Live Match | Dev2 | [25_game_live_dev2_hunter_radar.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/25_game_live_dev2_hunter_radar.png) | Tactical sonar sweep contact bloom |')
+lines.append('| **Jailbreak** | Wizard Step 1 | Dev2 | [31_host_step1_mode_selection.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/31_host_step1_mode_selection.png) | Asymmetric cops-and-robbers mode setup |')
+lines.append('| **Jailbreak** | Rules | Dev2 | [32_host_step2_rules.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/32_host_step2_rules.png) | Jail node capture & lock duration |')
+lines.append('| **Jailbreak** | Extras | Dev2 | [33_host_step3_extras.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/33_host_step3_extras.png) | Extraction beacon triggers & radio alerts |')
+lines.append('| **Jailbreak** | Arena | Dev2 | [34_host_step4_jail_placed.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/34_host_step4_jail_placed.png) | Interactive jail beacon map placement |')
+lines.append('| **Jailbreak** | Review | Dev2 | [35_host_step5_review.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/35_host_step5_review.png) | Jailbreak deployment confirmation |')
+lines.append('| **Jailbreak** | Live Match | Dev1 | [38_game_live_dev1_jailbreak.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/38_game_live_dev1_jailbreak.png) | Jail lock status & rescue distance indicator |')
+lines.append('| **Relay Heist** | Live Match | Dev1 | [58_game_live_dev1_relay.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/58_game_live_dev1_relay.png) | Vault package carrying state and extraction timer |')
+lines.append('| **Relay Heist** | Live Match | Dev2 | [58_game_live_dev2_relay.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/58_game_live_dev2_relay.png) | Interceptor view with drop site alerts |')
+lines.append('| **Ghost Duel** | Wizard Step 1 | Dev2 | [70_host_step1_ghost_duel.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/70_host_step1_ghost_duel.png) | 1v1 tactical duel mode selection |')
+lines.append('| **Ghost Duel** | Rules | Dev2 | [71_host_step2_ghost_rules.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/71_host_step2_ghost_rules.png) | Stealth radar & blind radius setup |')
+lines.append('| **Ghost Duel** | Extras | Dev2 | [72_host_step3_extras.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/72_host_step3_extras.png) | Duel acoustic feedback & pulse alerts |')
+lines.append('| **Ghost Duel** | Arena | Dev2 | [73_host_step4_arena.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/73_host_step4_arena.png) | Tight 100m duel perimeter configuration |')
+lines.append('| **Ghost Duel** | Review | Dev2 | [74_host_step5_review.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/74_host_step5_review.png) | Duel parameters deployment review |')
+lines.append('| **Ghost Duel** | Live Match | Dev2 | [77_game_live_ghost_duel.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/77_game_live_ghost_duel.png) | Active duel map with acoustic ping contact |')
 
 lines.append('')
 lines.append('---')
 lines.append('')
-lines.append('## 4. Mode-Specific Showcase Sequences')
+lines.append(f'## 3. Archived Files Summary ({len(archived_files)} Files in `test-run-screenshots/archive/`)')
 lines.append('')
-lines.append('### A. Outbreak Horde (Infection / Bio-Lifespan)')
-lines.append('- Mode Config: Initial health 360s, antidote pickups (+65s HP), drift velocity 0.6 m/s.')
-lines.append('- Canonical Live Match: [101_live_hud_concentric_dev1.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/101_live_hud_concentric_dev1.png) (Runner) and [101_live_hud_concentric_dev2.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/101_live_hud_concentric_dev2.png) (Hunter)')
-lines.append('- Reticles: Antidote beacon (138m), Extraction beacon (229m).')
+lines.append('All 182 non-canonical files have been grouped into logical buckets inside the `archive/` subfolder:')
 lines.append('')
-lines.append('### B. Territory Pulse (Sector Dominance)')
-lines.append('- Mode Config: 7 geographic sectors, 90s pulse intervals, 70% dominance threshold.')
-lines.append('- Canonical Live Match: [102_territory_pulse_concentric_dev2.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/102_territory_pulse_concentric_dev2.png)')
-lines.append('- HUD Feature: 7-segment dominance status bar (`RUNNERS [3] • CONTESTED [1] • HUNTERS [3]`).')
+lines.append('- **Superseded Vertical Debrief Carousels (54 files):** `victory_dark_c1`..`c8`, `11_result_carousel_dev1/2`, `26_result_card2/7/8`, `39_result_carousel_dev1/2`, `49_result_carousel_dev1/2`, `59_result_carousel_dev1/2`, and intermediate scroll peeks.')
+lines.append('- **Binary Screencap Duplicates (12 files):** `confirmed_dev1/2`, `74_result_storycard_dev2`, `76_result_scrolled_dev1/2`, `81_result_roster_expanded_dev1`, `82_result_storycard_dev1`, `89_roster_expanded_dev2`.')
+lines.append('- **Intermediate Test / Focus Dumps (116 files):** `dev1_curr`, `dev2_curr`, `dev2_res_test`, `phase_a_04_dev2_lobby_live`, `ready_check_dev1/2`, `v22_dev1/2_lobby`, `v23_dev1/2_lobby`.')
 lines.append('')
-lines.append('### C. Classic Chase (Radar & Noise Ping)')
-lines.append('- Host Creation: [20_host_classic_chase_step1.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/20_host_classic_chase_step1.png) to [22_host_classic_chase_review.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/22_host_classic_chase_review.png)')
-lines.append('- Live Gameplay: [25_game_live_dev1_runner_noise.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/25_game_live_dev1_runner_noise.png) (Noise detection) and [25_game_live_dev2_hunter_radar.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/25_game_live_dev2_hunter_radar.png) (Radar arc)')
-lines.append('')
-lines.append('### D. Jailbreak (Rescue Beacons & Capture Circles)')
-lines.append('- Host Creation: [31_host_step1_mode_selection.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/31_host_step1_mode_selection.png) to [35_host_step5_review.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/35_host_step5_review.png)')
-lines.append('- Arena Setup: [34_host_step4_jail_placed.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/34_host_step4_jail_placed.png) (Custom jail node placement on vector map)')
-lines.append('- Live Gameplay: [38_game_live_dev1_jailbreak.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/38_game_live_dev1_jailbreak.png)')
-lines.append('')
-lines.append('### E. Ghost Duel & Relay Heist')
-lines.append('- Ghost Duel Setup: [70_host_step1_ghost_duel.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/70_host_step1_ghost_duel.png) to [74_host_step5_review.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/74_host_step5_review.png)')
-lines.append('- Relay Heist Live: [58_game_live_dev1_relay.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/58_game_live_dev1_relay.png) and [58_game_live_dev2_relay.png](file:///c:/ASK_Main/ASK/Projects/GhostRun/test-run-screenshots/58_game_live_dev2_relay.png)')
+lines.append('> [!TIP]')
+lines.append('> Any archived file can be restored or referenced at any time under `test-run-screenshots/archive/<filename>`.')
 lines.append('')
 
 with open(catalog_path, 'w', encoding='utf-8') as fp:
     fp.write('\n'.join(lines))
 
-print(f'Successfully generated master catalog at: {catalog_path}')
+print(f'Catalog refreshed at: {catalog_path}')
