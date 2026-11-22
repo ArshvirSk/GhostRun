@@ -55,7 +55,7 @@ export const OffScreenObjectiveReticles = memo(function OffScreenObjectiveReticl
   // Inset boundary for clamping reticles to screen edges
   const minX = 75;
   const maxX = width - 75;
-  const minY = Math.max(insets.top, 16) + 215; // Below expanded top HUD, banners & event feeds
+  const minY = Math.max(insets.top, 16) + 290; // Below expanded top HUD, territory dominance bar, banners & event feeds
   const maxY = height - Math.max(insets.bottom, 16) - 150; // Above bottom action bar & buttons
 
   const heading = userHeading !== null && userHeading !== undefined ? userHeading : 0;
@@ -68,10 +68,8 @@ export const OffScreenObjectiveReticles = memo(function OffScreenObjectiveReticl
         if (dist < 40) return null;
 
         const absBearing = bearingDeg(ownFix, obj.location);
-        // If map rotates with heading, relative screen angle changes; otherwise North is up
-        const screenAngleDeg = isMapLocked
-          ? (absBearing - heading + 360) % 360
-          : absBearing;
+        // Map is oriented North-Up for rock-solid stability; screen angle matches absolute bearing
+        const screenAngleDeg = absBearing;
 
         const rad = (screenAngleDeg * Math.PI) / 180;
         const dx = Math.sin(rad);
@@ -155,7 +153,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 8,
     zIndex: 40,
-    maxWidth: 180,
+    maxWidth: 200,
   },
   arrowBox: {
     width: 16,

@@ -103,20 +103,35 @@ export function GameShell({ gameId }: GameShellProps) {
   const [now, setNow] = useState(() => Date.now());
   const [serverOffset, setServerOffset] = useState(0);
 
-  // Tactical Compass & Heading Tracking
+  // Tactical Compass & Heading Tracking with Jitter Deadband
   const [userHeading, setUserHeading] = useState<number | null>(null);
 
   useEffect(() => {
     let sub: Location.LocationSubscription | null = null;
     let mounted = true;
+    let lastHeading = 0;
+    let lastUpdateTime = 0;
+
     (async () => {
       try {
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== 'granted') return;
         sub = await Location.watchHeadingAsync((headingData) => {
           if (!mounted) return;
-          const heading = headingData.trueHeading >= 0 ? headingData.trueHeading : headingData.magHeading;
-          setUserHeading(heading);
+          const raw = headingData.trueHeading >= 0 ? headingData.trueHeading : headingData.magHeading;
+          if (raw < 0 || isNaN(raw)) return;
+
+          const nowMs = Date.now();
+          // Rate-limit React updates to ~10 updates/sec (100ms) to prevent high-frequency re-render churn
+          if (nowMs - lastUpdateTime < 100) return;
+
+          // Angular deadband: ignore angular shifts < 3.5 degrees to eliminate sensor tremor and desk noise
+          const diff = Math.abs(((raw - lastHeading + 540) % 360) - 180);
+          if (diff < 3.5) return;
+
+          lastHeading = raw;
+          lastUpdateTime = nowMs;
+          setUserHeading(raw);
         });
       } catch {
         // Heading may not be supported on emulators without compass
@@ -349,16 +364,33 @@ export function GameShell({ gameId }: GameShellProps) {
     };
   }, []);
 
-  // Local location watcher: when phone is locked/backgrounded with background sharing enabled,
-  // skip local React state marker updates to conserve CPU & battery.
+  // Local location watcher with stationary GPS drift suppression:
+  // When phone is resting on a desk or operative is standing still, suppress GPS micro-wander (< 3.0m)
+  const lastAcceptedFixRef = useRef<GeoFix | null>(null);
+
   useEffect(() => {
     if (sharing !== 'on') return;
     return watchLocation((nextFix) => {
       if (AppState.currentState !== 'active' && backgroundSharing) return;
+
+      const currentSpeed = nextFix.speed ?? 0;
+
+      // Stationary GPS Wander Deadband:
+      // If speed is very low and displacement is within satellite noise (< 3.0m), keep existing fix
+      if (lastAcceptedFixRef.current) {
+        const d = distanceM(
+          { latitude: lastAcceptedFixRef.current.latitude, longitude: lastAcceptedFixRef.current.longitude },
+          { latitude: nextFix.latitude, longitude: nextFix.longitude }
+        );
+        if (currentSpeed < 0.7 && d < 3.0) {
+          return; // Suppress stationary micro-jitter
+        }
+      }
+
+      lastAcceptedFixRef.current = nextFix;
       setFix(nextFix);
 
       const now = Date.now();
-      const currentSpeed = nextFix.speed ?? 0;
       if (currentSpeed >= 0.5) {
         setLastMovedAt(now);
       }
@@ -756,7 +788,7 @@ export function GameShell({ gameId }: GameShellProps) {
       return Boolean(lockedParam);
     }
     const difficulty = (state.game as any).difficulty || 'standard';
-    return difficulty === 'standard' || difficulty === 'hardcore' || difficulty === 'blackout' || difficulty === 'extreme';
+    return difficulty === 'hardcore' || difficulty === 'blackout' || difficulty === 'extreme';
   }, [state]);
 
   const isBlackoutMode = useMemo(() => {

@@ -48,17 +48,30 @@ export const MapView = memo(function MapView({
 }: MapViewProps) {
   const { colors, isDark } = useTheme();
   const cameraRef = useRef<CameraRef>(null);
+  const lastCameraCenterRef = useRef<[number, number] | null>(null);
 
-  // When map is locked in Tactical Compass mode, center camera on player and rotate with device heading
+  // Smooth camera following with stationary deadband & rock-solid North-Up orientation.
+  // Suppresses stationary GPS micro-wander (< 4m) and eliminates compass-induced map spinning.
   useEffect(() => {
-    if (!isMapLocked || !ownFix || !cameraRef.current) return;
+    if (!ownFix || !cameraRef.current) return;
+
+    if (lastCameraCenterRef.current) {
+      const prevLngLat = { longitude: lastCameraCenterRef.current[0], latitude: lastCameraCenterRef.current[1] };
+      const dist = distanceM(prevLngLat, ownFix);
+      // Suppress stationary GPS jitter when stationary
+      if (dist < 4.0) {
+        return;
+      }
+    }
+
+    lastCameraCenterRef.current = [ownFix.longitude, ownFix.latitude];
     cameraRef.current.easeTo({
       center: [ownFix.longitude, ownFix.latitude],
-      bearing: userHeading !== null && userHeading !== undefined ? userHeading : 0,
+      bearing: 0, // Always North-Up: map NEVER spins or goes crazy when phone is tilted
       zoom: 16.5,
-      duration: 300,
+      duration: 800, // Smooth glide when actually moving
     });
-  }, [isMapLocked, ownFix, userHeading]);
+  }, [ownFix]);
   // Memoized GeoJSON features
   const areaRing = useMemo(() => {
     return circleRing({ longitude: area.longitude, latitude: area.latitude }, area.radius_m);
