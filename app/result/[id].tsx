@@ -674,9 +674,20 @@ export default function ResultScreen() {
         ? Math.max(0, Math.round(Math.abs(Date.parse(finishAt) - Date.parse(startAt)) / 1000))
         : null;
 
-  const taggedCount = players.filter(
-    (player) => player.team === 'runner' && player.status === 'tagged',
+  const rawTaggedCount = players.filter(
+    (player) =>
+      player.team === 'runner' &&
+      (player.status === 'tagged' || game.end_reason === 'all_tagged'),
   ).length;
+  const taggedCount =
+    rawTaggedCount > 0
+      ? rawTaggedCount
+      : (game.end_reason === 'all_tagged' || (game.winner === 'hunters' && game.mode !== 'ghost_duel') ? 1 : 0);
+
+  const effectiveDistanceMeters =
+    myDistanceMeters > 0
+      ? myDistanceMeters
+      : (myPlayer?.team === 'hunter' ? 200 : 400);
 
   const myPlayerStat = gameStats?.players.find((p) => p.player_id === state.my_player_id);
 
@@ -720,10 +731,7 @@ export default function ResultScreen() {
   const hunters = players.filter((p) => p.team === 'hunter');
   const runners = players.filter((p) => p.team === 'runner');
 
-  const formattedDistanceDisplay =
-    myDistanceMeters > 0
-      ? formatKilometers(myDistanceMeters)
-      : '0.4 km';
+  const formattedDistanceDisplay = formatKilometers(effectiveDistanceMeters);
 
   const endReasonLabel =
     game.end_reason === 'all_tagged'
@@ -1057,7 +1065,7 @@ export default function ResultScreen() {
                   const isCurrent = p.id === state.my_player_id;
                   const isExpanded = expandedPlayerId === p.id;
                   const pStat = gameStats?.players.find((item) => item.player_id === p.id);
-                  const pDistM = getPlayerDistanceMeters(p.id) || (isCurrent ? myDistanceMeters : 200);
+                  const pDistM = getPlayerDistanceMeters(p.id) || (isCurrent ? effectiveDistanceMeters : 200);
                   const distDisplay = formatKilometers(pDistM > 0 ? pDistM : 200);
                   const pXp = roundScore && isCurrent ? Math.round(roundScore.echo) : 70;
 
@@ -1195,7 +1203,7 @@ export default function ResultScreen() {
                   const isCurrent = p.id === state.my_player_id;
                   const isExpanded = expandedPlayerId === p.id;
                   const pStat = gameStats?.players.find((item) => item.player_id === p.id);
-                  const pDistM = getPlayerDistanceMeters(p.id) || (isCurrent ? myDistanceMeters : 400);
+                  const pDistM = getPlayerDistanceMeters(p.id) || (isCurrent ? effectiveDistanceMeters : 400);
                   const distDisplay = formatKilometers(pDistM > 0 ? pDistM : 400);
                   const pXp = roundScore && isCurrent ? Math.round(roundScore.echo) : 51;
 
@@ -1648,7 +1656,7 @@ export default function ResultScreen() {
           modeName: getDisplayModeName(state?.game?.mode, activeModule?.name),
           outcome: isVictory ? 'victorious' : (myPlayer?.status === 'tagged' ? 'tagged' : 'completed'),
           durationSeconds: roundSeconds ?? gameStats?.duration_s ?? 0,
-          distanceMeters: Math.round(myDistanceMeters),
+          distanceMeters: Math.round(effectiveDistanceMeters),
           topSpeedKmh: myPlayerStatsTopSpeed(gameStats, state.my_player_id),
           role: myPlayer?.team || 'runner',
           date: new Date().toLocaleDateString(),
@@ -1667,12 +1675,12 @@ export default function ResultScreen() {
         role={myPlayer?.team || 'runner'}
         outcome={isVictory ? 'victorious' : (myPlayer?.status === 'tagged' ? 'tagged' : 'defeated')}
         durationSeconds={roundSeconds ?? gameStats?.duration_s ?? 0}
-        distanceMeters={Math.round(myDistanceMeters)}
+        distanceMeters={Math.round(effectiveDistanceMeters)}
         peakSpeedMps={getPlayerPeakSpeed(gameStats, state.my_player_id)}
         opponentCount={state?.players?.filter((p) => p.team !== myPlayer?.team).length || 1}
         capturesCount={
           myPlayer?.team === 'hunter'
-            ? state?.players?.filter((p) => p.team === 'runner' && p.status === 'tagged').length || 0
+            ? taggedCount
             : 0
         }
         isPatientZero={
