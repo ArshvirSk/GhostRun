@@ -74,18 +74,18 @@ export const MapView = memo(function MapView({
     }
 
     // Deadbands:
-    // 1. Angular deadband: ignore shifts < 4.0 deg to eliminate sensor tremor and desk noise
-    const shouldRotate = Math.abs(angleDelta) >= 4.0;
-    // 2. Spatial deadband: ignore GPS micro-wander < 3.5 meters when stationary
-    const shouldPan = distMoved >= 3.5;
+    // 1. Angular deadband: ignore shifts < 2.5 deg to eliminate sensor tremor and desk noise
+    const shouldRotate = Math.abs(angleDelta) >= 2.5;
+    // 2. Spatial deadband: ignore GPS micro-wander < 1.5 meters when stationary
+    const shouldPan = distMoved >= 1.5;
 
     // If neither threshold is crossed, keep camera completely frozen (rock solid on table)
     if (!shouldRotate && !shouldPan && lastCameraCenterRef.current !== null) {
       return;
     }
 
-    // Rate-limit camera easeTo calls to at most once per 250ms to match ease animation duration
-    if (now - lastUpdateTimeRef.current < 250 && lastCameraCenterRef.current !== null) {
+    // Rate-limit camera easeTo calls to at most once per 75ms for high-responsiveness real-time tracking
+    if (now - lastUpdateTimeRef.current < 75 && lastCameraCenterRef.current !== null) {
       return;
     }
 
@@ -106,7 +106,8 @@ export const MapView = memo(function MapView({
       bearing: nextBearing,
       zoom: 16.5,
       padding: { top: 120, bottom: 40, left: 0, right: 0 },
-      duration: 300,
+      duration: 100,
+      easing: 'linear',
     });
   }, [ownFix, userHeading]);
   // Memoized GeoJSON features

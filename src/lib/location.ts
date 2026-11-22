@@ -246,8 +246,8 @@ export function watchLocation(
   void Location.watchPositionAsync(
     {
       accuracy: options?.accuracy ?? Location.Accuracy.High,
-      timeInterval: options?.timeInterval ?? 2_500,
-      distanceInterval: options?.distanceInterval ?? 2,
+      timeInterval: options?.timeInterval ?? 800,
+      distanceInterval: options?.distanceInterval ?? 1,
     },
     (location) => {
       if (!cancelled) onFix(toFix(location));

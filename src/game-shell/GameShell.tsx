@@ -122,20 +122,16 @@ export function GameShell({ gameId }: GameShellProps) {
           if (raw < 0 || isNaN(raw)) return;
 
           const nowMs = Date.now();
-          // Rate-limit React updates to ~5 updates/sec (200ms) to prevent high-frequency re-render churn
-          if (nowMs - lastUpdateTime < 200) return;
+          // Rate-limit React updates to ~16 updates/sec (60ms) for snappy real-time tracking
+          if (nowMs - lastUpdateTime < 60) return;
 
-          // Angular deadband: ignore angular shifts < 5.0 degrees to eliminate sensor tremor and desk noise
+          // Angular deadband: ignore angular shifts < 2.5 degrees to eliminate sensor tremor and desk noise
           const diff = Math.abs(((raw - lastHeading + 540) % 360) - 180);
-          if (diff < 5.0) return;
+          if (diff < 2.5) return;
 
-          // Exponential moving average filter for buttery smooth heading transitions
-          const angleDelta = ((raw - lastHeading + 540) % 360) - 180;
-          const smoothed = (lastHeading + angleDelta * 0.4 + 360) % 360;
-
-          lastHeading = smoothed;
+          lastHeading = raw;
           lastUpdateTime = nowMs;
-          setUserHeading(smoothed);
+          setUserHeading(raw);
         });
       } catch {
         // Heading may not be supported on emulators without compass
@@ -374,40 +370,43 @@ export function GameShell({ gameId }: GameShellProps) {
 
   useEffect(() => {
     if (sharing !== 'on') return;
-    return watchLocation((nextFix) => {
-      if (AppState.currentState !== 'active' && backgroundSharing) return;
+    return watchLocation(
+      (nextFix) => {
+        if (AppState.currentState !== 'active' && backgroundSharing) return;
 
-      const currentSpeed = nextFix.speed ?? 0;
+        const currentSpeed = nextFix.speed ?? 0;
 
-      // Stationary GPS Wander Deadband:
-      // If speed is very low and displacement is within satellite noise (< 4.0m), keep existing fix
-      if (lastAcceptedFixRef.current) {
-        const d = distanceM(
-          { latitude: lastAcceptedFixRef.current.latitude, longitude: lastAcceptedFixRef.current.longitude },
-          { latitude: nextFix.latitude, longitude: nextFix.longitude }
-        );
-        if (currentSpeed < 0.8 && d < 4.0) {
-          return; // Suppress stationary micro-jitter
+        // Stationary GPS Wander Deadband:
+        // If speed is very low (< 0.6 m/s) and displacement is within satellite noise (< 2.0m), keep existing fix
+        if (lastAcceptedFixRef.current) {
+          const d = distanceM(
+            { latitude: lastAcceptedFixRef.current.latitude, longitude: lastAcceptedFixRef.current.longitude },
+            { latitude: nextFix.latitude, longitude: nextFix.longitude }
+          );
+          if (currentSpeed < 0.6 && d < 2.0) {
+            return; // Suppress stationary micro-jitter
+          }
         }
-      }
 
-      lastAcceptedFixRef.current = nextFix;
-      setFix(nextFix);
+        lastAcceptedFixRef.current = nextFix;
+        setFix(nextFix);
 
-      const now = Date.now();
-      if (currentSpeed >= 0.5) {
-        setLastMovedAt(now);
-      }
-      const stationarySec = Math.max(0, (now - lastMovedAt) / 1000);
-      const adaptive = calculateAdaptiveGpsConfig({
-        speedMps: currentSpeed,
-        stationaryDurationSec: stationarySec,
-        batteryGuardEnabled: batteryGuardOn,
-      });
-      setPowerTier(adaptive.powerTier);
+        const now = Date.now();
+        if (currentSpeed >= 0.5) {
+          setLastMovedAt(now);
+        }
+        const stationarySec = Math.max(0, (now - lastMovedAt) / 1000);
+        const adaptive = calculateAdaptiveGpsConfig({
+          speedMps: currentSpeed,
+          stationaryDurationSec: stationarySec,
+          batteryGuardEnabled: batteryGuardOn,
+        });
+        setPowerTier(adaptive.powerTier);
 
-      if (!backgroundSharing) void uploadLocation(nextFix);
-    });
+        if (!backgroundSharing) void uploadLocation(nextFix);
+      },
+      { timeInterval: 800, distanceInterval: 1 }
+    );
   }, [backgroundSharing, batteryGuardOn, lastMovedAt, sharing]);
 
   // Derived state & selectors
