@@ -74,6 +74,11 @@ export function AnimatedPlayerPointer({
       ? require('../../../assets/map/pointers/hunter-pointer.png')
       : require('../../../assets/map/pointers/runner-pointer.png');
 
+  // The pointer asset is 128x128 with the arrow graphic centered at y=47 (17px above PNG center).
+  // Translating down by (17/128 * size) places the chevron arrow's visual centroid exactly at (0,0)
+  // so the arrow tip and body are concentric with the player GPS coordinates and tag radius ring.
+  const yOffset = Math.round(size * (17 / 128));
+
   return (
     <View style={[styles.container, { width: size, height: size }, style]}>
       <Animated.View
@@ -84,7 +89,15 @@ export function AnimatedPlayerPointer({
           opacity: reducedMotion ? 1 : coneOpacity,
         }}
       >
-        <Image source={imageSource} style={{ width: size, height: size }} resizeMode="contain" />
+        <Image
+          source={imageSource}
+          style={{
+            width: size,
+            height: size,
+            transform: [{ translateY: yOffset }],
+          }}
+          resizeMode="contain"
+        />
       </Animated.View>
     </View>
   );

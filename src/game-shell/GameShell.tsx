@@ -122,16 +122,20 @@ export function GameShell({ gameId }: GameShellProps) {
           if (raw < 0 || isNaN(raw)) return;
 
           const nowMs = Date.now();
-          // Rate-limit React updates to ~10 updates/sec (100ms) to prevent high-frequency re-render churn
-          if (nowMs - lastUpdateTime < 100) return;
+          // Rate-limit React updates to ~5 updates/sec (200ms) to prevent high-frequency re-render churn
+          if (nowMs - lastUpdateTime < 200) return;
 
-          // Angular deadband: ignore angular shifts < 3.5 degrees to eliminate sensor tremor and desk noise
+          // Angular deadband: ignore angular shifts < 5.0 degrees to eliminate sensor tremor and desk noise
           const diff = Math.abs(((raw - lastHeading + 540) % 360) - 180);
-          if (diff < 3.5) return;
+          if (diff < 5.0) return;
 
-          lastHeading = raw;
+          // Exponential moving average filter for buttery smooth heading transitions
+          const angleDelta = ((raw - lastHeading + 540) % 360) - 180;
+          const smoothed = (lastHeading + angleDelta * 0.4 + 360) % 360;
+
+          lastHeading = smoothed;
           lastUpdateTime = nowMs;
-          setUserHeading(raw);
+          setUserHeading(smoothed);
         });
       } catch {
         // Heading may not be supported on emulators without compass
@@ -376,13 +380,13 @@ export function GameShell({ gameId }: GameShellProps) {
       const currentSpeed = nextFix.speed ?? 0;
 
       // Stationary GPS Wander Deadband:
-      // If speed is very low and displacement is within satellite noise (< 3.0m), keep existing fix
+      // If speed is very low and displacement is within satellite noise (< 4.0m), keep existing fix
       if (lastAcceptedFixRef.current) {
         const d = distanceM(
           { latitude: lastAcceptedFixRef.current.latitude, longitude: lastAcceptedFixRef.current.longitude },
           { latitude: nextFix.latitude, longitude: nextFix.longitude }
         );
-        if (currentSpeed < 0.7 && d < 3.0) {
+        if (currentSpeed < 0.8 && d < 4.0) {
           return; // Suppress stationary micro-jitter
         }
       }

@@ -74,18 +74,18 @@ export const MapView = memo(function MapView({
     }
 
     // Deadbands:
-    // 1. Angular deadband: ignore shifts < 3.5 deg to eliminate sensor tremor and desk noise
-    const shouldRotate = Math.abs(angleDelta) >= 3.5;
-    // 2. Spatial deadband: ignore GPS micro-wander < 3.0 meters when stationary
-    const shouldPan = distMoved >= 3.0;
+    // 1. Angular deadband: ignore shifts < 4.0 deg to eliminate sensor tremor and desk noise
+    const shouldRotate = Math.abs(angleDelta) >= 4.0;
+    // 2. Spatial deadband: ignore GPS micro-wander < 3.5 meters when stationary
+    const shouldPan = distMoved >= 3.5;
 
     // If neither threshold is crossed, keep camera completely frozen (rock solid on table)
     if (!shouldRotate && !shouldPan && lastCameraCenterRef.current !== null) {
       return;
     }
 
-    // Rate-limit camera easeTo calls to at most once per 160ms to prevent animation stutter
-    if (now - lastUpdateTimeRef.current < 160 && lastCameraCenterRef.current !== null) {
+    // Rate-limit camera easeTo calls to at most once per 250ms to match ease animation duration
+    if (now - lastUpdateTimeRef.current < 250 && lastCameraCenterRef.current !== null) {
       return;
     }
 
@@ -105,7 +105,8 @@ export const MapView = memo(function MapView({
       center: nextCenter,
       bearing: nextBearing,
       zoom: 16.5,
-      duration: 350,
+      padding: { top: 120, bottom: 40, left: 0, right: 0 },
+      duration: 300,
     });
   }, [ownFix, userHeading]);
   // Memoized GeoJSON features
@@ -200,6 +201,12 @@ export const MapView = memo(function MapView({
         attribution={false}
         compass={false}
         logo={false}
+        dragPan={false}
+        touchZoom={false}
+        doubleTapZoom={false}
+        doubleTapHoldZoom={false}
+        touchRotate={false}
+        touchPitch={false}
         mapStyle={isDark ? DARK_MAP_STYLE : DAY_MAP_STYLE}
         onPress={isMapLocked ? undefined : onPressMap}
         style={StyleSheet.absoluteFill}
@@ -209,6 +216,7 @@ export const MapView = memo(function MapView({
           initialViewState={{
             center: [area.longitude, area.latitude],
             zoom: 15,
+            padding: { top: 120, bottom: 40, left: 0, right: 0 },
           }}
         />
 
