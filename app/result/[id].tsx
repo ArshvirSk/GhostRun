@@ -33,7 +33,7 @@ import { getModeModule } from '../../src/modes/registry';
 import { listFriends, listFriendRequests, sendFriendRequest } from '../../src/lib/friends';
 
 const MAP_STYLE =
-  process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
+  process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
 
 type RoundScore = {
   game_id: string;
@@ -225,6 +225,24 @@ function teamLabel(team: Team) {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = SCREEN_WIDTH - 32;
+
+const CARD_TITLES = [
+  'OUTCOME DOSSIER',
+  'SEASON ECHO',
+  'MATCH HIGHLIGHTS',
+  'MODE DEBRIEF',
+  'OPERATIVE ROSTER',
+  'GHOST ARCHIVE',
+  'RECAP EXPORT',
+  'COMMAND ACTIONS',
+];
+
+function formatExcludedReason(reason: string | null | undefined): string {
+  if (!reason) return 'Casual round — competitive scoring requires multi-operative grid presence.';
+  if (reason === 'duration_too_short') return 'Round duration was under the minimum required for ranked yield.';
+  if (reason === 'insufficient_players') return 'Minimum operative count not reached for competitive scoring.';
+  return reason.replace(/_/g, ' ');
+}
 
 export default function ResultScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -573,8 +591,8 @@ export default function ResultScreen() {
 
   const handleCardScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
-    const index = Math.round(offsetX / CARD_WIDTH);
-    if (index !== activeCardIndex && index >= 0) {
+    const index = Math.min(CARD_TITLES.length - 1, Math.max(0, Math.round(offsetX / SCREEN_WIDTH)));
+    if (index !== activeCardIndex) {
       setActiveCardIndex(index);
     }
   };
@@ -812,7 +830,7 @@ export default function ResultScreen() {
       }
     : null;
 
-  const cardsCount = 8;
+  const cardsCount = CARD_TITLES.length;
 
   return (
     <View style={styles.screen}>
@@ -953,25 +971,15 @@ export default function ResultScreen() {
         {/* Pagination & Indicator Header */}
         <View style={styles.deckHeader}>
           <View style={styles.deckCategoryRow}>
-            <Ionicons color={colors.primary} name="layers-outline" size={14} />
-            <Text variant="caption" color={colors.primary} weight="bold">
-              CARD {activeCardIndex + 1} OF {cardsCount} · {
-                activeCardIndex === 0
-                  ? 'OUTCOME DOSSIER'
-                  : activeCardIndex === 1
-                    ? 'SEASON ECHO'
-                    : activeCardIndex === 2
-                      ? 'MATCH HIGHLIGHTS'
-                      : activeCardIndex === 3
-                        ? 'TACTICAL DEBRIEF'
-                        : activeCardIndex === 4
-                          ? 'OPERATIVE ROSTER'
-                          : activeCardIndex === 5
-                            ? 'GHOST ARCHIVE'
-                            : activeCardIndex === 6
-                              ? 'MISSION RECAP'
-                              : 'COMMAND ACTIONS'
-              }
+            <Ionicons color={colors.primary} name="layers-outline" size={13} />
+            <Text
+              variant="caption"
+              color={colors.primary}
+              weight="bold"
+              numberOfLines={1}
+              style={{ flexShrink: 1 }}
+            >
+              CARD {activeCardIndex + 1}/{cardsCount} · {CARD_TITLES[activeCardIndex] || 'DOSSIER'}
             </Text>
           </View>
           <View style={styles.indicatorDotsRow}>
@@ -991,689 +999,754 @@ export default function ResultScreen() {
         <ScrollView
           horizontal
           pagingEnabled
+          decelerationRate="fast"
           showsHorizontalScrollIndicator={false}
           onScroll={handleCardScroll}
           scrollEventThrottle={16}
           contentContainerStyle={styles.cardsScrollerContent}
         >
           {/* CARD 1: MISSION OUTCOME DOSSIER */}
-          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+          <View style={styles.cardSlide}>
             <Card variant="elevated" style={styles.cardInner}>
-              <View style={styles.cardHeaderRow}>
-                <Text variant="label" color={outcomeAccent}>
-                  {isVictory ? 'MISSION ACCOMPLISHED' : 'MISSION CONCLUDED'}
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={styles.cardScrollContent}>
+                <View style={styles.cardHeaderRow}>
+                  <Text variant="label" color={outcomeAccent} style={{ flex: 1, marginRight: spacing.xs }}>
+                    {isVictory ? 'MISSION ACCOMPLISHED' : 'MISSION CONCLUDED'}
+                  </Text>
+                  <Chip
+                    label={game.end_reason?.replace(/_/g, ' ').toUpperCase() || 'ENDED'}
+                    variant="default"
+                    size="sm"
+                  />
+                </View>
+
+                <Text variant="body" color={colors.text} style={{ marginTop: spacing.xs, lineHeight: 20 }}>
+                  {reasonCopy}
                 </Text>
-                <Chip
-                  label={game.end_reason?.replace(/_/g, ' ').toUpperCase() || 'ENDED'}
-                  variant="default"
-                  size="sm"
-                />
-              </View>
 
-              <Text variant="body" color={colors.text} style={{ marginTop: spacing.sm, lineHeight: 20 }}>
-                {reasonCopy}
-              </Text>
-
-              <View style={styles.statsGrid}>
-                <View style={styles.statBox}>
-                  <Text variant="caption" color={colors.textMuted}>OPERATIONAL DURATION</Text>
-                  <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                    {roundSeconds !== null && roundSeconds > 0 ? formatDuration(roundSeconds) : '—'}
-                  </Text>
-                </View>
-
-                {isGhostDuel ? (
-                  <>
-                    <View style={styles.statBox}>
-                      <Text variant="caption" color={colors.textMuted}>SPLIT DELTA</Text>
-                      <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
-                        {ghostScore?.delta_s !== undefined
-                          ? `${ghostScore.delta_s > 0 ? '+' : ''}${ghostScore.delta_s.toFixed(1)}s`
-                          : '—'}
-                      </Text>
-                    </View>
-                    <View style={styles.statBox}>
-                      <Text variant="caption" color={colors.textMuted}>PERFORMANCE SCORE</Text>
-                      <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
-                        {ghostScore?.score ?? '—'}
-                      </Text>
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <View style={styles.statBox}>
-                      <Text variant="caption" color={colors.textMuted}>OPERATIVES TAGGED</Text>
-                      <Text variant="headline" color={colors.hunter} style={{ marginTop: 2 }}>
-                        {taggedCount}
-                      </Text>
-                    </View>
-                    <View style={styles.statBox}>
-                      <Text variant="caption" color={colors.textMuted}>TOTAL IN SQUAD</Text>
-                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                        {players.length}
-                      </Text>
-                    </View>
-                  </>
-                )}
-              </View>
-
-              <Text variant="caption" color={colors.textSubtle} style={{ marginTop: spacing.md }}>
-                Swipe left for Season Echo yield and tactical highlights →
-              </Text>
-            </Card>
-          </View>
-
-          {/* CARD 2: SEASON ECHO & COMPETITIVE YIELD (FL-P2) */}
-          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
-            <Card variant="elevated" style={styles.cardInner}>
-              <View style={styles.cardHeaderRow}>
-                <Text variant="label" color="#F59E0B">
-                  SEASON ECHO // COMPETITIVE YIELD
-                </Text>
-                <Chip
-                  label={roundScore?.counted ? 'SEASON RECORDED' : 'CASUAL ROUND'}
-                  variant={roundScore?.counted ? 'accent' : 'default'}
-                  size="sm"
-                />
-              </View>
-
-              <View style={styles.echoHeroBox}>
-                <Text style={styles.echoHeroNumber}>
-                  +{roundScore ? Math.round(roundScore.echo) : 0}
-                </Text>
-                <Text style={styles.echoHeroUnit}>SEASON ECHO PTS EARNED</Text>
-              </View>
-
-              <View style={styles.echoGrid}>
-                <View style={styles.echoMetricItem}>
-                  <Text style={styles.echoMetricLabel}>OUTCOME (O)</Text>
-                  <Text style={styles.echoMetricValue}>
-                    +{roundScore?.o !== null && roundScore?.o !== undefined ? Math.round(roundScore.o) : 0}
-                  </Text>
-                </View>
-                <View style={styles.echoMetricItem}>
-                  <Text style={styles.echoMetricLabel}>YIELD (Y)</Text>
-                  <Text style={styles.echoMetricValue}>
-                    {roundScore?.y !== null && roundScore?.y !== undefined
-                      ? `${Math.round(roundScore.y * 100)}%`
-                      : '0%'}
-                  </Text>
-                </View>
-                <View style={styles.echoMetricItem}>
-                  <Text style={styles.echoMetricLabel}>PRESENCE (P)</Text>
-                  <Text style={styles.echoMetricValue}>
-                    {roundScore?.p !== null && roundScore?.p !== undefined
-                      ? `${roundScore.p.toFixed(1)}x`
-                      : '1.0x'}
-                  </Text>
-                </View>
-                <View style={styles.echoMetricItem}>
-                  <Text style={styles.echoMetricLabel}>DISTANCE (D)</Text>
-                  <Text style={styles.echoMetricValue}>
-                    {roundScore?.d !== null && roundScore?.d !== undefined
-                      ? `${Math.round(roundScore.d)}m`
-                      : '0m'}
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={styles.echoFooterText}>
-                {roundScore?.counted
-                  ? 'Recorded toward your Seasonal Leaderboard Division rank.'
-                  : roundScore?.excluded_reason || 'Casual round — competitive scoring requires multi-operative grid presence.'}
-              </Text>
-            </Card>
-          </View>
-
-          {/* CARD 3: MATCH HIGHLIGHTS & STRATEGIC STATS */}
-          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
-            <Card variant="elevated" style={styles.cardInner}>
-              <Text variant="label" color={colors.primary} style={{ marginBottom: spacing.sm }}>
-                PERSONAL TELEMETRY & HIGHLIGHTS
-              </Text>
-
-              <View style={styles.statsGrid}>
-                {myPlayerStats && (
-                  <View style={styles.statBoxHighlight}>
-                    <Text variant="caption" color={colors.primary}>CLOSEST CALL</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {myPlayerStats.closest_call_m !== null
-                        ? formatDistance(myPlayerStats.closest_call_m, unitSystem)
-                        : myPlayerStats.share_trail === false
-                          ? 'Private Route'
-                          : '—'}
-                    </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                      {myPlayerStats.share_trail === false ? 'Route kept confidential' : 'Opponent nearest vector'}
-                    </Text>
-                  </View>
-                )}
-
-                {myPlayerStats?.best_bluff && (
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.warning}>BEST BLUFF</Text>
-                    <Text variant="body" weight="bold" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {myPlayerStats.best_bluff.title}
-                    </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                      {myPlayerStats.best_bluff.detail}
-                    </Text>
-                  </View>
-                )}
-
-                {myPlayerStats && myPlayerStats.team === 'runner' && (
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>LONGEST UNSEEN</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {formatDuration(myPlayerStats.longest_unseen_s)}
-                    </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                      Undetected stealth streak
-                    </Text>
-                  </View>
-                )}
-
-                {myPlayerStats && (
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>PEAK NOISE LEVEL</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {myPlayerStats.loudest_noise}
-                      <Text variant="caption" color={colors.textMuted}> / 100</Text>
-                    </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                      Acoustic telemetry max
-                    </Text>
-                  </View>
-                )}
-
-                {gameStats && gameStats.heat_stats.total_presses > 0 && (
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>HEAT HIT RATE</Text>
-                    <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
-                      {gameStats.heat_stats.hit_rate_pct}%
-                    </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                      {gameStats.heat_stats.hot_hits} of {gameStats.heat_stats.total_presses} probes hot
-                    </Text>
-                  </View>
-                )}
-
-                {gameStats && gameStats.total_drops_claimed > 0 && (
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>DROPS CLAIMED</Text>
-                    <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
-                      {myPlayerStats?.drops_claimed ?? 0}
-                      <Text variant="caption" color={colors.textMuted}> / {gameStats.total_drops_claimed}</Text>
-                    </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                      Tactical field caches
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </Card>
-          </View>
-
-          {/* CARD 3: TACTICAL MODE DEBRIEF */}
-          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
-            <Card variant="elevated" style={styles.cardInner}>
-              <Text variant="label" color={colors.primary} style={{ marginBottom: spacing.sm }}>
-                MODE DEBRIEF & PARAMETERS
-              </Text>
-
-              {isGhostDuel && ghostScore && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBoxHighlight}>
-                    <Text variant="caption" color={colors.primary}>FINAL TIME TRIAL SCORE</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {ghostScore.score}
-                    </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                      {ghostScore.delta_s >= 0
-                        ? `Beat ghost pace by ${ghostScore.delta_s.toFixed(1)}s`
-                        : `Behind ghost pace by ${Math.abs(ghostScore.delta_s).toFixed(1)}s`}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>YOUR ELAPSED TIME</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {formatDuration(ghostScore.player_time_s)}
-                    </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                      Ghost: {formatDuration(ghostScore.ghost_time_s)}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>ROUTE EFFICIENCY</Text>
-                    <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
-                      {Math.round(ghostScore.efficiency * 100)}%
-                    </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                      Direct vs traveled vector
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {isTerritoryPulse && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBoxHighlight}>
-                    <Text variant="caption" color={colors.primary}>TERRITORY CONTROL OUTCOME</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {game.end_reason === 'territory_dominance' ? 'DOMINANCE' : 'POINTS'}
-                    </Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                      {game.winner === 'runners' ? 'Runners Victory' : game.winner === 'hunters' ? 'Hunters Victory' : 'Draw'}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>SECTORS</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>7</Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>Radial map grid</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>THRESHOLD</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>70%</Text>
-                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>Dominance pulse</Text>
-                  </View>
-                </View>
-              )}
-
-              {isRelayHeist && gameStats?.mode_recap && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBoxHighlight}>
-                    <Text variant="caption" color={colors.primary}>PACKAGE STATUS</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {gameStats.mode_recap.package_secured
-                        ? 'SECURED BY HUNTERS'
-                        : game.end_reason === 'extraction_complete'
-                          ? 'EXTRACTED BY RUNNERS'
-                          : 'INTERCEPTED'}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>SQUAD HANDOFFS</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {gameStats.mode_recap.total_handoffs ?? 0}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>PACKAGE DROPS</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {gameStats.mode_recap.package_drops ?? 0}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {isJailbreak && gameStats?.mode_recap && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBoxHighlight}>
-                    <Text variant="caption" color={colors.primary}>JAILBREAK OUTCOME</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {game.end_reason === 'all_jailed' ? 'ALL JAILED' : 'PRISONERS ESCAPED'}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>RESCUES TRIGGERED</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {gameStats.mode_recap.total_rescues ?? 0}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>TOTAL JAILED</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {gameStats.mode_recap.total_jailed ?? 0}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {gameStats?.mode_recap?.ai_gm && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBoxHighlight}>
-                    <Text variant="caption" color={colors.primary}>AI GAME MASTER INTERVENTIONS</Text>
-                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {gameStats.mode_recap.ai_gm.total_events} / {gameStats.mode_recap.ai_gm.max_events}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>LAST DISPATCH</Text>
-                    <Text variant="body" weight="bold" color={colors.textLight} style={{ marginTop: 2, textTransform: 'uppercase' }}>
-                      {gameStats.mode_recap.ai_gm.last_event_type?.replace(/_/g, ' ') || 'None'}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {!isGhostDuel && !isTerritoryPulse && !isRelayHeist && !isJailbreak && (
                 <View style={styles.statsGrid}>
                   <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>EXTRACTION TARGET</Text>
-                    <Text variant="body" color={colors.textLight} style={{ marginTop: 2 }}>
-                      {target ? 'Placed & Infiltrated' : 'None Configured'}
+                    <Text variant="caption" color={colors.textMuted}>OPERATIONAL DURATION</Text>
+                    <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                      {roundSeconds !== null && roundSeconds > 0 ? formatDuration(roundSeconds) : '—'}
                     </Text>
                   </View>
-                  <View style={styles.statBox}>
-                    <Text variant="caption" color={colors.textMuted}>RADAR PING INTERVAL</Text>
-                    <Text variant="body" color={colors.textLight} style={{ marginTop: 2 }}>
-                      Standard 10s Pings
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </Card>
-          </View>
 
-          {/* CARD 4: OPERATIVE ROSTER & SECRECY LIFT */}
-          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
-            <Card variant="elevated" style={styles.cardInner}>
-              <View style={styles.cardHeaderRow}>
-                <Text variant="label" color={colors.primary}>
-                  SECRECY LIFTED // OPERATIVE ROSTER ({players.length})
-                </Text>
-                <Chip label="UNCLASSIFIED" variant="default" size="sm" />
-              </View>
-
-              <ScrollView style={{ maxHeight: 220, marginTop: spacing.sm }}>
-                {players.map((player) => {
-                  const position = positions.find((entry) => entry.player_id === player.id);
-                  const isWinner = player.id === winnerId;
-                  const isAgent = player.secret_role === 'agent';
-
-                  return (
-                    <Pressable
-                      key={player.id}
-                      accessibilityRole="button"
-                      onPress={() => {
-                        if (player.id !== state.my_player_id && player.user_id) {
-                          handleInspectPlayer(player.user_id, player.display_name, player.color);
-                        }
-                      }}
-                      style={styles.playerRow}
-                    >
-                      <View style={[styles.playerDot, { backgroundColor: player.color }]} />
-                      <View style={{ flex: 1, marginLeft: spacing.sm }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text variant="body" weight="bold" color={colors.textLight}>
-                            {player.display_name.toUpperCase()}
-                          </Text>
-                          {player.user_id === game.host_id && (
-                            <MaterialCommunityIcons color={colors.warning} name="crown" size={13} />
-                          )}
-                          {isAgent && (
-                            <Chip label="DOUBLE AGENT" variant="accent" size="sm" />
-                          )}
-                          {player.secret_role === 'vip' && (
-                            <Chip label="VIP" variant="accent" size="sm" />
-                          )}
-                          {player.secret_role === 'bodyguard' && (
-                            <Chip label="GUARD" variant="default" size="sm" />
-                          )}
-                          {player.id === state.my_player_id ? (
-                            <Text variant="caption" color={colors.primary}>(you)</Text>
-                          ) : (
-                            <Ionicons name="person-circle-outline" size={14} color={colors.textMuted} />
-                          )}
-                        </View>
-                        <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                          {teamLabel(player.team)} · {position ? 'Position recorded' : 'No fix'}
+                  {isGhostDuel ? (
+                    <>
+                      <View style={styles.statBox}>
+                        <Text variant="caption" color={colors.textMuted}>SPLIT DELTA</Text>
+                        <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
+                          {ghostScore?.delta_s !== undefined
+                            ? `${ghostScore.delta_s > 0 ? '+' : ''}${ghostScore.delta_s.toFixed(1)}s`
+                            : '—'}
                         </Text>
                       </View>
-                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                        <Text
-                          variant="caption"
-                          weight="bold"
-                          color={
-                            isWinner
-                              ? colors.success
-                              : player.status === 'tagged'
-                                ? colors.danger
-                                : colors.textMuted
-                          }
-                        >
-                          {isWinner ? 'Reached Target' : player.status === 'tagged' ? 'Tagged' : teamLabel(player.team)}
+                      <View style={styles.statBox}>
+                        <Text variant="caption" color={colors.textMuted}>PERFORMANCE SCORE</Text>
+                        <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
+                          {ghostScore?.score ?? '—'}
                         </Text>
-
-                        {player.id !== state.my_player_id && player.user_id && (
-                          friendUserIds.has(player.user_id) ? (
-                            <View style={styles.friendPill}>
-                              <Ionicons name="checkmark" size={10} color="#10B981" />
-                              <Text style={styles.friendPillText}>Friend</Text>
-                            </View>
-                          ) : requestedUserIds.has(player.user_id) ? (
-                            <View style={styles.requestSentPill}>
-                              <Text style={styles.requestSentPillText}>Request Sent</Text>
-                            </View>
-                          ) : (
-                            <Pressable
-                              accessibilityRole="button"
-                              accessibilityLabel={`Add ${player.display_name} as friend`}
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                void handleQuickAddFriend(player.user_id, player.display_name);
-                              }}
-                              disabled={Boolean(sendingFriendReq[player.user_id])}
-                              style={styles.rosterAddBtn}
-                            >
-                              {sendingFriendReq[player.user_id] ? (
-                                <ActivityIndicator size="small" color="#000000" />
-                              ) : (
-                                <>
-                                  <Ionicons name="person-add" size={10} color="#000000" />
-                                  <Text style={styles.rosterAddBtnText}>Add</Text>
-                                </>
-                              )}
-                            </Pressable>
-                          )
-                        )}
                       </View>
-                    </Pressable>
-                  );
-                })}
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.statBox}>
+                        <Text variant="caption" color={colors.textMuted}>OPERATIVES TAGGED</Text>
+                        <Text variant="headline" color={colors.hunter} style={{ marginTop: 2 }}>
+                          {taggedCount}
+                        </Text>
+                      </View>
+                      <View style={styles.statBox}>
+                        <Text variant="caption" color={colors.textMuted}>TOTAL IN SQUAD</Text>
+                        <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                          {players.length}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+                  <Button
+                    title={rematchBusy ? 'Rematch…' : 'Play Again'}
+                    variant="primary"
+                    size="md"
+                    style={{ flex: 1 }}
+                    disabled={rematchBusy}
+                    onPress={() => void playAgain(true)}
+                  />
+                  <Button
+                    title="Watch Replay"
+                    variant="secondary"
+                    size="md"
+                    onPress={() => router.push({ pathname: '/replay/[id]', params: { id: gameId } })}
+                  />
+                </View>
+
+                <Text variant="caption" color={colors.textSubtle} style={{ marginTop: spacing.xs, textAlign: 'center' }}>
+                  Swipe left for Season Echo yield and tactical highlights →
+                </Text>
               </ScrollView>
             </Card>
           </View>
 
-          {/* CARD 5: GHOST LIBRARY CONTRIBUTION */}
-          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+          {/* CARD 2: SEASON ECHO & COMPETITIVE YIELD (FL-P2) */}
+          <View style={styles.cardSlide}>
             <Card variant="elevated" style={styles.cardInner}>
-              <View style={styles.cardHeaderRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <MaterialCommunityIcons color={colors.ghostTrail} name="ghost" size={18} />
-                  <Text variant="label" color={colors.ghostTrail}>
-                    GHOST LIBRARY CONTRIBUTION
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={styles.cardScrollContent}>
+                <View style={styles.cardHeaderRow}>
+                  <Text variant="label" color="#F59E0B" style={{ flex: 1, marginRight: spacing.xs }}>
+                    SEASON ECHO // COMPETITIVE YIELD
                   </Text>
+                  <Chip
+                    label={roundScore?.counted ? 'SEASON RECORDED' : 'CASUAL ROUND'}
+                    variant={roundScore?.counted ? 'accent' : 'default'}
+                    size="sm"
+                  />
                 </View>
-                <Chip label="PRIVACY BUFFER" variant="default" size="sm" />
-              </View>
 
-              {ghostPreview && ghostPreview.can_contribute && !ghostDismissed && !ghostPermanentlyDeclined ? (
-                <>
-                  {ghostSuccess || ghostPreview.already_contributed ? (
-                    <View style={styles.ghostStatusBox}>
-                      <Ionicons color={colors.success} name="checkmark-circle" size={20} />
-                      <Text variant="body" color={colors.text} style={{ marginLeft: spacing.sm, flex: 1 }}>
-                        {ghostSuccess
-                          ? 'Thank you! Route trimmed by 150m and contributed to the solo training archive.'
-                          : 'This route is already archived in the ghost library.'}
+                <View style={styles.echoHeroBox}>
+                  <Text style={styles.echoHeroNumber}>
+                    +{roundScore ? Math.round(roundScore.echo) : 0}
+                  </Text>
+                  <Text style={styles.echoHeroUnit}>SEASON ECHO PTS EARNED</Text>
+                </View>
+
+                <View style={styles.echoGrid}>
+                  <View style={styles.echoMetricItem}>
+                    <Text style={styles.echoMetricLabel}>OUTCOME (O)</Text>
+                    <Text style={styles.echoMetricValue}>
+                      +{roundScore?.o !== null && roundScore?.o !== undefined ? Math.round(roundScore.o) : 0}
+                    </Text>
+                  </View>
+                  <View style={styles.echoMetricItem}>
+                    <Text style={styles.echoMetricLabel}>YIELD (Y)</Text>
+                    <Text style={styles.echoMetricValue}>
+                      {roundScore?.y !== null && roundScore?.y !== undefined
+                        ? `${Math.round(roundScore.y * 100)}%`
+                        : '0%'}
+                    </Text>
+                  </View>
+                  <View style={styles.echoMetricItem}>
+                    <Text style={styles.echoMetricLabel}>PRESENCE (P)</Text>
+                    <Text style={styles.echoMetricValue}>
+                      {roundScore?.p !== null && roundScore?.p !== undefined
+                        ? `${roundScore.p.toFixed(1)}x`
+                        : '1.0x'}
+                    </Text>
+                  </View>
+                  <View style={styles.echoMetricItem}>
+                    <Text style={styles.echoMetricLabel}>DISTANCE (D)</Text>
+                    <Text style={styles.echoMetricValue}>
+                      {roundScore?.d !== null && roundScore?.d !== undefined
+                        ? `${Math.round(roundScore.d)}m`
+                        : '0m'}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.echoFooterText}>
+                  {roundScore?.counted
+                    ? 'Recorded toward your Seasonal Leaderboard Division rank.'
+                    : formatExcludedReason(roundScore?.excluded_reason)}
+                </Text>
+              </ScrollView>
+            </Card>
+          </View>
+
+          {/* CARD 3: MATCH HIGHLIGHTS & STRATEGIC STATS */}
+          <View style={styles.cardSlide}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={styles.cardScrollContent}>
+                <View style={styles.cardHeaderRow}>
+                  <Text variant="label" color={colors.primary} style={{ flex: 1 }}>
+                    PERSONAL TELEMETRY & HIGHLIGHTS
+                  </Text>
+                  <Chip label="OPERATIVE INTEL" variant="default" size="sm" />
+                </View>
+
+                <View style={styles.statsGrid}>
+                  {myPlayerStats && (
+                    <View style={styles.statBoxHighlight}>
+                      <Text variant="caption" color={colors.primary}>CLOSEST CALL</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {myPlayerStats.closest_call_m !== null
+                          ? formatDistance(myPlayerStats.closest_call_m, unitSystem)
+                          : myPlayerStats.share_trail === false
+                            ? 'Private Route'
+                            : '—'}
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        {myPlayerStats.share_trail === false ? 'Route kept confidential' : 'Opponent nearest vector'}
                       </Text>
                     </View>
-                  ) : (
-                    <>
-                      <Text variant="body" color={colors.text} style={{ marginTop: spacing.sm, lineHeight: 19 }}>
-                        Help solo operatives train against authentic pace. Your path is anonymized and trimmed by 150m at start and end.
-                      </Text>
-
-                      <View style={[styles.statsGrid, { marginVertical: spacing.md }]}>
-                        <View style={styles.statBox}>
-                          <Text variant="caption" color={colors.textMuted}>TRIMMED LENGTH</Text>
-                          <Text variant="body" weight="bold" color={colors.textLight}>
-                            {formatDistance(ghostPreview.trimmed_length_m, unitSystem)}
-                          </Text>
-                        </View>
-                        <View style={styles.statBox}>
-                          <Text variant="caption" color={colors.textMuted}>DURATION</Text>
-                          <Text variant="body" weight="bold" color={colors.textLight}>
-                            {formatDuration(ghostPreview.duration_s)}
-                          </Text>
-                        </View>
-                        <View style={styles.statBox}>
-                          <Text variant="caption" color={colors.textMuted}>DIFFICULTY</Text>
-                          <Text variant="body" weight="bold" color={colors.textLight} style={{ textTransform: 'capitalize' }}>
-                            {ghostPreview.difficulty}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                        <Button
-                          title={ghostBusy ? 'Archiving…' : 'Contribute Route'}
-                          variant="primary"
-                          size="sm"
-                          disabled={ghostBusy}
-                          onPress={() => void handleContributeGhost()}
-                        />
-                        <Button
-                          title="Not Now"
-                          variant="secondary"
-                          size="sm"
-                          onPress={() => setGhostDismissed(true)}
-                        />
-                        <Button
-                          title="Never"
-                          variant="secondary"
-                          size="sm"
-                          onPress={() => void handleNeverAskGhost()}
-                        />
-                      </View>
-                    </>
                   )}
-                </>
-              ) : (
-                <View style={styles.ghostStatusBox}>
-                  <MaterialCommunityIcons color={colors.textMuted} name="shield-check" size={20} />
-                  <Text variant="body" color={colors.textMuted} style={{ marginLeft: spacing.sm, flex: 1 }}>
-                    Ghost contribution is {ghostPermanentlyDeclined ? 'permanently disabled in your privacy settings' : 'reserved for runner routes with sufficient length'}.
-                  </Text>
+
+                  {myPlayerStats?.best_bluff && (
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.warning}>BEST BLUFF</Text>
+                      <Text variant="body" weight="bold" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {myPlayerStats.best_bluff.title}
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        {myPlayerStats.best_bluff.detail}
+                      </Text>
+                    </View>
+                  )}
+
+                  {myPlayerStats && myPlayerStats.team === 'runner' && (
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>LONGEST UNSEEN</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {formatDuration(myPlayerStats.longest_unseen_s)}
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        Undetected stealth streak
+                      </Text>
+                    </View>
+                  )}
+
+                  {myPlayerStats && (
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>PEAK NOISE LEVEL</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {myPlayerStats.loudest_noise}
+                        <Text variant="caption" color={colors.textMuted}> / 100</Text>
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        Acoustic telemetry max
+                      </Text>
+                    </View>
+                  )}
+
+                  {gameStats && gameStats.heat_stats.total_presses > 0 && (
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>HEAT HIT RATE</Text>
+                      <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
+                        {gameStats.heat_stats.hit_rate_pct}%
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        {gameStats.heat_stats.hot_hits} of {gameStats.heat_stats.total_presses} probes hot
+                      </Text>
+                    </View>
+                  )}
+
+                  {gameStats && gameStats.total_drops_claimed > 0 && (
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>DROPS CLAIMED</Text>
+                      <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
+                        {myPlayerStats?.drops_claimed ?? 0}
+                        <Text variant="caption" color={colors.textMuted}> / {gameStats.total_drops_claimed}</Text>
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        Tactical field caches
+                      </Text>
+                    </View>
+                  )}
                 </View>
-              )}
+              </ScrollView>
             </Card>
           </View>
 
-          {/* CARD 6: SHAREABLE RECAP CARD PLACEHOLDER (Addendum C #4) */}
-          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+          {/* CARD 4: TACTICAL MODE DEBRIEF */}
+          <View style={styles.cardSlide}>
             <Card variant="elevated" style={styles.cardInner}>
-              <View style={styles.cardHeaderRow}>
-                <Text variant="label" color={colors.primary}>
-                  MISSION RECAP CARD // EXPORT
-                </Text>
-                <Chip label="PREVIEW" variant="accent" size="sm" />
-              </View>
-
-              {/* Shareable Card Visual Frame */}
-              <View style={styles.recapCardPreview}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text variant="headline" color={colors.primary}>GHOSTRUN</Text>
-                  <Chip label={winnerTitle.toUpperCase()} variant="accent" size="sm" />
-                </View>
-
-                <View style={{ marginVertical: spacing.md }}>
-                  <Text variant="body" weight="bold" color={colors.textLight}>
-                    OPERATIVE: {playerById.get(state.my_player_id)?.display_name || 'CLASSIFIED'}
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={styles.cardScrollContent}>
+                <View style={styles.cardHeaderRow}>
+                  <Text variant="label" color={colors.primary} style={{ flex: 1 }}>
+                    MODE DEBRIEF & PARAMETERS
                   </Text>
-                  <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
-                    MODE: {game.mode.toUpperCase()} · CODE: #{game.code}
-                  </Text>
+                  <Chip
+                    label={
+                      isTerritoryPulse
+                        ? 'TERRITORY PULSE'
+                        : isGhostDuel
+                          ? 'SOLO GHOST DUEL'
+                          : isAssassinRing
+                            ? 'ASSASSIN RING'
+                            : isRelayHeist
+                              ? 'RELAY HEIST'
+                              : isJailbreak
+                                ? 'JAILBREAK'
+                                : game.mode === 'classic_chase'
+                                  ? 'CLASSIC CHASE'
+                                  : 'TAG HUNT'
+                    }
+                    variant="accent"
+                    size="sm"
+                  />
                 </View>
 
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View>
-                    <Text variant="caption" color={colors.textMuted}>TIME</Text>
-                    <Text variant="body" weight="bold" color={colors.textLight}>
-                      {roundSeconds ? formatDuration(roundSeconds) : '—'}
-                    </Text>
+                {isGhostDuel && ghostScore && (
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statBoxHighlight}>
+                      <Text variant="caption" color={colors.primary}>FINAL TIME TRIAL SCORE</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {ghostScore.score}
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        {ghostScore.delta_s >= 0
+                          ? `Beat ghost pace by ${ghostScore.delta_s.toFixed(1)}s`
+                          : `Behind ghost pace by ${Math.abs(ghostScore.delta_s).toFixed(1)}s`}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>YOUR ELAPSED TIME</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {formatDuration(ghostScore.player_time_s)}
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        Ghost: {formatDuration(ghostScore.ghost_time_s)}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>ROUTE EFFICIENCY</Text>
+                      <Text variant="headline" color={colors.primary} style={{ marginTop: 2 }}>
+                        {Math.round(ghostScore.efficiency * 100)}%
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        Direct vs traveled vector
+                      </Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text variant="caption" color={colors.textMuted}>SQUAD</Text>
-                    <Text variant="body" weight="bold" color={colors.textLight}>
-                      {players.length} PLAYERS
-                    </Text>
-                  </View>
-                  <View>
-                    <Text variant="caption" color={colors.textMuted}>STATUS</Text>
-                    <Text variant="body" weight="bold" color={outcomeAccent}>
-                      {isVictory ? 'VICTORIOUS' : 'COMPLETED'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
+                )}
 
-              <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
-                <Button
-                  title="Export Story Card (9:16)"
-                  variant="primary"
-                  size="md"
-                  onPress={() => setStoryCardModalVisible(true)}
-                />
-                <Button
-                  title="Share Mission Recap Card"
-                  variant="secondary"
-                  size="md"
-                  onPress={() => setShareCardModalVisible(true)}
-                />
-                <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', marginTop: spacing.xs }}>
-                  Generates 9:16 vertical story card with 150m boundary trim for social dispatches.
-                </Text>
-              </View>
+                {isTerritoryPulse && (
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statBoxHighlight}>
+                      <Text variant="caption" color={colors.primary}>TERRITORY CONTROL OUTCOME</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {game.end_reason === 'territory_dominance' ? 'DOMINANCE' : 'POINTS'}
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        {game.winner === 'runners' ? 'Runners Victory' : game.winner === 'hunters' ? 'Hunters Victory' : 'Draw'}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>SECTORS</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>7</Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>Radial map grid</Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>THRESHOLD</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>70%</Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>Dominance pulse</Text>
+                    </View>
+                  </View>
+                )}
+
+                {isRelayHeist && gameStats?.mode_recap && (
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statBoxHighlight}>
+                      <Text variant="caption" color={colors.primary}>PACKAGE STATUS</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {gameStats.mode_recap.package_secured
+                          ? 'SECURED BY HUNTERS'
+                          : game.end_reason === 'extraction_complete'
+                            ? 'EXTRACTED BY RUNNERS'
+                            : 'INTERCEPTED'}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>SQUAD HANDOFFS</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {gameStats.mode_recap.total_handoffs ?? 0}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>PACKAGE DROPS</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {gameStats.mode_recap.package_drops ?? 0}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {isJailbreak && gameStats?.mode_recap && (
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statBoxHighlight}>
+                      <Text variant="caption" color={colors.primary}>JAILBREAK OUTCOME</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {game.end_reason === 'all_jailed' ? 'ALL JAILED' : 'PRISONERS ESCAPED'}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>RESCUES TRIGGERED</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {gameStats.mode_recap.total_rescues ?? 0}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>TOTAL JAILED</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {gameStats.mode_recap.total_jailed ?? 0}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {gameStats?.mode_recap?.ai_gm && (
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statBoxHighlight}>
+                      <Text variant="caption" color={colors.primary}>AI GAME MASTER INTERVENTIONS</Text>
+                      <Text variant="headline" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {gameStats.mode_recap.ai_gm.total_events} / {gameStats.mode_recap.ai_gm.max_events}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>LAST DISPATCH</Text>
+                      <Text variant="body" weight="bold" color={colors.textLight} style={{ marginTop: 2, textTransform: 'uppercase' }}>
+                        {gameStats.mode_recap.ai_gm.last_event_type?.replace(/_/g, ' ') || 'None'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {!isGhostDuel && !isTerritoryPulse && !isRelayHeist && !isJailbreak && (
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>EXTRACTION TARGET</Text>
+                      <Text variant="body" color={colors.textLight} style={{ marginTop: 2 }}>
+                        {target ? 'Placed & Infiltrated' : 'None Configured'}
+                      </Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Text variant="caption" color={colors.textMuted}>RADAR PING INTERVAL</Text>
+                      <Text variant="body" color={colors.textLight} style={{ marginTop: 2 }}>
+                        Standard 10s Pings
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </ScrollView>
             </Card>
           </View>
 
-          {/* CARD 7: MISSION COMMAND ACTIONS & REMATCH */}
-          <View style={[styles.cardSlide, { width: CARD_WIDTH }]}>
+          {/* CARD 5: OPERATIVE ROSTER & SECRECY LIFT */}
+          <View style={styles.cardSlide}>
             <Card variant="elevated" style={styles.cardInner}>
-              <Text variant="label" color={colors.primary} style={{ marginBottom: spacing.sm }}>
-                MISSION ACTIONS & REMATCH
-              </Text>
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={styles.cardScrollContent}>
+                <View style={styles.cardHeaderRow}>
+                  <Text variant="label" color={colors.primary} style={{ flex: 1 }}>
+                    SECRECY LIFTED // ROSTER ({players.length})
+                  </Text>
+                  <Chip label="UNCLASSIFIED" variant="default" size="sm" />
+                </View>
 
-              {rematchError !== '' && (
-                <Text variant="body" color={colors.danger} style={{ marginBottom: spacing.sm }}>
-                  {rematchError}
+                <View style={{ marginTop: spacing.sm }}>
+                  {players.map((player) => {
+                    const position = positions.find((entry) => entry.player_id === player.id);
+                    const isWinner = player.id === winnerId;
+                    const isAgent = player.secret_role === 'agent';
+
+                    return (
+                      <Pressable
+                        key={player.id}
+                        accessibilityRole="button"
+                        onPress={() => {
+                          if (player.id !== state.my_player_id && player.user_id) {
+                            handleInspectPlayer(player.user_id, player.display_name, player.color);
+                          }
+                        }}
+                        style={styles.playerRow}
+                      >
+                        <View style={[styles.playerDot, { backgroundColor: player.color }]} />
+                        <View style={{ flex: 1, marginLeft: spacing.sm, marginRight: spacing.xs }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text variant="body" weight="bold" color={colors.textLight}>
+                              {player.display_name.toUpperCase()}
+                            </Text>
+                            {player.user_id === game.host_id && (
+                              <MaterialCommunityIcons color={colors.warning} name="crown" size={13} />
+                            )}
+                            {isAgent && (
+                              <Chip label="DOUBLE AGENT" variant="accent" size="sm" />
+                            )}
+                            {player.secret_role === 'vip' && (
+                              <Chip label="VIP" variant="accent" size="sm" />
+                            )}
+                            {player.secret_role === 'bodyguard' && (
+                              <Chip label="GUARD" variant="default" size="sm" />
+                            )}
+                            {player.id === state.my_player_id ? (
+                              <Text variant="caption" color={colors.primary}>(you)</Text>
+                            ) : (
+                              <Ionicons name="person-circle-outline" size={14} color={colors.textMuted} />
+                            )}
+                          </View>
+                          <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                            {teamLabel(player.team)} · {position ? 'Position recorded' : 'No fix'}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                          <Text
+                            variant="caption"
+                            weight="bold"
+                            color={
+                              isWinner
+                                ? colors.success
+                                : player.status === 'tagged'
+                                  ? colors.danger
+                                  : colors.textMuted
+                            }
+                          >
+                            {isWinner ? 'Reached Target' : player.status === 'tagged' ? 'Tagged' : teamLabel(player.team)}
+                          </Text>
+
+                          {player.id !== state.my_player_id && player.user_id && (
+                            friendUserIds.has(player.user_id) ? (
+                              <View style={styles.friendPill}>
+                                <Ionicons name="checkmark" size={10} color="#10B981" />
+                                <Text style={styles.friendPillText}>Friend</Text>
+                              </View>
+                            ) : requestedUserIds.has(player.user_id) ? (
+                              <View style={styles.requestSentPill}>
+                                <Text style={styles.requestSentPillText}>Request Sent</Text>
+                              </View>
+                            ) : (
+                              <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={`Add ${player.display_name} as friend`}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  void handleQuickAddFriend(player.user_id, player.display_name);
+                                }}
+                                disabled={Boolean(sendingFriendReq[player.user_id])}
+                                style={styles.rosterAddBtn}
+                              >
+                                {sendingFriendReq[player.user_id] ? (
+                                  <ActivityIndicator size="small" color="#000000" />
+                                ) : (
+                                  <>
+                                    <Ionicons name="person-add" size={10} color="#000000" />
+                                    <Text style={styles.rosterAddBtnText}>Add</Text>
+                                  </>
+                                )}
+                              </Pressable>
+                            )
+                          )}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </Card>
+          </View>
+
+          {/* CARD 6: GHOST LIBRARY CONTRIBUTION */}
+          <View style={styles.cardSlide}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={styles.cardScrollContent}>
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                    <MaterialCommunityIcons color={colors.ghostTrail} name="ghost" size={18} />
+                    <Text variant="label" color={colors.ghostTrail}>
+                      GHOST LIBRARY ARCHIVE
+                    </Text>
+                  </View>
+                  <Chip label="PRIVACY BUFFER" variant="default" size="sm" />
+                </View>
+
+                {ghostPreview && ghostPreview.can_contribute && !ghostDismissed && !ghostPermanentlyDeclined ? (
+                  <>
+                    {ghostSuccess || ghostPreview.already_contributed ? (
+                      <View style={styles.ghostStatusBox}>
+                        <Ionicons color={colors.success} name="checkmark-circle" size={20} />
+                        <Text variant="body" color={colors.text} style={{ marginLeft: spacing.sm, flex: 1 }}>
+                          {ghostSuccess
+                            ? 'Thank you! Route trimmed by 150m and contributed to the solo training archive.'
+                            : 'This route is already archived in the ghost library.'}
+                        </Text>
+                      </View>
+                    ) : (
+                      <>
+                        <Text variant="body" color={colors.text} style={{ marginTop: spacing.sm, lineHeight: 19 }}>
+                          Help solo operatives train against authentic pace. Your path is anonymized and trimmed by 150m at start and end.
+                        </Text>
+
+                        <View style={[styles.statsGrid, { marginVertical: spacing.md }]}>
+                          <View style={styles.statBox}>
+                            <Text variant="caption" color={colors.textMuted}>TRIMMED LENGTH</Text>
+                            <Text variant="body" weight="bold" color={colors.textLight}>
+                              {formatDistance(ghostPreview.trimmed_length_m, unitSystem)}
+                            </Text>
+                          </View>
+                          <View style={styles.statBox}>
+                            <Text variant="caption" color={colors.textMuted}>DURATION</Text>
+                            <Text variant="body" weight="bold" color={colors.textLight}>
+                              {formatDuration(ghostPreview.duration_s)}
+                            </Text>
+                          </View>
+                          <View style={styles.statBox}>
+                            <Text variant="caption" color={colors.textMuted}>DIFFICULTY</Text>
+                            <Text variant="body" weight="bold" color={colors.textLight} style={{ textTransform: 'capitalize' }}>
+                              {ghostPreview.difficulty}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={{ gap: spacing.sm }}>
+                          <Button
+                            title={ghostBusy ? 'Archiving…' : 'Contribute Route'}
+                            variant="primary"
+                            size="md"
+                            disabled={ghostBusy}
+                            onPress={() => void handleContributeGhost()}
+                          />
+                          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                            <Button
+                              title="Not Now"
+                              variant="secondary"
+                              size="sm"
+                              style={{ flex: 1 }}
+                              onPress={() => setGhostDismissed(true)}
+                            />
+                            <Button
+                              title="Never Ask"
+                              variant="secondary"
+                              size="sm"
+                              style={{ flex: 1 }}
+                              onPress={() => void handleNeverAskGhost()}
+                            />
+                          </View>
+                        </View>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <View style={styles.ghostStatusBox}>
+                    <MaterialCommunityIcons color={colors.textMuted} name="shield-check" size={20} />
+                    <Text variant="body" color={colors.textMuted} style={{ marginLeft: spacing.sm, flex: 1 }}>
+                      Ghost contribution is {ghostPermanentlyDeclined ? 'permanently disabled in your privacy settings' : 'reserved for runner routes with sufficient length'}.
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+            </Card>
+          </View>
+
+          {/* CARD 7: SHAREABLE RECAP CARD */}
+          <View style={styles.cardSlide}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={styles.cardScrollContent}>
+                <View style={styles.cardHeaderRow}>
+                  <Text variant="label" color={colors.primary} style={{ flex: 1 }}>
+                    MISSION RECAP CARD // EXPORT
+                  </Text>
+                  <Chip label="PREVIEW" variant="accent" size="sm" />
+                </View>
+
+                {/* Shareable Card Visual Frame */}
+                <View style={styles.recapCardPreview}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.xs }}>
+                    <Text variant="headline" color={colors.primary}>GHOSTRUN</Text>
+                    <Chip label={winnerTitle.toUpperCase()} variant="accent" size="sm" />
+                  </View>
+
+                  <View style={{ marginVertical: spacing.sm }}>
+                    <Text variant="body" weight="bold" color={colors.textLight}>
+                      OPERATIVE: {playerById.get(state.my_player_id)?.display_name || 'CLASSIFIED'}
+                    </Text>
+                    <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                      MODE: {game.mode.toUpperCase().replace(/_/g, ' ')} · CODE: #{game.code}
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs }}>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="caption" color={colors.textMuted}>TIME</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textLight, marginTop: 2 }} numberOfLines={1}>
+                        {roundSeconds ? formatDuration(roundSeconds) : '—'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      <Text variant="caption" color={colors.textMuted}>SQUAD</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textLight, marginTop: 2 }} numberOfLines={1}>
+                        {players.length} {players.length === 1 ? 'PLAYER' : 'PLAYERS'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <Text variant="caption" color={colors.textMuted}>STATUS</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: outcomeAccent, marginTop: 2 }} numberOfLines={1}>
+                        {isVictory ? 'VICTORY' : 'COMPLETED'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
+                  <Button
+                    title="Export Story Card (9:16)"
+                    variant="primary"
+                    size="md"
+                    onPress={() => setStoryCardModalVisible(true)}
+                  />
+                  <Button
+                    title="Share Mission Recap Card"
+                    variant="secondary"
+                    size="md"
+                    onPress={() => setShareCardModalVisible(true)}
+                  />
+                  <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center', marginTop: spacing.xs }}>
+                    Generates 9:16 vertical story card with 150m boundary trim for social dispatches.
+                  </Text>
+                </View>
+              </ScrollView>
+            </Card>
+          </View>
+
+          {/* CARD 8: MISSION COMMAND ACTIONS & REMATCH */}
+          <View style={styles.cardSlide}>
+            <Card variant="elevated" style={styles.cardInner}>
+              <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true} contentContainerStyle={styles.cardScrollContent}>
+                <View style={styles.cardHeaderRow}>
+                  <Text variant="label" color={colors.primary} style={{ flex: 1 }}>
+                    MISSION ACTIONS & REMATCH
+                  </Text>
+                  <Chip label="TACTICAL" variant="default" size="sm" />
+                </View>
+
+                {rematchError !== '' && (
+                  <Text variant="body" color={colors.danger} style={{ marginBottom: spacing.sm }}>
+                    {rematchError}
+                  </Text>
+                )}
+
+                <View style={{ gap: spacing.sm, marginTop: spacing.xs }}>
+                  <Button
+                    title={rematchBusy ? 'Opening Rematch Lobby…' : 'Play Again (Rotate Roles)'}
+                    variant="primary"
+                    size="md"
+                    disabled={rematchBusy}
+                    onPress={() => void playAgain(true)}
+                  />
+                  <Button
+                    title="Play Again (Keep Roles)"
+                    variant="secondary"
+                    size="md"
+                    disabled={rematchBusy}
+                    onPress={() => void playAgain(false)}
+                  />
+                  <Button
+                    title="Watch Tactical Replay (±15s)"
+                    variant="secondary"
+                    size="md"
+                    onPress={() => router.push({ pathname: '/replay/[id]', params: { id: gameId } })}
+                  />
+                  <Button
+                    title="Return to Base"
+                    variant="ghost"
+                    size="md"
+                    onPress={() => router.replace('/play' as any)}
+                  />
+                </View>
+
+                <Text variant="caption" color={colors.textSubtle} style={{ marginTop: spacing.sm, lineHeight: 16 }}>
+                  Routes are recorded by the server at 10-second intervals. Final positions reflect the last valid fixes stored before the round concluded.
                 </Text>
-              )}
-
-              <View style={{ gap: spacing.sm }}>
-                <Button
-                  title={rematchBusy ? 'Opening Rematch Lobby…' : 'Play Again (Rotate Roles)'}
-                  variant="primary"
-                  size="lg"
-                  disabled={rematchBusy}
-                  onPress={() => void playAgain(true)}
-                />
-                <Button
-                  title="Play Again (Keep Roles)"
-                  variant="ghost"
-                  size="md"
-                  disabled={rematchBusy}
-                  onPress={() => void playAgain(false)}
-                />
-                <Button
-                  title="Watch Replay (±15s Controls)"
-                  variant="secondary"
-                  size="md"
-                  onPress={() => router.push({ pathname: '/replay/[id]', params: { id: gameId } })}
-                />
-                <Button
-                  title="Return to Base (Play)"
-                  variant="secondary"
-                  size="sm"
-                  onPress={() => router.replace('/play' as any)}
-                />
-              </View>
-
-              <Text variant="caption" color={colors.textSubtle} style={{ marginTop: spacing.md, lineHeight: 16 }}>
-                Routes are recorded by the server at 10-second intervals. Final positions reflect the last valid fixes stored before the round concluded.
-              </Text>
+              </ScrollView>
             </Card>
           </View>
         </ScrollView>
@@ -1760,9 +1833,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     bottom: 0,
     left: 0,
-    maxHeight: '56%',
-    paddingBottom: spacing.lg,
-    paddingTop: spacing.md,
+    maxHeight: '62%',
+    paddingBottom: spacing.sm,
+    paddingTop: spacing.sm,
     position: 'absolute',
     right: 0,
     zIndex: 10,
@@ -1772,37 +1845,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.base,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.xs,
   },
   deckCategoryRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 6,
+    flex: 1,
+    minWidth: 0,
+    marginRight: spacing.sm,
   },
   indicatorDotsRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 5,
+    gap: 4,
+    flexShrink: 0,
   },
   dot: {
     backgroundColor: colors.borderDark,
     borderRadius: radii.full,
-    height: 6,
-    width: 6,
+    height: 5,
+    width: 5,
   },
   activeDot: {
     backgroundColor: colors.primary,
-    width: 14,
+    borderRadius: radii.full,
+    height: 5,
+    width: 12,
   },
   cardsScrollerContent: {
-    paddingHorizontal: spacing.base,
-    gap: spacing.md,
+    paddingHorizontal: 0,
   },
   cardSlide: {
-    flex: 1,
+    width: SCREEN_WIDTH,
+    paddingHorizontal: spacing.base,
   },
   cardInner: {
     padding: spacing.md,
+    maxHeight: '100%',
+    overflow: 'hidden',
+  },
+  cardScrollContent: {
+    paddingBottom: spacing.md,
   },
   cardHeaderRow: {
     alignItems: 'center',

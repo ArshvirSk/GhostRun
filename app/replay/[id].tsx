@@ -32,7 +32,7 @@ import {
 } from '../../src/lib/storyCardCore';
 
 const MAP_STYLE =
-  process.env.EXPO_PUBLIC_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty';
+  process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
 
 type Team = 'runner' | 'hunter' | 'unassigned';
 
