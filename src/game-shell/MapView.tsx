@@ -49,29 +49,65 @@ export const MapView = memo(function MapView({
   const { colors, isDark } = useTheme();
   const cameraRef = useRef<CameraRef>(null);
   const lastCameraCenterRef = useRef<[number, number] | null>(null);
+  const currentBearingRef = useRef<number>(0);
+  const lastUpdateTimeRef = useRef<number>(0);
 
-  // Smooth camera following with stationary deadband & rock-solid North-Up orientation.
-  // Suppresses stationary GPS micro-wander (< 4m) and eliminates compass-induced map spinning.
+  // Centered Operative Heading-Up Lock:
+  // The centered operative remains fixed pointing UP (12 o'clock) while the map smoothly rotates
+  // and follows beneath the player. Uses angular and spatial deadbands to eliminate sensor jitter.
   useEffect(() => {
     if (!ownFix || !cameraRef.current) return;
 
+    const now = Date.now();
+    const targetHeading = userHeading !== null && userHeading !== undefined ? userHeading : 0;
+
+    // Shortest angular rotation delta (-180 to +180) to avoid 359-deg flip spins
+    const angleDelta = ((targetHeading - currentBearingRef.current + 540) % 360) - 180;
+
+    // Check position displacement from last camera center
+    let distMoved = 0;
     if (lastCameraCenterRef.current) {
       const prevLngLat = { longitude: lastCameraCenterRef.current[0], latitude: lastCameraCenterRef.current[1] };
-      const dist = distanceM(prevLngLat, ownFix);
-      // Suppress stationary GPS jitter when stationary
-      if (dist < 4.0) {
-        return;
-      }
+      distMoved = distanceM(prevLngLat, ownFix);
+    } else {
+      distMoved = 999;
     }
 
-    lastCameraCenterRef.current = [ownFix.longitude, ownFix.latitude];
+    // Deadbands:
+    // 1. Angular deadband: ignore shifts < 3.5 deg to eliminate sensor tremor and desk noise
+    const shouldRotate = Math.abs(angleDelta) >= 3.5;
+    // 2. Spatial deadband: ignore GPS micro-wander < 3.0 meters when stationary
+    const shouldPan = distMoved >= 3.0;
+
+    // If neither threshold is crossed, keep camera completely frozen (rock solid on table)
+    if (!shouldRotate && !shouldPan && lastCameraCenterRef.current !== null) {
+      return;
+    }
+
+    // Rate-limit camera easeTo calls to at most once per 160ms to prevent animation stutter
+    if (now - lastUpdateTimeRef.current < 160 && lastCameraCenterRef.current !== null) {
+      return;
+    }
+
+    lastUpdateTimeRef.current = now;
+
+    const nextBearing = shouldRotate
+      ? currentBearingRef.current + angleDelta
+      : currentBearingRef.current;
+    currentBearingRef.current = nextBearing;
+
+    const nextCenter: [number, number] = shouldPan
+      ? [ownFix.longitude, ownFix.latitude]
+      : (lastCameraCenterRef.current || [ownFix.longitude, ownFix.latitude]);
+    lastCameraCenterRef.current = nextCenter;
+
     cameraRef.current.easeTo({
-      center: [ownFix.longitude, ownFix.latitude],
-      bearing: 0, // Always North-Up: map NEVER spins or goes crazy when phone is tilted
+      center: nextCenter,
+      bearing: nextBearing,
       zoom: 16.5,
-      duration: 800, // Smooth glide when actually moving
+      duration: 350,
     });
-  }, [ownFix]);
+  }, [ownFix, userHeading]);
   // Memoized GeoJSON features
   const areaRing = useMemo(() => {
     return circleRing({ longitude: area.longitude, latitude: area.latitude }, area.radius_m);
@@ -303,7 +339,7 @@ export const MapView = memo(function MapView({
           <Marker id="own-pointer" lngLat={[ownFix.longitude, ownFix.latitude]}>
             <AnimatedPlayerPointer
               role={role === 'hunter' ? 'hunter' : 'runner'}
-              heading={userHeading ?? 0}
+              heading={0}
               size={52}
             />
           </Marker>

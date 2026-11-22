@@ -68,8 +68,9 @@ export const OffScreenObjectiveReticles = memo(function OffScreenObjectiveReticl
         if (dist < 40) return null;
 
         const absBearing = bearingDeg(ownFix, obj.location);
-        // Map is oriented North-Up for rock-solid stability; screen angle matches absolute bearing
-        const screenAngleDeg = absBearing;
+        // Map rotates with user heading while player is locked pointing UP (12 o'clock).
+        // Relative screen angle is absolute bearing minus operative heading.
+        const screenAngleDeg = (absBearing - heading + 360) % 360;
 
         const rad = (screenAngleDeg * Math.PI) / 180;
         const dx = Math.sin(rad);
