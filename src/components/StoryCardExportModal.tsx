@@ -235,7 +235,7 @@ export function StoryCardExportModal({
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: 'rgba(5, 7, 12, 0.88)', opacity: fadeAnim },
+            { backgroundColor: 'rgba(10, 14, 23, 0.96)', opacity: fadeAnim },
           ]}
         />
         <Pressable onPress={handleClose} style={StyleSheet.absoluteFill} />
@@ -601,6 +601,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: CARD_WIDTH,
+    backgroundColor: '#0F1420',
+    borderWidth: 1,
+    borderColor: '#232B3E',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     marginBottom: 8,
   },
   closeBtn: {

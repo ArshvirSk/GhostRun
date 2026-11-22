@@ -230,9 +230,33 @@ function formatExcludedReason(reason: string | null | undefined): string {
   return reason.replace(/_/g, ' ');
 }
 
+function getDisplayModeName(gameMode?: string, moduleName?: string): string {
+  if (moduleName) return moduleName.toUpperCase();
+  if (!gameMode) return 'TAG HUNT';
+  switch (gameMode) {
+    case 'tag_hunt':
+      return 'TAG HUNT';
+    case 'outbreak_horde':
+      return 'OUTBREAK HORDE';
+    case 'classic_chase':
+      return 'CLASSIC CHASE';
+    case 'jailbreak':
+      return 'JAILBREAK';
+    case 'assassin_ring':
+      return 'ASSASSIN RING';
+    case 'relay_heist':
+      return 'RELAY HEIST';
+    case 'territory_pulse':
+      return 'TERRITORY PULSE';
+    case 'ghost_duel':
+      return 'SOLO GHOST DUEL';
+    default:
+      return gameMode.toUpperCase().replace(/_/g, ' ');
+  }
+}
+
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_MAP_HEIGHT = Math.round(SCREEN_HEIGHT * 0.38);
-const MIN_MAP_HEIGHT = 110;
 const MAX_MAP_HEIGHT = Math.round(SCREEN_HEIGHT * 0.72);
 
 export default function ResultScreen() {
@@ -269,11 +293,12 @@ export default function ResultScreen() {
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
+  const minMapHeight = Math.max(insets.top, 16) + 84;
   const activeMapHeight =
     mapMode === 'expanded'
       ? MAX_MAP_HEIGHT
       : isScrolled || mapMode === 'minimized'
-        ? MIN_MAP_HEIGHT
+        ? minMapHeight
         : BASE_MAP_HEIGHT;
 
   const handleDebriefScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -949,21 +974,7 @@ export default function ResultScreen() {
         <View style={styles.topHudRow}>
           <View style={styles.topHudLeft}>
             <Chip
-              label={
-                isTerritoryPulse
-                  ? 'TERRITORY PULSE'
-                  : isGhostDuel
-                    ? 'SOLO GHOST DUEL'
-                    : isAssassinRing
-                      ? 'ASSASSIN RING'
-                      : isRelayHeist
-                        ? 'RELAY HEIST'
-                        : isJailbreak
-                          ? 'JAILBREAK'
-                          : game.mode === 'classic_chase'
-                            ? 'CLASSIC CHASE'
-                            : 'TAG HUNT'
-              }
+              label={getDisplayModeName(game.mode, activeModule?.name)}
               variant="accent"
               size="sm"
             />
@@ -1031,14 +1042,19 @@ export default function ResultScreen() {
           {/* ======================================================== */}
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: outcomeAccent }]}>
+              <Text style={[styles.sectionTitle, { color: outcomeAccent }]} numberOfLines={1}>
                 {isVictory ? 'MISSION ACCOMPLISHED' : 'MISSION CONCLUDED'}
               </Text>
               <View style={{ flexShrink: 0 }}>
                 <Chip
-                  label={game.end_reason?.replace(/_/g, ' ').toUpperCase() || 'ENDED'}
+                  label={
+                    game.end_reason === 'all_tagged'
+                      ? 'ALL TAGGED'
+                      : game.end_reason?.replace(/_/g, ' ').toUpperCase() || 'ENDED'
+                  }
                   variant="default"
                   size="sm"
+                  style={{ paddingHorizontal: 6 }}
                 />
               </View>
             </View>
@@ -1547,11 +1563,13 @@ export default function ResultScreen() {
           {/* ======================================================== */}
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 }}>
                 <Ionicons name="share-social-outline" size={14} color="#C8FF00" />
-                <Text style={styles.sectionTitle}>SHAREABLE STORY CARD</Text>
+                <Text style={styles.sectionTitle} numberOfLines={1}>SHAREABLE STORY CARD</Text>
               </View>
-              <Chip label="9:16 PREVIEW" variant="accent" size="sm" />
+              <View style={{ flexShrink: 0 }}>
+                <Chip label="9:16 PREVIEW" variant="accent" size="sm" />
+              </View>
             </View>
 
             {/* Clean 9:16 Preview Frame (Fixed overlapping & unclipped layout) */}
@@ -1570,7 +1588,7 @@ export default function ResultScreen() {
                   OPERATIVE: {playerById.get(state.my_player_id)?.display_name || 'CLASSIFIED'}
                 </Text>
                 <Text style={styles.recapModeText}>
-                  MODE: {game.mode.toUpperCase().replace(/_/g, ' ')} · CODE: #{game.code}
+                  MODE: {getDisplayModeName(game.mode, activeModule?.name)} · CODE: #{game.code}
                 </Text>
               </View>
 
@@ -1589,8 +1607,14 @@ export default function ResultScreen() {
                 </View>
                 <View style={[styles.recapStatCol, styles.recapStatColRight]}>
                   <Text style={styles.recapStatLabel}>STATUS</Text>
-                  <Text style={[styles.recapStatValue, { color: outcomeAccent }]} numberOfLines={1}>
-                    {isVictory ? 'VICTORY' : 'COMPLETED'}
+                  <Text
+                    style={[
+                      styles.recapStatValue,
+                      { color: isVictory ? '#C8FF00' : '#FF5A5F' },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {isVictory ? 'VICTORY' : 'DEFEAT'}
                   </Text>
                 </View>
               </View>
@@ -1703,9 +1727,9 @@ export default function ResultScreen() {
       <ShareRoundCardModal
         visible={shareCardModalVisible}
         metrics={{
-          modeName: activeModule?.name || state?.game?.mode || 'Classic Chase',
-          outcome: isVictory ? 'victorious' : 'completed',
-          durationSeconds: gameStats?.duration_s || 0,
+          modeName: getDisplayModeName(state?.game?.mode, activeModule?.name),
+          outcome: isVictory ? 'victorious' : (myPlayer?.status === 'tagged' ? 'tagged' : 'completed'),
+          durationSeconds: roundSeconds ?? gameStats?.duration_s ?? 0,
           distanceMeters: Math.round(myDistanceMeters),
           topSpeedKmh: myPlayerStatsTopSpeed(gameStats, state.my_player_id),
           role: myPlayer?.team || 'runner',
@@ -1721,10 +1745,10 @@ export default function ResultScreen() {
         onClose={() => setStoryCardModalVisible(false)}
         gameId={gameId || ''}
         gameCode={state?.game?.code || ''}
-        modeName={activeModule?.name || state?.game?.mode || 'Classic Chase'}
+        modeName={getDisplayModeName(state?.game?.mode, activeModule?.name)}
         role={myPlayer?.team || 'runner'}
-        outcome={isVictory ? 'victorious' : 'completed'}
-        durationSeconds={gameStats?.duration_s || 0}
+        outcome={isVictory ? 'victorious' : (myPlayer?.status === 'tagged' ? 'tagged' : 'defeated')}
+        durationSeconds={roundSeconds ?? gameStats?.duration_s ?? 0}
         distanceMeters={Math.round(myDistanceMeters)}
         peakSpeedMps={getPlayerPeakSpeed(gameStats, state.my_player_id)}
         opponentCount={state?.players?.filter((p) => p.team !== myPlayer?.team).length || 1}
@@ -1772,7 +1796,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   topHud: {
-    backgroundColor: 'rgba(18, 22, 31, 0.94)',
+    backgroundColor: '#0F131C',
     borderColor: '#232B3E',
     borderRadius: radii.card,
     borderWidth: 1,
@@ -1781,7 +1805,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     position: 'absolute',
     right: spacing.base,
-    zIndex: 10,
+    zIndex: 50,
+    elevation: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.7,
+    shadowRadius: 10,
   },
   topHudRow: {
     alignItems: 'center',
@@ -1867,7 +1896,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 6,
+    flexWrap: 'wrap',
+    rowGap: 4,
+    gap: 8,
     marginBottom: spacing.xs,
   },
   sectionTitle: {
