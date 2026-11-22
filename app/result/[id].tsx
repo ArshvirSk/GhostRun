@@ -181,7 +181,10 @@ type RoundResultState = {
     status: string;
     winner: 'runners' | 'hunters' | null;
     end_reason: string | null;
+    created_at?: string | null;
+    head_start_at?: string | null;
     live_at: string | null;
+    started_at?: string | null;
     ends_at: string | null;
     ended_at: string | null;
     tag_radius_m: number;
@@ -210,8 +213,9 @@ type TrailCollection = {
 function formatDuration(totalSeconds: number) {
   const seconds = Math.max(0, Math.round(totalSeconds));
   const minutes = Math.floor(seconds / 60);
+  const remSec = seconds % 60;
   if (minutes < 1) return `${seconds}s`;
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60) return `${minutes}m${remSec > 0 ? ` ${remSec}s` : ''}`;
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
@@ -756,9 +760,17 @@ export default function ResultScreen() {
                           : 'Time expired. Runners evaded hunters throughout the operational duration.'
                       : 'The round has concluded.';
 
-  const finishAt = game.end_reason === 'time_expired' ? game.ends_at : game.ended_at;
+  const finishAt =
+    game.end_reason === 'time_expired'
+      ? (game.ends_at || game.ended_at)
+      : (game.ended_at || game.ends_at);
+  const startAt = game.head_start_at || game.live_at || game.started_at || game.created_at;
   const roundSeconds =
-    game.live_at && finishAt ? (Date.parse(finishAt) - Date.parse(game.live_at)) / 1000 : null;
+    gameStats?.duration_s && gameStats.duration_s > 0
+      ? gameStats.duration_s
+      : startAt && finishAt
+        ? Math.max(0, Math.round(Math.abs(Date.parse(finishAt) - Date.parse(startAt)) / 1000))
+        : null;
   const taggedCount = players.filter(
     (player) => player.team === 'runner' && player.status === 'tagged',
   ).length;
@@ -992,7 +1004,7 @@ export default function ResultScreen() {
                   {isVictory ? 'MISSION ACCOMPLISHED' : 'MISSION CONCLUDED'}
                 </Text>
                 <Chip
-                  label={game.end_reason?.replace('_', ' ').toUpperCase() || 'ENDED'}
+                  label={game.end_reason?.replace(/_/g, ' ').toUpperCase() || 'ENDED'}
                   variant="default"
                   size="sm"
                 />
@@ -1328,7 +1340,7 @@ export default function ResultScreen() {
                   <View style={styles.statBox}>
                     <Text variant="caption" color={colors.textMuted}>LAST DISPATCH</Text>
                     <Text variant="body" weight="bold" color={colors.textLight} style={{ marginTop: 2, textTransform: 'uppercase' }}>
-                      {gameStats.mode_recap.ai_gm.last_event_type?.replace('_', ' ') || 'None'}
+                      {gameStats.mode_recap.ai_gm.last_event_type?.replace(/_/g, ' ') || 'None'}
                     </Text>
                   </View>
                 </View>

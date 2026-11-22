@@ -65,7 +65,12 @@ export const HudFrame = memo(function HudFrame({
         ? tokens.colors.danger
         : tokens.colors.primary;
 
-  const eyebrow = `${state.game.status.toUpperCase()} · ${state.my_team.toUpperCase()}`;
+  const formattedStatus =
+    state.game.status === 'head_start'
+      ? 'HEAD START'
+      : state.game.status.replace(/_/g, ' ').toUpperCase();
+  const formattedTeam = state.my_team.replace(/_/g, ' ').toUpperCase();
+  const eyebrow = `${formattedStatus} · ${formattedTeam}`;
 
   return (
     <Pressable

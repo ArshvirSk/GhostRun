@@ -25,6 +25,7 @@ export default function HostReviewScreen() {
   const selectedModifiers = useHostStore((s) => s.selectedModifiers);
   const selectedRoles = useHostStore((s) => s.selectedRoles);
   const radius = useHostStore((s) => s.radius);
+  const center = useHostStore((s) => s.center);
   const placements = useHostStore((s) => s.placements);
   const buildCreateGamePayload = useHostStore((s) => s.buildCreateGamePayload);
 
@@ -84,8 +85,8 @@ export default function HostReviewScreen() {
         }
       } else if (modeId === 'relay_heist') {
         try {
-          const lat = placements.extraction ? placements.extraction[1] : areaCenter[1];
-          const lng = placements.extraction ? placements.extraction[0] : areaCenter[0];
+          const lat = placements.extraction ? placements.extraction[1] : center[1];
+          const lng = placements.extraction ? placements.extraction[0] : center[0];
           await supabase.rpc('set_extraction_location', {
             p_game_id: created.game_id,
             p_lat: lat,

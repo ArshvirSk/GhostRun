@@ -20,6 +20,7 @@ export interface CodeBoxesProps {
   error?: boolean;
   hasError?: boolean;
   disabled?: boolean;
+  autoFocus?: boolean;
   style?: ViewStyle;
 }
 
@@ -32,6 +33,7 @@ export function CodeBoxes({
   error = false,
   hasError = false,
   disabled = false,
+  autoFocus = false,
   style,
 }: CodeBoxesProps) {
   const { colors, radii } = useTheme();
@@ -152,6 +154,7 @@ export function CodeBoxes({
               accessibilityLabel={`Room code digit ${index + 1}`}
               autoCapitalize="characters"
               autoCorrect={false}
+              autoFocus={index === 0 && autoFocus}
               cursorColor={colors.accent}
               editable={!disabled}
               keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'default'}

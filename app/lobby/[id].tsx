@@ -71,6 +71,11 @@ interface LobbyGame {
   roles: string[];
   mode_params: Record<string, unknown>;
   status: string;
+  area?: {
+    latitude: number;
+    longitude: number;
+    radius_m?: number;
+  } | null;
   jail?: {
     id: string;
     latitude: number;
@@ -1840,7 +1845,7 @@ function PlayerRow({
         style={styles.playerInfo}
       >
         <View style={[styles.avatarDot, { backgroundColor: player.color || colors.primary, borderRadius: radii.pill }]} />
-        <View style={{ flex: 1, marginLeft: 8, marginRight: 6, justifyContent: 'center' }}>
+        <View style={{ flex: 1, marginLeft: 8, marginRight: 8, justifyContent: 'center', minWidth: 0 }}>
           <View style={styles.nameRow}>
             <Text
               variant="title"
@@ -2431,10 +2436,13 @@ const styles = StyleSheet.create({
     padding: 10,
     borderWidth: 1,
     marginBottom: 0,
+    width: '100%',
   },
   playerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    justifyContent: 'space-between',
   },
   avatarDot: {
     width: 24,
@@ -2444,15 +2452,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
   },
   youBadge: {
     backgroundColor: 'rgba(167, 139, 250, 0.2)',
     borderColor: '#A78BFA',
     borderWidth: 1,
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 5,
-    marginLeft: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 5,
     flexShrink: 0,
   },
   youBadgeText: {

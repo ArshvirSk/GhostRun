@@ -352,7 +352,7 @@ export default function ScheduleScreen() {
                         {game.title}
                       </Text>
                       <Text variant="caption" style={{ color: colors.primary, marginTop: 2 }}>
-                        {game.mode_id.toUpperCase().replace('_', ' ')} · {dateStr} at {timeStr}
+                        {game.mode_id.toUpperCase().replace(/_/g, ' ')} · {dateStr} at {timeStr}
                       </Text>
                       {game.area_name ? (
                         <View style={styles.inlineRow}>

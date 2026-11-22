@@ -374,6 +374,7 @@ export default function JoinGameScreen() {
             <CodeBoxes
               length={CODE_LENGTH}
               value={code}
+              autoFocus={true}
               onChangeCode={(newCode) => {
                 const parsed = parseInviteUrl(newCode).code ?? newCode;
                 setCode(parsed.slice(0, CODE_LENGTH));

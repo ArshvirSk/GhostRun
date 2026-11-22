@@ -910,9 +910,9 @@ export default function ReplayScreen() {
         : activeEvent?.kind === 'heat'
           ? `Heat Probe · ${activeEvent.heat.display_name}`
           : activeEvent?.kind === 'handoff'
-            ? `Relay · ${activeEvent.event.type.replace('_', ' ')}`
+            ? `Relay · ${activeEvent.event.type.replace(/_/g, ' ')}`
             : activeEvent?.kind === 'jail'
-              ? `Jail · ${activeEvent.event.type.replace('_', ' ')}`
+              ? `Jail · ${activeEvent.event.type.replace(/_/g, ' ')}`
               : 'No event at this moment';
 
   const eventDetail =

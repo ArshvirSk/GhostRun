@@ -213,7 +213,7 @@ export function PlayContent() {
           styles.scrollContent,
           {
             paddingTop: Math.max(insets.top, 24) + 8,
-            paddingBottom: Math.max(insets.bottom, 20) + 110,
+            paddingBottom: Math.max(insets.bottom, 24) + 140,
           },
         ]}
         showsVerticalScrollIndicator={false}
