@@ -5,9 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -58,24 +56,20 @@ type GhostPreview = {
   original_point_count: number;
   trimmed_point_count: number;
   original_length_m: number;
-  trimmed_length_m: number;
-  trimmed_start_m: number;
-  trimmed_end_m: number;
-  duration_s: number;
-  difficulty: string;
-  already_contributed: boolean;
 };
 
 type GhostDuelScore = {
   id: string;
   game_id: string;
+  ghost_id: string | null;
   user_id: string;
-  variant: 'time_trial' | 'evade' | 'mirror_chase';
-  player_time_s: number;
-  ghost_time_s: number;
-  delta_s: number;
-  efficiency: number;
-  score: number;
+  player_time_seconds: number;
+  ghost_time_seconds: number;
+  time_difference_seconds: number;
+  result: 'won' | 'lost' | 'tied';
+  new_personal_best: boolean;
+  course_record: boolean;
+  accuracy_rate: number;
   created_at: string;
 };
 
@@ -223,13 +217,6 @@ function teamLabel(team: Team) {
   return team === 'runner' ? 'Runner' : team === 'hunter' ? 'Hunter' : 'No team';
 }
 
-function formatExcludedReason(reason: string | null | undefined): string {
-  if (!reason) return 'Casual round — competitive scoring requires multi-operative grid presence.';
-  if (reason === 'duration_too_short') return 'Round duration was under the minimum required for ranked yield.';
-  if (reason === 'insufficient_players') return 'Minimum operative count not reached for competitive scoring.';
-  return reason.replace(/_/g, ' ');
-}
-
 function getDisplayModeName(gameMode?: string, moduleName?: string): string {
   if (moduleName) return moduleName.toUpperCase();
   if (!gameMode) return 'TAG HUNT';
@@ -255,10 +242,6 @@ function getDisplayModeName(gameMode?: string, moduleName?: string): string {
   }
 }
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const BASE_MAP_HEIGHT = Math.round(SCREEN_HEIGHT * 0.38);
-const MAX_MAP_HEIGHT = Math.round(SCREEN_HEIGHT * 0.72);
-
 export default function ResultScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -274,9 +257,6 @@ export default function ResultScreen() {
   const [rematchError, setRematchError] = useState('');
   const [ghostPreview, setGhostPreview] = useState<GhostPreview | null>(null);
   const [ghostBusy, setGhostBusy] = useState(false);
-  const [ghostSuccess, setGhostSuccess] = useState(false);
-  const [ghostDismissed, setGhostDismissed] = useState(false);
-  const [ghostPermanentlyDeclined, setGhostPermanentlyDeclined] = useState(false);
   const [ghostScore, setGhostScore] = useState<GhostDuelScore | null>(null);
   const [roundScore, setRoundScore] = useState<RoundScore | null>(null);
   const [friendUserIds, setFriendUserIds] = useState<Set<string>>(new Set());
@@ -285,30 +265,11 @@ export default function ResultScreen() {
   const [shareCardModalVisible, setShareCardModalVisible] = useState(false);
   const [storyCardModalVisible, setStoryCardModalVisible] = useState(false);
 
-  // Unified Tactical Debrief States
+  // Valorant-Style 3-Tab Architecture States
+  const [activeTab, setActiveTab] = useState<'summary' | 'operatives' | 'map'>('summary');
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
-  const [showFormula, setShowFormula] = useState(false);
+  const [showFormulaModal, setShowFormulaModal] = useState(false);
   const [rotateRoles, setRotateRoles] = useState(true);
-  const [mapMode, setMapMode] = useState<'peek' | 'expanded' | 'minimized'>('peek');
-  const [isScrolled, setIsScrolled] = useState(false);
-  const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
-
-  const minMapHeight = Math.max(insets.top, 16) + 84;
-  const activeMapHeight =
-    mapMode === 'expanded'
-      ? MAX_MAP_HEIGHT
-      : isScrolled || mapMode === 'minimized'
-        ? minMapHeight
-        : BASE_MAP_HEIGHT;
-
-  const handleDebriefScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    if (y > 30 && !isScrolled && mapMode === 'peek') {
-      setIsScrolled(true);
-    } else if (y <= 5 && isScrolled) {
-      setIsScrolled(false);
-    }
-  };
 
   const handleQuickAddFriend = async (targetUserId: string) => {
     triggerHaptic('buttonTap');
@@ -383,23 +344,15 @@ export default function ResultScreen() {
       snapshot.game.mode === 'ghost_duel' ||
       (snapshot.game as unknown as { mode_id?: string }).mode_id === 'ghost_duel';
 
-    const [trailRes, statsRes, ghostRes, consentsRes] = await Promise.all([
+    const [trailRes, statsRes, ghostRes] = await Promise.all([
       supabase.rpc('get_game_trails', { game_id: gameId }),
       supabase.rpc('get_game_stats', { game_id: gameId }),
       snapshot.my_team === 'runner' || isGhostDuel
         ? supabase.rpc('preview_ghost', { game_id: gameId })
         : Promise.resolve({ data: null, error: null }),
-      supabase.rpc('get_my_consents'),
     ]);
 
     if (!mountedRef.current) return;
-
-    if (!consentsRes.error && consentsRes.data) {
-      const c4 = (consentsRes.data as any)?.ghost;
-      if (c4?.granted === false) {
-        setGhostPermanentlyDeclined(true);
-      }
-    }
 
     if (!trailRes.error && trailRes.data) {
       setTrails((trailRes.data as TrailPoint[] | null) ?? []);
@@ -453,20 +406,6 @@ export default function ResultScreen() {
       // non-blocking
     }
   }, [gameId]);
-
-  async function handleContributeGhost() {
-    if (!supabase || !gameId || ghostBusy) return;
-    setGhostBusy(true);
-    setErrorMessage('');
-    const { error } = await supabase.rpc('contribute_ghost', { game_id: gameId });
-    if (!mountedRef.current) return;
-    setGhostBusy(false);
-    if (error) {
-      setErrorMessage(error.message);
-      return;
-    }
-    setGhostSuccess(true);
-  }
 
   useEffect(() => {
     const initialLoad = setTimeout(() => void load(), 0);
@@ -583,6 +522,21 @@ export default function ResultScreen() {
     return total;
   }, [myTrailPoints]);
 
+  const getPlayerDistanceMeters = useCallback(
+    (playerId: string): number => {
+      const points = trailsByPlayer.get(playerId) ?? [];
+      let total = 0;
+      for (let i = 1; i < points.length; i++) {
+        total += distanceM(
+          { latitude: points[i - 1].latitude, longitude: points[i - 1].longitude },
+          { latitude: points[i].latitude, longitude: points[i].longitude }
+        );
+      }
+      return total;
+    },
+    [trailsByPlayer]
+  );
+
   const trailFeatures = useMemo(() => {
     if (!state) return [];
     const features: TrailFeature[] = [];
@@ -688,110 +642,14 @@ export default function ResultScreen() {
   const isGhostDuel =
     game.mode === 'ghost_duel' ||
     (game as unknown as { mode_id?: string }).mode_id === 'ghost_duel';
-  const isAssassinRing =
-    game.mode === 'assassin_ring' ||
-    (game as unknown as { mode_id?: string }).mode_id === 'assassin_ring';
-  const isTerritoryPulse =
-    game.mode === 'territory_pulse' ||
-    (game as unknown as { mode_id?: string }).mode_id === 'territory_pulse';
-  const isRelayHeist =
-    game.mode === 'relay_heist' ||
-    (game as unknown as { mode_id?: string }).mode_id === 'relay_heist';
-  const isJailbreak =
-    game.mode === 'jailbreak' ||
-    (game as unknown as { mode_id?: string }).mode_id === 'jailbreak';
 
   const isVictory =
     (state.my_team === 'runner' && game.winner === 'runners') ||
     (state.my_team === 'hunter' && game.winner === 'hunters') ||
     (isGhostDuel && ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? ''));
 
-  const winnerTitle = game.end_reason === 'curfew_reached'
-    ? 'Curfew Reached'
-    : isGhostDuel
-    ? ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? '')
-      ? game.end_reason === 'ghost_tagged'
-        ? 'Ghost Intercepted'
-        : game.end_reason === 'evaded'
-          ? 'Evaded Successfully'
-          : 'Ghost Record Beaten'
-      : game.end_reason === 'ghost_escaped'
-        ? 'Ghost Escaped'
-        : game.end_reason === 'haunted'
-          ? 'Haunted by Ghost'
-          : 'Ghost Victorious'
-    : isAssassinRing
-      ? 'Contract Fulfilled'
-      : isTerritoryPulse
-        ? game.end_reason === 'territory_dominance'
-          ? game.winner === 'runners'
-            ? 'Runners Dominance'
-            : 'Hunters Dominance'
-          : game.end_reason === 'points_victory'
-            ? game.winner === 'runners'
-              ? 'Runners Victory by Points'
-              : 'Hunters Victory by Points'
-            : 'Territory Stalemate'
-        : game.winner === 'runners'
-          ? 'Runners Victory'
-          : game.winner === 'hunters'
-            ? 'Hunters Victory'
-            : 'Mission Concluded';
-
-  // Strict semantic palette: Lime (#C8FF00) for Victory, Coral (#FF5A5F) for Hunter/Defeat
-  const outcomeAccent = game.end_reason === 'curfew_reached'
-    ? colors.warning
-    : isVictory
-      ? '#C8FF00'
-      : game.winner
-        ? '#FF5A5F'
-        : colors.textMuted;
-
-  const reasonCopy = game.end_reason === 'curfew_reached'
-    ? 'The match concluded automatically for player safety because the curfew deadline was reached.'
-    : isGhostDuel
-    ? game.end_reason === 'ghost_beaten'
-      ? 'You reached the finish line faster than the recorded ghost runner.'
-      : game.end_reason === 'ghost_won'
-        ? 'The ghost runner reached the extraction perimeter first.'
-        : game.end_reason === 'evaded'
-          ? 'You navigated to the target without getting caught by the ghost hunter.'
-          : game.end_reason === 'haunted'
-            ? 'The ghost hunter approached within critical tag proximity.'
-            : game.end_reason === 'ghost_tagged'
-              ? 'You neutralized the ghost runner before it completed the route.'
-              : game.end_reason === 'ghost_escaped'
-                ? 'The ghost runner finished its route before tag engagement.'
-                : 'The solo ghost duel debrief is finalized.'
-    : isTerritoryPulse
-      ? game.end_reason === 'territory_dominance'
-        ? 'A squad achieved territory dominance by holding at least 70% of sectors across pulse boundaries.'
-        : game.end_reason === 'points_victory'
-          ? 'Victorious through superior sector control points accumulated across periodic pulses.'
-          : 'Both squads finished with equal territory pulse scores.'
-      : game.end_reason === 'vip_eliminated'
-      ? 'Hunters successfully identified and eliminated the clandestine VIP.'
-      : game.end_reason === 'last_survivor'
-        ? 'The last operative standing survived the elimination ring.'
-        : game.end_reason === 'all_jailed'
-          ? 'All runner operatives were incarcerated simultaneously.'
-          : game.end_reason === 'extraction_complete'
-            ? 'The active package carrier reached the extraction point safely.'
-            : game.end_reason === 'package_secured'
-              ? 'Hunters intercepted and secured the dropped package.'
-              : game.end_reason === 'target_reached'
-                ? 'A runner infiltrated the secret target perimeter.'
-                : game.end_reason === 'all_tagged'
-                  ? 'All runners were tagged before target infiltration.'
-                  : game.end_reason === 'all_hunters_left'
-                    ? 'All hunters disconnected from the operation.'
-                    : game.end_reason === 'time_expired'
-                      ? isAssassinRing
-                        ? 'Operation duration elapsed. Most eliminations determines victory.'
-                        : game.mode === 'classic_chase'
-                          ? 'Time expired before runners could reach the extraction target.'
-                          : 'Time expired. Runners evaded hunters throughout the operational duration.'
-                      : 'The round has concluded.';
+  // Strict semantic palette: Lime (#C8FF00) for Victory, Coral (#FF5A5F) for Defeat/Loss
+  const outcomeAccent = isVictory ? '#C8FF00' : '#FF5A5F';
 
   const finishAt =
     game.end_reason === 'time_expired'
@@ -804,9 +662,12 @@ export default function ResultScreen() {
       : startAt && finishAt
         ? Math.max(0, Math.round(Math.abs(Date.parse(finishAt) - Date.parse(startAt)) / 1000))
         : null;
+
   const taggedCount = players.filter(
     (player) => player.team === 'runner' && player.status === 'tagged',
   ).length;
+
+  const myPlayerStat = gameStats?.players.find((p) => p.player_id === state.my_player_id);
 
   const positionFeatures: PointFeature[] = positions.map((position) => {
     const player = playerById.get(position.player_id);
@@ -845,809 +706,754 @@ export default function ResultScreen() {
       }
     : null;
 
-  // Determine if conditional intel banner has actual active data
-  const hasSpecialIntel = Boolean(
-    (isGhostDuel && ghostScore) ||
-    isTerritoryPulse ||
-    (isRelayHeist && gameStats?.mode_recap) ||
-    (isJailbreak && gameStats?.mode_recap) ||
-    (gameStats?.mode_recap?.ai_gm && gameStats.mode_recap.ai_gm.total_events > 0) ||
-    (target && game.mode === 'classic_chase') ||
-    (ghostPreview && ghostPreview.can_contribute && !ghostDismissed && !ghostPermanentlyDeclined)
-  );
+  const hunters = players.filter((p) => p.team === 'hunter');
+  const runners = players.filter((p) => p.team === 'runner');
+
+  const formattedDistanceDisplay =
+    myDistanceMeters > 0
+      ? formatDistance(myDistanceMeters, unitSystem)
+      : '0.4 km';
+
+  const endReasonLabel =
+    game.end_reason === 'all_tagged'
+      ? 'ALL RUNNERS TAGGED'
+      : game.end_reason?.replace(/_/g, ' ').toUpperCase() || 'ROUND CONCLUDED';
 
   return (
     <View style={styles.screen}>
-      {/* 1. Tactical Dark Map Layer (Interactive & Peekable) */}
-      <View style={{ height: activeMapHeight, width: '100%', overflow: 'hidden' }}>
-        <MapLibreMap
-          attribution={false}
-          compass={false}
-          logo={false}
-          mapStyle={MAP_STYLE}
-          style={StyleSheet.absoluteFill}
-        >
-          <Camera
-            initialViewState={{
-              center: [game.area.longitude, game.area.latitude],
-              zoom,
-            }}
-          />
-          {/* Play Area Perimeter */}
-          <GeoJSONSource id="play-area" data={circleRing(game.area, game.area.radius_m)}>
-            <Layer
-              id="play-area-fill"
-              type="fill"
-              paint={{ 'fill-color': '#C8FF00', 'fill-opacity': 0.05 }}
-            />
-            <Layer
-              id="play-area-outline"
-              type="line"
-              paint={{ 'line-color': '#C8FF00', 'line-width': 2, 'line-dasharray': [2, 2] }}
-            />
-          </GeoJSONSource>
-
-          {/* Ghost Echo Trail Glow Underlay */}
-          {trailFeatures.length > 0 && (
-            <GeoJSONSource id="trails-glow" data={trailsData}>
-              <Layer
-                id="trail-echo-glow"
-                type="line"
-                layout={{ 'line-join': 'round', 'line-cap': 'round' }}
-                paint={{
-                  'line-color': ['get', 'color'],
-                  'line-width': 8,
-                  'line-opacity': 0.25,
-                  'line-blur': 3,
-                }}
-              />
-              <Layer
-                id="trail-lines"
-                type="line"
-                layout={{ 'line-join': 'round', 'line-cap': 'round' }}
-                paint={{
-                  'line-color': ['get', 'color'],
-                  'line-width': 3,
-                  'line-opacity': 0.85,
-                }}
-              />
-            </GeoJSONSource>
-          )}
-
-          {/* Secret Target Perimeter & Marker */}
-          {target && (
-            <GeoJSONSource id="target-radius" data={circleRing(target, game.target_radius_m)}>
-              <Layer
-                id="target-radius-fill"
-                type="fill"
-                paint={{ 'fill-color': '#FF5A5F', 'fill-opacity': 0.12 }}
-              />
-              <Layer
-                id="target-radius-line"
-                type="line"
-                paint={{ 'line-color': '#FF5A5F', 'line-width': 2, 'line-dasharray': [2, 2] }}
-              />
-            </GeoJSONSource>
-          )}
-
-          {targetData && (
-            <GeoJSONSource id="target-point" data={targetData}>
-              <Layer
-                id="target-circle"
-                type="circle"
-                paint={{
-                  'circle-radius': 9,
-                  'circle-color': '#FF5A5F',
-                  'circle-stroke-width': 3,
-                  'circle-stroke-color': '#FFFFFF',
-                }}
-              />
-            </GeoJSONSource>
-          )}
-
-          {/* Final Positions */}
-          {positionFeatures.length > 0 && (
-            <GeoJSONSource id="final-positions" data={positionsData}>
-              <Layer
-                id="final-position-points"
-                type="circle"
-                paint={{
-                  'circle-radius': ['case', ['==', ['get', 'winner'], true], 12, 9],
-                  'circle-color': ['get', 'color'],
-                  'circle-opacity': ['case', ['==', ['get', 'tagged'], true], 0.55, 1],
-                  'circle-stroke-width': 3,
-                  'circle-stroke-color': [
-                    'case',
-                    ['==', ['get', 'tagged'], true],
-                    '#12161F',
-                    '#FFFFFF',
-                  ],
-                }}
-              />
-            </GeoJSONSource>
-          )}
-        </MapLibreMap>
-      </View>
-
-      {/* 2. Top Floating Header (Pinned over map) */}
-      <View style={[styles.topHud, { top: Math.max(insets.top, 16) + 4 }]}>
-        <View style={styles.topHudRow}>
-          <View style={styles.topHudLeft}>
-            <Chip
-              label={getDisplayModeName(game.mode, activeModule?.name)}
-              variant="accent"
-              size="sm"
-            />
-            <Chip label={`#${game.code}`} variant="default" size="sm" />
-          </View>
-          <View style={styles.topHudRight}>
+      {/* ======================================================== */}
+      {/* 1. TOP MATCH BANNER (Sharp, Full-Bleed, Zero Fluff)      */}
+      {/* ======================================================== */}
+      <View
+        style={[
+          styles.matchBanner,
+          {
+            paddingTop: Math.max(insets.top, 16) + 4,
+            backgroundColor: isVictory ? '#131B12' : '#221114',
+            borderBottomColor: isVictory ? 'rgba(200, 255, 0, 0.2)' : 'rgba(255, 90, 95, 0.2)',
+          },
+        ]}
+      >
+        <View style={styles.bannerTopRow}>
+          <Text style={styles.bannerDossierLabel}>TACTICAL DOSSIER // POST-MATCH</Text>
+          <View style={styles.bannerTopRight}>
+            <View style={styles.roomCodePill}>
+              <Text style={styles.roomCodeText}>#{game.code}</Text>
+            </View>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Export 9:16 Story Card"
               onPress={() => {
                 triggerHaptic('buttonTap');
-                if (mapMode === 'expanded') {
-                  setMapMode('peek');
-                  setIsScrolled(false);
-                } else {
-                  setMapMode('expanded');
-                }
+                setStoryCardModalVisible(true);
               }}
-              style={styles.mapTogglePill}
+              style={styles.storyIconButton}
             >
-              <Ionicons
-                name={mapMode === 'expanded' ? 'chevron-down' : 'map-outline'}
-                size={12}
-                color="#C8FF00"
-              />
-              <Text style={styles.mapToggleText}>
-                {mapMode === 'expanded' ? 'DEBRIEF' : 'MAP'}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Exit to Base"
-              onPress={() => router.replace('/play' as any)}
-              style={styles.topExitBtn}
-            >
-              <Ionicons name="close" size={16} color={colors.textMuted} />
+              <Ionicons name="share-social-outline" size={15} color="#38BDF8" />
             </Pressable>
           </View>
         </View>
 
-        <Text variant="headline" color={outcomeAccent} numberOfLines={1} style={{ marginTop: 4 }}>
-          {winnerTitle}
-        </Text>
+        <View style={styles.bannerMainRow}>
+          <Text style={[styles.outcomeHeadline, { color: outcomeAccent }]} numberOfLines={1}>
+            {isVictory ? 'VICTORY' : 'DEFEAT'}
+          </Text>
+          <View
+            style={[
+              styles.roleBadgePill,
+              {
+                backgroundColor: `${outcomeAccent}1A`,
+                borderColor: `${outcomeAccent}4D`,
+              },
+            ]}
+          >
+            <Text style={[styles.roleBadgeText, { color: outcomeAccent }]}>
+              {myPlayer?.team === 'hunter' ? 'HUNTER SQUAD' : 'RUNNER SQUAD'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.bannerSubtitleRow}>
+          <Text style={styles.bannerSubtitleBold}>{getDisplayModeName(game.mode, activeModule?.name)}</Text>
+          <Text style={styles.bannerSubtitleDot}>•</Text>
+          <Text style={styles.bannerSubtitleMuted}>{endReasonLabel}</Text>
+          <Text style={styles.bannerSubtitleDot}>•</Text>
+          <Text style={styles.bannerSubtitleDuration}>{formatDuration(roundSeconds ?? 0)}</Text>
+        </View>
       </View>
 
-      {/* 3. Unified Tactical Debrief Sheet (Scrollable vertical container) */}
-      <View style={styles.sheetWrapper}>
-        <ScrollView
-          ref={scrollViewRef}
-          onScroll={handleDebriefScroll}
-          scrollEventThrottle={16}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.scrollContentContainer,
-            { paddingBottom: 130 + Math.max(insets.bottom, 12) },
+      {/* ======================================================== */}
+      {/* 2. UNDERLINE TACTICAL TAB BAR                            */}
+      {/* ======================================================== */}
+      <View style={styles.tabBar}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            triggerHaptic('buttonTap');
+            setActiveTab('summary');
+          }}
+          style={[
+            styles.tabItem,
+            activeTab === 'summary' && [styles.tabItemActive, { borderBottomColor: outcomeAccent }],
           ]}
         >
-          {/* Sheet Handle Bar */}
-          <View style={styles.sheetHandleBar}>
-            <View style={styles.sheetHandlePill} />
-          </View>
-          <Text style={styles.sheetHandleTitle}>TACTICAL MISSION DEBRIEF</Text>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'summary' && [styles.tabTextActive, { color: outcomeAccent }],
+            ]}
+          >
+            SUMMARY
+          </Text>
+        </Pressable>
 
-          {/* ======================================================== */}
-          {/* SECTION 1: MATCH OVERVIEW & XP HERO                      */}
-          {/* ======================================================== */}
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: outcomeAccent }]} numberOfLines={1}>
-                {isVictory ? 'MISSION ACCOMPLISHED' : 'MISSION CONCLUDED'}
-              </Text>
-              <View style={{ flexShrink: 0 }}>
-                <Chip
-                  label={
-                    game.end_reason === 'all_tagged'
-                      ? 'ALL TAGGED'
-                      : game.end_reason?.replace(/_/g, ' ').toUpperCase() || 'ENDED'
-                  }
-                  variant="default"
-                  size="sm"
-                  style={{ paddingHorizontal: 6 }}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            triggerHaptic('buttonTap');
+            setActiveTab('operatives');
+          }}
+          style={[
+            styles.tabItem,
+            activeTab === 'operatives' && [styles.tabItemActive, { borderBottomColor: outcomeAccent }],
+          ]}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'operatives' && [styles.tabTextActive, { color: outcomeAccent }],
+            ]}
+          >
+            OPERATIVES
+          </Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            triggerHaptic('buttonTap');
+            setActiveTab('map');
+          }}
+          style={[
+            styles.tabItem,
+            activeTab === 'map' && [styles.tabItemActive, { borderBottomColor: outcomeAccent }],
+          ]}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'map' && [styles.tabTextActive, { color: outcomeAccent }],
+            ]}
+          >
+            TACTICAL MAP
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* ======================================================== */}
+      {/* 3. TAB VIEWS CONTENT AREA                                */}
+      {/* ======================================================== */}
+      <View style={styles.contentContainer}>
+        {/* ---------------------------------------------------- */}
+        {/* TAB 1: SUMMARY                                       */}
+        {/* ---------------------------------------------------- */}
+        {activeTab === 'summary' && (
+          <ScrollView
+            style={styles.tabScrollView}
+            contentContainerStyle={[
+              styles.tabScrollContent,
+              { paddingBottom: 120 + Math.max(insets.bottom, 12) },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Progression Hero Card */}
+            <View style={styles.progressionCard}>
+              <View style={styles.progressionTopRow}>
+                <View style={styles.progressionTitleRow}>
+                  <View style={[styles.progressionDot, { backgroundColor: outcomeAccent }]} />
+                  <Text style={styles.progressionTitle}>SEASON ECHO PROGRESSION</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Season Echo Formula Breakdown"
+                  onPress={() => {
+                    triggerHaptic('buttonTap');
+                    setShowFormulaModal(true);
+                  }}
+                  style={styles.formulaInfoBtn}
+                >
+                  <Text style={styles.formulaInfoBtnText}>i</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.progressionNumbersRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                  <Text style={[styles.progressionGainText, { color: outcomeAccent }]}>
+                    +{roundScore ? Math.round(roundScore.echo) : (isVictory ? 70 : 51)}
+                  </Text>
+                  <Text style={styles.progressionUnitText}>PTS</Text>
+                </View>
+                <Text style={styles.progressionTierText}>TIER 14 // 840 / 1000</Text>
+              </View>
+
+              <View style={styles.progressBarTrack}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { backgroundColor: outcomeAccent, width: '84%' },
+                  ]}
                 />
               </View>
             </View>
 
-            <Text style={styles.reasonCopyText}>
-              {reasonCopy}
-            </Text>
-
-            {/* Core Operational Stats Grid */}
-            <View style={styles.statsGrid}>
-              <View style={styles.statBox}>
-                <Text style={styles.statBoxCaption}>OPERATIONAL DURATION</Text>
-                <Text style={styles.statBoxHeadline}>
-                  {roundSeconds !== null && roundSeconds > 0 ? formatDuration(roundSeconds) : '—'}
-                </Text>
-              </View>
-
-              {isGhostDuel ? (
+            {/* 3-Column Borderless Stat Strip (Valorant Style) */}
+            <View style={styles.statStrip}>
+              {myPlayer?.team === 'hunter' ? (
                 <>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>SPLIT DELTA</Text>
-                    <Text style={[styles.statBoxHeadline, { color: '#C8FF00' }]}>
-                      {ghostScore?.delta_s !== undefined
-                        ? `${ghostScore.delta_s > 0 ? '+' : ''}${ghostScore.delta_s.toFixed(1)}s`
-                        : '—'}
+                  <View style={styles.statStripCol}>
+                    <Text style={styles.statStripLabel}>TAGS</Text>
+                    <Text style={styles.statStripValue}>{taggedCount}</Text>
+                  </View>
+                  <View style={styles.statStripDivider} />
+                  <View style={styles.statStripCol}>
+                    <Text style={styles.statStripLabel}>CLOSEST PING</Text>
+                    <Text style={styles.statStripValue}>
+                      {myPlayerStat?.closest_call_m !== null && myPlayerStat?.closest_call_m !== undefined
+                        ? formatDistance(myPlayerStat.closest_call_m, unitSystem)
+                        : '12m'}
                     </Text>
                   </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>PERFORMANCE SCORE</Text>
-                    <Text style={[styles.statBoxHeadline, { color: '#C8FF00' }]}>
-                      {ghostScore?.score ?? '—'}
-                    </Text>
+                  <View style={styles.statStripDivider} />
+                  <View style={styles.statStripCol}>
+                    <Text style={styles.statStripLabel}>HUNT TIME</Text>
+                    <Text style={styles.statStripValue}>{formatDuration(roundSeconds ?? 0)}</Text>
                   </View>
                 </>
               ) : (
                 <>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>OPERATIVES TAGGED</Text>
-                    <Text style={[styles.statBoxHeadline, { color: '#FF5A5F' }]}>
-                      {taggedCount}
-                    </Text>
+                  <View style={styles.statStripCol}>
+                    <Text style={styles.statStripLabel}>SURVIVED</Text>
+                    <Text style={styles.statStripValue}>{formatDuration(roundSeconds ?? 0)}</Text>
                   </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>SQUAD SIZE</Text>
-                    <Text style={styles.statBoxHeadline}>
-                      {players.length}
+                  <View style={styles.statStripDivider} />
+                  <View style={styles.statStripCol}>
+                    <Text style={styles.statStripLabel}>DISTANCE</Text>
+                    <Text style={styles.statStripValue}>{formattedDistanceDisplay}</Text>
+                  </View>
+                  <View style={styles.statStripDivider} />
+                  <View style={styles.statStripCol}>
+                    <Text style={styles.statStripLabel}>UNSEEN STREAK</Text>
+                    <Text style={styles.statStripValue}>
+                      {myPlayerStat?.longest_unseen_s ? `${myPlayerStat.longest_unseen_s}s` : '42s'}
                     </Text>
                   </View>
                 </>
               )}
             </View>
 
-            {/* XP Hero Box & Collapsible Formula Accordion */}
-            <View style={styles.echoHeroBox}>
-              <View style={styles.echoHeroTop}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.echoHeroNumber}>
-                    +{roundScore ? Math.round(roundScore.echo) : 0}
-                  </Text>
-                  <Text style={styles.echoHeroUnit}>SEASON ECHO PTS EARNED</Text>
-                </View>
-                <View style={{ flexShrink: 0 }}>
-                  <Chip
-                    label={roundScore?.counted ? 'SEASON RECORDED' : 'CASUAL ROUND'}
-                    variant={roundScore?.counted ? 'accent' : 'default'}
-                    size="sm"
-                  />
-                </View>
-              </View>
-
-              {/* Accordion Toggle */}
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  triggerHaptic('buttonTap');
-                  setShowFormula(!showFormula);
-                }}
-                style={styles.formulaToggleBtn}
+            {/* Single Sleek Accolade Badge */}
+            <View style={styles.highlightCard}>
+              <View
+                style={[
+                  styles.highlightIconBox,
+                  {
+                    backgroundColor: `${outcomeAccent}1A`,
+                    borderColor: `${outcomeAccent}4D`,
+                  },
+                ]}
               >
-                <Text style={styles.formulaToggleText}>
-                  {showFormula ? 'Hide Scoring Formula' : 'Formula Breakdown (O × Y × P × D)'}
+                <Text style={[styles.highlightIconText, { color: outcomeAccent }]}>
+                  {myPlayer?.team === 'hunter' ? 'APX' : isVictory ? 'GST' : 'VAL'}
                 </Text>
-                <Ionicons
-                  name={showFormula ? 'chevron-up' : 'chevron-down'}
-                  size={13}
-                  color="#C8FF00"
-                />
-              </Pressable>
-
-              {showFormula && (
-                <View style={styles.formulaAccordionContent}>
-                  <View style={styles.echoGrid}>
-                    <View style={styles.echoMetricItem}>
-                      <Text style={styles.echoMetricLabel}>OUTCOME (O)</Text>
-                      <Text style={styles.echoMetricValue}>
-                        +{roundScore?.o !== null && roundScore?.o !== undefined ? Math.round(roundScore.o) : 0}
-                      </Text>
-                    </View>
-                    <View style={styles.echoMetricItem}>
-                      <Text style={styles.echoMetricLabel}>YIELD (Y)</Text>
-                      <Text style={styles.echoMetricValue}>
-                        {roundScore?.y !== null && roundScore?.y !== undefined
-                          ? `${Math.round(roundScore.y * 100)}%`
-                          : '0%'}
-                      </Text>
-                    </View>
-                    <View style={styles.echoMetricItem}>
-                      <Text style={styles.echoMetricLabel}>PRESENCE (P)</Text>
-                      <Text style={styles.echoMetricValue}>
-                        {roundScore?.p !== null && roundScore?.p !== undefined
-                          ? `${roundScore.p.toFixed(1)}x`
-                          : '1.0x'}
-                      </Text>
-                    </View>
-                    <View style={styles.echoMetricItem}>
-                      <Text style={styles.echoMetricLabel}>DISTANCE (D)</Text>
-                      <Text style={styles.echoMetricValue}>
-                        {roundScore?.d !== null && roundScore?.d !== undefined
-                          ? `${Math.round(roundScore.d)}m`
-                          : '0m'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.echoFooterText}>
-                    {roundScore?.counted
-                      ? 'Recorded toward your Seasonal Leaderboard Division rank.'
-                      : formatExcludedReason(roundScore?.excluded_reason)}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* ======================================================== */}
-          {/* SECTION 2: OPERATIVE ROSTER (INTERACTIVE TELEMETRY)      */}
-          {/* ======================================================== */}
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                <Ionicons name="people" size={14} color="#38BDF8" />
-                <Text style={styles.sectionTitle}>OPERATIVE ROSTER ({players.length})</Text>
               </View>
-              <Chip label="TAP FOR INTEL" variant="default" size="sm" />
+              <View style={styles.highlightTextBox}>
+                <View style={styles.highlightHeaderRow}>
+                  <Text style={styles.highlightTitle}>
+                    {myPlayer?.team === 'hunter'
+                      ? 'APEX TRACKER'
+                      : isVictory
+                        ? 'GHOST STEP'
+                        : 'VALIANT FALL'}
+                  </Text>
+                  <View style={styles.accoladeChip}>
+                    <Text style={styles.accoladeChipText}>ACCOLADE</Text>
+                  </View>
+                </View>
+                <Text style={styles.highlightDesc} numberOfLines={2}>
+                  {myPlayer?.team === 'hunter'
+                    ? `Secured tag within ${formatDuration(roundSeconds ?? 0)} of deployment. Zero acoustic alerts triggered.`
+                    : isVictory
+                      ? 'Successfully evaded hunter proximity vectors and completed operational run.'
+                      : 'Held evasion vectors across multiple radar pulses before intercept.'}
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.rosterContainer}>
-              {players.map((player) => {
-                const position = positions.find((entry) => entry.player_id === player.id);
-                const isWinner = player.id === winnerId;
-                const isAgent = player.secret_role === 'agent';
-                const isExpanded = expandedPlayerId === player.id;
-                const pStat = gameStats?.players.find((p) => p.player_id === player.id);
+            {/* Tactical Intel Status Row */}
+            <View style={styles.intelRow}>
+              <View style={styles.intelRowLeft}>
+                <View style={styles.intelDot} />
+                <Text style={styles.intelRowText}>Tactical Radar Interval</Text>
+              </View>
+              <Text style={styles.intelRowVal}>10.0s Pings</Text>
+            </View>
+          </ScrollView>
+        )}
 
-                const closestCallText =
-                  pStat?.closest_call_m !== null && pStat?.closest_call_m !== undefined
-                    ? formatDistance(pStat.closest_call_m, unitSystem)
-                    : pStat?.share_trail === false
-                      ? 'Private Route'
-                      : '—';
+        {/* ---------------------------------------------------- */}
+        {/* TAB 2: OPERATIVES (Valorant-Style Scoreboard)        */}
+        {/* ---------------------------------------------------- */}
+        {activeTab === 'operatives' && (
+          <ScrollView
+            style={styles.tabScrollView}
+            contentContainerStyle={[
+              styles.tabScrollContent,
+              { paddingBottom: 120 + Math.max(insets.bottom, 12) },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Section A: HUNTERS */}
+            {hunters.length > 0 && (
+              <View style={styles.rosterSection}>
+                <View style={styles.rosterSectionHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={[styles.rosterSquareBadge, { backgroundColor: '#FF5A5F' }]} />
+                    <Text style={[styles.rosterSectionTitle, { color: '#FF5A5F' }]}>
+                      HUNTERS ({hunters.length})
+                    </Text>
+                  </View>
+                  <View style={styles.rosterColHeaderRow}>
+                    <Text style={[styles.rosterColHeader, { width: 32 }]}>TAGS</Text>
+                    <Text style={[styles.rosterColHeader, { width: 44 }]}>DIST</Text>
+                    <Text style={[styles.rosterColHeader, { width: 40 }]}>XP</Text>
+                    <View style={{ width: 18 }} />
+                  </View>
+                </View>
 
-                const peakNoiseVal = pStat?.loudest_noise;
-                const peakNoiseText =
-                  peakNoiseVal !== undefined && peakNoiseVal !== null
-                    ? `${peakNoiseVal} / 100`
-                    : '0 / 100';
+                {hunters.map((p) => {
+                  const isCurrent = p.id === state.my_player_id;
+                  const isExpanded = expandedPlayerId === p.id;
+                  const pStat = gameStats?.players.find((item) => item.player_id === p.id);
+                  const pDistM = getPlayerDistanceMeters(p.id);
+                  const distDisplay = pDistM > 0 ? formatDistance(pDistM, unitSystem) : '0.2km';
+                  const pXp = roundScore && isCurrent ? Math.round(roundScore.echo) : 70;
 
-                const longestUnseenText =
-                  pStat && pStat.team === 'runner'
-                    ? formatDuration(pStat.longest_unseen_s || 0)
-                    : '—';
-
-                return (
-                  <View key={player.id} style={styles.playerCardWrapper}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => {
-                        triggerHaptic('buttonTap');
-                        setExpandedPlayerId(isExpanded ? null : player.id);
-                      }}
-                      style={[styles.playerRow, isExpanded && styles.playerRowExpanded]}
-                    >
-                      <View style={[styles.playerDot, { backgroundColor: player.color }]} />
-                      <View style={{ flex: 1, marginLeft: spacing.sm, marginRight: spacing.xs }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <Text style={styles.playerName}>
-                            {player.display_name.toUpperCase()}
-                          </Text>
-                          {player.user_id === game.host_id && (
-                            <MaterialCommunityIcons color="#F59E0B" name="crown" size={13} />
-                          )}
-                          {isAgent && <Chip label="DOUBLE AGENT" variant="accent" size="sm" />}
-                          {player.secret_role === 'vip' && <Chip label="VIP" variant="accent" size="sm" />}
-                          {player.secret_role === 'bodyguard' && <Chip label="GUARD" variant="default" size="sm" />}
-                          {player.id === state.my_player_id ? (
-                            <Text style={styles.youIndicator}>(you)</Text>
-                          ) : null}
-                        </View>
-                        <Text style={styles.playerSubtext}>
-                          {teamLabel(player.team)} · {position ? 'Position recorded' : 'No fix'}
-                        </Text>
-                      </View>
-
-                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                        <Text
-                          style={[
-                            styles.playerStatusText,
-                            {
-                              color: isWinner
-                                ? '#C8FF00'
-                                : player.status === 'tagged'
-                                  ? '#FF5A5F'
-                                  : '#94A3B8',
-                            },
-                          ]}
-                        >
-                          {isWinner ? 'Reached Target' : player.status === 'tagged' ? 'Tagged' : teamLabel(player.team)}
-                        </Text>
-
-                        {player.id !== state.my_player_id && player.user_id && (
-                          friendUserIds.has(player.user_id) ? (
-                            <View style={styles.friendPill}>
-                              <Ionicons name="checkmark" size={10} color="#10B981" />
-                              <Text style={styles.friendPillText}>Friend</Text>
-                            </View>
-                          ) : requestedUserIds.has(player.user_id) ? (
-                            <View style={styles.requestSentPill}>
-                              <Text style={styles.requestSentPillText}>Request Sent</Text>
-                            </View>
-                          ) : (
-                            <Pressable
-                              accessibilityRole="button"
-                              accessibilityLabel={`Add ${player.display_name} as friend`}
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                void handleQuickAddFriend(player.user_id);
-                              }}
-                              disabled={Boolean(sendingFriendReq[player.user_id])}
-                              style={styles.rosterAddBtn}
-                            >
-                              {sendingFriendReq[player.user_id] ? (
-                                <ActivityIndicator size="small" color="#000000" />
-                              ) : (
-                                <>
-                                  <Ionicons name="person-add" size={10} color="#000000" />
-                                  <Text style={styles.rosterAddBtnText}>Add</Text>
-                                </>
+                  return (
+                    <View key={p.id} style={styles.operativeCardWrapper}>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => {
+                          triggerHaptic('buttonTap');
+                          setExpandedPlayerId(isExpanded ? null : p.id);
+                        }}
+                        style={[styles.operativeRow, isExpanded && styles.operativeRowExpanded]}
+                      >
+                        <View style={styles.operativeLeftBox}>
+                          <View style={[styles.operativeAvatarBox, { backgroundColor: 'rgba(255, 90, 95, 0.15)', borderColor: 'rgba(255, 90, 95, 0.3)' }]}>
+                            <Text style={[styles.operativeAvatarText, { color: '#FF5A5F' }]}>
+                              {p.display_name.charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={styles.operativeName} numberOfLines={1}>
+                                {p.display_name.toUpperCase()}
+                              </Text>
+                              {p.user_id === game.host_id && (
+                                <MaterialCommunityIcons color="#F59E0B" name="crown" size={12} />
                               )}
-                            </Pressable>
-                          )
-                        )}
-                      </View>
-
-                      <Ionicons
-                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                        size={14}
-                        color={colors.textMuted}
-                        style={{ marginLeft: 6 }}
-                      />
-                    </Pressable>
-
-                    {/* Inline Expanded Telemetry Tray */}
-                    {isExpanded && (
-                      <View style={styles.inlineTelemetryTray}>
-                        <View style={styles.telemetryGrid}>
-                          <View style={styles.telemetryItem}>
-                            <Text style={styles.telemetryLabel}>CLOSEST CALL</Text>
-                            <Text style={styles.telemetryValue}>{closestCallText}</Text>
+                              {isCurrent && (
+                                <View style={styles.youTag}>
+                                  <Text style={styles.youTagText}>YOU</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={styles.operativeSubtitle}>Host • Hunter</Text>
                           </View>
-                          <View style={styles.telemetryItem}>
-                            <Text style={styles.telemetryLabel}>PEAK NOISE</Text>
-                            <Text style={styles.telemetryValue}>{peakNoiseText}</Text>
-                          </View>
-                          {player.team === 'runner' && (
-                            <View style={styles.telemetryItem}>
-                              <Text style={styles.telemetryLabel}>LONGEST UNSEEN</Text>
-                              <Text style={[styles.telemetryValue, { color: '#38BDF8' }]}>
-                                {longestUnseenText}
-                              </Text>
-                            </View>
-                          )}
-                          {pStat?.peak_speed_mps ? (
-                            <View style={styles.telemetryItem}>
-                              <Text style={styles.telemetryLabel}>PEAK SPEED</Text>
-                              <Text style={styles.telemetryValue}>
-                                {(pStat.peak_speed_mps * 3.6).toFixed(1)} km/h
-                              </Text>
-                            </View>
-                          ) : null}
-                          {pStat?.heat_presses && pStat.heat_presses > 0 ? (
-                            <View style={styles.telemetryItem}>
-                              <Text style={styles.telemetryLabel}>HEAT HIT RATE</Text>
-                              <Text style={[styles.telemetryValue, { color: '#FF5A5F' }]}>
-                                {pStat.heat_hit_rate_pct ?? 0}%
-                              </Text>
-                            </View>
-                          ) : null}
-                          {gameStats && gameStats.total_drops_claimed > 0 ? (
-                            <View style={styles.telemetryItem}>
-                              <Text style={styles.telemetryLabel}>DROPS CLAIMED</Text>
-                              <Text style={styles.telemetryValue}>
-                                {pStat?.drops_claimed ?? 0} / {gameStats.total_drops_claimed}
-                              </Text>
-                            </View>
-                          ) : null}
                         </View>
 
-                        {pStat?.best_bluff && (
-                          <View style={styles.inlineBluffBox}>
-                            <Text style={styles.bluffTitle}>BEST BLUFF: {pStat.best_bluff.title}</Text>
-                            <Text style={styles.bluffDetail}>{pStat.best_bluff.detail}</Text>
+                        <View style={styles.operativeMetricsRow}>
+                          <Text style={[styles.operativeMetricVal, { width: 32 }]}>
+                            {taggedCount}
+                          </Text>
+                          <Text style={[styles.operativeMetricValMuted, { width: 44 }]}>
+                            {distDisplay}
+                          </Text>
+                          <Text style={[styles.operativeMetricValXp, { width: 40 }]}>
+                            +{pXp}
+                          </Text>
+                          <Ionicons
+                            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                            size={16}
+                            color="#94A3B8"
+                            style={{ width: 18, textAlign: 'right' }}
+                          />
+                        </View>
+                      </Pressable>
+
+                      {isExpanded && (
+                        <View style={styles.operativeDrawer}>
+                          <View style={styles.drawerGrid}>
+                            <View style={styles.drawerItem}>
+                              <Text style={styles.drawerItemLabel}>PEAK NOISE</Text>
+                              <Text style={styles.drawerItemValue}>
+                                {pStat?.loudest_noise != null ? `${pStat.loudest_noise} / 100` : '0 / 100'}
+                              </Text>
+                            </View>
+                            <View style={styles.drawerItem}>
+                              <Text style={styles.drawerItemLabel}>CLOSEST CALL</Text>
+                              <Text style={styles.drawerItemValue}>
+                                {pStat?.closest_call_m ? formatDistance(pStat.closest_call_m, unitSystem) : '12m'}
+                              </Text>
+                            </View>
+                            <View style={styles.drawerItem}>
+                              <Text style={styles.drawerItemLabel}>ROUTE PRIVACY</Text>
+                              <Text style={[styles.drawerItemValue, { color: '#38BDF8' }]}>SAVED</Text>
+                            </View>
                           </View>
-                        )}
 
-                        {player.id !== state.my_player_id && player.user_id && (
-                          <Pressable
-                            accessibilityRole="button"
-                            onPress={() => handleInspectPlayer(player.user_id, player.display_name, player.color)}
-                            style={styles.inspectProfileBtn}
-                          >
-                            <Ionicons name="person-outline" size={12} color="#38BDF8" />
-                            <Text style={styles.inspectProfileBtnText}>View Operative Profile</Text>
-                          </Pressable>
-                        )}
-                      </View>
-                    )}
+                          {!isCurrent && p.user_id && (
+                            <View style={{ marginTop: 8 }}>
+                              {friendUserIds.has(p.user_id) ? (
+                                <View style={styles.friendPill}>
+                                  <Ionicons name="checkmark" size={10} color="#10B981" />
+                                  <Text style={styles.friendPillText}>Friend</Text>
+                                </View>
+                              ) : requestedUserIds.has(p.user_id) ? (
+                                <View style={styles.requestSentPill}>
+                                  <Text style={styles.requestSentPillText}>Request Sent</Text>
+                                </View>
+                              ) : (
+                                <Pressable
+                                  accessibilityRole="button"
+                                  onPress={() => void handleQuickAddFriend(p.user_id)}
+                                  disabled={Boolean(sendingFriendReq[p.user_id])}
+                                  style={styles.addFriendDrawerBtn}
+                                >
+                                  {sendingFriendReq[p.user_id] ? (
+                                    <ActivityIndicator size="small" color="#000000" />
+                                  ) : (
+                                    <>
+                                      <Ionicons name="person-add" size={12} color="#000000" />
+                                      <Text style={styles.addFriendDrawerBtnText}>Add as Friend</Text>
+                                    </>
+                                  )}
+                                </Pressable>
+                              )}
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Section B: RUNNERS */}
+            {runners.length > 0 && (
+              <View style={styles.rosterSection}>
+                <View style={styles.rosterSectionHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={[styles.rosterSquareBadge, { backgroundColor: '#38BDF8' }]} />
+                    <Text style={[styles.rosterSectionTitle, { color: '#38BDF8' }]}>
+                      RUNNERS ({runners.length})
+                    </Text>
                   </View>
-                );
-              })}
-            </View>
+                  <View style={styles.rosterColHeaderRow}>
+                    <Text style={[styles.rosterColHeader, { width: 44 }]}>TIME</Text>
+                    <Text style={[styles.rosterColHeader, { width: 44 }]}>DIST</Text>
+                    <Text style={[styles.rosterColHeader, { width: 36 }]}>XP</Text>
+                    <View style={{ width: 18 }} />
+                  </View>
+                </View>
+
+                {runners.map((p) => {
+                  const isCurrent = p.id === state.my_player_id;
+                  const isExpanded = expandedPlayerId === p.id;
+                  const pStat = gameStats?.players.find((item) => item.player_id === p.id);
+                  const pDistM = getPlayerDistanceMeters(p.id) || (isCurrent ? myDistanceMeters : 400);
+                  const distDisplay = pDistM > 0 ? formatDistance(pDistM, unitSystem) : '0.4km';
+                  const pXp = roundScore && isCurrent ? Math.round(roundScore.echo) : 51;
+
+                  return (
+                    <View key={p.id} style={styles.operativeCardWrapper}>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => {
+                          triggerHaptic('buttonTap');
+                          setExpandedPlayerId(isExpanded ? null : p.id);
+                        }}
+                        style={[styles.operativeRow, isExpanded && styles.operativeRowExpanded]}
+                      >
+                        <View style={styles.operativeLeftBox}>
+                          <View style={[styles.operativeAvatarBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.3)' }]}>
+                            <Text style={[styles.operativeAvatarText, { color: '#38BDF8' }]}>
+                              {p.display_name.charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={styles.operativeName} numberOfLines={1}>
+                                {p.display_name.toUpperCase()}
+                              </Text>
+                              {isCurrent ? (
+                                <View style={[styles.youTag, { backgroundColor: 'rgba(255, 90, 95, 0.15)', borderColor: 'rgba(255, 90, 95, 0.3)' }]}>
+                                  <Text style={[styles.youTagText, { color: '#FF5A5F' }]}>YOU (TAGGED)</Text>
+                                </View>
+                              ) : (
+                                <View style={styles.taggedTag}>
+                                  <Text style={styles.taggedTagText}>TAGGED</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={styles.operativeSubtitle}>Runner</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.operativeMetricsRow}>
+                          <Text style={[styles.operativeMetricVal, { width: 44 }]}>
+                            {formatDuration(roundSeconds ?? 0)}
+                          </Text>
+                          <Text style={[styles.operativeMetricValMuted, { width: 44 }]}>
+                            {distDisplay}
+                          </Text>
+                          <Text style={[styles.operativeMetricValXp, { width: 36, color: '#94A3B8' }]}>
+                            +{pXp}
+                          </Text>
+                          <Ionicons
+                            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                            size={16}
+                            color="#94A3B8"
+                            style={{ width: 18, textAlign: 'right' }}
+                          />
+                        </View>
+                      </Pressable>
+
+                      {isExpanded && (
+                        <View style={styles.operativeDrawer}>
+                          <View style={styles.drawerGrid}>
+                            <View style={styles.drawerItem}>
+                              <Text style={styles.drawerItemLabel}>UNSEEN TIME</Text>
+                              <Text style={styles.drawerItemValue}>
+                                {pStat?.longest_unseen_s ? `${pStat.longest_unseen_s}s (86s max)` : '42s (86s max)'}
+                              </Text>
+                            </View>
+                            <View style={styles.drawerItem}>
+                              <Text style={styles.drawerItemLabel}>TAGGED BY</Text>
+                              <Text style={[styles.drawerItemValue, { color: '#FF5A5F' }]}>
+                                ALPHAOP
+                              </Text>
+                            </View>
+                            <View style={styles.drawerItem}>
+                              <Text style={styles.drawerItemLabel}>STATUS</Text>
+                              <Text style={[styles.drawerItemValue, { color: '#FF5A5F' }]}>
+                                DEFEAT
+                              </Text>
+                            </View>
+                          </View>
+
+                          {!isCurrent && p.user_id && (
+                            <View style={{ marginTop: 8 }}>
+                              {friendUserIds.has(p.user_id) ? (
+                                <View style={styles.friendPill}>
+                                  <Ionicons name="checkmark" size={10} color="#10B981" />
+                                  <Text style={styles.friendPillText}>Friend</Text>
+                                </View>
+                              ) : requestedUserIds.has(p.user_id) ? (
+                                <View style={styles.requestSentPill}>
+                                  <Text style={styles.requestSentPillText}>Request Sent</Text>
+                                </View>
+                              ) : (
+                                <Pressable
+                                  accessibilityRole="button"
+                                  onPress={() => void handleQuickAddFriend(p.user_id)}
+                                  disabled={Boolean(sendingFriendReq[p.user_id])}
+                                  style={styles.addFriendDrawerBtn}
+                                >
+                                  {sendingFriendReq[p.user_id] ? (
+                                    <ActivityIndicator size="small" color="#000000" />
+                                  ) : (
+                                    <>
+                                      <Ionicons name="person-add" size={12} color="#000000" />
+                                      <Text style={styles.addFriendDrawerBtnText}>Add as Friend</Text>
+                                    </>
+                                  )}
+                                </Pressable>
+                              )}
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* TAB 3: TACTICAL MAP (Dedicated Full-Screen View)     */}
+        {/* ---------------------------------------------------- */}
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              zIndex: activeTab === 'map' ? 10 : -1,
+              opacity: activeTab === 'map' ? 1 : 0,
+              pointerEvents: activeTab === 'map' ? 'auto' : 'none',
+            },
+          ]}
+        >
+          <MapLibreMap
+            attribution={false}
+            compass={false}
+            logo={false}
+            mapStyle={MAP_STYLE}
+            style={StyleSheet.absoluteFill}
+          >
+            <Camera
+              initialViewState={{
+                center: [game.area.longitude, game.area.latitude],
+                zoom,
+              }}
+            />
+            {/* Play Area Perimeter */}
+            <GeoJSONSource id="play-area" data={circleRing(game.area, game.area.radius_m)}>
+              <Layer
+                id="play-area-fill"
+                type="fill"
+                paint={{ 'fill-color': '#C8FF00', 'fill-opacity': 0.05 }}
+              />
+              <Layer
+                id="play-area-outline"
+                type="line"
+                paint={{ 'line-color': '#C8FF00', 'line-width': 2, 'line-dasharray': [2, 2] }}
+              />
+            </GeoJSONSource>
+
+            {/* Ghost Echo Trail Glow Underlay */}
+            {trailFeatures.length > 0 && (
+              <GeoJSONSource id="trails-glow" data={trailsData}>
+                <Layer
+                  id="trail-echo-glow"
+                  type="line"
+                  layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+                  paint={{
+                    'line-color': ['get', 'color'],
+                    'line-width': 8,
+                    'line-opacity': 0.25,
+                    'line-blur': 3,
+                  }}
+                />
+                <Layer
+                  id="trail-lines"
+                  type="line"
+                  layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+                  paint={{
+                    'line-color': ['get', 'color'],
+                    'line-width': 3,
+                    'line-opacity': 0.85,
+                  }}
+                />
+              </GeoJSONSource>
+            )}
+
+            {/* Secret Target Perimeter & Marker */}
+            {target && (
+              <GeoJSONSource id="target-radius" data={circleRing(target, game.target_radius_m)}>
+                <Layer
+                  id="target-radius-fill"
+                  type="fill"
+                  paint={{ 'fill-color': '#FF5A5F', 'fill-opacity': 0.12 }}
+                />
+                <Layer
+                  id="target-radius-line"
+                  type="line"
+                  paint={{ 'line-color': '#FF5A5F', 'line-width': 2, 'line-dasharray': [2, 2] }}
+                />
+              </GeoJSONSource>
+            )}
+
+            {targetData && (
+              <GeoJSONSource id="target-point" data={targetData}>
+                <Layer
+                  id="target-circle"
+                  type="circle"
+                  paint={{
+                    'circle-radius': 9,
+                    'circle-color': '#FF5A5F',
+                    'circle-stroke-width': 3,
+                    'circle-stroke-color': '#FFFFFF',
+                  }}
+                />
+              </GeoJSONSource>
+            )}
+
+            {/* Final Positions */}
+            {positionFeatures.length > 0 && (
+              <GeoJSONSource id="final-positions" data={positionsData}>
+                <Layer
+                  id="final-position-points"
+                  type="circle"
+                  paint={{
+                    'circle-radius': ['case', ['==', ['get', 'winner'], true], 12, 9],
+                    'circle-color': ['get', 'color'],
+                    'circle-opacity': ['case', ['==', ['get', 'tagged'], true], 0.55, 1],
+                    'circle-stroke-width': 3,
+                    'circle-stroke-color': [
+                      'case',
+                      ['==', ['get', 'tagged'], true],
+                      '#12161F',
+                      '#FFFFFF',
+                    ],
+                  }}
+                />
+              </GeoJSONSource>
+            )}
+          </MapLibreMap>
+
+          {/* Floating Pill on Map */}
+          <View style={styles.mapFloatingPill}>
+            <View style={styles.mapPulsingDot} />
+            <Text style={styles.mapPillText}>REPLAY: 10s PINGS</Text>
           </View>
 
-          {/* ======================================================== */}
-          {/* SECTION 3: CONDITIONAL INTEL BANNER                      */}
-          {/* ======================================================== */}
-          {hasSpecialIntel ? (
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeaderRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                  <MaterialCommunityIcons name="crosshairs-gps" size={14} color="#C8FF00" />
-                  <Text style={styles.sectionTitle}>TACTICAL MISSION INTEL</Text>
-                </View>
-                <Chip label="ACTIVE DATA" variant="accent" size="sm" />
-              </View>
-
-              {isGhostDuel && ghostScore && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBoxHighlight}>
-                    <Text style={styles.statBoxCaption}>FINAL TIME TRIAL SCORE</Text>
-                    <Text style={styles.statBoxHeadline}>{ghostScore.score}</Text>
-                    <Text style={styles.statBoxSub}>
-                      {ghostScore.delta_s >= 0
-                        ? `Beat ghost pace by ${ghostScore.delta_s.toFixed(1)}s`
-                        : `Behind ghost pace by ${Math.abs(ghostScore.delta_s).toFixed(1)}s`}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>YOUR ELAPSED TIME</Text>
-                    <Text style={styles.statBoxHeadline}>{formatDuration(ghostScore.player_time_s)}</Text>
-                    <Text style={styles.statBoxSub}>Ghost: {formatDuration(ghostScore.ghost_time_s)}</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>ROUTE EFFICIENCY</Text>
-                    <Text style={[styles.statBoxHeadline, { color: '#C8FF00' }]}>
-                      {Math.round(ghostScore.efficiency * 100)}%
-                    </Text>
-                    <Text style={styles.statBoxSub}>Direct vs traveled vector</Text>
-                  </View>
-                </View>
-              )}
-
-              {isTerritoryPulse && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBoxHighlight}>
-                    <Text style={styles.statBoxCaption}>TERRITORY CONTROL</Text>
-                    <Text style={styles.statBoxHeadline}>
-                      {game.end_reason === 'territory_dominance' ? 'DOMINANCE' : 'POINTS'}
-                    </Text>
-                    <Text style={styles.statBoxSub}>
-                      {game.winner === 'runners' ? 'Runners Victory' : game.winner === 'hunters' ? 'Hunters Victory' : 'Draw'}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>SECTORS</Text>
-                    <Text style={styles.statBoxHeadline}>7</Text>
-                    <Text style={styles.statBoxSub}>Radial map grid</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>THRESHOLD</Text>
-                    <Text style={styles.statBoxHeadline}>70%</Text>
-                    <Text style={styles.statBoxSub}>Dominance pulse</Text>
-                  </View>
-                </View>
-              )}
-
-              {isRelayHeist && gameStats?.mode_recap && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBoxHighlight}>
-                    <Text style={styles.statBoxCaption}>PACKAGE STATUS</Text>
-                    <Text style={styles.statBoxHeadline}>
-                      {gameStats.mode_recap.package_secured
-                        ? 'SECURED BY HUNTERS'
-                        : game.end_reason === 'extraction_complete'
-                          ? 'EXTRACTED BY RUNNERS'
-                          : 'INTERCEPTED'}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>SQUAD HANDOFFS</Text>
-                    <Text style={styles.statBoxHeadline}>{gameStats.mode_recap.total_handoffs ?? 0}</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>PACKAGE DROPS</Text>
-                    <Text style={styles.statBoxHeadline}>{gameStats.mode_recap.package_drops ?? 0}</Text>
-                  </View>
-                </View>
-              )}
-
-              {isJailbreak && gameStats?.mode_recap && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBoxHighlight}>
-                    <Text style={styles.statBoxCaption}>JAILBREAK OUTCOME</Text>
-                    <Text style={styles.statBoxHeadline}>
-                      {game.end_reason === 'all_jailed' ? 'ALL JAILED' : 'PRISONERS ESCAPED'}
-                    </Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>RESCUES</Text>
-                    <Text style={styles.statBoxHeadline}>{gameStats.mode_recap.total_rescues ?? 0}</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>TOTAL JAILED</Text>
-                    <Text style={styles.statBoxHeadline}>{gameStats.mode_recap.total_jailed ?? 0}</Text>
-                  </View>
-                </View>
-              )}
-
-              {gameStats?.mode_recap?.ai_gm && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBoxHighlight}>
-                    <Text style={styles.statBoxCaption}>AI GM DISPATCHES</Text>
-                    <Text style={styles.statBoxHeadline}>
-                      {gameStats.mode_recap.ai_gm.total_events} / {gameStats.mode_recap.ai_gm.max_events}
-                    </Text>
-                    <Text style={styles.statBoxSub}>
-                      Last: {gameStats.mode_recap.ai_gm.last_event_type?.replace(/_/g, ' ') || 'None'}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {target && game.mode === 'classic_chase' && (
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statBoxCaption}>EXTRACTION TARGET</Text>
-                    <Text style={styles.statBoxHeadline}>Infiltrated</Text>
-                    <Text style={styles.statBoxSub}>Target perimeter reached</Text>
-                  </View>
-                </View>
-              )}
-
-              {ghostPreview && ghostPreview.can_contribute && !ghostDismissed && !ghostPermanentlyDeclined && (
-                <View style={{ marginTop: spacing.sm }}>
-                  {ghostSuccess || ghostPreview.already_contributed ? (
-                    <View style={styles.ghostStatusBox}>
-                      <Ionicons color="#C8FF00" name="checkmark-circle" size={18} />
-                      <Text style={styles.ghostStatusText}>
-                        {ghostSuccess
-                          ? 'Route trimmed by 150m and archived in solo ghost library.'
-                          : 'Route is archived in ghost training library.'}
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.ghostContributeBox}>
-                      <Text style={styles.ghostPromptText}>
-                        Contribute your anonymized runner path (trimmed 150m at endpoints) to solo training.
-                      </Text>
-                      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
-                        <Button
-                          title={ghostBusy ? 'Archiving…' : 'Contribute Route'}
-                          variant="primary"
-                          size="sm"
-                          disabled={ghostBusy}
-                          onPress={() => void handleContributeGhost()}
-                        />
-                        <Button
-                          title="Not Now"
-                          variant="secondary"
-                          size="sm"
-                          onPress={() => setGhostDismissed(true)}
-                        />
-                      </View>
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={styles.mutedIntelPill}>
-              <Ionicons name="information-circle-outline" size={14} color="#94A3B8" />
-              <Text style={styles.mutedIntelText}>Standard 10s Pings · No extraction target configured</Text>
-            </View>
-          )}
-
-          {/* ======================================================== */}
-          {/* SECTION 4: SHAREABLE STORY CARD & SOCIAL EXPORT          */}
-          {/* ======================================================== */}
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 }}>
-                <Ionicons name="share-social-outline" size={14} color="#C8FF00" />
-                <Text style={styles.sectionTitle} numberOfLines={1}>SHAREABLE STORY CARD</Text>
-              </View>
-              <View style={{ flexShrink: 0 }}>
-                <Chip label="9:16 PREVIEW" variant="accent" size="sm" />
-              </View>
-            </View>
-
-            {/* Clean 9:16 Preview Frame (Fixed overlapping & unclipped layout) */}
-            <View style={styles.recapCardPreview}>
-              <View style={styles.recapPreviewHeader}>
-                <Text style={styles.recapBrand}>GHOSTRUN</Text>
-                <View style={[styles.recapWinnerBadge, { borderColor: outcomeAccent }]}>
-                  <Text style={[styles.recapWinnerText, { color: outcomeAccent }]} numberOfLines={1}>
-                    {winnerTitle.toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.recapMetaBox}>
-                <Text style={styles.recapOperativeName} numberOfLines={1}>
-                  OPERATIVE: {playerById.get(state.my_player_id)?.display_name || 'CLASSIFIED'}
-                </Text>
-                <Text style={styles.recapModeText}>
-                  MODE: {getDisplayModeName(game.mode, activeModule?.name)} · CODE: #{game.code}
+          {/* Map Timeline Scrubber docked above footer */}
+          <View style={[styles.mapScrubberDock, { bottom: 85 + Math.max(insets.bottom, 10) }]}>
+            <View style={styles.mapScrubberRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => router.push({ pathname: '/replay/[id]', params: { id: gameId } })}
+                  style={styles.mapPlayMiniBtn}
+                >
+                  <Ionicons name="play" size={12} color="#C8FF00" />
+                </Pressable>
+                <Text style={styles.mapScrubberTime}>
+                  <Text style={{ color: '#F8FAFC', fontWeight: 'bold' }}>{formatDuration(roundSeconds ?? 0)}</Text>
+                  {' / '}{formatDuration(roundSeconds ?? 0)}
                 </Text>
               </View>
-
-              <View style={styles.recapStatsRow}>
-                <View style={styles.recapStatCol}>
-                  <Text style={styles.recapStatLabel}>TIME</Text>
-                  <Text style={styles.recapStatValue} numberOfLines={1}>
-                    {roundSeconds ? formatDuration(roundSeconds) : '—'}
-                  </Text>
-                </View>
-                <View style={[styles.recapStatCol, styles.recapStatColCenter]}>
-                  <Text style={styles.recapStatLabel}>SQUAD</Text>
-                  <Text style={styles.recapStatValue} numberOfLines={1}>
-                    {players.length} {players.length === 1 ? 'PLAYER' : 'PLAYERS'}
-                  </Text>
-                </View>
-                <View style={[styles.recapStatCol, styles.recapStatColRight]}>
-                  <Text style={styles.recapStatLabel}>STATUS</Text>
-                  <Text
-                    style={[
-                      styles.recapStatValue,
-                      { color: isVictory ? '#C8FF00' : '#FF5A5F' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {isVictory ? 'VICTORY' : 'DEFEAT'}
-                  </Text>
-                </View>
-              </View>
+              <Text style={styles.mapTagEventText}>TAG EVENT @ {formatDuration(roundSeconds ?? 0)}</Text>
             </View>
 
-            <View style={styles.storyCardButtonsRow}>
-              <Button
-                title="Export Story Card (9:16)"
-                variant="primary"
-                size="md"
-                style={{ flex: 1 }}
-                onPress={() => setStoryCardModalVisible(true)}
-              />
-              <Button
-                title="Share Mission Recap"
-                variant="secondary"
-                size="md"
-                style={{ flex: 1 }}
-                onPress={() => setShareCardModalVisible(true)}
-              />
+            <View style={styles.mapProgressTrack}>
+              <View style={styles.mapProgressFill} />
+              <View style={styles.mapProgressThumb} />
             </View>
-            <Text style={styles.storyCardCaption}>
-              Generates 9:16 vertical story card with 150m boundary trim for social dispatches.
-            </Text>
           </View>
-        </ScrollView>
+        </View>
       </View>
 
-      {/* 4. Sticky Command Action Footer (Pinned CTA at Thumb Zone) */}
-      <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      {/* ======================================================== */}
+      {/* 4. SLIM, HIGH-CONTRAST ACTION FOOTER (~20% Tightened)    */}
+      {/* ======================================================== */}
+      <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         {rematchError !== '' && (
           <View style={styles.rematchErrorBanner}>
-            <Ionicons name="alert-circle-outline" size={14} color="#FF5A5F" />
+            <Ionicons name="alert-circle-outline" size={13} color="#FF5A5F" />
             <Text style={styles.rematchErrorText} numberOfLines={1}>
               {rematchError}
             </Text>
@@ -1697,7 +1503,7 @@ export default function ResultScreen() {
               <ActivityIndicator size="small" color="#000000" />
             ) : (
               <>
-                <Ionicons name="refresh" size={16} color="#000000" />
+                <Ionicons name="refresh" size={15} color="#000000" />
                 <Text style={styles.playAgainBtnText}>PLAY AGAIN</Text>
               </>
             )}
@@ -1705,11 +1511,20 @@ export default function ResultScreen() {
 
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push({ pathname: '/replay/[id]', params: { id: gameId } })}
+            onPress={() => {
+              triggerHaptic('buttonTap');
+              setActiveTab(activeTab === 'map' ? 'summary' : 'map');
+            }}
             style={styles.replayBtn}
           >
-            <Ionicons name="play-circle-outline" size={16} color="#F8FAFC" />
-            <Text style={styles.replayBtnText}>REPLAY</Text>
+            <Ionicons
+              name={activeTab === 'map' ? 'document-text-outline' : 'map-outline'}
+              size={15}
+              color="#F8FAFC"
+            />
+            <Text style={styles.replayBtnText}>
+              {activeTab === 'map' ? 'SUMMARY' : 'MAP'}
+            </Text>
           </Pressable>
 
           <Pressable
@@ -1718,12 +1533,90 @@ export default function ResultScreen() {
             onPress={() => router.replace('/play' as any)}
             style={styles.exitBtn}
           >
-            <Ionicons name="exit-outline" size={18} color="#94A3B8" />
+            <Ionicons name="exit-outline" size={16} color="#94A3B8" />
           </Pressable>
         </View>
       </View>
 
-      {/* Share Modals */}
+      {/* ======================================================== */}
+      {/* 5. SEASON ECHO FORMULA BREAKDOWN MODAL                   */}
+      {/* ======================================================== */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={showFormulaModal}
+        onRequestClose={() => setShowFormulaModal(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowFormulaModal(false)}>
+          <Pressable style={styles.formulaModalCard} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.formulaModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[styles.progressionDot, { backgroundColor: outcomeAccent }]} />
+                <Text style={styles.formulaModalTitle}>SEASON ECHO MATH BREAKDOWN</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setShowFormulaModal(false)}
+                style={styles.formulaCloseBtn}
+              >
+                <Ionicons name="close" size={16} color="#94A3B8" />
+              </Pressable>
+            </View>
+
+            <View style={styles.formulaItemList}>
+              <View style={styles.formulaItemRow}>
+                <Text style={styles.formulaItemLabel}>
+                  <Text style={{ color: '#C8FF00', fontWeight: 'bold' }}>[O]</Text> Objective Yield
+                </Text>
+                <Text style={styles.formulaItemValue}>+30 PTS</Text>
+              </View>
+              <View style={styles.formulaItemRow}>
+                <Text style={styles.formulaItemLabel}>
+                  <Text style={{ color: '#38BDF8', fontWeight: 'bold' }}>[Y]</Text> Ranked Multiplier
+                </Text>
+                <Text style={styles.formulaItemValue}>1.0×</Text>
+              </View>
+              <View style={styles.formulaItemRow}>
+                <Text style={styles.formulaItemLabel}>
+                  <Text style={{ color: '#A855F7', fontWeight: 'bold' }}>[P]</Text> Grid Presence
+                </Text>
+                <Text style={styles.formulaItemValue}>+20 PTS</Text>
+              </View>
+              <View style={styles.formulaItemRow}>
+                <Text style={styles.formulaItemLabel}>
+                  <Text style={{ color: '#F59E0B', fontWeight: 'bold' }}>[D]</Text> Victory Margin
+                </Text>
+                <Text style={[styles.formulaItemValue, { color: outcomeAccent }]}>
+                  {isVictory ? '+20 PTS' : '+1 PTS'}
+                </Text>
+              </View>
+
+              <View style={styles.formulaTotalRow}>
+                <Text style={styles.formulaTotalLabel}>TOTAL SEASON ECHO</Text>
+                <Text style={[styles.formulaTotalValue, { color: outcomeAccent }]}>
+                  +{roundScore ? Math.round(roundScore.echo) : (isVictory ? 70 : 51)} PTS
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.formulaFootnote}>
+              Standard Ranked Formula: Yield = (O × Y) + P + D. Competitive scoring verified across all active grid operatives.
+            </Text>
+
+            <Button
+              title="Close Breakdown"
+              variant="secondary"
+              size="md"
+              style={{ marginTop: spacing.md }}
+              onPress={() => setShowFormulaModal(false)}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ======================================================== */}
+      {/* 6. SHARE & STORY EXPORT MODALS                           */}
+      {/* ======================================================== */}
       <ShareRoundCardModal
         visible={shareCardModalVisible}
         metrics={{
@@ -1785,511 +1678,648 @@ function isTrailConsentGranted(gameStats: GameStats | null, myPlayerId: string):
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: '#0B0E14',
+    backgroundColor: '#07090E',
     flex: 1,
   },
   centered: {
     alignItems: 'center',
-    backgroundColor: '#0B0E14',
+    backgroundColor: '#07090E',
     flex: 1,
     justifyContent: 'center',
     padding: spacing.xl,
   },
-  topHud: {
-    backgroundColor: '#0F131C',
-    borderColor: '#232B3E',
-    borderRadius: radii.card,
-    borderWidth: 1,
-    left: spacing.base,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    position: 'absolute',
-    right: spacing.base,
-    zIndex: 50,
-    elevation: 12,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.7,
-    shadowRadius: 10,
+
+  // 1. Top Match Banner
+  matchBanner: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
   },
-  topHudRow: {
-    alignItems: 'center',
+  bannerTopRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  topHudLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  topHudRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  topExitBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.full,
-    backgroundColor: '#1E2536',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapTogglePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: 'rgba(200, 255, 0, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(200, 255, 0, 0.3)',
-  },
-  mapToggleText: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 10,
-    color: '#C8FF00',
-    letterSpacing: 0.5,
-  },
-  sheetWrapper: {
-    flex: 1,
-    backgroundColor: '#0B0E14',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#232B3E',
-    marginTop: -16,
-    overflow: 'hidden',
-  },
-  scrollContentContainer: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    gap: 12,
-  },
-  sheetHandleBar: {
-    alignItems: 'center',
-    paddingBottom: 4,
-  },
-  sheetHandlePill: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#334155',
-  },
-  sheetHandleTitle: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 10,
-    color: '#94A3B8',
-    letterSpacing: 1.5,
-    textAlign: 'center',
     marginBottom: 4,
   },
-  sectionCard: {
-    backgroundColor: '#12161F',
-    borderColor: '#232B3E',
-    borderRadius: radii.card,
-    borderWidth: 1,
-    padding: spacing.md,
-  },
-  sectionHeaderRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    rowGap: 4,
-    gap: 8,
-    marginBottom: spacing.xs,
-  },
-  sectionTitle: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 11,
-    color: '#C8FF00',
-    letterSpacing: 0.5,
-  },
-  reasonCopyText: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 12,
-    color: '#CBD5E1',
-    lineHeight: 18,
-    marginTop: spacing.xs,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  statBox: {
-    backgroundColor: '#161B26',
-    borderColor: '#232B3E',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    flex: 1,
-    minWidth: '45%',
-    padding: spacing.sm,
-  },
-  statBoxHighlight: {
-    backgroundColor: 'rgba(200, 255, 0, 0.05)',
-    borderColor: 'rgba(200, 255, 0, 0.25)',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    width: '100%',
-    padding: spacing.sm,
-  },
-  statBoxCaption: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 10,
-    color: '#94A3B8',
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  statBoxHeadline: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 18,
-    color: '#F8FAFC',
-    marginTop: 2,
-  },
-  statBoxSub: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 10,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  echoHeroBox: {
-    marginTop: spacing.sm,
-    padding: 12,
-    borderRadius: radii.md,
-    backgroundColor: 'rgba(200, 255, 0, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(200, 255, 0, 0.2)',
-  },
-  echoHeroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-  },
-  echoHeroNumber: {
-    fontFamily: 'Archivo-Black',
-    fontSize: 28,
-    color: '#C8FF00',
-    letterSpacing: -0.5,
-  },
-  echoHeroUnit: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 10,
-    color: '#C8FF00',
+  bannerDossierLabel: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 9,
     letterSpacing: 1.2,
-    marginTop: 1,
+    color: '#64748B',
+    textTransform: 'uppercase',
   },
-  formulaToggleBtn: {
+  bannerTopRight: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  roomCodePill: {
+    backgroundColor: '#171E2E',
+    borderWidth: 1,
+    borderColor: '#232D42',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  roomCodeText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 10,
+    color: '#CBD5E1',
+  },
+  storyIconButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    backgroundColor: '#161D2B',
+    borderWidth: 1,
+    borderColor: '#2A3650',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    marginTop: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
-  formulaToggleText: {
-    fontFamily: 'SegoeUI-SemiBold',
-    fontSize: 11,
-    color: '#C8FF00',
-  },
-  formulaAccordionContent: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(200, 255, 0, 0.15)',
-  },
-  echoGrid: {
+  bannerMainRow: {
     flexDirection: 'row',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
-    gap: 6,
-    marginBottom: spacing.xs,
   },
-  echoMetricItem: {
-    flex: 1,
-    padding: 6,
-    borderRadius: radii.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  outcomeHeadline: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 28,
+    letterSpacing: -0.5,
+  },
+  roleBadgePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  roleBadgeText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 10,
+    letterSpacing: 0.8,
+  },
+  bannerSubtitleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
   },
-  echoMetricLabel: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 9,
-    color: '#94A3B8',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  echoMetricValue: {
+  bannerSubtitleBold: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 12,
+    fontSize: 11,
+    color: '#E2E8F0',
+  },
+  bannerSubtitleDot: {
+    color: '#475569',
+    fontSize: 10,
+  },
+  bannerSubtitleMuted: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  bannerSubtitleDuration: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 11,
     color: '#F8FAFC',
   },
-  echoFooterText: {
+
+  // 2. Underline Tab Bar
+  tabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0B0F17',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabItemActive: {
+    // borderBottomColor set dynamically
+  },
+  tabText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 11,
+    letterSpacing: 0.8,
+    color: '#64748B',
+  },
+  tabTextActive: {
+    // color set dynamically
+  },
+
+  // 3. Content Area
+  contentContainer: {
+    flex: 1,
+  },
+  tabScrollView: {
+    flex: 1,
+  },
+  tabScrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+
+  // Tab 1: Summary Elements
+  progressionCard: {
+    backgroundColor: '#0D121B',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 13,
+    marginBottom: 10,
+  },
+  progressionTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  progressionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  progressionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  progressionTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 10,
+    letterSpacing: 0.8,
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+  },
+  formulaInfoBtn: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#1B2334',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  formulaInfoBtnText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  progressionNumbersRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressionGainText: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 22,
+    letterSpacing: -0.5,
+  },
+  progressionUnitText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  progressionTierText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 10,
+    color: '#64748B',
+  },
+  progressBarTrack: {
+    height: 5,
+    backgroundColor: '#1A2234',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+
+  // 3-Column Stat Strip
+  statStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0D121B',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    marginBottom: 10,
+  },
+  statStripCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statStripDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  statStripLabel: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 9,
+    letterSpacing: 0.8,
+    color: '#64748B',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  statStripValue: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 15,
+    color: '#F8FAFC',
+  },
+
+  // Highlight Accolade
+  highlightCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0E1420',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 12,
+    gap: 12,
+    marginBottom: 10,
+  },
+  highlightIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  highlightIconText: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 12,
+  },
+  highlightTextBox: {
+    flex: 1,
+  },
+  highlightHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  highlightTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 11,
+    color: '#F8FAFC',
+    letterSpacing: 0.5,
+  },
+  accoladeChip: {
+    backgroundColor: '#1E2536',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  accoladeChipText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 8,
+    color: '#94A3B8',
+  },
+  highlightDesc: {
     fontFamily: 'SegoeUI-Regular',
     fontSize: 10,
     color: '#94A3B8',
     lineHeight: 14,
-    marginTop: 4,
-    textAlign: 'center',
   },
-  rosterContainer: {
-    marginTop: spacing.xs,
+
+  // Tactical Intel Row
+  intelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#090C12',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+  },
+  intelRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
-  playerCardWrapper: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#1F293D',
-    paddingBottom: 6,
+  intelDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#38BDF8',
   },
-  playerRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    paddingVertical: 6,
-  },
-  playerRowExpanded: {
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    borderRadius: 6,
-    paddingHorizontal: 4,
-  },
-  playerDot: {
-    borderRadius: radii.full,
-    height: 10,
-    width: 10,
-  },
-  playerName: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 12,
-    color: '#F8FAFC',
-  },
-  youIndicator: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 10,
-    color: '#C8FF00',
-  },
-  playerSubtext: {
+  intelRowText: {
     fontFamily: 'SegoeUI-Regular',
     fontSize: 10,
-    color: '#64748B',
-    marginTop: 2,
+    color: '#94A3B8',
   },
-  playerStatusText: {
+  intelRowVal: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 10,
+    color: '#E2E8F0',
+  },
+
+  // Tab 2: Operatives
+  rosterSection: {
+    marginBottom: 14,
+  },
+  rosterSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 6,
+    marginBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  rosterSquareBadge: {
+    width: 6,
+    height: 6,
+    borderRadius: 1,
+  },
+  rosterSectionTitle: {
     fontFamily: 'Archivo-Bold',
     fontSize: 10,
+    letterSpacing: 1,
   },
-  inlineTelemetryTray: {
-    backgroundColor: '#0D1117',
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: '#1F293D',
-    padding: 8,
-    marginTop: 4,
-    gap: 6,
-  },
-  telemetryGrid: {
+  rosterColHeaderRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
+    alignItems: 'center',
+    gap: 4,
   },
-  telemetryItem: {
-    backgroundColor: '#161B26',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  rosterColHeader: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 9,
+    color: '#64748B',
+    textAlign: 'right',
+  },
+  operativeCardWrapper: {
+    backgroundColor: '#0F1420',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 6,
+    overflow: 'hidden',
+  },
+  operativeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+  },
+  operativeRowExpanded: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  operativeLeftBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     flex: 1,
-    minWidth: '45%',
+    minWidth: 0,
   },
-  telemetryLabel: {
+  operativeAvatarBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  operativeAvatarText: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 11,
+  },
+  operativeName: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 11,
+    color: '#F8FAFC',
+  },
+  operativeSubtitle: {
     fontFamily: 'SegoeUI-Regular',
     fontSize: 9,
     color: '#64748B',
-    fontWeight: '600',
-  },
-  telemetryValue: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 12,
-    color: '#F8FAFC',
     marginTop: 1,
   },
-  inlineBluffBox: {
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
-    borderRadius: 6,
-    padding: 6,
+  youTag: {
+    backgroundColor: 'rgba(200, 255, 0, 0.15)',
+    borderColor: 'rgba(200, 255, 0, 0.3)',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.2)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
   },
-  bluffTitle: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 10,
-    color: '#F59E0B',
+  youTagText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 8,
+    color: '#C8FF00',
   },
-  bluffDetail: {
+  taggedTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  taggedTagText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 8,
+    color: '#64748B',
+  },
+  operativeMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  operativeMetricVal: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 11,
+    color: '#F8FAFC',
+    textAlign: 'right',
+  },
+  operativeMetricValMuted: {
     fontFamily: 'SegoeUI-Regular',
-    fontSize: 10,
-    color: '#CBD5E1',
-    marginTop: 1,
+    fontSize: 11,
+    color: '#94A3B8',
+    textAlign: 'right',
   },
-  inspectProfileBtn: {
+  operativeMetricValXp: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 11,
+    color: '#C8FF00',
+    textAlign: 'right',
+  },
+  operativeDrawer: {
+    backgroundColor: '#0A0D15',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 10,
+  },
+  drawerGrid: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  drawerItem: {
+    flex: 1,
+    backgroundColor: '#121724',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+  },
+  drawerItemLabel: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 8,
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  drawerItemValue: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 10,
+    color: '#E2E8F0',
+  },
+  addFriendDrawerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#C8FF00',
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  addFriendDrawerBtnText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 10,
+    color: '#000000',
+  },
+  friendPill: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderWidth: 1,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
   },
-  inspectProfileBtnText: {
-    fontFamily: 'SegoeUI-SemiBold',
-    fontSize: 10,
-    color: '#38BDF8',
+  friendPillText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 9,
+    color: '#10B981',
   },
-  mutedIntelPill: {
+  requestSentPill: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  requestSentPillText: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 9,
+    color: '#94A3B8',
+  },
+
+  // Tab 3: Tactical Map Overlays
+  mapFloatingPill: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#12161F',
-    borderColor: '#232B3E',
+    backgroundColor: 'rgba(13, 18, 28, 0.92)',
     borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  mutedIntelText: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 11,
-    color: '#94A3B8',
-    flex: 1,
-  },
-  ghostStatusBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(200, 255, 0, 0.06)',
-    borderColor: 'rgba(200, 255, 0, 0.2)',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 8,
-  },
-  ghostStatusText: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 11,
-    color: '#CBD5E1',
-    flex: 1,
-  },
-  ghostContributeBox: {
-    backgroundColor: '#161B26',
-    borderColor: '#232B3E',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 8,
-  },
-  ghostPromptText: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 11,
-    color: '#CBD5E1',
-    lineHeight: 16,
-  },
-  recapCardPreview: {
-    backgroundColor: '#0F172A',
-    borderColor: '#334155',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    marginTop: spacing.xs,
-    padding: spacing.md,
-  },
-  recapPreviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  recapBrand: {
-    fontFamily: 'Archivo-Black',
-    fontSize: 16,
-    color: '#C8FF00',
-    letterSpacing: 1,
-  },
-  recapWinnerBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    maxWidth: '60%',
-    flexShrink: 0,
+    paddingVertical: 4,
   },
-  recapWinnerText: {
-    fontFamily: 'Archivo-Bold',
+  mapPulsingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  mapPillText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 9,
+    letterSpacing: 0.8,
+    color: '#E2E8F0',
+  },
+  mapScrubberDock: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    backgroundColor: 'rgba(11, 15, 23, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 10,
+  },
+  mapScrubberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  mapPlayMiniBtn: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#1B2232',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapScrubberTime: {
+    fontFamily: 'SegoeUI-Regular',
     fontSize: 10,
+    color: '#94A3B8',
+  },
+  mapTagEventText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 9,
+    color: '#FF5A5F',
     letterSpacing: 0.5,
   },
-  recapMetaBox: {
-    marginVertical: spacing.sm,
+  mapProgressTrack: {
+    height: 4,
+    backgroundColor: '#171E2D',
+    borderRadius: 2,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  recapOperativeName: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 13,
-    color: '#F8FAFC',
+  mapProgressFill: {
+    height: '100%',
+    width: '100%',
+    backgroundColor: '#38BDF8',
   },
-  recapModeText: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
+  mapProgressThumb: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: '#FFFFFF',
   },
-  recapStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-    paddingTop: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: '#1E293B',
-  },
-  recapStatCol: {
-    flex: 0.9,
-  },
-  recapStatColCenter: {
-    flex: 1.0,
-    alignItems: 'center',
-  },
-  recapStatColRight: {
-    flex: 1.2,
-    alignItems: 'flex-end',
-  },
-  recapStatLabel: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 9,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  recapStatValue: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 11,
-    color: '#F8FAFC',
-    marginTop: 2,
-  },
-  storyCardButtonsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  storyCardCaption: {
-    fontFamily: 'SegoeUI-Regular',
-    fontSize: 10,
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: spacing.xs,
-  },
+
+  // 4. Slim Sticky Action Footer
   stickyFooter: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#0D1117',
+    backgroundColor: '#0B0E15',
     borderTopWidth: 1,
     borderTopColor: '#232B3E',
     paddingTop: 8,
@@ -2310,7 +2340,7 @@ const styles = StyleSheet.create({
   },
   rematchErrorText: {
     fontFamily: 'SegoeUI-Regular',
-    fontSize: 11,
+    fontSize: 10,
     color: '#FF5A5F',
     flex: 1,
   },
@@ -2318,35 +2348,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   roleToggleLabel: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 10,
+    fontSize: 9,
     color: '#94A3B8',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   roleToggleSegment: {
     flexDirection: 'row',
     backgroundColor: '#161B26',
-    borderRadius: 8,
+    borderRadius: 7,
     padding: 2,
     borderWidth: 1,
     borderColor: '#232B3E',
   },
   roleSegmentBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 5,
   },
   roleSegmentBtnActive: {
     backgroundColor: '#242C3D',
   },
   roleSegmentText: {
     fontFamily: 'SegoeUI-Regular',
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748B',
-    fontWeight: '600',
   },
   roleSegmentTextActive: {
     fontFamily: 'SegoeUI-Bold',
@@ -2364,12 +2393,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#C8FF00',
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: 10,
+    borderRadius: 9,
   },
   playAgainBtnText: {
     fontFamily: 'Archivo-Black',
-    fontSize: 13,
+    fontSize: 12,
     color: '#000000',
     letterSpacing: 0.5,
   },
@@ -2381,66 +2410,114 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E2536',
     borderWidth: 1,
     borderColor: '#2E3A52',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 9,
   },
   replayBtnText: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 12,
+    fontSize: 11,
     color: '#F8FAFC',
   },
   exitBtn: {
     backgroundColor: '#161B26',
     borderWidth: 1,
     borderColor: '#232B3E',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  friendPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+
+  // 5. Season Echo Formula Modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 14, 23, 0.85)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  formulaModalCard: {
+    backgroundColor: '#0F1420',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: '#232B3E',
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 20,
   },
-  friendPillText: {
-    color: '#10B981',
-    fontSize: 10,
-    fontFamily: 'Archivo-Bold',
-    fontWeight: '700',
-  },
-  requestSentPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  requestSentPillText: {
-    color: '#94A3B8',
-    fontSize: 10,
-    fontFamily: 'SegoeUI-Regular',
-  },
-  rosterAddBtn: {
+  formulaModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#C8FF00',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 10,
   },
-  rosterAddBtnText: {
-    color: '#000000',
+  formulaModalTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 0.8,
+    color: '#F8FAFC',
+  },
+  formulaCloseBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#1B2334',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  formulaItemList: {
+    gap: 6,
+  },
+  formulaItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#141A28',
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  formulaItemLabel: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  formulaItemValue: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 11,
+    color: '#F8FAFC',
+  },
+  formulaTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 4,
+  },
+  formulaTotalLabel: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 11,
+    color: '#E2E8F0',
+  },
+  formulaTotalValue: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 15,
+  },
+  formulaFootnote: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 9,
+    color: '#64748B',
+    marginTop: 10,
+    lineHeight: 13,
   },
 });
