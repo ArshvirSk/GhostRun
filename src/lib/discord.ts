@@ -7,6 +7,7 @@ import {
   validateDiscordWebhookUrl,
   buildMatchCreationDiscordPayload,
   buildMatchRecapDiscordPayload,
+  buildTestTransmissionDiscordPayload,
 } from './discordCore';
 
 export * from './discordCore';
@@ -40,4 +41,15 @@ export async function sendDiscordWebhook(
   } catch (err: any) {
     return { success: false, error: err.message || 'Network error delivering Discord webhook' };
   }
+}
+
+/**
+ * Transmits a verification test embed to a Discord webhook URL
+ */
+export async function testDiscordWebhookTransmission(
+  webhookUrl: string,
+  hostName: string
+): Promise<{ success: boolean; error?: string }> {
+  const payload = buildTestTransmissionDiscordPayload({ hostName });
+  return sendDiscordWebhook(webhookUrl, payload);
 }

@@ -9,6 +9,7 @@ import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
 import { Chip } from '../../src/ui/Chip';
 import { MatchDurationTimeline } from '../../src/ui/MatchDurationTimeline';
+import { DiscordWebhookConfigCard } from '../../src/components/DiscordWebhookConfigCard';
 import { getModeModule } from '../../src/modes/registry';
 import { useHostStore } from '../../src/stores/hostStore';
 import { triggerHaptic } from '../../src/motion/haptics';
@@ -220,6 +221,9 @@ export default function HostReviewScreen() {
             </View>
           </Card>
         )}
+
+        {/* Discord Squad Integration Panel (NF-22) */}
+        <DiscordWebhookConfigCard hostName="Host Operative" />
 
         {/* Safety Checklist Card */}
         <Card variant="elevated" style={{ padding: spacing.md, marginBottom: spacing.lg }}>

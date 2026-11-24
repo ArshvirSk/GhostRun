@@ -6,6 +6,7 @@ import {
   buildMatchRecapDiscordPayload,
   buildEmergencySosDiscordPayload,
   buildScheduledGameDiscordPayload,
+  buildTestTransmissionDiscordPayload,
   DISCORD_COLORS,
 } from '../src/lib/discordCore';
 
@@ -133,4 +134,18 @@ console.log('--- Testing NF-22: Discord Integration Engine ---');
   console.log('✓ Test 7: buildScheduledGameDiscordPayload formats upcoming reminder embed');
 }
 
-console.log('\nAll 7 NF-22 Discord integration tests passed successfully!\n');
+// Test 8: buildTestTransmissionDiscordPayload
+{
+  const testPayload = buildTestTransmissionDiscordPayload({
+    hostName: 'GhostLead',
+  });
+  assert.strictEqual(testPayload.username, 'GhostRun Squad Comms');
+  assert.ok(testPayload.embeds && testPayload.embeds.length === 1);
+  const embed = testPayload.embeds[0];
+  assert.strictEqual(embed.color, DISCORD_COLORS.primaryLime);
+  assert.ok(embed.title.includes('GHOSTRUN TACTICAL TRANSMISSION TEST'));
+  assert.ok(embed.description?.includes('GhostLead'));
+  console.log('✓ Test 8: buildTestTransmissionDiscordPayload produces verified test transmission embed');
+}
+
+console.log('\nAll 8 NF-22 Discord integration tests passed successfully!\n');

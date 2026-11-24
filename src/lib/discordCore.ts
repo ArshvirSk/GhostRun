@@ -220,3 +220,29 @@ export function buildScheduledGameDiscordPayload(params: {
     embeds: [embed],
   };
 }
+
+/**
+ * Build a test transmission verification embed
+ */
+export function buildTestTransmissionDiscordPayload(params: {
+  hostName: string;
+}): DiscordWebhookPayload {
+  const host = sanitizeDiscordEmbedString(params.hostName || 'Operative', 48);
+
+  const embed: DiscordEmbed = {
+    title: 'GHOSTRUN TACTICAL TRANSMISSION TEST',
+    description: `Tactical squad link established. Verified connection to GhostRun Tactical Network for host **${host}**.`,
+    color: DISCORD_COLORS.primaryLime,
+    fields: [
+      { name: 'Channel Status', value: 'LINK ACTIVE', inline: true },
+      { name: 'GPS Privacy Firewall', value: 'ZERO-LEAKAGE ENFORCED', inline: true },
+    ],
+    footer: { text: 'GhostRun Tactical Network v2.9.23 · ghostrun.app' },
+    timestamp: new Date().toISOString(),
+  };
+
+  return {
+    username: 'GhostRun Squad Comms',
+    embeds: [embed],
+  };
+}

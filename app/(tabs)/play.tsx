@@ -699,6 +699,28 @@ export function PlayContent() {
                 Schedule
               </Text>
             </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Pre-Flight Hardware Check"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                router.push('/preflight' as any);
+              }}
+              style={({ pressed }) => [
+                styles.secondaryActionBtn,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+                  borderColor: colors.border,
+                },
+                pressed && { opacity: 0.85, transform: [{ scale: 0.985 }] },
+              ]}
+            >
+              <Ionicons name="hardware-chip-outline" size={16} color={colors.primary} />
+              <Text style={[styles.secondaryActionText, { color: colors.text }]}>
+                Pre-Flight
+              </Text>
+            </Pressable>
           </View>
         </View>
 
