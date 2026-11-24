@@ -44,6 +44,18 @@ export function bearingDeg(a: LngLat, b: LngLat): number {
   return (brng + 360) % 360;
 }
 
+/** Projects a coordinate forward by distance in metres and bearing in degrees. */
+export function projectPoint(origin: LngLat, distanceM: number, bearingDeg: number): LngLat {
+  const dLat = (distanceM * Math.cos((bearingDeg * Math.PI) / 180)) / EARTH_RADIUS_M;
+  const dLng =
+    (distanceM * Math.sin((bearingDeg * Math.PI) / 180)) /
+    (EARTH_RADIUS_M * Math.cos((origin.latitude * Math.PI) / 180));
+  return {
+    latitude: origin.latitude + (dLat * 180) / Math.PI,
+    longitude: origin.longitude + (dLng * 180) / Math.PI,
+  };
+}
+
 /** A closed ring of coordinates approximating a circle of `radiusM` metres. */
 export function circleRing(center: LngLat, radiusM: number): CircleFeature {
   const steps = 96;

@@ -1,4 +1,4 @@
-import { Camera, GeoJSONSource, Layer, Map as MapLibreMap } from '../../src/lib/map';
+import { Camera, GeoJSONSource, Layer, Map as MapLibreMap, type CameraRef } from '../../src/lib/map';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +30,17 @@ import {
   findNextTagTime,
   findPrevTagTime,
 } from '../../src/lib/storyCardCore';
+import {
+  interpolatePlayerPosition,
+  buildVelocityVector,
+  buildVelocityVectorFeatures,
+  extractReplayClimaxes,
+  findNearestClimaxEvent,
+  formatCompassHeading,
+  formatTacticalSpeed,
+  type InterpolatedOperative,
+  type VelocityVector,
+} from '../../src/lib/replayKinematicsCore';
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
@@ -302,15 +313,19 @@ export default function ReplayScreen() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [visibleLayers, setVisibleLayers] = useState({
     trails: true,
+    vectors: true,
     pings: true,
     heat: true,
     zones: true,
     npc: true,
     drops: true,
   });
+  const [selectedOperativeId, setSelectedOperativeId] = useState<string | null>(null);
+  const [followOperative, setFollowOperative] = useState(false);
 
   const mountedRef = useRef(true);
   const cursorRef = useRef(0);
+  const cameraRef = useRef<CameraRef>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -509,42 +524,79 @@ export default function ReplayScreen() {
     return ids;
   }, [replay, cursorMs, hasTimeline]);
 
-  const positionFeatures = useMemo(() => {
-    const features: PointFeature[] = [];
-    if (!state) return features;
+  const interpolatedOperatives = useMemo<InterpolatedOperative[]>(() => {
+    if (!state) return [];
+    const ops: InterpolatedOperative[] = [];
     for (const player of state.players ?? []) {
       const finalPosition = (state.positions ?? []).find((position) => position.player_id === player.id);
-      let longitude: number | null = null;
-      let latitude: number | null = null;
-
-      if (hasTimeline && cursorS >= durationS && finalPosition) {
-        longitude = finalPosition.longitude;
-        latitude = finalPosition.latitude;
-      } else {
-        const points = trailsByPlayer.get(player.id) ?? [];
-        let last: TrailPoint | null = null;
-        for (const point of points) {
-          if (!hasTimeline || Date.parse(point.recorded_at) <= cursorMs) last = point;
-          else break;
-        }
-        if (last) {
-          longitude = last.longitude;
-          latitude = last.latitude;
-        } else if (!hasTimeline && finalPosition) {
-          longitude = finalPosition.longitude;
-          latitude = finalPosition.latitude;
-        }
+      const points = trailsByPlayer.get(player.id) ?? [];
+      const interp = interpolatePlayerPosition(
+        points,
+        hasTimeline ? cursorMs : Number.POSITIVE_INFINITY,
+        finalPosition ? { longitude: finalPosition.longitude, latitude: finalPosition.latitude } : null,
+      );
+      if (interp) {
+        ops.push({
+          playerId: player.id,
+          displayName: player.display_name,
+          team: player.team,
+          color: player.color,
+          longitude: interp.longitude,
+          latitude: interp.latitude,
+          headingDeg: interp.headingDeg,
+          speedMps: interp.speedMps,
+          isTagged: taggedIds.has(player.id),
+          isInterpolated: interp.isInterpolated,
+        });
       }
+    }
+    return ops;
+  }, [state, trailsByPlayer, cursorMs, hasTimeline, taggedIds]);
 
-      if (longitude === null || latitude === null) continue;
-      features.push({
-        type: 'Feature',
-        properties: { color: player.color, tagged: taggedIds.has(player.id) },
-        geometry: { type: 'Point', coordinates: [longitude, latitude] },
+  const selectedOperative = useMemo(() => {
+    return interpolatedOperatives.find((o) => o.playerId === selectedOperativeId) || null;
+  }, [interpolatedOperatives, selectedOperativeId]);
+
+  // Auto-follow selected operative camera tracking
+  useEffect(() => {
+    if (followOperative && selectedOperative && cameraRef.current) {
+      cameraRef.current.easeTo({
+        center: [selectedOperative.longitude, selectedOperative.latitude],
+        duration: 200,
       });
     }
-    return features;
-  }, [state, trailsByPlayer, cursorMs, hasTimeline, cursorS, durationS, taggedIds]);
+  }, [followOperative, selectedOperative?.longitude, selectedOperative?.latitude]);
+
+  const positionFeatures = useMemo(() => {
+    return interpolatedOperatives.map((op) => ({
+      type: 'Feature' as const,
+      properties: {
+        color: op.color,
+        tagged: op.isTagged,
+        selected: selectedOperativeId === op.playerId,
+        speed: op.speedMps,
+        heading: op.headingDeg,
+      },
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [op.longitude, op.latitude] as [number, number],
+      },
+    }));
+  }, [interpolatedOperatives, selectedOperativeId]);
+
+  const velocityVectors = useMemo(() => {
+    if (!visibleLayers.vectors) return [];
+    const vecs: VelocityVector[] = [];
+    for (const op of interpolatedOperatives) {
+      const v = buildVelocityVector(op);
+      if (v) vecs.push(v);
+    }
+    return vecs;
+  }, [interpolatedOperatives, visibleLayers.vectors]);
+
+  const { lines: vectorLineFeatures, tips: vectorTipFeatures } = useMemo(() => {
+    return buildVelocityVectorFeatures(velocityVectors);
+  }, [velocityVectors]);
 
   const pingFeatures = useMemo(() => {
     const features: PointFeature[] = [];
@@ -749,6 +801,39 @@ export default function ReplayScreen() {
     return latest;
   }, [events, cursorS]);
 
+  const tagCoordsMap = useMemo(() => {
+    const map = new Map<number, LngLat>();
+    for (const tag of replay?.tags ?? []) {
+      const points = trailsByPlayer.get(tag.runner_id) ?? [];
+      const taggedAt = Date.parse(tag.tagged_at);
+      let atTag: TrailPoint | null = null;
+      for (const point of points) {
+        if (Date.parse(point.recorded_at) <= taggedAt) atTag = point;
+        else break;
+      }
+      if (atTag) {
+        map.set(tag.id, { longitude: atTag.longitude, latitude: atTag.latitude });
+      }
+    }
+    return map;
+  }, [replay?.tags, trailsByPlayer]);
+
+  const matchClimaxes = useMemo(() => {
+    return extractReplayClimaxes({
+      liveAtMs,
+      durationS,
+      tags: replay?.tags,
+      tagCoords: tagCoordsMap,
+      target: state?.target,
+      winner: game?.winner,
+      endReason: game?.end_reason,
+    });
+  }, [liveAtMs, durationS, replay?.tags, tagCoordsMap, state?.target, game?.winner, game?.end_reason]);
+
+  const activeClimax = useMemo(() => {
+    return findNearestClimaxEvent(matchClimaxes, cursorS, 4.0);
+  }, [matchClimaxes, cursorS]);
+
   if (!gameId) {
     return (
       <View
@@ -864,6 +949,29 @@ export default function ReplayScreen() {
     type: 'FeatureCollection',
     features: tagFeatures,
   };
+  const vectorLineData = {
+    type: 'FeatureCollection' as const,
+    features: vectorLineFeatures,
+  };
+  const vectorTipData: PointCollection = {
+    type: 'FeatureCollection',
+    features: vectorTipFeatures,
+  };
+  const selectedOpData: PointCollection | null = selectedOperative
+    ? {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { color: selectedOperative.color },
+            geometry: {
+              type: 'Point',
+              coordinates: [selectedOperative.longitude, selectedOperative.latitude],
+            },
+          },
+        ],
+      }
+    : null;
   const targetData: PointCollection | null = state.target
     ? {
         type: 'FeatureCollection',
@@ -936,6 +1044,7 @@ export default function ReplayScreen() {
     <View style={styles.screen}>
       <MapLibreMap attribution={false} compass={false} logo={false} mapStyle={MAP_STYLE} style={StyleSheet.absoluteFill}>
         <Camera
+          ref={cameraRef}
           initialViewState={{
             center: [game?.area.longitude ?? 0, game?.area.latitude ?? 0],
             zoom,
@@ -1124,6 +1233,52 @@ export default function ReplayScreen() {
           </GeoJSONSource>
         )}
 
+        {vectorLineFeatures.length > 0 && (
+          <GeoJSONSource id="replay-velocity-lines" data={vectorLineData}>
+            <Layer
+              id="replay-velocity-line-layer"
+              type="line"
+              layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+              paint={{
+                'line-color': ['get', 'color'],
+                'line-width': 2.5,
+                'line-opacity': 0.85,
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {vectorTipFeatures.length > 0 && (
+          <GeoJSONSource id="replay-velocity-tips" data={vectorTipData}>
+            <Layer
+              id="replay-velocity-tip-layer"
+              type="circle"
+              paint={{
+                'circle-radius': 4.5,
+                'circle-color': ['get', 'color'],
+                'circle-stroke-width': 1.5,
+                'circle-stroke-color': colors.textLight,
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
+        {selectedOpData && (
+          <GeoJSONSource id="replay-selected-op" data={selectedOpData}>
+            <Layer
+              id="replay-selected-halo"
+              type="circle"
+              paint={{
+                'circle-radius': 15,
+                'circle-color': ['get', 'color'],
+                'circle-opacity': 0.25,
+                'circle-stroke-width': 2,
+                'circle-stroke-color': colors.primary,
+              }}
+            />
+          </GeoJSONSource>
+        )}
+
         {npcPointFeatures.length > 0 && (
           <GeoJSONSource id="replay-npc-points" data={npcPointData}>
             <Layer
@@ -1213,6 +1368,33 @@ export default function ReplayScreen() {
         </View>
       </View>
 
+      {/* Floating Climax Callout Banner */}
+      {activeClimax && (
+        <View style={styles.floatingClimaxCard}>
+          <View style={styles.floatingClimaxHeader}>
+            <View style={styles.climaxBadge}>
+              <Ionicons
+                color={activeClimax.kind === 'extraction' ? colors.primary : colors.danger}
+                name={activeClimax.kind === 'extraction' ? 'flag' : 'flash'}
+                size={14}
+              />
+              <Text variant="caption" weight="bold" style={styles.climaxBadgeText}>
+                {activeClimax.kind === 'extraction' ? 'EXTRACTION CLIMAX' : 'CAPTURE CLIMAX'}
+              </Text>
+            </View>
+            <Text variant="caption" color={colors.textMuted}>
+              T+{formatClock(activeClimax.atSecond)}
+            </Text>
+          </View>
+          <Text variant="body" weight="bold" color={colors.textLight} style={{ marginTop: 2 }}>
+            {activeClimax.title}
+          </Text>
+          <Text variant="caption" color={colors.textMuted} style={{ marginTop: 1 }}>
+            {activeClimax.subtitle}
+          </Text>
+        </View>
+      )}
+
       {/* Bottom Controls Sheet */}
       <View style={styles.sheet}>
         <ScrollView contentContainerStyle={[styles.sheetContent, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
@@ -1228,6 +1410,16 @@ export default function ReplayScreen() {
               <Chip
                 label="Trails"
                 variant={visibleLayers.trails ? 'accent' : 'default'}
+                size="sm"
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setVisibleLayers((l) => ({ ...l, vectors: !l.vectors }))}
+            >
+              <Chip
+                label="Vectors"
+                variant={visibleLayers.vectors ? 'accent' : 'default'}
                 size="sm"
               />
             </Pressable>
@@ -1449,6 +1641,79 @@ export default function ReplayScreen() {
             </Text>
           )}
 
+          {/* Operative Telemetry Inspector */}
+          {interpolatedOperatives.length > 0 && (
+            <View style={styles.rosterSection}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+                <Text variant="label" color={colors.primary}>
+                  OPERATIVE TELEMETRY ({interpolatedOperatives.length})
+                </Text>
+                {selectedOperative && (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setFollowOperative((f) => !f)}
+                    style={[styles.followPill, followOperative && styles.followPillActive]}
+                  >
+                    <Ionicons
+                      color={followOperative ? colors.backgroundDark : colors.primary}
+                      name="locate"
+                      size={12}
+                    />
+                    <Text
+                      variant="caption"
+                      weight="bold"
+                      color={followOperative ? colors.backgroundDark : colors.primary}
+                      style={{ marginLeft: 4 }}
+                    >
+                      {followOperative ? 'FOLLOWING' : 'FOLLOW CAM'}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rosterScroll}>
+                {interpolatedOperatives.map((op) => {
+                  const isSelected = selectedOperativeId === op.playerId;
+                  return (
+                    <Pressable
+                      key={op.playerId}
+                      accessibilityRole="button"
+                      onPress={() => {
+                        if (selectedOperativeId === op.playerId) {
+                          setSelectedOperativeId(null);
+                          setFollowOperative(false);
+                        } else {
+                          setSelectedOperativeId(op.playerId);
+                        }
+                      }}
+                      style={[
+                        styles.operativeCard,
+                        isSelected && styles.operativeCardSelected,
+                        { borderLeftColor: op.color },
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text variant="caption" weight="bold" color={colors.textLight} numberOfLines={1} style={{ maxWidth: 85 }}>
+                          {op.displayName}
+                        </Text>
+                        <Chip
+                          label={op.isTagged ? 'TAGGED' : op.team.toUpperCase()}
+                          variant={op.isTagged ? 'default' : op.team === 'hunter' ? 'warning' : 'accent'}
+                          size="sm"
+                        />
+                      </View>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 4 }}>
+                        Speed: <Text variant="caption" weight="bold" color={op.speedMps >= 0.4 ? colors.primary : colors.textMuted}>{formatTacticalSpeed(op.speedMps)}</Text>
+                      </Text>
+                      <Text variant="caption" color={colors.textMuted} style={{ marginTop: 2 }}>
+                        Heading: <Text variant="caption" weight="bold" color={colors.textLight}>{formatCompassHeading(op.headingDeg)}</Text>
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Return Action */}
           <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
             <Button
@@ -1663,5 +1928,66 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     paddingHorizontal: spacing.sm,
+  },
+  floatingClimaxCard: {
+    position: 'absolute',
+    bottom: '53%',
+    left: spacing.base,
+    right: spacing.base,
+    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+    borderColor: colors.danger,
+    borderWidth: 1.5,
+    borderRadius: radii.md,
+    padding: spacing.sm,
+    zIndex: 15,
+  },
+  floatingClimaxHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  climaxBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  climaxBadgeText: {
+    color: colors.danger,
+    letterSpacing: 0.5,
+  },
+  rosterSection: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  rosterScroll: {
+    gap: spacing.xs,
+    paddingVertical: 2,
+  },
+  operativeCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderLeftWidth: 3,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    minWidth: 140,
+  },
+  operativeCardSelected: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0, 240, 255, 0.08)',
+  },
+  followPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 240, 255, 0.1)',
+    borderColor: colors.primary,
+    borderWidth: 1,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+  },
+  followPillActive: {
+    backgroundColor: colors.primary,
   },
 });
