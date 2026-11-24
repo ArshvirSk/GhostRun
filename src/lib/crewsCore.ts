@@ -63,14 +63,40 @@ export function validateCrewCode(code: string): CrewValidationResult {
 }
 
 /**
- * Generate formatted invite message for messaging or social channels
+ * Formats a privacy-preserving tactical crew invitation message
  */
 export function formatCrewInviteText(crewName: string, crewCode: string): string {
+  const cleanName = (crewName || 'Ghost Squad').trim().toUpperCase();
+  const cleanCode = normalizeCrewCode(crewCode);
+
   return [
-    `Join my GhostRun Crew: [${crewName.toUpperCase()}]`,
-    `Crew Code: ${crewCode.toUpperCase()}`,
-    `--------------------------------`,
-    `Enter this code in GhostRun to deploy together on upcoming patrols.`,
-    `ghostrun.app`,
+    `GHOSTRUN TACTICAL SQUAD INVITE`,
+    `Join Crew: ${cleanName}`,
+    `Squad Code: ${cleanCode}`,
+    `Assemble your operatives: https://ghostrun.app/crew?code=${cleanCode}`,
   ].join('\n');
+}
+
+/**
+ * Evaluates whether an operative has permission to perform a crew action.
+ */
+export function canUserPerformCrewAction(
+  role: 'captain' | 'member' | undefined,
+  action: 'edit_name' | 'regenerate_code' | 'disband' | 'leave' | 'invite'
+): boolean {
+  if (!role) return false;
+  if (action === 'invite') return true; // All members can invite
+  if (action === 'leave') return true; // Any member can leave (captain reassigns or disbands)
+  // Destructive / administrative actions require captain role
+  return role === 'captain';
+}
+
+/**
+ * Formats a concise roster summary for UI headers.
+ */
+export function formatCrewRosterSummary(crew: Crew, memberCount: number = 0): string {
+  const count = crew.member_count ?? memberCount;
+  const countLabel = count === 1 ? '1 Operative' : `${count} Operatives`;
+  const roleLabel = crew.my_role === 'captain' ? 'CAPTAIN' : 'MEMBER';
+  return `${crew.name.toUpperCase()} [${crew.code}] · ${countLabel} · ${roleLabel}`;
 }

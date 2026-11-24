@@ -5,12 +5,25 @@
  * realistic pedestrian stealth gameplay pacing.
  */
 
+export const MIN_PLAYABLE_RADIUS_M = 100;
+export const MAX_PLAYABLE_RADIUS_M = 2000;
+export const MIN_PLAYABLE_DURATION_MIN = 3;
+export const MAX_PLAYABLE_DURATION_MIN = 60;
+
 export interface AreaCompatibilityResult {
   isCompatible: boolean;
   status: 'optimal' | 'too_large' | 'too_cramped';
   badgeLabel: string;
   detail: string;
   requiredSpeedMps: number;
+}
+
+export type TacticalPacing = 'fast' | 'balanced' | 'endurance';
+
+export interface PacingProfile {
+  paceCategory: 'leisure_walk' | 'brisk_walk' | 'tactical_jog' | 'unsustainable_sprint';
+  speedKmh: number;
+  speedMps: number;
 }
 
 /**
@@ -59,8 +72,71 @@ export function evaluateAreaCompatibility(
   return {
     isCompatible: true,
     status: 'optimal',
-    badgeLabel: 'ARENA & DURATION COMPATIBLE',
-    detail: `Optimal ${Math.round(safeRadius)}m perimeter allows balanced evasion and intercept pacing over ${safeDurationMin} minutes.`,
+    badgeLabel: 'TACTICAL SCALE COMPATIBLE',
+    detail: `Realistic operational territory: ${(requiredSpeedMps * 3.6).toFixed(1)} km/h average traversal pace.`,
     requiredSpeedMps,
   };
+}
+
+/**
+ * Estimates the pacing classification for a given radius and duration.
+ */
+export function estimatePacingProfile(
+  radiusM: number,
+  durationMinutes: number
+): PacingProfile {
+  const safeRadius = Math.max(50, radiusM || 500);
+  const safeDurationMin = Math.max(1, durationMinutes || 15);
+  const durationSec = safeDurationMin * 60;
+  const diameterM = safeRadius * 2;
+  const speedMps = diameterM / durationSec;
+  const speedKmh = Math.round(speedMps * 3.6 * 10) / 10;
+
+  let paceCategory: PacingProfile['paceCategory'] = 'brisk_walk';
+  if (speedMps > 3.8) {
+    paceCategory = 'unsustainable_sprint';
+  } else if (speedMps >= 2.0) {
+    paceCategory = 'tactical_jog';
+  } else if (speedMps >= 1.0) {
+    paceCategory = 'brisk_walk';
+  } else {
+    paceCategory = 'leisure_walk';
+  }
+
+  return { paceCategory, speedKmh, speedMps };
+}
+
+/**
+ * Computes recommended match duration given arena radius.
+ */
+export function computeRecommendedDurationMinutes(
+  radiusM: number,
+  pacing: TacticalPacing = 'balanced'
+): number {
+  const safeRadius = Math.max(MIN_PLAYABLE_RADIUS_M, Math.min(MAX_PLAYABLE_RADIUS_M, radiusM));
+  const diameterM = safeRadius * 2;
+
+  // Target speeds: fast = 2.5 m/s, balanced = 1.5 m/s, endurance = 0.8 m/s
+  const targetSpeedMps = pacing === 'fast' ? 2.5 : pacing === 'endurance' ? 0.8 : 1.5;
+  const recommendedSec = diameterM / targetSpeedMps;
+  const minutes = Math.round(recommendedSec / 60);
+
+  return Math.max(MIN_PLAYABLE_DURATION_MIN, Math.min(MAX_PLAYABLE_DURATION_MIN, minutes));
+}
+
+/**
+ * Computes recommended arena radius given match duration.
+ */
+export function computeRecommendedRadiusM(
+  durationMinutes: number,
+  pacing: TacticalPacing = 'balanced'
+): number {
+  const safeDurationMin = Math.max(MIN_PLAYABLE_DURATION_MIN, Math.min(MAX_PLAYABLE_DURATION_MIN, durationMinutes));
+  const durationSec = safeDurationMin * 60;
+
+  const targetSpeedMps = pacing === 'fast' ? 2.5 : pacing === 'endurance' ? 0.8 : 1.5;
+  const recommendedDiameterM = durationSec * targetSpeedMps;
+  const radiusM = Math.round(recommendedDiameterM / 2 / 25) * 25; // snap to 25m increments
+
+  return Math.max(MIN_PLAYABLE_RADIUS_M, Math.min(MAX_PLAYABLE_RADIUS_M, radiusM));
 }

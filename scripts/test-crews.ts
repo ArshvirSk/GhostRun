@@ -4,6 +4,8 @@ import {
   normalizeCrewCode,
   validateCrewCode,
   formatCrewInviteText,
+  canUserPerformCrewAction,
+  formatCrewRosterSummary,
 } from '../src/lib/crewsCore';
 
 console.log('--- Testing NF-16: Persistent Crews & Squad Lists ---');
@@ -44,4 +46,33 @@ console.log('--- Testing NF-16: Persistent Crews & Squad Lists ---');
   console.log('✓ Test 4: formatCrewInviteText formats privacy-safe tactical invite');
 }
 
-console.log('\nAll 4 NF-16 crew tests passed successfully!\n');
+// Test 5: canUserPerformCrewAction
+{
+  assert.strictEqual(canUserPerformCrewAction('captain', 'disband'), true, 'Captain can disband');
+  assert.strictEqual(canUserPerformCrewAction('member', 'disband'), false, 'Member cannot disband');
+  assert.strictEqual(canUserPerformCrewAction('captain', 'edit_name'), true, 'Captain can edit name');
+  assert.strictEqual(canUserPerformCrewAction('member', 'edit_name'), false, 'Member cannot edit name');
+  assert.strictEqual(canUserPerformCrewAction('member', 'invite'), true, 'Member can invite');
+  assert.strictEqual(canUserPerformCrewAction('member', 'leave'), true, 'Member can leave');
+  assert.strictEqual(canUserPerformCrewAction(undefined, 'invite'), false, 'Undefined role cannot act');
+  console.log('✓ Test 5: canUserPerformCrewAction enforces RBAC permissions');
+}
+
+// Test 6: formatCrewRosterSummary
+{
+  const summary = formatCrewRosterSummary({
+    id: 'c-1',
+    name: 'Shadow Unit',
+    code: 'SHAD4',
+    created_by: 'u-1',
+    created_at: new Date().toISOString(),
+    my_role: 'captain',
+    member_count: 4,
+  });
+  assert.ok(summary.includes('SHADOW UNIT [SHAD4]'), 'Header has crew name and code');
+  assert.ok(summary.includes('4 Operatives'), 'Header has operative count');
+  assert.ok(summary.includes('CAPTAIN'), 'Header indicates user role');
+  console.log('✓ Test 6: formatCrewRosterSummary formats header label');
+}
+
+console.log('\nAll NF-16 crew tests passed successfully!\n');

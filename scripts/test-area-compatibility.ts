@@ -1,5 +1,10 @@
 import assert from 'node:assert';
-import { evaluateAreaCompatibility } from '../src/lib/areaCompatibility';
+import {
+  evaluateAreaCompatibility,
+  estimatePacingProfile,
+  computeRecommendedDurationMinutes,
+  computeRecommendedRadiusM,
+} from '../src/lib/areaCompatibility';
 
 console.log('--- Testing Area & Duration Compatibility Engine ---');
 
@@ -29,5 +34,29 @@ const blackoutScale = evaluateAreaCompatibility(300, 10);
 assert(blackoutScale.isCompatible === true, '300m / 10m should be compatible');
 assert(blackoutScale.status === 'optimal', 'Blackout tactical scale should be optimal');
 console.log('✓ Test 4: Compact tactical radius evaluates as optimal');
+
+// Test 5: Pacing profile estimation
+const sprintPace = estimatePacingProfile(2000, 5);
+assert.strictEqual(sprintPace.paceCategory, 'unsustainable_sprint', '2km in 5m is sprint');
+
+const jogPace = estimatePacingProfile(800, 10);
+assert.strictEqual(jogPace.paceCategory, 'tactical_jog', '800m in 10m is tactical jog');
+
+const walkPace = estimatePacingProfile(400, 10);
+assert.strictEqual(walkPace.paceCategory, 'brisk_walk', '400m in 10m is brisk walk');
+console.log('✓ Test 5: estimatePacingProfile correctly classifies speed tiers');
+
+// Test 6: computeRecommendedDurationMinutes
+const recDuration = computeRecommendedDurationMinutes(500, 'balanced');
+assert(recDuration >= 10 && recDuration <= 15, '500m balanced duration is around 11-12m');
+
+const recFastDuration = computeRecommendedDurationMinutes(500, 'fast');
+assert(recFastDuration < recDuration, 'Fast pacing recommends shorter duration');
+console.log('✓ Test 6: computeRecommendedDurationMinutes produces realistic match times');
+
+// Test 7: computeRecommendedRadiusM
+const recRadius = computeRecommendedRadiusM(15, 'balanced');
+assert(recRadius >= 600 && recRadius <= 800, '15m balanced radius is between 600m and 800m');
+console.log('✓ Test 7: computeRecommendedRadiusM produces realistic arena scale');
 
 console.log('All Area & Duration Compatibility tests passed successfully!\n');
