@@ -16,20 +16,14 @@ npm run format:check
 # 2. Strict TypeScript compilation
 npm run typecheck
 
-# 3. Expo ESLint validation
-npm run lint
+# 3. Unit test suite (50 test suites covering all 28 NF specs & game modes)
+npm test
 
-# 4. Auth & cooldown unit tests
-npm run test:cooldown
-
-# 5. Database RLS and Secrecy Matrix verification (116+ checks)
-npm run rls
-
-# 6. End-to-end multi-player simulation scenarios
-npm run sim
+# 4. Autonomous headless match simulator (all 14 game scenarios)
+npm run sim:match
 ```
 
-All 6 test suites **must pass 100%** with zero errors or unhandled rejections.
+All test suites **must pass 100%** with zero errors or unhandled rejections.
 
 ---
 
@@ -37,11 +31,11 @@ All 6 test suites **must pass 100%** with zero errors or unhandled rejections.
 
 Every release must increment both the semantic version string and the Android integer `versionCode` in lockstep across all configuration files:
 
-1. `package.json`: `"version": "X.Y.Z"`
-2. `app.json`: `"version": "X.Y.Z"`
+1. `package.json`: `"version": "2.9.23"`
+2. `app.json`: `"version": "2.9.23"`, `"android.versionCode": 38`
 3. `android/app/build.gradle`:
-   - `versionCode <N>` (monotonically increasing integer)
-   - `versionName "X.Y.Z"`
+   - `versionCode 38` (monotonically increasing integer)
+   - `versionName "2.9.23"`
 
 ---
 
