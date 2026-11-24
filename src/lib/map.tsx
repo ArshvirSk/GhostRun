@@ -46,6 +46,14 @@ export const Layer = (maplibre?.Layer ?? EmptyComponent) as unknown as MaplibreM
 export const Marker = (maplibre?.Marker ?? EmptyComponent) as unknown as MaplibreModule['Marker'];
 export const ViewAnnotation = (maplibre?.ViewAnnotation ??
   EmptyComponent) as unknown as MaplibreModule['ViewAnnotation'];
+export const OfflineManager = (maplibre?.OfflineManager ?? {
+  createPack: async () => {},
+  getPacks: async () => [],
+  getPack: async () => null,
+  deletePack: async () => {},
+  resetDatabase: async () => {},
+}) as unknown as MaplibreModule['OfflineManager'];
+export const offlineManager = OfflineManager;
 export type { CameraRef } from '@maplibre/maplibre-react-native';
 
 const styles = StyleSheet.create({

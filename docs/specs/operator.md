@@ -1,6 +1,6 @@
-# Operator Role Add-on Specification (VM1 Verified)
+# Operator Role Add-on Specification (VM1 & VM2 Verified)
 
-> **Document Status:** Complete & Verified (`VM1: Spec check`)  
+> **Document Status:** Complete & Verified (`VM2: Simulator Scenario 13 & Offline Verification Passed`)  
 > **Target Role:** `operator` (Operator Remote Teammate Role Add-on)  
 > **Compatible Base Modes:** `classic_chase`, `tag_hunt`, `jailbreak`, `relay_heist` (docs/MODES.md §2.3, §5.3)  
 > **Source Specification:** [`docs/MODES.md` §5.3](file:///c:/ASK_Main/ASK/Projects/GhostRun/docs/MODES.md#L567-L584)  

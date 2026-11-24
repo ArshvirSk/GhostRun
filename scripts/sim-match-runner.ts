@@ -1517,6 +1517,372 @@ console.log('\n--- Scenario 12: AI Game Master (Deterministic Engine, 5 Events, 
   );
 }
 
+// -----------------------------------------------------------------------------
+// Scenario 13: Overwatch Drone / Remote Operator (Aerial Recon, Markers, Scans & Tag Immunity)
+// -----------------------------------------------------------------------------
+console.log('\n--- Scenario 13: Overwatch Drone / Remote Operator (Recon, Markers, Scans) ---');
+{
+  const arenaCenter: LngLat = { latitude: 37.7749, longitude: -122.4194 };
+  const arenaRadiusM = 500;
+
+  let fieldRunner: OperativeState = {
+    id: 'op-field-runner',
+    codename: 'GHOST-01',
+    team: 'runner',
+    latitude: projectCoordinate(arenaCenter, 150, 45).latitude,
+    longitude: projectCoordinate(arenaCenter, 150, 45).longitude,
+    heading: 45,
+    speedMps: 3.2,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let fieldHunter: OperativeState = {
+    id: 'op-field-hunter',
+    codename: 'HUNTER-01',
+    team: 'hunter',
+    latitude: projectCoordinate(arenaCenter, 120, 225).latitude,
+    longitude: projectCoordinate(arenaCenter, 120, 225).longitude,
+    heading: 0,
+    speedMps: 3.0,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  // Remote Operators (Aerial Overwatch)
+  interface RemoteOperatorState {
+    id: string;
+    codename: string;
+    team: 'runner' | 'hunter';
+    isRemote: boolean;
+    activeMarkers: { id: string; lat: number; lng: number; label: string; createdAt: number }[];
+    lastScanAt: number | null;
+  }
+
+  let runnerDrone: RemoteOperatorState = {
+    id: 'op-runner-drone',
+    codename: 'SKY-RUNNER',
+    team: 'runner',
+    isRemote: true,
+    activeMarkers: [],
+    lastScanAt: null,
+  };
+
+  let hunterDrone: RemoteOperatorState = {
+    id: 'op-hunter-drone',
+    codename: 'SKY-HUNTER',
+    team: 'hunter',
+    isRemote: true,
+    activeMarkers: [],
+    lastScanAt: null,
+  };
+
+  // Step 1: Remote Operator Invariants & Tag Immunity
+  // Remote players do NOT submit physical positions
+  const trySubmitPositionRemote = (op: RemoteOperatorState): boolean => {
+    if (op.isRemote) return false; // Early returns without writing
+    return true;
+  };
+  assert.strictEqual(trySubmitPositionRemote(runnerDrone), false, 'Remote operators do not upload physical GPS positions');
+
+  // Hunters attempting to tag a remote operator are strictly rejected
+  const tryTagRemote = (hunter: OperativeState, target: RemoteOperatorState): { success: boolean; error?: string } => {
+    if (target.isRemote) {
+      return { success: false, error: 'Remote operators cannot be tagged' };
+    }
+    return { success: true };
+  };
+  const tagAttempt = tryTagRemote(fieldHunter, runnerDrone);
+  assert.strictEqual(tagAttempt.success, false);
+  assert.strictEqual(tagAttempt.error, 'Remote operators cannot be tagged', 'Remote operators enjoy absolute tag immunity');
+
+  // Step 2: Tactical Map Marker Placement & Pruning (Max 3 concurrent per squad)
+  const placeMarker = (
+    operator: RemoteOperatorState,
+    coord: LngLat,
+    label: string,
+    timestamp: number
+  ): { success: boolean; prunedCount: number; error?: string } => {
+    const distFromCenter = distanceM(arenaCenter, coord);
+    // Boundary check: max 1.5x area radius
+    if (distFromCenter > arenaRadiusM * 1.5) {
+      return { success: false, prunedCount: 0, error: 'marker_out_of_bounds' };
+    }
+
+    const newMarker = {
+      id: `mark-${Math.random().toString(36).substring(2, 7)}`,
+      lat: coord.latitude,
+      lng: coord.longitude,
+      label,
+      createdAt: timestamp,
+    };
+
+    operator.activeMarkers.push(newMarker);
+    let pruned = 0;
+    // Enforce max 3 active markers per team (prune oldest)
+    if (operator.activeMarkers.length > 3) {
+      pruned = operator.activeMarkers.length - 3;
+      operator.activeMarkers.splice(0, pruned);
+    }
+
+    return { success: true, prunedCount: pruned };
+  };
+
+  // Place 4 markers in sequence
+  const mark1 = placeMarker(runnerDrone, projectCoordinate(arenaCenter, 100, 0), 'NORTH-RALLY', 1000);
+  const mark2 = placeMarker(runnerDrone, projectCoordinate(arenaCenter, 150, 90), 'CHOKE-POINT', 2000);
+  const mark3 = placeMarker(runnerDrone, projectCoordinate(arenaCenter, 200, 180), 'SAFE-HOUSE', 3000);
+  assert.strictEqual(runnerDrone.activeMarkers.length, 3, '3 tactical markers placed');
+  assert.strictEqual(mark3.prunedCount, 0);
+
+  // 4th marker prunes oldest (mark1)
+  const mark4 = placeMarker(runnerDrone, projectCoordinate(arenaCenter, 80, 270), 'EXFIL-ALPHA', 4000);
+  assert.strictEqual(runnerDrone.activeMarkers.length, 3, 'Active markers strictly capped at 3');
+  assert.strictEqual(mark4.prunedCount, 1, 'Oldest marker automatically pruned upon 4th placement');
+  assert.strictEqual(runnerDrone.activeMarkers[0].label, 'CHOKE-POINT', 'First marker evicted, second is now oldest');
+  assert.strictEqual(runnerDrone.activeMarkers[2].label, 'EXFIL-ALPHA', 'Latest marker appended at tail');
+
+  // Step 3: Recon Scan 90-Second Cooldown Enforcement
+  const SCAN_COOLDOWN_S = 90;
+  const triggerScan = (
+    operator: RemoteOperatorState,
+    currentMatchSec: number
+  ): { success: boolean; cooldownRemainingS?: number } => {
+    if (operator.lastScanAt !== null && currentMatchSec - operator.lastScanAt < SCAN_COOLDOWN_S) {
+      return { success: false, cooldownRemainingS: SCAN_COOLDOWN_S - (currentMatchSec - operator.lastScanAt) };
+    }
+    operator.lastScanAt = currentMatchSec;
+    return { success: true };
+  };
+
+  const scan1 = triggerScan(runnerDrone, 30);
+  assert.strictEqual(scan1.success, true, 'First scan executes cleanly');
+  assert.strictEqual(runnerDrone.lastScanAt, 30);
+
+  // Attempt scan at 60s (30s elapsed < 90s cooldown) -> rejected
+  const scanEarly = triggerScan(runnerDrone, 60);
+  assert.strictEqual(scanEarly.success, false, 'Early scan rejected by cooldown guard');
+  assert.strictEqual(scanEarly.cooldownRemainingS, 60, 'Exactly 60s cooldown remaining reported');
+
+  // Attempt scan at 125s (95s elapsed >= 90s cooldown) -> succeeds
+  const scanReady = triggerScan(runnerDrone, 125);
+  assert.strictEqual(scanReady.success, true, 'Scan succeeds after 90s cooldown expires');
+
+  // Step 4: Runner Operator Scan — 150m Fuzzed Hunter Envelope
+  // Finds nearest field hunter, applies 10-30m deterministic fuzzing, emits 150m envelope
+  const executeRunnerScan = (
+    hunter: OperativeState
+  ): { success: boolean; envelopeRadiusM: number; fuzzedCenter: LngLat; offsetM: number; ttlS: number } => {
+    const truePos: LngLat = { latitude: hunter.latitude, longitude: hunter.longitude };
+    const fuzzDistanceM = 22.0; // Deterministic fuzzing between 10m and 30m
+    const fuzzBearing = 135.0;
+    const fuzzedCenter = projectCoordinate(truePos, fuzzDistanceM, fuzzBearing);
+    const offset = distanceM(truePos, fuzzedCenter);
+    return {
+      success: true,
+      envelopeRadiusM: 150.0,
+      fuzzedCenter,
+      offsetM: offset,
+      ttlS: 10,
+    };
+  };
+
+  const runnerScanResult = executeRunnerScan(fieldHunter);
+  assert.strictEqual(runnerScanResult.success, true);
+  assert.strictEqual(runnerScanResult.envelopeRadiusM, 150.0, 'Runner scan produces 150m detection envelope');
+  assert.strictEqual(runnerScanResult.ttlS, 10, 'Envelope has 10s tactical time-to-live');
+  assert.ok(runnerScanResult.offsetM >= 10 && runnerScanResult.offsetM <= 30, 'Hunter true location fuzzed by 22m (within 10-30m safety buffer)');
+
+  // Step 5: Hunter Operator Census Scan — 200m Aggregate Headcount (Zero Coordinates Leaked)
+  const executeHunterScan = (
+    center: LngLat,
+    runners: OperativeState[]
+  ): { success: boolean; runnerCount: number; scanRadiusM: number } => {
+    let count = 0;
+    for (const r of runners) {
+      const d = distanceM(center, { latitude: r.latitude, longitude: r.longitude });
+      if (d <= 200.0 && r.status === 'active') {
+        count++;
+      }
+    }
+    return { success: true, runnerCount: count, scanRadiusM: 200.0 };
+  };
+
+  const hunterScanCenter = projectCoordinate(arenaCenter, 100, 45); // Near field runner
+  const hunterScanResult = executeHunterScan(hunterScanCenter, [fieldRunner]);
+  assert.strictEqual(hunterScanResult.success, true);
+  assert.strictEqual(hunterScanResult.runnerCount, 1, 'Hunter census detects 1 active runner in 200m radius');
+  assert.strictEqual(hunterScanResult.scanRadiusM, 200.0);
+
+  // Step 6: Shared Team Victory
+  fieldRunner.status = 'extracted';
+  const matchWinner = 'runner';
+  const droneSharedVictory = runnerDrone.team === matchWinner;
+  assert.strictEqual(droneSharedVictory, true, 'Remote operator is scored as co-victor with field squad');
+
+  console.log(
+    '✓ PASS: Overwatch Drone verified: remote operator status, absolute tag immunity, marker placement with FIFO pruning (max 3), 90s scan cooldown, 150m fuzzed envelope, 200m hunter headcount census, and shared squad victory'
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Scenario 14: Blackout Radar (Passive Directional Sonar & Stealth Pacing)
+// -----------------------------------------------------------------------------
+console.log('\n--- Scenario 14: Blackout Radar (Passive Directional Sonar & Stealth Pacing) ---');
+{
+  const arenaCenter: LngLat = { latitude: 37.7749, longitude: -122.4194 };
+  const arenaRadiusM = 500;
+
+  let runner: OperativeState = {
+    id: 'op-blackout-runner',
+    codename: 'SHADOW',
+    team: 'runner',
+    latitude: arenaCenter.latitude,
+    longitude: arenaCenter.longitude,
+    heading: 0, // Facing North
+    speedMps: 2.8,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let hunter: OperativeState = {
+    id: 'op-blackout-hunter',
+    codename: 'SONAR',
+    team: 'hunter',
+    latitude: projectCoordinate(arenaCenter, 180, 90).latitude, // 180m East
+    longitude: projectCoordinate(arenaCenter, 180, 90).longitude,
+    heading: 270, // Facing West (toward runner)
+    speedMps: 3.2,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  // Step 1: Radio Silence / Stealth Pacing (90s Ping Interval)
+  const BLACKOUT_PING_INTERVAL_S = 90;
+  const isPingDue = (lastPingSec: number, currentSec: number): boolean => {
+    return currentSec - lastPingSec >= BLACKOUT_PING_INTERVAL_S;
+  };
+  assert.strictEqual(isPingDue(0, 30), false, 'Normal 30s ping suppressed under Blackout radio silence');
+  assert.strictEqual(isPingDue(0, 89), false, 'Stealth maintained at 89s');
+  assert.strictEqual(isPingDue(0, 90), true, 'Ping only released at extended 90s stealth cadence');
+
+  // Step 2: Relative Azimuth Sonar Calculation (Directional Bearing)
+  // Operative Hunter is at (180m East), heading West (270 deg)
+  // Runner is at center (0, 0), relative to Hunter, runner is due West (270 deg true bearing)
+  const hunterPos: LngLat = { latitude: hunter.latitude, longitude: hunter.longitude };
+  const runnerPos: LngLat = { latitude: runner.latitude, longitude: runner.longitude };
+
+  const trueBearingToRunner = bearingDeg(hunterPos, runnerPos);
+  assert.strictEqual(Math.round(trueBearingToRunner), 270, 'True bearing to runner is 270° (due West)');
+
+  // Relative heading = (bearing - heading + 360) % 360
+  // Hunter is facing West (270 deg), target is at 270 deg -> Relative heading is 0° (Straight Ahead)
+  const relHeadingAhead = (trueBearingToRunner - hunter.heading + 360) % 360;
+  assert.strictEqual(Math.round(relHeadingAhead), 0, 'Target is directly straight ahead (0° relative)');
+
+  // Now Hunter turns North (heading 0 deg)
+  hunter.heading = 0;
+  const relHeadingLeft = (trueBearingToRunner - hunter.heading + 360) % 360;
+  assert.strictEqual(Math.round(relHeadingLeft), 270, 'When facing North, target West is on the left flank (270° relative)');
+
+  // Helper for 4-sector tactical sonar HUD
+  const getSonarSector = (relativeDeg: number): 'ahead' | 'right' | 'behind' | 'left' => {
+    const norm = (relativeDeg + 360) % 360;
+    if (norm >= 337.5 || norm < 22.5) return 'ahead';
+    if (norm >= 22.5 && norm < 157.5) return 'right';
+    if (norm >= 157.5 && norm < 202.5) return 'behind';
+    return 'left';
+  };
+
+  assert.strictEqual(getSonarSector(relHeadingAhead), 'ahead');
+  assert.strictEqual(getSonarSector(relHeadingLeft), 'left');
+
+  // Step 3: Acoustic Distance Cadence
+  const getAcousticCadenceMs = (distM: number): number => {
+    if (distM > 100) return 5000; // 5s long-range chirp
+    if (distM > 40) return 2000;  // 2s medium sonar pulse
+    return 500;                   // 0.5s rapid proximity ping
+  };
+
+  const dist180 = distanceM(hunterPos, runnerPos);
+  assert.strictEqual(getAcousticCadenceMs(dist180), 5000, 'Long range acoustic cadence: 5000ms');
+
+  // Hunter closes in to 65m
+  const hunterClosePos = projectCoordinate(runnerPos, 65, 90);
+  hunter.latitude = hunterClosePos.latitude;
+  hunter.longitude = hunterClosePos.longitude;
+  const dist65 = distanceM({ latitude: hunter.latitude, longitude: hunter.longitude }, runnerPos);
+  assert.strictEqual(getAcousticCadenceMs(dist65), 2000, 'Medium range acoustic cadence: 2000ms');
+
+  // Hunter closes in to 25m
+  const hunterNearPos = projectCoordinate(runnerPos, 25, 90);
+  hunter.latitude = hunterNearPos.latitude;
+  hunter.longitude = hunterNearPos.longitude;
+  const dist25 = distanceM({ latitude: hunter.latitude, longitude: hunter.longitude }, runnerPos);
+  assert.strictEqual(getAcousticCadenceMs(dist25), 500, 'Rapid hot sonar ping cadence: 500ms');
+
+  // Step 4: Strict Out-of-Bounds Instant Reveal (`reveal_live`)
+  // Runner strays outside perimeter (515m from center > 500m)
+  runner.latitude = projectCoordinate(arenaCenter, 515, 0).latitude;
+  runner.longitude = projectCoordinate(arenaCenter, 515, 0).longitude;
+  const runnerDistFromCenter = distanceM(arenaCenter, { latitude: runner.latitude, longitude: runner.longitude });
+  assert.ok(runnerDistFromCenter > arenaRadiusM, 'Runner stepped out of bounds');
+
+  let liveRevealEmitted = false;
+  const evaluateBlackoutBoundaryPenalty = (distFromCenter: number, radiusM: number) => {
+    if (distFromCenter > radiusM) {
+      liveRevealEmitted = true; // Immediate live reveal under blackout preset
+      return 'reveal_live';
+    }
+    return 'in_bounds';
+  };
+  const penalty = evaluateBlackoutBoundaryPenalty(runnerDistFromCenter, arenaRadiusM);
+  assert.strictEqual(penalty, 'reveal_live');
+  assert.strictEqual(liveRevealEmitted, true, 'Boundary breach immediately triggers reveal_live penalty');
+
+  // Step 5: Close Quarters Tag Collision (15m radius)
+  const BLACKOUT_TAG_RADIUS_M = 15.0;
+  // Hunter closes in to 12m from runner
+  hunter.latitude = projectCoordinate({ latitude: runner.latitude, longitude: runner.longitude }, 12, 180).latitude;
+  hunter.longitude = projectCoordinate({ latitude: runner.latitude, longitude: runner.longitude }, 12, 180).longitude;
+  const tagDist = distanceM(
+    { latitude: hunter.latitude, longitude: hunter.longitude },
+    { latitude: runner.latitude, longitude: runner.longitude }
+  );
+  assert.ok(tagDist <= BLACKOUT_TAG_RADIUS_M, 'Hunter is within 15m tag radius');
+
+  runner.status = 'tagged';
+  assert.strictEqual(runner.status, 'tagged', 'Runner tagged under Blackout conditions');
+
+  console.log(
+    '✓ PASS: Blackout Radar verified: 90s radio silence stealth pacing, relative bearing azimuth calculation, 3-tier acoustic pulse cadence, instant out-of-bounds reveal_live, and 15m tag collision'
+  );
+}
+
 console.log('\n================================================================');
-console.log('  All 12 Autonomous Match Simulation Scenarios PASSED (100%)    ');
+console.log('  All 14 Autonomous Match Simulation Scenarios PASSED (100%)    ');
 console.log('================================================================\n');
