@@ -7,6 +7,8 @@
  * - Standard community matches (up to 8 players) remain permanently free.
  */
 
+export const FEATURE_MONETISATION_DEFAULT = false;
+
 export type HostingTier = 'community_free' | 'event_host_pro';
 
 export interface HostingProduct {
@@ -37,6 +39,29 @@ export interface EntitlementResult {
   canHost: boolean;
   tier: HostingTier;
   reason?: string;
+}
+
+/**
+ * Returns current monetisation status and human-readable policy summary
+ */
+export function getMonetisationStatus(enabled: boolean = FEATURE_MONETISATION_DEFAULT): {
+  isMonetisationActive: boolean;
+  canHostFreely: boolean;
+  policy: string;
+} {
+  if (!enabled) {
+    return {
+      isMonetisationActive: false,
+      canHostFreely: true,
+      policy: 'All hosting tiers including Event Mode (up to 150 players) are 100% free and unblocked.',
+    };
+  }
+
+  return {
+    isMonetisationActive: true,
+    canHostFreely: false,
+    policy: 'Community matches up to 8 players are free; large events (> 8 players) require an Event Host Pass.',
+  };
 }
 
 /**

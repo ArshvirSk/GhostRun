@@ -3,6 +3,8 @@ import {
   getRadarPalette,
   HUD_SCALE_MULTIPLIERS,
   formatA11yHudAnnouncement,
+  formatA11yRoleBriefing,
+  getHighContrastOverlay,
   RADAR_PALETTES,
 } from '../src/lib/accessibilityCore';
 
@@ -72,4 +74,30 @@ console.log('--- Testing NF-25: Accessibility Extras & Colorblind Radar ---');
   console.log('✓ Test 4: formatA11yHudAnnouncement formats screen reader tactical cues without ambiguity');
 }
 
-console.log('\nAll 4 NF-25 accessibility tests passed successfully!\n');
+// Test 5: High-Contrast Sunlight Mode Overrides
+{
+  const standardOverlay = getHighContrastOverlay(false);
+  assert.strictEqual(standardOverlay.borderStrokeWidth, 1);
+
+  const sunlightOverlay = getHighContrastOverlay(true);
+  assert.strictEqual(sunlightOverlay.backgroundOverlay, '#000000');
+  assert.strictEqual(sunlightOverlay.textContrast, '#FFFFFF');
+  assert.strictEqual(sunlightOverlay.borderStrokeWidth, 2);
+  console.log('✓ Test 5: getHighContrastOverlay boosts contrast and stroke width for outdoor sunlight');
+}
+
+// Test 6: Role Briefing VoiceOver Cues
+{
+  const runnerBriefing = formatA11yRoleBriefing('runner', 'Classic Chase');
+  assert.ok(runnerBriefing.includes('You are a Runner'));
+  assert.ok(runnerBriefing.includes('Classic Chase'));
+
+  const hunterBriefing = formatA11yRoleBriefing('hunter', 'Tag Hunt');
+  assert.ok(hunterBriefing.includes('You are a Hunter'));
+
+  const operatorBriefing = formatA11yRoleBriefing('operator', 'Territory Pulse');
+  assert.ok(operatorBriefing.includes('Overwatch Operator'));
+  console.log('✓ Test 6: formatA11yRoleBriefing formats role briefings for screen readers');
+}
+
+console.log('\nAll 6 NF-25 accessibility tests passed successfully!\n');

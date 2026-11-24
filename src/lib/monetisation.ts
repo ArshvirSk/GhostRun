@@ -7,6 +7,8 @@ import {
   HOSTING_PRODUCTS,
   evaluateHostingEntitlement,
   EntitlementResult,
+  FEATURE_MONETISATION_DEFAULT,
+  getMonetisationStatus,
 } from './monetisationCore';
 import { fetchRemoteConfigFlags } from './admin';
 
@@ -17,7 +19,7 @@ export * from './monetisationCore';
  */
 export async function checkCanHostMatch(playerCount: number): Promise<EntitlementResult> {
   const { flags } = await fetchRemoteConfigFlags();
-  const monetisationEnabled = Boolean(flags.monetisation_enabled);
+  const monetisationEnabled = Boolean(flags.monetisation_enabled ?? FEATURE_MONETISATION_DEFAULT);
 
   return evaluateHostingEntitlement({
     monetisationEnabled,

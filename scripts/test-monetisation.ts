@@ -2,12 +2,15 @@ import assert from 'node:assert';
 import {
   evaluateHostingEntitlement,
   HOSTING_PRODUCTS,
+  FEATURE_MONETISATION_DEFAULT,
+  getMonetisationStatus,
 } from '../src/lib/monetisationCore';
 
 console.log('--- Testing NF-28: Hosting Purchase & Monetisation Safeguards ---');
 
 // Test 1: Monetisation disabled by default (F-D9 standing decision)
 {
+  assert.strictEqual(FEATURE_MONETISATION_DEFAULT, false, 'Default monetisation flag must strictly be false');
   const smallMatch = evaluateHostingEntitlement({
     monetisationEnabled: false,
     playerCount: 4,
@@ -16,9 +19,9 @@ console.log('--- Testing NF-28: Hosting Purchase & Monetisation Safeguards ---')
 
   const largeMatch = evaluateHostingEntitlement({
     monetisationEnabled: false,
-    playerCount: 120,
+    playerCount: 150,
   });
-  assert.strictEqual(largeMatch.canHost, true, 'When monetisation is off, large events must be free');
+  assert.strictEqual(largeMatch.canHost, true, 'When monetisation is off, large events up to 150 players must be 100% free');
   console.log('✓ Test 1: evaluateHostingEntitlement provides 100% free hosting when monetisation flag is off');
 }
 
@@ -69,4 +72,18 @@ console.log('--- Testing NF-28: Hosting Purchase & Monetisation Safeguards ---')
   console.log('✓ Test 4: Product catalogue defines standard event host pass');
 }
 
-console.log('\nAll 4 NF-28 monetisation tests passed successfully!\n');
+// Test 5: getMonetisationStatus switch helper
+{
+  const statusDefault = getMonetisationStatus();
+  assert.strictEqual(statusDefault.isMonetisationActive, false);
+  assert.strictEqual(statusDefault.canHostFreely, true);
+  assert.ok(statusDefault.policy.includes('100% free and unblocked'));
+
+  const statusActive = getMonetisationStatus(true);
+  assert.strictEqual(statusActive.isMonetisationActive, true);
+  assert.strictEqual(statusActive.canHostFreely, false);
+  assert.ok(statusActive.policy.includes('Event Host Pass'));
+  console.log('✓ Test 5: getMonetisationStatus accurately reflects switch status and hosting policies');
+}
+
+console.log('\nAll 5 NF-28 monetisation tests passed successfully!\n');

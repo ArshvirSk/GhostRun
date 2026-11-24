@@ -10,6 +10,13 @@
 
 export type ColorblindMode = 'none' | 'protanopia' | 'deuteranopia' | 'tritanopia';
 
+export const COLORBLIND_MODE_LABELS: Record<ColorblindMode, string> = {
+  none: 'Standard Vision (Default)',
+  protanopia: 'Protanopia (Red-Weak)',
+  deuteranopia: 'Deuteranopia (Green-Weak)',
+  tritanopia: 'Tritanopia (Blue-Weak)',
+};
+
 export interface TacticalRadarPalette {
   runner: string;
   hunter: string;
@@ -54,6 +61,12 @@ export const RADAR_PALETTES: Record<ColorblindMode, TacticalRadarPalette> = {
 
 export type HudScale = 'standard' | 'large' | 'extra_large';
 
+export const HUD_SCALE_LABELS: Record<HudScale, string> = {
+  standard: 'Standard (1.0x)',
+  large: 'Large (1.25x)',
+  extra_large: 'Extra Large (1.5x)',
+};
+
 export const HUD_SCALE_MULTIPLIERS: Record<HudScale, number> = {
   standard: 1.0,
   large: 1.25,
@@ -65,6 +78,48 @@ export const HUD_SCALE_MULTIPLIERS: Record<HudScale, number> = {
  */
 export function getRadarPalette(mode: ColorblindMode = 'none'): TacticalRadarPalette {
   return RADAR_PALETTES[mode] || RADAR_PALETTES.none;
+}
+
+/**
+ * Returns high-contrast outdoor sunlight styling overrides
+ */
+export function getHighContrastOverlay(isSunlightMode: boolean): {
+  backgroundOverlay: string;
+  textContrast: string;
+  borderStrokeWidth: number;
+} {
+  if (!isSunlightMode) {
+    return {
+      backgroundOverlay: 'rgba(5, 7, 9, 0.85)',
+      textContrast: '#F8FAFC',
+      borderStrokeWidth: 1,
+    };
+  }
+
+  return {
+    backgroundOverlay: '#000000',
+    textContrast: '#FFFFFF',
+    borderStrokeWidth: 2,
+  };
+}
+
+/**
+ * Formats an accessible TalkBack / VoiceOver audio briefing for assigned tactical role
+ */
+export function formatA11yRoleBriefing(
+  role: 'runner' | 'hunter' | 'spectator' | 'operator',
+  modeName: string
+): string {
+  switch (role) {
+    case 'runner':
+      return `Mission deployed: ${modeName}. You are a Runner. Evade hunters, use cover, and extract safely.`;
+    case 'hunter':
+      return `Mission deployed: ${modeName}. You are a Hunter. Track radar pings, pursue runners, and secure physical tags.`;
+    case 'operator':
+      return `Mission deployed: ${modeName}. You are an Overwatch Operator. Mark targets, scan zones, and support your squad remotely.`;
+    default:
+      return `Mission deployed: ${modeName}. You are a Spectator observing tactical field movements.`;
+  }
 }
 
 /**
