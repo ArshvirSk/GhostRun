@@ -4,6 +4,7 @@ import {
   determineRankTier,
   calculateSeasonRecap,
   buildSeasonRecapShareText,
+  calculateHighlightAccolade,
   RoundHistoryEntry,
 } from '../src/lib/seasonRecapCore';
 
@@ -117,4 +118,118 @@ console.log('--- Testing NF-15: Season Recap ("Wrapped") ---');
   console.log('✓ Test 5: buildSeasonRecapShareText enforces strict privacy rules (zero GPS coordinates)');
 }
 
-console.log('\nAll 5 NF-15 season recap tests passed successfully!\n');
+// Test 6: Expanded Mode Name Catalog in Season Recap
+{
+  const rounds: RoundHistoryEntry[] = [
+    { id: '1', mode_id: 'relay_heist', team: 'runner', won: true, distance_meters: 1500 },
+    { id: '2', mode_id: 'assassin_ring', team: 'solo', won: true, distance_meters: 2000 },
+    { id: '3', mode_id: 'pinpoint', team: 'runner', won: true, distance_meters: 800 },
+    { id: '4', mode_id: 'territory_pulse', team: 'hunter', won: true, distance_meters: 2500 },
+  ];
+
+  const recap = calculateSeasonRecap(rounds, [], 'Special Operations');
+  assert.strictEqual(recap.totalRounds, 4);
+  assert.ok(
+    ['Relay Heist', 'Assassin Ring', 'Pinpoint', 'Territory Pulse'].includes(recap.favoriteModeName),
+    'Recognizes expanded official mode names'
+  );
+  console.log('✓ Test 6: calculateSeasonRecap correctly maps expanded game mode catalog titles');
+}
+
+// Test 7: Tactical Match Debrief Accolade Determinations
+{
+  // Double Agent: Undetected Mole
+  const moleAccolade = calculateHighlightAccolade({
+    modeId: 'classic_chase',
+    isVictory: true,
+    team: 'hunter',
+    secretRole: 'agent',
+    status: 'active',
+  });
+  assert.strictEqual(moleAccolade.code, 'MOLE');
+  assert.strictEqual(moleAccolade.title, 'UNDETECTED MOLE');
+
+  // Double Agent: Tribunal Ejected
+  const trbAccolade = calculateHighlightAccolade({
+    modeId: 'classic_chase',
+    isVictory: false,
+    team: 'hunter',
+    secretRole: 'agent',
+    status: 'tagged',
+  });
+  assert.strictEqual(trbAccolade.code, 'TRB');
+  assert.strictEqual(trbAccolade.title, 'TRIBUNAL JUSTICE');
+
+  // VIP Escort: Bodyguard Sacrifice
+  const bgAccolade = calculateHighlightAccolade({
+    modeId: 'classic_chase',
+    isVictory: true,
+    team: 'runner',
+    secretRole: 'bodyguard',
+  });
+  assert.strictEqual(bgAccolade.code, 'GRD');
+  assert.strictEqual(bgAccolade.title, 'SECRET SERVICE');
+
+  // Jailbreak: Locksmith Hero
+  const jbAccolade = calculateHighlightAccolade({
+    modeId: 'jailbreak',
+    isVictory: true,
+    team: 'runner',
+  });
+  assert.strictEqual(jbAccolade.code, 'BRK');
+  assert.strictEqual(jbAccolade.title, 'LOCKSMITH HERO');
+
+  // Jailbreak: Iron Warden
+  const jbHunterAccolade = calculateHighlightAccolade({
+    modeId: 'jailbreak',
+    isVictory: true,
+    team: 'hunter',
+  });
+  assert.strictEqual(jbHunterAccolade.code, 'WRD');
+  assert.strictEqual(jbHunterAccolade.title, 'IRON WARDEN');
+
+  // Relay Heist: Encrypted Courier
+  const rlyAccolade = calculateHighlightAccolade({
+    modeId: 'relay_heist',
+    isVictory: true,
+    team: 'runner',
+  });
+  assert.strictEqual(rlyAccolade.code, 'RLY');
+  assert.strictEqual(rlyAccolade.title, 'ENCRYPTED COURIER');
+
+  // Assassin Ring: Lone Predator
+  const asnAccolade = calculateHighlightAccolade({
+    modeId: 'assassin_ring',
+    isVictory: true,
+    team: 'solo',
+  });
+  assert.strictEqual(asnAccolade.code, 'ASN');
+  assert.strictEqual(asnAccolade.title, 'LONE PREDATOR');
+
+  console.log('✓ Test 7: calculateHighlightAccolade maps mode-specific tactical debrief badges and titles');
+}
+
+// Test 8: Performance Accolade Fallbacks (Speed & Stealth)
+{
+  const fastHunter = calculateHighlightAccolade({
+    modeId: 'classic_chase',
+    isVictory: true,
+    team: 'hunter',
+    durationSeconds: 95,
+  });
+  assert.strictEqual(fastHunter.code, 'APX');
+  assert.strictEqual(fastHunter.title, 'APEX TRACKER');
+  assert.ok(fastHunter.description.includes('1m 35s'));
+
+  const stealthRunner = calculateHighlightAccolade({
+    modeId: 'classic_chase',
+    isVictory: true,
+    team: 'runner',
+  });
+  assert.strictEqual(stealthRunner.code, 'GST');
+  assert.strictEqual(stealthRunner.title, 'GHOST STEP');
+
+  console.log('✓ Test 8: calculateHighlightAccolade formats hunter and runner performance accolades');
+}
+
+console.log('\nAll 8 NF-15 season recap tests passed successfully!\n');

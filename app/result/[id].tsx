@@ -29,6 +29,7 @@ import { StoryCardExportModal } from '../../src/components/StoryCardExportModal'
 import { triggerHaptic } from '../../src/motion/haptics';
 import { getModeModule } from '../../src/modes/registry';
 import { listFriends, listFriendRequests, sendFriendRequest } from '../../src/lib/friends';
+import { calculateHighlightAccolade } from '../../src/lib/seasonRecapCore';
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
@@ -1090,60 +1091,46 @@ export default function ResultScreen() {
             </View>
 
             {/* Single Sleek Accolade Badge */}
-            <View style={styles.highlightCard}>
-              <View
-                style={[
-                  styles.highlightIconBox,
-                  {
-                    backgroundColor: `${outcomeAccent}1A`,
-                    borderColor: `${outcomeAccent}4D`,
-                  },
-                ]}
-              >
-                <Text style={[styles.highlightIconText, { color: outcomeAccent }]}>
-                  {isPinpoint ? 'PNT' : isOutbreak ? 'BIO' : isTerritory ? 'PLS' : myPlayer?.team === 'hunter' ? 'APX' : isVictory ? 'GST' : 'VAL'}
-                </Text>
-              </View>
-              <View style={styles.highlightTextBox}>
-                <View style={styles.highlightHeaderRow}>
-                  <Text style={styles.highlightTitle}>
-                    {isPinpoint
-                      ? (isVictory ? 'OPENGUESSR APEX' : 'FIELD DEDUCER')
-                      : isOutbreak
-                        ? (isVictory ? 'IMMUNE EXTRACTION' : 'HORDE VECTOR')
-                        : isTerritory
-                          ? (isVictory ? 'ZONE DOMINANCE' : 'CONTESTED RIVAL')
-                          : myPlayer?.team === 'hunter'
-                            ? 'APEX TRACKER'
-                            : isVictory
-                              ? 'GHOST STEP'
-                              : 'VALIANT FALL'}
-                  </Text>
-                  <View style={styles.accoladeChip}>
-                    <Text style={styles.accoladeChipText}>ACCOLADE</Text>
+            {(() => {
+              const accolade = calculateHighlightAccolade({
+                modeId,
+                isVictory: Boolean(isVictory),
+                team: myPlayer?.team || 'runner',
+                secretRole: myPlayerStat?.secret_role,
+                status: myPlayerStat?.status,
+                durationSeconds: roundSeconds ?? 0,
+              });
+              return (
+                <View style={styles.highlightCard}>
+                  <View
+                    style={[
+                      styles.highlightIconBox,
+                      {
+                        backgroundColor: `${outcomeAccent}1A`,
+                        borderColor: `${outcomeAccent}4D`,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.highlightIconText, { color: outcomeAccent }]}>
+                      {accolade.code}
+                    </Text>
+                  </View>
+                  <View style={styles.highlightTextBox}>
+                    <View style={styles.highlightHeaderRow}>
+                      <Text style={styles.highlightTitle}>
+                        {accolade.title}
+                      </Text>
+                      <View style={styles.accoladeChip}>
+                        <Text style={styles.accoladeChipText}>ACCOLADE</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.highlightDesc} numberOfLines={2}>
+                      {accolade.description}
+                    </Text>
                   </View>
                 </View>
-                <Text style={styles.highlightDesc} numberOfLines={2}>
-                  {isPinpoint
-                    ? (isVictory
-                        ? 'Aligned camera perspective and scored precision bullseye within geofence.'
-                        : 'Scouted and located target landmark across real-world terrain.')
-                    : isOutbreak
-                      ? (isVictory
-                          ? 'Outran infection swarm and preserved biological lifespan to extraction buzzer.'
-                          : 'Spread infection across park corridors and claimed conversion victory.')
-                      : isTerritory
-                        ? (isVictory
-                            ? 'Captured critical mass of tactical pulse sectors for team victory.'
-                            : 'Contested pulse nodes under intense opposing team pressure.')
-                        : myPlayer?.team === 'hunter'
-                          ? `Secured tag within ${formatDuration(roundSeconds ?? 0)} of deployment. Zero acoustic alerts triggered.`
-                          : isVictory
-                            ? 'Successfully evaded hunter proximity vectors and completed operational run.'
-                            : 'Held evasion vectors across multiple radar pulses before intercept.'}
-                </Text>
-              </View>
-            </View>
+              );
+            })()}
 
             {/* 9:16 Vertical Story Card Export Action Card */}
             <Pressable

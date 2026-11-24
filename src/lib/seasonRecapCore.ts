@@ -42,9 +42,177 @@ const MODE_NAMES: Record<string, string> = {
   classic_chase: 'Classic Chase',
   tag_hunt: 'Tag Hunt',
   jailbreak: 'Jailbreak',
-  horde: 'Horde Mode',
+  relay_heist: 'Relay Heist',
+  assassin_ring: 'Assassin Ring',
+  outbreak_horde: 'Outbreak Horde',
+  horde: 'Outbreak Horde',
+  pinpoint: 'Pinpoint',
+  territory_pulse: 'Territory Pulse',
   ghost_duel: 'Ghost Duel',
 };
+
+export interface AccoladeResult {
+  code: string;
+  title: string;
+  description: string;
+}
+
+/**
+ * Determines tactical match debrief accolade based on game mode, team, and operative performance.
+ */
+export function calculateHighlightAccolade(params: {
+  modeId: string;
+  isVictory: boolean;
+  team: string;
+  secretRole?: string | null;
+  status?: string;
+  durationSeconds?: number;
+}): AccoladeResult {
+  const { modeId, isVictory, team, secretRole, status, durationSeconds = 0 } = params;
+
+  if (secretRole === 'agent') {
+    return status !== 'tagged'
+      ? {
+          code: 'MOLE',
+          title: 'UNDETECTED MOLE',
+          description: 'Secretly coordinated intelligence with runner squad without being unmasked by tribunal.',
+        }
+      : {
+          code: 'TRB',
+          title: 'TRIBUNAL JUSTICE',
+          description: 'Unmasked by emergency hunter tribunal and neutralized prior to runner extraction.',
+        };
+  }
+
+  if (secretRole === 'vip') {
+    return isVictory
+      ? {
+          code: 'VIP',
+          title: 'HIGH-VALUE EXTRACTION',
+          description: 'Protected VIP successfully reached extraction target zone under squad escort.',
+        }
+      : {
+          code: 'VIP',
+          title: 'ESCORT COMPROMISED',
+          description: 'Hunters penetrated squad perimeter and neutralized high-value operative asset.',
+        };
+  }
+
+  if (secretRole === 'bodyguard') {
+    return {
+      code: 'GRD',
+      title: 'SECRET SERVICE',
+      description: 'Absorbed hunter focus and tactical role-swaps to ensure team mission survivability.',
+    };
+  }
+
+  switch (modeId) {
+    case 'pinpoint':
+      return isVictory
+        ? {
+            code: 'PNT',
+            title: 'OPENGUESSR APEX',
+            description: 'Aligned camera perspective and scored precision bullseye within geofence.',
+          }
+        : {
+            code: 'PNT',
+            title: 'FIELD DEDUCER',
+            description: 'Scouted and located target landmark across real-world terrain.',
+          };
+    case 'outbreak_horde':
+    case 'horde':
+      return isVictory
+        ? {
+            code: 'BIO',
+            title: 'IMMUNE EXTRACTION',
+            description: 'Outran infection swarm and preserved biological lifespan to extraction buzzer.',
+          }
+        : {
+            code: 'BIO',
+            title: 'HORDE VECTOR',
+            description: 'Spread infection across park corridors and claimed conversion victory.',
+          };
+    case 'territory_pulse':
+      return isVictory
+        ? {
+            code: 'PLS',
+            title: 'ZONE DOMINANCE',
+            description: 'Captured critical mass of tactical pulse sectors for team victory.',
+          }
+        : {
+            code: 'PLS',
+            title: 'CONTESTED RIVAL',
+            description: 'Contested pulse nodes under intense opposing team pressure.',
+          };
+    case 'jailbreak':
+      return isVictory
+        ? (team === 'hunter'
+            ? {
+                code: 'WRD',
+                title: 'IRON WARDEN',
+                description: 'Maintained holding cell containment and eliminated runner extraction potential.',
+              }
+            : {
+                code: 'BRK',
+                title: 'LOCKSMITH HERO',
+                description: 'Completed stealth lockpick holds and freed captured cellmates from holding.',
+              })
+        : {
+            code: 'BRK',
+            title: 'HOLDING CELL HERO',
+            description: 'Stood resolute against hunter sweeps and pressured cell security.',
+          };
+    case 'relay_heist':
+      return isVictory
+        ? (team === 'runner'
+            ? {
+                code: 'RLY',
+                title: 'ENCRYPTED COURIER',
+                description: 'Maintained package handoffs and reached extraction point with carrier payload.',
+              }
+            : {
+                code: 'RLY',
+                title: 'VAULT INTERCEPTOR',
+                description: 'Intercepted runner package carrier and secured vault telemetry for squad victory.',
+              })
+        : {
+            code: 'RLY',
+            title: 'RELAY CONTESTER',
+            description: 'Battled in carrier recovery zones under intense tactical pressure.',
+          };
+    case 'assassin_ring':
+      return isVictory
+        ? {
+            code: 'ASN',
+            title: 'LONE PREDATOR',
+            description: 'Fulfilled contract chain to emerge as sole surviving operative in the ring.',
+          }
+        : {
+            code: 'ASN',
+            title: 'TACTICAL CONTRACTOR',
+            description: 'Tracked assigned prey across proximity pulses before contract reassignment.',
+          };
+    default:
+      if (team === 'hunter') {
+        return {
+          code: 'APX',
+          title: 'APEX TRACKER',
+          description: `Secured tag within ${formatDuration(durationSeconds)} of deployment. Zero acoustic alerts triggered.`,
+        };
+      }
+      return isVictory
+        ? {
+            code: 'GST',
+            title: 'GHOST STEP',
+            description: 'Successfully evaded hunter proximity vectors and completed operational run.',
+          }
+        : {
+            code: 'VAL',
+            title: 'VALIANT FALL',
+            description: 'Held evasion vectors across multiple radar pulses before intercept.',
+          };
+  }
+}
 
 /**
  * Format seconds into mm:ss or hh:mm

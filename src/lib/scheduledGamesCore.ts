@@ -144,3 +144,79 @@ export function summarizeRsvps(rsvps: ScheduledGameRsvp[]): {
     total: rsvps.length,
   };
 }
+
+/**
+ * Calculates the exact timestamp for a 15-minute lobby warmup reminder alarm.
+ */
+export function calculateWarmupAlarmTime(
+  scheduledAt: Date,
+  warmupMinutes: number = 15
+): Date {
+  return new Date(scheduledAt.getTime() - warmupMinutes * 60 * 1000);
+}
+
+export type ScheduledGamePhase = 'upcoming' | 'warmup' | 'active' | 'concluded';
+
+/**
+ * Determines the live lifecycle phase of a scheduled game.
+ */
+export function getScheduledGamePhase(
+  scheduledAt: Date,
+  now: Date = new Date(),
+  durationMinutes: number = 60,
+  warmupMinutes: number = 15
+): ScheduledGamePhase {
+  const schedMs = scheduledAt.getTime();
+  const nowMs = now.getTime();
+  const warmupMs = schedMs - warmupMinutes * 60 * 1000;
+  const concludeMs = schedMs + durationMinutes * 60 * 1000;
+
+  if (nowMs < warmupMs) return 'upcoming';
+  if (nowMs < schedMs) return 'warmup';
+  if (nowMs < concludeMs) return 'active';
+  return 'concluded';
+}
+
+/**
+ * Calculates the next recurring occurrence timestamp for repeating squad matches.
+ */
+export function calculateNextRecurringOccurrence(
+  frequency: 'daily' | 'weekly' | 'biweekly',
+  baseDate: Date,
+  afterDate: Date = new Date()
+): Date {
+  const stepMs =
+    frequency === 'daily'
+      ? 24 * 60 * 60 * 1000
+      : frequency === 'weekly'
+        ? 7 * 24 * 60 * 60 * 1000
+        : 14 * 24 * 60 * 60 * 1000;
+
+  let current = new Date(baseDate.getTime());
+  while (current.getTime() <= afterDate.getTime()) {
+    current = new Date(current.getTime() + stepMs);
+  }
+  return current;
+}
+
+/**
+ * Builds push notification reminder payload for upcoming scheduled games.
+ */
+export function buildScheduledGameNotification(
+  game: ScheduledGame,
+  type: 'warmup' | 'starting'
+): { title: string; body: string; data: { gameId: string; type: string } } {
+  const locationText = game.area_name ? ` at ${game.area_name}` : '';
+  if (type === 'warmup') {
+    return {
+      title: `Match Warmup: ${game.title}`,
+      body: `Operation starts in 15 minutes${locationText}. Open GhostRun to ready up with your squad.`,
+      data: { gameId: game.id, type: 'warmup' },
+    };
+  }
+  return {
+    title: `Deployment Commencing: ${game.title}`,
+    body: `Match lobby is open${locationText}. Deploy now!`,
+    data: { gameId: game.id, type: 'starting' },
+  };
+}

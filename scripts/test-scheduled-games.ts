@@ -10,6 +10,10 @@ import {
   validateScheduledGameInput,
   buildGameIcsContent,
   summarizeRsvps,
+  calculateWarmupAlarmTime,
+  getScheduledGamePhase,
+  calculateNextRecurringOccurrence,
+  buildScheduledGameNotification,
   ScheduledGame,
   ScheduledGameRsvp,
 } from '../src/lib/scheduledGamesCore';
@@ -189,4 +193,81 @@ console.log('--- Testing NF-13: Scheduled Games & Calendar Reminders ---');
   console.log('✓ Test 9: summarizeRsvps aggregates player responses correctly');
 }
 
-console.log('\nAll 9 NF-13 scheduled game tests passed successfully!\n');
+// Test 10: calculateWarmupAlarmTime (15-min Lobby Warmup Alarm)
+{
+  const matchTime = new Date('2026-11-20T20:00:00Z');
+  const warmupAlarm = calculateWarmupAlarmTime(matchTime, 15);
+  assert.strictEqual(
+    warmupAlarm.toISOString(),
+    '2026-11-20T19:45:00.000Z',
+    'Warmup alarm must be exactly 15 minutes before match start'
+  );
+  console.log('✓ Test 10: calculateWarmupAlarmTime computes exact 15-minute lobby warmup trigger');
+}
+
+// Test 11: getScheduledGamePhase Lifecycle Transitions
+{
+  const matchStart = new Date('2026-11-20T20:00:00Z');
+  const durationMin = 60;
+
+  // 1 hour before -> upcoming
+  const tUpcoming = new Date('2026-11-20T19:00:00Z');
+  assert.strictEqual(getScheduledGamePhase(matchStart, tUpcoming, durationMin), 'upcoming');
+
+  // 10 minutes before -> warmup
+  const tWarmup = new Date('2026-11-20T19:50:00Z');
+  assert.strictEqual(getScheduledGamePhase(matchStart, tWarmup, durationMin), 'warmup');
+
+  // 30 minutes in -> active
+  const tActive = new Date('2026-11-20T20:30:00Z');
+  assert.strictEqual(getScheduledGamePhase(matchStart, tActive, durationMin), 'active');
+
+  // 90 minutes after -> concluded
+  const tConcluded = new Date('2026-11-20T21:30:00Z');
+  assert.strictEqual(getScheduledGamePhase(matchStart, tConcluded, durationMin), 'concluded');
+
+  console.log('✓ Test 11: getScheduledGamePhase tracks upcoming -> warmup -> active -> concluded lifecycle');
+}
+
+// Test 12: calculateNextRecurringOccurrence (Repeating Match Templates)
+{
+  const baseTime = new Date('2026-11-10T19:00:00Z');
+  const now = new Date('2026-11-18T12:00:00Z');
+
+  // Daily recurrence: base is 19:00 UTC, now is 12:00 UTC -> next daily is later today at 19:00 UTC
+  const nextDaily = calculateNextRecurringOccurrence('daily', baseTime, now);
+  assert.strictEqual(nextDaily.toISOString(), '2026-11-18T19:00:00.000Z');
+
+  // Weekly recurrence (Tuesday night match)
+  const nextWeekly = calculateNextRecurringOccurrence('weekly', baseTime, now);
+  assert.strictEqual(nextWeekly.toISOString(), '2026-11-24T19:00:00.000Z');
+
+  console.log('✓ Test 12: calculateNextRecurringOccurrence steps repeating squad game schedules forward');
+}
+
+// Test 13: buildScheduledGameNotification Push Alert Payloads
+{
+  const game: ScheduledGame = {
+    id: 'sg-match-77',
+    host_id: 'host-1',
+    title: 'Friday Night Sector Siege',
+    mode_id: 'territory_pulse',
+    scheduled_at: '2026-11-21T21:00:00Z',
+    area_name: 'Presidio Grounds',
+    created_at: '2026-11-18T10:00:00Z',
+  };
+
+  const warmupNotif = buildScheduledGameNotification(game, 'warmup');
+  assert.ok(warmupNotif.title.includes('Match Warmup: Friday Night Sector Siege'));
+  assert.ok(warmupNotif.body.includes('15 minutes'));
+  assert.ok(warmupNotif.body.includes('Presidio Grounds'));
+  assert.strictEqual(warmupNotif.data.gameId, 'sg-match-77');
+
+  const startNotif = buildScheduledGameNotification(game, 'starting');
+  assert.ok(startNotif.title.includes('Deployment Commencing'));
+  assert.strictEqual(startNotif.data.type, 'starting');
+
+  console.log('✓ Test 13: buildScheduledGameNotification builds tactical push notification payloads');
+}
+
+console.log('\nAll 13 NF-13 scheduled game tests passed successfully!\n');
