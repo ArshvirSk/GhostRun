@@ -7,6 +7,7 @@
     "start": "expo start --dev-client",
     "test": "node scripts/run-all-tests.mjs",
     "test:all": "node scripts/run-all-tests.mjs",
+    "sim:match": "node --import tsx scripts/sim-match-runner.ts",
     "android": "expo run:android",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
