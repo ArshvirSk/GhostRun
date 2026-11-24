@@ -20,6 +20,15 @@ import {
 } from '../src/lib/batteryResilienceCore';
 import { evaluatePinpointScore, evaluatePinpointClues } from '../src/modes/pinpoint/engine';
 import { PinpointTarget } from '../src/modes/pinpoint/types';
+import {
+  createBlackboxSession,
+  appendBlackboxFix,
+  appendBlackboxEvent,
+  finalizeBlackboxSession,
+  serializeBlackboxToJsonl,
+  parseBlackboxFromJsonl,
+  validateBlackboxSession,
+} from '../src/lib/blackboxCore';
 
 // Physical Earth Constants
 const EARTH_RADIUS_M = 6371008.8;
@@ -1883,6 +1892,90 @@ console.log('\n--- Scenario 14: Blackout Radar (Passive Directional Sonar & Stea
   );
 }
 
+// ----------------------------------------------------------------------------
+// Scenario 15: Blackbox Telemetry Replayer (Real-World Match Ingestion & Forensic Validation)
+// ----------------------------------------------------------------------------
+{
+  console.log('\n--- Scenario 15: Blackbox Telemetry Replayer (Real-World Match Ingestion & Forensic Validation) ---');
+
+  // Step 1: Synthesize a real-world field session
+  const session = createBlackboxSession({
+    gameId: 'FIELD-REC-77',
+    modeId: 'vip_escort',
+    callsign: 'Viper',
+    role: 'vip',
+    initialBatteryLevel: 0.94,
+  });
+
+  const baseCoord: LngLat = { latitude: 37.7749, longitude: -122.4194 };
+  const baseTime = Date.now();
+  let accumulatedDistanceM = 0;
+
+  // Record 60 seconds of realistic human sprint trajectory (3.5 m/s)
+  for (let s = 0; s < 60; s++) {
+    const projected = projectCoordinate(baseCoord, s * 3.5, 45);
+    appendBlackboxFix(session, {
+      timestamp: baseTime + s * 1000,
+      lat: projected.latitude,
+      lng: projected.longitude,
+      accuracy: 3.2 + (s % 4) * 0.3, // Realistic jitter 3.2m - 4.1m
+      speed: 3.5,
+      heading: 45,
+      batteryLevel: 0.94 - s * 0.0001,
+    });
+  }
+
+  // Record match events during sprint
+  appendBlackboxEvent(session, {
+    timestamp: baseTime + 15000,
+    type: 'ping_received',
+    payload: { source: 'hunter-1', distanceM: 65 },
+  });
+
+  appendBlackboxEvent(session, {
+    timestamp: baseTime + 45000,
+    type: 'tag_attempt',
+    payload: { hunterId: 'hunter-2', distanceM: 22 },
+  });
+
+  finalizeBlackboxSession(session);
+
+  // Step 2: Serialize to .ghostbox JSONL format
+  const jsonlContent = serializeBlackboxToJsonl(session);
+  assert.ok(jsonlContent.length > 500, 'JSONL blackbox stream generated');
+
+  // Step 3: Headless simulator replayer ingestion
+  const replayedSession = parseBlackboxFromJsonl(jsonlContent);
+  const validation = validateBlackboxSession(replayedSession);
+
+  assert.strictEqual(validation.valid, true, 'Blackbox validation must pass');
+  assert.strictEqual(validation.fixCount, 60, 'All 60 fixes must be faithfully deserialized');
+  assert.strictEqual(validation.durationSeconds, 59, 'Recorded duration must be 59-60s');
+  assert.strictEqual(replayedSession.events.length, 4, 'Must contain start, ping, tag, and end events');
+
+  // Step 4: Step-by-step kinematic replayer step through
+  let maxVelocityMps = 0;
+  for (let i = 1; i < replayedSession.fixes.length; i++) {
+    const prev = replayedSession.fixes[i - 1];
+    const curr = replayedSession.fixes[i];
+    const dtSec = (curr.timestamp - prev.timestamp) / 1000.0;
+    const stepDist = distanceM(
+      { latitude: prev.lat, longitude: prev.lng },
+      { latitude: curr.lat, longitude: curr.lng }
+    );
+    accumulatedDistanceM += stepDist;
+    const velocity = stepDist / dtSec;
+    if (velocity > maxVelocityMps) maxVelocityMps = velocity;
+  }
+
+  assert.ok(maxVelocityMps < MAX_HUMAN_SPRINT_SPEED_MPS, 'Replayed velocity must not trigger vehicle tripwire');
+  assert.ok(accumulatedDistanceM > 190 && accumulatedDistanceM < 220, 'Traversed expected distance ~206m');
+
+  console.log(
+    '✓ PASS: Blackbox Telemetry Replayer verified: lossless JSONL deserialization, 60-fix kinematic trajectory replay, zero vehicle tripwires, event synchronization, and forensic match validation'
+  );
+}
+
 console.log('\n================================================================');
-console.log('  All 14 Autonomous Match Simulation Scenarios PASSED (100%)    ');
+console.log('  All 15 Autonomous Match Simulation Scenarios PASSED (100%)    ');
 console.log('================================================================\n');
