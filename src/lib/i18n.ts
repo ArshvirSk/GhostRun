@@ -40,6 +40,13 @@ export const TRANSLATION_CATALOG = {
     'modes.jailbreak': 'Jailbreak',
     'modes.ghost_duel': 'Ghost Duel',
     'modes.relay_heist': 'Relay Heist',
+    'modes.outbreak_horde': 'Outbreak Horde',
+    'modes.territory_pulse': 'Territory Pulse',
+    'modes.vip_escort': 'VIP Escort',
+    'modes.double_agent': 'Double Agent',
+    'modes.pinpoint': 'Pinpoint',
+    'modes.assassin_ring': 'Assassin Ring',
+    'modes.blackout_radar': 'Blackout Radar',
 
     // Tactical Alerts
     'alerts.hunter_nearby': 'Hunter nearby! Conceal position.',
@@ -47,6 +54,8 @@ export const TRANSLATION_CATALOG = {
     'alerts.you_were_tagged': 'You have been tagged! Transitioning role.',
     'alerts.tag_confirmed': 'Target tagged successfully.',
     'alerts.boundary_warning': 'Warning: Approaching operational boundary.',
+    'alerts.countdown': '{seconds}s remaining',
+    'alerts.hunter_distance': 'Hunter within {distance}m!',
 
     // Safety & SOS
     'safety.checkin_prompt': 'Safety Check-in: Confirm you are safe.',
@@ -78,6 +87,13 @@ export const TRANSLATION_CATALOG = {
     'modes.jailbreak': 'Fuga de Prisión',
     'modes.ghost_duel': 'Duelo Fantasma',
     'modes.relay_heist': 'Atraco por Relevos',
+    'modes.outbreak_horde': 'Horda del Brote',
+    'modes.territory_pulse': 'Pulso de Territorio',
+    'modes.vip_escort': 'Escolta VIP',
+    'modes.double_agent': 'Doble Agente',
+    'modes.pinpoint': 'Punto Preciso',
+    'modes.assassin_ring': 'Anillo de Asesinos',
+    'modes.blackout_radar': 'Radar de Apagón',
 
     // Tactical Alerts
     'alerts.hunter_nearby': '¡Cazador cerca! Oculta tu posición.',
@@ -85,6 +101,8 @@ export const TRANSLATION_CATALOG = {
     'alerts.you_were_tagged': '¡Has sido atrapado!',
     'alerts.tag_confirmed': 'Objetivo atrapado con éxito.',
     'alerts.boundary_warning': 'Aviso: Límite del área aproximándose.',
+    'alerts.countdown': '{seconds}s restantes',
+    'alerts.hunter_distance': '¡Cazador a menos de {distance}m!',
 
     // Safety & SOS
     'safety.checkin_prompt': 'Control de seguridad: Confirma que estás a salvo.',
@@ -116,6 +134,13 @@ export const TRANSLATION_CATALOG = {
     'modes.jailbreak': 'Gefängnisausbruch',
     'modes.ghost_duel': 'Geister-Duell',
     'modes.relay_heist': 'Staffel-Raubzug',
+    'modes.outbreak_horde': 'Ausbruch-Horde',
+    'modes.territory_pulse': 'Territoriums-Puls',
+    'modes.vip_escort': 'VIP-Begleitung',
+    'modes.double_agent': 'Doppelagent',
+    'modes.pinpoint': 'Punktgenau',
+    'modes.assassin_ring': 'Attentäter-Ring',
+    'modes.blackout_radar': 'Blackout-Radar',
 
     // Tactical Alerts
     'alerts.hunter_nearby': 'Jäger in der Nähe! Verstecken!',
@@ -123,6 +148,8 @@ export const TRANSLATION_CATALOG = {
     'alerts.you_were_tagged': 'Du wurdest markiert!',
     'alerts.tag_confirmed': 'Ziel erfolgreich markiert.',
     'alerts.boundary_warning': 'Warnung: Zonenrand nähert sich.',
+    'alerts.countdown': '{seconds}s verbleibend',
+    'alerts.hunter_distance': 'Jäger innerhalb von {distance}m!',
 
     // Safety & SOS
     'safety.checkin_prompt': 'Sicherheits-Check: Bestätige deine Sicherheit.',
@@ -154,6 +181,13 @@ export const TRANSLATION_CATALOG = {
     'modes.jailbreak': 'Évasion',
     'modes.ghost_duel': 'Duel Fantôme',
     'modes.relay_heist': 'Braquage Relais',
+    'modes.outbreak_horde': 'Horde Déferlante',
+    'modes.territory_pulse': 'Pulsion de Territoire',
+    'modes.vip_escort': 'Escorte VIP',
+    'modes.double_agent': 'Agent Double',
+    'modes.pinpoint': 'Point de Chute',
+    'modes.assassin_ring': 'Cercle des Assassins',
+    'modes.blackout_radar': 'Radar Furtif',
 
     // Tactical Alerts
     'alerts.hunter_nearby': 'Chasseur proche ! Cachez-vous.',
@@ -161,6 +195,8 @@ export const TRANSLATION_CATALOG = {
     'alerts.you_were_tagged': 'Vous avez été capturé !',
     'alerts.tag_confirmed': 'Cible capturée avec succès.',
     'alerts.boundary_warning': 'Attention : Approche de la limite de zone.',
+    'alerts.countdown': '{seconds}s restants',
+    'alerts.hunter_distance': 'Chasseur à moins de {distance}m !',
 
     // Safety & SOS
     'safety.checkin_prompt': 'Point de sécurité : Confirmez votre sécurité.',
@@ -192,6 +228,13 @@ export const TRANSLATION_CATALOG = {
     'modes.jailbreak': '脱獄',
     'modes.ghost_duel': 'ゴーストデュエル',
     'modes.relay_heist': 'リレーハイスト',
+    'modes.outbreak_horde': 'アウトブレイク・ホード',
+    'modes.territory_pulse': 'テリトリーパルス',
+    'modes.vip_escort': 'VIPエスコート',
+    'modes.double_agent': 'ダブルエージェント',
+    'modes.pinpoint': 'ピンポイント',
+    'modes.assassin_ring': 'アサシンリング',
+    'modes.blackout_radar': 'ブラックアウトレーダー',
 
     // Tactical Alerts
     'alerts.hunter_nearby': 'ハンター接近！身を隠せ。',
@@ -199,6 +242,8 @@ export const TRANSLATION_CATALOG = {
     'alerts.you_were_tagged': 'タグされました！',
     'alerts.tag_confirmed': 'ターゲットのタグに成功。',
     'alerts.boundary_warning': '警告: 作戦エリアの境界に接近中。',
+    'alerts.countdown': '残り{seconds}秒',
+    'alerts.hunter_distance': '{distance}m以内にハンター接近！',
 
     // Safety & SOS
     'safety.checkin_prompt': '安否確認: 安全を確認してください。',
@@ -223,7 +268,7 @@ export function getLocale(): SupportedLocale {
 }
 
 /**
- * Translates a key with optional parameter interpolation
+ * Translates a key with optional parameter interpolation and automatic English fallback.
  */
 export function t(
   key: TranslationKey,
