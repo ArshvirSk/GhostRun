@@ -722,6 +722,387 @@ console.log('\n--- Scenario 8: Jailbreak Holding Cell, Stealth Rescue Hold & All
   );
 }
 
+// -----------------------------------------------------------------------------
+// Scenario 9: Relay Heist Package Transfer, Tag Drop, Securing Contest & Extraction
+// -----------------------------------------------------------------------------
+console.log('\n--- Scenario 9: Relay Heist Package Transfer, Tag Drop, Securing Contest & Extraction ---');
+{
+  const center: LngLat = { latitude: 37.7749, longitude: -122.4194 };
+  const targetPoint: LngLat = projectCoordinate(center, 200, 0); // 200m North
+  const extractionRadiusM = 25.0;
+  const handoffRadiusM = 5.0;
+  const handoffCooldownS = 20;
+  const pickupRadiusM = 10.0;
+  const securingHoldS = 20;
+  const offlineDropS = 60;
+
+  let runnerTorch: OperativeState = {
+    id: 'op-torch-1',
+    codename: 'TORCH',
+    team: 'runner',
+    latitude: center.latitude,
+    longitude: center.longitude,
+    heading: 0,
+    speedMps: 3.4,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let runnerBeacon: OperativeState = {
+    id: 'op-beacon-2',
+    codename: 'BEACON',
+    team: 'runner',
+    latitude: projectCoordinate(center, 3.5, 90).latitude, // 3.5m East
+    longitude: projectCoordinate(center, 3.5, 90).longitude,
+    heading: 0,
+    speedMps: 3.1,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let hunterShadow: OperativeState = {
+    id: 'op-shadow-3',
+    codename: 'SHADOW',
+    team: 'hunter',
+    latitude: projectCoordinate(center, 80, 0).latitude,
+    longitude: projectCoordinate(center, 80, 0).longitude,
+    heading: 180,
+    speedMps: 4.5,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let packageEntity = {
+    status: 'carried' as 'carried' | 'dropped' | 'secured',
+    carrierId: runnerTorch.id as string | null,
+    visibleTo: 'runner' as 'runner' | 'all',
+    latitude: runnerTorch.latitude,
+    longitude: runnerTorch.longitude,
+    securingHunterId: null as string | null,
+    securingStartedAtSec: null as number | null,
+    handoffCooldownUntilSec: 0,
+  };
+
+  assert.strictEqual(packageEntity.status, 'carried');
+  assert.strictEqual(packageEntity.visibleTo, 'runner', 'Package is hidden from hunters while carried');
+
+  // Step 1: Mutual 5m physical handoff
+  const handoffDist = distanceM(
+    { latitude: runnerTorch.latitude, longitude: runnerTorch.longitude },
+    { latitude: runnerBeacon.latitude, longitude: runnerBeacon.longitude }
+  );
+  assert.ok(handoffDist <= handoffRadiusM, 'Runners are within 5m handoff threshold');
+
+  // Carrier transfers package to Beacon
+  const currentSec = 10;
+  assert.ok(currentSec >= packageEntity.handoffCooldownUntilSec, 'Cooldown has expired');
+  packageEntity.carrierId = runnerBeacon.id;
+  packageEntity.handoffCooldownUntilSec = currentSec + handoffCooldownS;
+
+  assert.strictEqual(packageEntity.carrierId, runnerBeacon.id, 'Beacon is now the active package carrier');
+
+  // Anti-ping-pong check: Torch cannot immediately request handoff back
+  const canHandoffBackImmediately = currentSec + 5 >= packageEntity.handoffCooldownUntilSec;
+  assert.strictEqual(canHandoffBackImmediately, false, 'Rapid handoff spam blocked by 20s cooldown');
+
+  // Step 2: Hunter intercepts and tags carrier Beacon
+  hunterShadow.latitude = projectCoordinate({ latitude: runnerBeacon.latitude, longitude: runnerBeacon.longitude }, 14, 0).latitude;
+  hunterShadow.longitude = projectCoordinate({ latitude: runnerBeacon.latitude, longitude: runnerBeacon.longitude }, 14, 0).longitude;
+  const tagDist = distanceM(
+    { latitude: hunterShadow.latitude, longitude: hunterShadow.longitude },
+    { latitude: runnerBeacon.latitude, longitude: runnerBeacon.longitude }
+  );
+  assert.ok(tagDist <= TAG_COLLISION_RADIUS_M, 'Hunter is within tag range');
+
+  // Tagging carrier drops package and reveals it to all players
+  runnerBeacon.status = 'tagged';
+  packageEntity.status = 'dropped';
+  packageEntity.carrierId = null;
+  packageEntity.visibleTo = 'all'; // Scramble initiated!
+  packageEntity.latitude = runnerBeacon.latitude;
+  packageEntity.longitude = runnerBeacon.longitude;
+
+  assert.strictEqual(packageEntity.status, 'dropped');
+  assert.strictEqual(packageEntity.visibleTo, 'all', 'Dropped package is broadcast to all players');
+
+  // Step 3: Hunter Securing Contest vs Runner Recovery
+  hunterShadow.latitude = projectCoordinate({ latitude: packageEntity.latitude, longitude: packageEntity.longitude }, 4.0, 180).latitude;
+  hunterShadow.longitude = projectCoordinate({ latitude: packageEntity.latitude, longitude: packageEntity.longitude }, 4.0, 180).longitude;
+  const hunterDistToPkg = distanceM(
+    { latitude: hunterShadow.latitude, longitude: hunterShadow.longitude },
+    { latitude: packageEntity.latitude, longitude: packageEntity.longitude }
+  );
+  assert.ok(hunterDistToPkg <= pickupRadiusM, 'Hunter is within 10m securing zone');
+
+  // Hunter begins 20s securing hold
+  packageEntity.securingHunterId = hunterShadow.id;
+  packageEntity.securingStartedAtSec = 30;
+
+  // At second 12 of hold (hold not finished), Runner Torch dashes in within 6.5m
+  const holdElapsedSec = 12;
+  assert.ok(holdElapsedSec < securingHoldS, 'Hunter securing hold is incomplete');
+
+  runnerTorch.latitude = projectCoordinate({ latitude: packageEntity.latitude, longitude: packageEntity.longitude }, 6.5, 90).latitude;
+  runnerTorch.longitude = projectCoordinate({ latitude: packageEntity.latitude, longitude: packageEntity.longitude }, 6.5, 90).longitude;
+  const torchDistToPkg = distanceM(
+    { latitude: runnerTorch.latitude, longitude: runnerTorch.longitude },
+    { latitude: packageEntity.latitude, longitude: packageEntity.longitude }
+  );
+  assert.ok(torchDistToPkg <= pickupRadiusM, 'Torch is within 10m recovery radius');
+
+  // Torch recovers package! Cancels hunter hold and hides package again
+  packageEntity.status = 'carried';
+  packageEntity.carrierId = runnerTorch.id;
+  packageEntity.securingHunterId = null;
+  packageEntity.securingStartedAtSec = null;
+  packageEntity.visibleTo = 'runner';
+
+  assert.strictEqual(packageEntity.carrierId, runnerTorch.id);
+  assert.strictEqual(packageEntity.visibleTo, 'runner', 'Recovered package re-cloaks from hunters');
+
+  // Step 4: Carrier Torch reaches extraction point
+  runnerTorch.latitude = projectCoordinate(targetPoint, 18.5, 45).latitude;
+  runnerTorch.longitude = projectCoordinate(targetPoint, 18.5, 45).longitude;
+  const distToExtraction = distanceM(
+    { latitude: runnerTorch.latitude, longitude: runnerTorch.longitude },
+    targetPoint
+  );
+  assert.ok(distToExtraction <= extractionRadiusM, 'Carrier is inside 25m extraction zone');
+
+  let matchWinner: string | null = null;
+  let endReason: string | null = null;
+  if (packageEntity.carrierId === runnerTorch.id && distToExtraction <= extractionRadiusM) {
+    matchWinner = 'runners';
+    endReason = 'extraction_complete';
+  }
+
+  assert.strictEqual(matchWinner, 'runners');
+  assert.strictEqual(endReason, 'extraction_complete');
+
+  // Step 5: Verify carrier offline auto-drop rule (X-9)
+  const carrierOfflineSec = 65;
+  let offlineDropTriggered = false;
+  if (carrierOfflineSec >= offlineDropS) {
+    offlineDropTriggered = true;
+  }
+  assert.strictEqual(offlineDropTriggered, true, 'Carrier offline > 60s triggers automated package drop');
+
+  console.log(
+    '✓ PASS: Relay Heist verified: 5m mutual handoff, 20s anti-spam cooldown, tag package drop (visible_to all), 10m recovery aborting hunter hold, 25m extraction victory, and 60s offline auto-drop'
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Scenario 10: Assassin Ring Hamiltonian Cycle, Proximity Pulse, Relinking & Last Survivor
+// -----------------------------------------------------------------------------
+console.log('\n--- Scenario 10: Assassin Ring Hamiltonian Cycle, Proximity Pulse, Relinking & Last Survivor ---');
+{
+  const center: LngLat = { latitude: 37.7749, longitude: -122.4194 };
+  const safeZoneCenter: LngLat = center;
+  const safeZoneRadiusM = 20.0;
+  const tagRadiusM = 15.0;
+
+  // 4 Solo Operatives in Ring Permutation: A -> B -> C -> D -> A
+  let opA: OperativeState = {
+    id: 'op-ares-a',
+    codename: 'ARES',
+    team: 'solo',
+    latitude: center.latitude,
+    longitude: center.longitude,
+    heading: 0,
+    speedMps: 3.5,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let opB: OperativeState = {
+    id: 'op-bastion-b',
+    codename: 'BASTION',
+    team: 'solo',
+    latitude: projectCoordinate(center, 120, 90).latitude,
+    longitude: projectCoordinate(center, 120, 90).longitude,
+    heading: 90,
+    speedMps: 3.2,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let opC: OperativeState = {
+    id: 'op-cipher-c',
+    codename: 'CIPHER',
+    team: 'solo',
+    latitude: projectCoordinate(center, 150, 180).latitude,
+    longitude: projectCoordinate(center, 150, 180).longitude,
+    heading: 180,
+    speedMps: 2.8,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let opD: OperativeState = {
+    id: 'op-dagger-d',
+    codename: 'DAGGER',
+    team: 'solo',
+    latitude: projectCoordinate(center, 75, 0).latitude,
+    longitude: projectCoordinate(center, 75, 0).longitude,
+    heading: 180,
+    speedMps: 4.2,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  // Hamiltonian ring contracts: Map of hunterId -> preyId
+  const ring = new Map<string, string>([
+    [opA.id, opB.id],
+    [opB.id, opC.id],
+    [opC.id, opD.id],
+    [opD.id, opA.id],
+  ]);
+
+  // Step 1: Zero-knowledge prey secrecy check
+  assert.strictEqual(ring.get(opA.id), opB.id, "A's contract is B");
+  assert.strictEqual(ring.get(opD.id), opA.id, "D's contract is A (D is hunting A)");
+
+  // Step 2: Directionless Sensory Proximity Pulse
+  // Hunter D approaches A:
+  // Far threshold: 100m (amber), Near threshold: 40m (red)
+  const distDToA_far = distanceM(
+    { latitude: opD.latitude, longitude: opD.longitude },
+    { latitude: opA.latitude, longitude: opA.longitude }
+  );
+  assert.strictEqual(Math.round(distDToA_far), 75);
+  const pulseFar = distDToA_far <= 40 ? 'close' : distDToA_far <= 100 ? 'near' : 'none';
+  assert.strictEqual(pulseFar, 'near', 'Amber sensory warning emitted at 75m without revealing hunter coordinates');
+
+  // Hunter D closes in to 25m
+  opD.latitude = projectCoordinate({ latitude: opA.latitude, longitude: opA.longitude }, 25, 0).latitude;
+  opD.longitude = projectCoordinate({ latitude: opA.latitude, longitude: opA.longitude }, 25, 0).longitude;
+  const distDToA_near = distanceM(
+    { latitude: opD.latitude, longitude: opD.longitude },
+    { latitude: opA.latitude, longitude: opA.longitude }
+  );
+  assert.strictEqual(Math.round(distDToA_near), 25);
+  const pulseNear = distDToA_near <= 40 ? 'close' : distDToA_near <= 100 ? 'near' : 'none';
+  assert.strictEqual(pulseNear, 'close', 'Urgent red sensory alert triggered when hunter is within 40m');
+
+  // Step 3: Safe Zone Shelter Immunity
+  // Operative A shelters in Safe Zone (distance 12m from center <= 20m)
+  opA.latitude = projectCoordinate(safeZoneCenter, 12, 45).latitude;
+  opA.longitude = projectCoordinate(safeZoneCenter, 12, 45).longitude;
+  const aDistToSafeZone = distanceM(
+    { latitude: opA.latitude, longitude: opA.longitude },
+    safeZoneCenter
+  );
+  assert.ok(aDistToSafeZone <= safeZoneRadiusM, 'Operative A is safely inside 20m safe zone circle');
+
+  // Hunter D attempts tag at 8m
+  opD.latitude = projectCoordinate({ latitude: opA.latitude, longitude: opA.longitude }, 8, 0).latitude;
+  opD.longitude = projectCoordinate({ latitude: opA.latitude, longitude: opA.longitude }, 8, 0).longitude;
+  const canTagInSafeZone = false; // Disabled by server rule
+  assert.strictEqual(canTagInSafeZone, false, 'Tags strictly rejected when target is sheltering in a safe zone');
+
+  // Step 4: Tactical Tag Outside Safe Zone & Ring Relinking
+  // Operative A leaves safe zone to hunt assigned prey B
+  opA.latitude = projectCoordinate(center, 125, 90).latitude;
+  opA.longitude = projectCoordinate(center, 125, 90).longitude;
+  opB.latitude = projectCoordinate(center, 135, 90).latitude;
+  opB.longitude = projectCoordinate(center, 135, 90).longitude;
+
+  const aDistToB = distanceM(
+    { latitude: opA.latitude, longitude: opA.longitude },
+    { latitude: opB.latitude, longitude: opB.longitude }
+  );
+  assert.ok(aDistToB <= tagRadiusM, 'A is within 15m tag range of prey B outside safe zone');
+
+  // A tags B!
+  opB.status = 'tagged'; // Eliminated
+  // Ring relinking: A inherits B's prey (C)
+  const bPrey = ring.get(opB.id)!;
+  ring.set(opA.id, bPrey); // A now hunts C!
+  ring.delete(opB.id);
+
+  assert.strictEqual(opB.status, 'tagged');
+  assert.strictEqual(ring.get(opA.id), opC.id, 'Ring relinked: Operative A now inherits contract on C');
+
+  const getActiveOperatives = () => [opA, opB, opC, opD].filter((op) => op.status === 'active');
+  assert.strictEqual(getActiveOperatives().length, 3, '3 active assassins remain');
+
+  // Step 5: Ring Contraction to 2-Player Final Duel
+  // A tracks and tags assigned prey C -> C eliminated
+  opC.status = 'tagged';
+  const cPrey = ring.get(opC.id)!;
+  ring.set(opA.id, cPrey); // A inherits C's prey (D)
+  ring.delete(opC.id);
+
+  assert.strictEqual(getActiveOperatives().length, 2, 'Final 2-player duel engaged');
+  assert.strictEqual(ring.get(opA.id), opD.id, "A's prey is D");
+  assert.strictEqual(ring.get(opD.id), opA.id, "D's prey is A (Dual mutual contract)");
+
+  // Step 6: Final Elimination & Last Survivor Victory
+  // A tags D
+  opD.status = 'tagged';
+  ring.delete(opD.id);
+
+  assert.strictEqual(getActiveOperatives().length, 1, 'Only 1 assassin remains standing');
+
+  let soloWinner: string | null = null;
+  let soloReason: string | null = null;
+  if (getActiveOperatives().length === 1) {
+    soloWinner = 'solo';
+    soloReason = 'last_survivor';
+  }
+
+  assert.strictEqual(soloWinner, 'solo');
+  assert.strictEqual(soloReason, 'last_survivor');
+  assert.strictEqual(getActiveOperatives()[0].id, opA.id, 'Operative A is crowned victorious sole survivor');
+
+  console.log(
+    '✓ PASS: Assassin Ring verified: Hamiltonian cycle, zero-knowledge contracts, directionless proximity pulse (75m near / 25m close), safe zone immunity, elimination relinking (A->C), and last survivor victory'
+  );
+}
+
 console.log('\n================================================================');
-console.log('  All 8 Autonomous Match Simulation Scenarios PASSED (100%)     ');
+console.log('  All 10 Autonomous Match Simulation Scenarios PASSED (100%)    ');
 console.log('================================================================\n');

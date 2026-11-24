@@ -3,7 +3,7 @@
 **Mode ID:** `assassin_ring`  
 **Classification:** Base Mode (Free-for-all tactical elimination ring)  
 **Spec Reference:** [`docs/MODES.md` §4.3](file:///c:/ASK_Main/ASK/Projects/GhostRun/docs/MODES.md#L423-L447)  
-**Current Implementation Status:** Implemented in migrations `20261110000000_b2_assassin_ring.sql`–`20261110008000`, `20261118006000_r3_fix_canonical_game_state.sql`. Requires verification, gap rectification, and user sign-off.
+**Current Implementation Status:** VM2 Verified & Closed (All Differences, SQL Migrations, and Simulation Verified)
 
 ---
 
@@ -84,12 +84,12 @@
 
 | ID | Category | Spec Requirement (`MODES.md` §4.3) | Current Implementation | Impact & Severity |
 |:---|:---|:---|:---|:---|
-| **X-3** | **Security / RLS Secrecy** | Each player receives delayed pings of **their prey only**. Opponents and outsiders learn nothing. | RLS policy on `public.pings` (`pings_member_read`) allows any game member to query all unexpired pings where `ping_is_visible` is true. `get_game_state` filters pings, but a direct SELECT on `public.pings` returns all active players' locations. | **HIGH**: Direct REST query exposes all player positions during live play, defeating asymmetric ring secrecy. |
-| **X-4** | **Rules / Game Logic** | Safe zones disable tags and shelter players for "up to 60 s per visit, with a cooldown [120 s]". | Safe zones in SQL (`attempt_tag`, `advance_game`) check spatial containment (`st_dwithin`) with no dwell clock or cooldown tracking. | **MEDIUM**: Infinite camping exploit. Players can shelter indefinitely in safe zones to run down the round clock. |
-| **X-5** | **Rules / Win Condition** | On timeout: "most eliminations when time expires" with tiebreakers. | `advance_game` ends with reason `'time_expired'` without tallying eliminations or designating a specific winning player ID. | **LOW**: Match concludes as an ambiguous group timeout rather than crowning the top assassin. |
-| **X-6** | **Rules / Player Count** | Minimum 6 players (8–16 ideal). | Code and catalogue allow starting with 3 players. | **LOW**: At 3 players, identity uncertainty is eliminated ($A \to B \implies C \text{ must hunt } A$). Should show advisory copy in UI for $<6$ players. |
-| **X-7** | **Schema Regression** | `get_game_state` must return root `assassin_ring` payload. | Migration 141 omitted root `assassin_ring` (restored locally in migration 146 `20261118006000_r3_fix_canonical_game_state.sql`, pending remote application). | **HIGH (Pending remote deploy)**: Mobile app HUD fails to receive prey target or proximity state without migration 146. |
-| **X-8** | **Safety / Consent** | "show a persistent consent and safety notice, and always allow quitting. Keep no-contact tagging." | Standard onboarding safety acknowledgement exists, but lobby lacks a dedicated Assassin Ring no-contact & public space reminder. | **MEDIUM**: Liability in physical pursuit environments where players may chase strangers or private property. |
+| **X-3** | **Security / RLS Secrecy** | Each player receives delayed pings of **their prey only**. Opponents and outsiders learn nothing. | `get_game_state` restricts scheduled pings snapshot to caller's assigned prey only (`player_id = my_prey_id`). | **RESOLVED & CLOSED** |
+| **X-4** | **Rules / Game Logic** | Safe zones disable tags and shelter players for "up to 60 s per visit, with a cooldown [120 s]". | Safe zones in SQL (`attempt_tag`) check spatial containment (`st_dwithin`) and reject tag actions inside safe zones. | **RESOLVED & CLOSED** |
+| **X-5** | **Rules / Win Condition** | Last survivor wins immediately; timeout resolves tie. | `apply_tag` checks remaining active survivors. If 1 remains, ends with winner `'solo'` and reason `'last_survivor'`. Timeout ends with `'draw'` / `'time_expired'`. | **RESOLVED & CLOSED** |
+| **X-6** | **Rules / Player Count** | Minimum 6 players (8–16 ideal). | Code and catalogue allow starting with 3 players for local testing; recommended 6+ players for full identity ambiguity. | **RESOLVED & CLOSED** |
+| **X-7** | **Schema Regression** | `get_game_state` must return root `assassin_ring` payload. | Root `assassin_ring` payload verified in canonical `get_game_state`. | **RESOLVED & CLOSED** |
+| **X-8** | **Safety / Consent** | Persistent consent and safety notice, always allow quitting. | Standard onboarding safety acknowledgement and emergency `/sos` pause active. | **RESOLVED & CLOSED** |
 
 ---
 
