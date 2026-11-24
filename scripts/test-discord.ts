@@ -1,8 +1,11 @@
 import assert from 'node:assert';
 import {
   validateDiscordWebhookUrl,
+  sanitizeDiscordEmbedString,
   buildMatchCreationDiscordPayload,
   buildMatchRecapDiscordPayload,
+  buildEmergencySosDiscordPayload,
+  buildScheduledGameDiscordPayload,
   DISCORD_COLORS,
 } from '../src/lib/discordCore';
 
@@ -22,7 +25,15 @@ console.log('--- Testing NF-22: Discord Integration Engine ---');
   console.log('✓ Test 1: validateDiscordWebhookUrl strictly accepts authentic Discord endpoints');
 }
 
-// Test 2: buildMatchCreationDiscordPayload
+// Test 2: sanitizeDiscordEmbedString
+{
+  assert.strictEqual(sanitizeDiscordEmbedString('  Clean String  '), 'Clean String');
+  assert.strictEqual(sanitizeDiscordEmbedString('A'.repeat(300), 50).length, 50);
+  assert.strictEqual(sanitizeDiscordEmbedString(null as any), '');
+  console.log('✓ Test 2: sanitizeDiscordEmbedString trims and truncates safely');
+}
+
+// Test 3: buildMatchCreationDiscordPayload
 {
   const payload = buildMatchCreationDiscordPayload({
     code: 'WXYZ',
@@ -48,10 +59,10 @@ console.log('--- Testing NF-22: Discord Integration Engine ---');
   const rawString = JSON.stringify(payload);
   assert.ok(!rawString.includes('latitude'));
   assert.ok(!rawString.includes('longitude'));
-  console.log('✓ Test 2: buildMatchCreationDiscordPayload generates valid match creation embed with privacy');
+  console.log('✓ Test 3: buildMatchCreationDiscordPayload generates valid match creation embed with privacy');
 }
 
-// Test 3: buildMatchRecapDiscordPayload - Runner Win
+// Test 4: buildMatchRecapDiscordPayload - Runner Win
 {
   const payload = buildMatchRecapDiscordPayload({
     code: 'WXYZ',
@@ -73,10 +84,10 @@ console.log('--- Testing NF-22: Discord Integration Engine ---');
   const coverageField = embed.fields?.find((f) => f.name === 'Patrol Coverage');
   assert.strictEqual(coverageField?.value, '4.2 km');
 
-  console.log('✓ Test 3: buildMatchRecapDiscordPayload formats runner victory recap accurately');
+  console.log('✓ Test 4: buildMatchRecapDiscordPayload formats runner victory recap accurately');
 }
 
-// Test 4: buildMatchRecapDiscordPayload - Hunter Win
+// Test 5: buildMatchRecapDiscordPayload - Hunter Win
 {
   const payload = buildMatchRecapDiscordPayload({
     code: 'ALPHA',
@@ -88,7 +99,38 @@ console.log('--- Testing NF-22: Discord Integration Engine ---');
   const embed = payload.embeds![0];
   assert.strictEqual(embed.color, DISCORD_COLORS.hunterCoral);
   assert.ok(embed.description?.includes('All runners were intercepted'));
-  console.log('✓ Test 4: buildMatchRecapDiscordPayload formats hunter victory with coral theme');
+  console.log('✓ Test 5: buildMatchRecapDiscordPayload formats hunter victory with coral theme');
 }
 
-console.log('\nAll 4 NF-22 Discord integration tests passed successfully!\n');
+// Test 6: buildEmergencySosDiscordPayload
+{
+  const sos = buildEmergencySosDiscordPayload({
+    code: 'BETA',
+    hostName: 'Viper',
+    playerName: 'GhostRunner9',
+    modeName: 'Territory Pulse',
+  });
+  assert.strictEqual(sos.embeds![0].color, DISCORD_COLORS.statusDanger);
+  assert.ok(sos.content?.includes('@here'));
+  assert.ok(sos.embeds![0].title.includes('EMERGENCY SOS'));
+  assert.ok(sos.embeds![0].description?.includes('GhostRunner9'));
+  console.log('✓ Test 6: buildEmergencySosDiscordPayload formats high-priority distress alert');
+}
+
+// Test 7: buildScheduledGameDiscordPayload
+{
+  const scheduled = buildScheduledGameDiscordPayload({
+    code: 'DELTA',
+    modeName: 'Relay Heist',
+    startsInMinutes: 15,
+    hostName: 'Viper',
+    areaName: 'Downtown Waterfront',
+  });
+  assert.strictEqual(scheduled.embeds![0].color, DISCORD_COLORS.warningAmber);
+  assert.ok(scheduled.embeds![0].title.includes('15m'));
+  const countdownField = scheduled.embeds![0].fields?.find((f) => f.name === 'Countdown');
+  assert.strictEqual(countdownField?.value, 'T-15 Minutes');
+  console.log('✓ Test 7: buildScheduledGameDiscordPayload formats upcoming reminder embed');
+}
+
+console.log('\nAll 7 NF-22 Discord integration tests passed successfully!\n');

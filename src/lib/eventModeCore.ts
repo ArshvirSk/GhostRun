@@ -24,6 +24,15 @@ export interface DelayedSpectatorFrame<T = any> {
   data: T;
 }
 
+export interface EventLeaderboardEntry {
+  rank: number;
+  id: string;
+  name: string;
+  team: string;
+  score: number;
+  status: string;
+}
+
 /**
  * Generates isolated Realtime Broadcast topic names
  */
@@ -50,6 +59,57 @@ export function validateEventConfig(config: Partial<EventMatchConfig>): {
     return { valid: false, error: 'Spectator feed delay must be at least 30 seconds to prevent ghosting.' };
   }
   return { valid: true };
+}
+
+/**
+ * Checks if a given user is designated as an event referee.
+ */
+export function isReferee(userId: string, refereeUserIds: string[] = []): boolean {
+  if (!userId || !refereeUserIds || refereeUserIds.length === 0) return false;
+  return refereeUserIds.includes(userId);
+}
+
+/**
+ * Authorizes referee operational commands (pause, resume, confirm_tag, emergency_stop).
+ */
+export function canRefereePerformAction(
+  action: 'pause' | 'resume' | 'confirm_tag' | 'emergency_stop',
+  isUserReferee: boolean
+): boolean {
+  return Boolean(isUserReferee);
+}
+
+/**
+ * Builds a sorted tactical leaderboard for large-scale operations.
+ */
+export function buildEventLeaderboard(
+  players: Array<{ id: string; name: string; team: string; score: number; status: string }>
+): EventLeaderboardEntry[] {
+  const sorted = [...players].sort((a, b) => b.score - a.score);
+  return sorted.map((p, index) => ({
+    rank: index + 1,
+    id: p.id,
+    name: p.name,
+    team: p.team,
+    score: p.score,
+    status: p.status,
+  }));
+}
+
+/**
+ * Computes event capacity and utilization metrics.
+ */
+export function calculateEventCapacityMetrics(
+  registeredCount: number,
+  maxPlayers: number
+): { availableSlots: number; isFull: boolean; utilizationPercent: number } {
+  const safeMax = Math.max(1, maxPlayers);
+  const count = Math.max(0, registeredCount);
+  const availableSlots = Math.max(0, safeMax - count);
+  const isFull = count >= safeMax;
+  const utilizationPercent = Math.min(100, Math.round((count / safeMax) * 100));
+
+  return { availableSlots, isFull, utilizationPercent };
 }
 
 /**

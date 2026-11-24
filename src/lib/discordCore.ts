@@ -35,6 +35,7 @@ export const DISCORD_COLORS = {
   hunterCoral: 0xff8a75, // 16747125
   spectralViolet: 0xb8a3ff, // 12100607
   statusDanger: 0xf87171, // 16281969
+  warningAmber: 0xfbbf24, // 16500516
 };
 
 /**
@@ -48,6 +49,14 @@ export function validateDiscordWebhookUrl(url: string): boolean {
 }
 
 /**
+ * Sanitizes an embed string field to prevent markdown injection or excessive length.
+ */
+export function sanitizeDiscordEmbedString(str: string, maxLength = 256): string {
+  if (!str || typeof str !== 'string') return '';
+  return str.trim().slice(0, maxLength);
+}
+
+/**
  * Build a Discord announcement for a newly hosted match
  */
 export function buildMatchCreationDiscordPayload(params: {
@@ -57,21 +66,29 @@ export function buildMatchCreationDiscordPayload(params: {
   areaName?: string | null;
   joinUrl?: string;
 }): DiscordWebhookPayload {
+  const code = sanitizeDiscordEmbedString(params.code.toUpperCase(), 16);
+  const modeName = sanitizeDiscordEmbedString(params.modeName, 64);
+  const hostName = sanitizeDiscordEmbedString(params.hostName, 64);
+
   const fields: DiscordEmbedField[] = [
-    { name: 'Operation Code', value: `\`${params.code.toUpperCase()}\``, inline: true },
-    { name: 'Tactical Doctrine', value: params.modeName, inline: true },
-    { name: 'Host Operative', value: params.hostName, inline: true },
+    { name: 'Operation Code', value: `\`${code}\``, inline: true },
+    { name: 'Tactical Doctrine', value: modeName, inline: true },
+    { name: 'Host Operative', value: hostName, inline: true },
   ];
 
   if (params.areaName) {
-    fields.push({ name: 'Rendezvous Area', value: params.areaName, inline: false });
+    fields.push({
+      name: 'Rendezvous Area',
+      value: sanitizeDiscordEmbedString(params.areaName, 128),
+      inline: false,
+    });
   }
 
-  const joinLink = params.joinUrl || `https://ghostrun.app/join?code=${params.code.toUpperCase()}`;
+  const joinLink = params.joinUrl || `https://ghostrun.app/join?code=${code}`;
 
   const embed: DiscordEmbed = {
     title: 'GhostRun Operation Mobilized',
-    description: `A new match is assembling. Tap below or enter code **${params.code.toUpperCase()}** in the GhostRun app to deploy.`,
+    description: `A new match is assembling. Tap below or enter code **${code}** in the GhostRun app to deploy.`,
     url: joinLink,
     color: DISCORD_COLORS.primaryLime,
     fields,
@@ -98,35 +115,108 @@ export function buildMatchRecapDiscordPayload(params: {
 }): DiscordWebhookPayload {
   const isRunnerWin = params.winner.toLowerCase().includes('runner');
   const durationMin = Math.floor(params.durationSeconds / 60);
-  const durationSec = Math.floor(params.durationSeconds % 60);
-  const durationStr = `${durationMin}m ${durationSec}s`;
+  const durationSec = params.durationSeconds % 60;
+  const timeStr = `${durationMin}m ${durationSec}s`;
 
   const fields: DiscordEmbedField[] = [
-    { name: 'Mode', value: params.modeName, inline: true },
-    { name: 'Duration', value: durationStr, inline: true },
-    { name: 'Victorious Unit', value: isRunnerWin ? 'RUNNERS (Evaded)' : 'HUNTERS (Intercepted)', inline: true },
+    { name: 'Outcome', value: isRunnerWin ? 'RUNNER EVASION VICTORY' : 'HUNTER INTERCEPTION VICTORY', inline: true },
+    { name: 'Duration', value: timeStr, inline: true },
   ];
 
-  if (params.totalDistanceMeters) {
-    const km = (params.totalDistanceMeters / 1000).toFixed(1);
-    fields.push({ name: 'Patrol Coverage', value: `${km} km`, inline: true });
+  if (typeof params.totalDistanceMeters === 'number' && params.totalDistanceMeters > 0) {
+    fields.push({
+      name: 'Patrol Coverage',
+      value: `${(params.totalDistanceMeters / 1000).toFixed(1)} km`,
+      inline: true,
+    });
   }
 
-  if (params.topSpeedKmh) {
-    fields.push({ name: 'Top Sprint', value: `${params.topSpeedKmh} km/h`, inline: true });
+  if (typeof params.topSpeedKmh === 'number' && params.topSpeedKmh > 0) {
+    fields.push({
+      name: 'Peak Velocity',
+      value: `${params.topSpeedKmh.toFixed(1)} km/h`,
+      inline: true,
+    });
   }
 
   const embed: DiscordEmbed = {
-    title: `Debrief: Operation ${params.code.toUpperCase()}`,
-    description: `Mission completed. ${isRunnerWin ? 'The ghosts evaded hunter radar.' : 'All runners were intercepted.'}`,
+    title: `Operation ${params.code.toUpperCase()} — Mission Debrief`,
+    description: isRunnerWin
+      ? 'Runners successfully evaded hunter radar and extracted safely.'
+      : 'All runners were intercepted and tagged before mission clock expiration.',
     color: isRunnerWin ? DISCORD_COLORS.primaryLime : DISCORD_COLORS.hunterCoral,
     fields,
-    footer: { text: 'GhostRun Tactical Network' },
+    footer: { text: 'GhostRun Tactical Debrief · ghostrun.app' },
     timestamp: new Date().toISOString(),
   };
 
   return {
-    username: 'GhostRun Radar Command',
+    username: 'GhostRun Tactical Debrief',
+    embeds: [embed],
+  };
+}
+
+/**
+ * Build a high-priority Emergency SOS alert for community channels
+ */
+export function buildEmergencySosDiscordPayload(params: {
+  code: string;
+  hostName: string;
+  playerName: string;
+  modeName: string;
+  timestamp?: string;
+}): DiscordWebhookPayload {
+  const embed: DiscordEmbed = {
+    title: 'EMERGENCY SOS ALERT',
+    description: `Operative **${params.playerName}** has triggered an emergency distress beacon in Operation **${params.code.toUpperCase()}** (${params.modeName}). Teammates and organizers have been notified.`,
+    color: DISCORD_COLORS.statusDanger,
+    fields: [
+      { name: 'Operation', value: `\`${params.code.toUpperCase()}\``, inline: true },
+      { name: 'Operative in Distress', value: params.playerName, inline: true },
+      { name: 'Host', value: params.hostName, inline: true },
+    ],
+    footer: { text: 'GhostRun Safety Protocol · ghostrun.app' },
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  };
+
+  return {
+    username: 'GhostRun Safety Monitor',
+    content: '@here High-priority operative distress beacon triggered.',
+    embeds: [embed],
+  };
+}
+
+/**
+ * Build a scheduled match upcoming reminder embed
+ */
+export function buildScheduledGameDiscordPayload(params: {
+  code: string;
+  modeName: string;
+  startsInMinutes: number;
+  hostName: string;
+  areaName?: string;
+}): DiscordWebhookPayload {
+  const fields: DiscordEmbedField[] = [
+    { name: 'Doctrine', value: params.modeName, inline: true },
+    { name: 'Countdown', value: `T-${params.startsInMinutes} Minutes`, inline: true },
+    { name: 'Host', value: params.hostName, inline: true },
+  ];
+
+  if (params.areaName) {
+    fields.push({ name: 'Location Area', value: params.areaName, inline: false });
+  }
+
+  const embed: DiscordEmbed = {
+    title: `Scheduled Operation Mobilizing in ${params.startsInMinutes}m`,
+    description: `Operatives, prepare for deployment. Lobby **${params.code.toUpperCase()}** will activate shortly.`,
+    color: DISCORD_COLORS.warningAmber,
+    fields,
+    footer: { text: 'GhostRun Scheduled Operations · ghostrun.app' },
+    timestamp: new Date().toISOString(),
+  };
+
+  return {
+    username: 'GhostRun Operations Dispatch',
     embeds: [embed],
   };
 }
