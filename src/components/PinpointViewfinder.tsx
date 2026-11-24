@@ -7,6 +7,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Text } from '../ui/Text';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -32,6 +33,7 @@ export function PinpointViewfinder({
   onClose,
   onSubmitShot,
 }: PinpointViewfinderProps) {
+  const [permission, requestPermission] = useCameraPermissions();
   const [ghostOpacity, setGhostOpacity] = useState<number>(0.5);
 
   if (!visible) return null;
@@ -69,14 +71,24 @@ export function PinpointViewfinder({
 
       {/* 2. Camera Viewfinder Area with Ghost Overlay */}
       <View style={styles.viewfinderFrame}>
-        {/* Placeholder simulated camera background */}
-        <View style={styles.cameraBackground}>
-          <View style={styles.reticleCrosshair}>
-            <View style={styles.reticleLineH} />
-            <View style={styles.reticleLineV} />
-            <View style={styles.reticleCenterDot} />
+        {/* Live Camera View with Simulated Fallback */}
+        {permission?.granted ? (
+          <CameraView style={StyleSheet.absoluteFill} facing="back" />
+        ) : (
+          <View style={styles.cameraBackground}>
+            <View style={styles.reticleCrosshair}>
+              <View style={styles.reticleLineH} />
+              <View style={styles.reticleLineV} />
+              <View style={styles.reticleCenterDot} />
+            </View>
+            <TouchableOpacity
+              style={styles.permissionPromptBtn}
+              onPress={() => void requestPermission()}
+            >
+              <Text style={styles.permissionPromptText}>ENABLE LIVE CAMERA</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        )}
 
         {/* Semi-transparent onion skin ghost image */}
         {Boolean(targetPhotoUrl) && (
@@ -214,6 +226,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  permissionPromptBtn: {
+    position: 'absolute',
+    bottom: 20,
+    backgroundColor: 'rgba(0, 240, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: '#00F0FF',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  permissionPromptText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 10,
+    color: '#00F0FF',
+    letterSpacing: 0.8,
   },
   ghostImage: {
     ...StyleSheet.absoluteFill,
