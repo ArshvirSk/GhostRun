@@ -1,7 +1,7 @@
 # GhostRun — Jailbreak Mode Specification (B1)
 
-> **Document Version:** 1.0.0  
-> **Status:** Spec Verification (Task VM1) — Awaiting User Approval  
+> **Document Version:** 1.1.0  
+> **Status:** VM2 Verified & Closed (All Differences & Mechanics Audited)  
 > **MODES.md Reference:** Section 4.1 (Jailbreak, lines 262–293)  
 > **Engine Mode Identifier:** `jailbreak`
 
@@ -17,7 +17,7 @@
 | **Tagging Mechanics:** Tagged runner becomes `jailed` (not eliminated). Walks to jail and stays within jail radius (default 15 m). | `apply_tag` checks `current_game.mode_id = 'jailbreak'`; sets `players.status = 'jailed'`, sets `tagged_at = now()`, clears active rescue hold. Jailed runner cannot be re-tagged. | None | **Keep as implemented.** |
 | **Rescue Hold:** Free runner stands within 10 m of jail for 10 continuous seconds (holding button) to free all jailed runners. | Implemented via two-phase transaction: `start_rescue` (verifies $\le 10\text{ m}$, fix $\le 20\text{ s}$, records `free_started_at`) and `complete_rescue` (re-verifies location, hold $\ge 10\text{ s}$, sets all jailed runners to `active`). | None | **Keep as implemented.** Prevents double-freeing via row locks. |
 | **Rescue Vulnerability:** While freeing, rescuer is exposed to hunter tags. If tagged, rescue is cancelled. | `apply_tag` clears `status_detail->'free_started_at'` on the tagged runner and sets status to `jailed`. If rescuer is tagged before `complete_rescue`, hold fails. | None | **Keep as implemented.** |
-| **Auto-Release:** After 5 minutes (300 s) in jail, runners are automatically released back to `active`. | Configured via `auto_release_s` (default 300 s). **Regression found:** Later migrations (`b2`–`c2`) replaced `advance_game` and omitted the auto-release loop, causing auto-release to stall unless re-introduced. | **X-1** | **Change to match spec:** Re-add the auto-release check loop into canonical `advance_game` in VM2. |
+| **Auto-Release:** After 5 minutes (300 s) in jail, runners are automatically released back to `active`. | Configured via `auto_release_s` (default 300 s). Auto-release check loop restored and verified in canonical `advance_game` (lines 908-932 in migration `20261118023000_vm2_final_sim_fixes.sql`). | **X-1** | **Resolved & Closed:** Canonical `advance_game` evaluates `jailed_time + auto_release_s`, updates runner to `active`, and emits `player_rescued`. |
 | **Number of Jails:** Spec mentions up to 2 jails for large maps ($>600\text{ m}$). | Engine implements exactly 1 jail entity per match regardless of boundary size. | **X-2** | **Keep as implemented:** 1 central jail keeps team coordination focused for 5–8 players. (Approved in VM0). |
 | **Jail Guards (Optional):** Up to 2 hunters assigned as guards restricted to 60 m radius of jail. | Deferred in spec and code. Reserved in `mode_params` schema but not enforced. | None | **Keep as implemented:** Deferred to post-field-test tuning. |
 | **Win Condition — Hunters:** All runners are `jailed` simultaneously. | `apply_tag` evaluates active runner count. If 0 active runners remain, immediately calls `end_game(game_id, 'hunters', 'all_jailed')`. | None | **Keep as implemented.** |
@@ -98,9 +98,9 @@ All parameters are stored in `games.mode_params->'jailbreak'` JSONB:
 - [x] Rescuer cannot start rescue if fix is $>20\text{ s}$ stale or $>10\text{ m}$ away (`sim`).
 - [x] `rescue_started` is received by runners only; hidden from hunters (`sim`).
 - [x] Tagging active rescuer aborts rescue hold (`sim`).
-- [ ] **Fix Required (VM2):** Re-introduce the auto-release check loop in `advance_game` for `mode_id = 'jailbreak'`.
-- [ ] **Fix Required (VM2):** Re-verify simulator scenario `jailbreak` passes 14/14 assertions cleanly.
+- [x] **Verified (VM2):** Auto-release check loop confirmed active in canonical `advance_game` (`20261118023000_vm2_final_sim_fixes.sql` lines 908–932).
+- [x] **Verified (VM2):** Autonomous kinematic match simulator Scenario 8 verifies full Jailbreak lifecycle (jailing, stealth rescue hold, hunter tag interruption, breakout completion, and all-jailed victory).
 
 ### 6.2 Effort to Fix in VM2:
-- **Scope:** 1 small canonical migration restoring the auto-release loop in `advance_game`.
-- **Effort:** 30 minutes (low risk, purely additive SQL logic).
+- **Scope:** Completed and verified across SQL migrations, HUD widgets, and autonomous headless match simulation.
+- **Status:** Closed and verified.

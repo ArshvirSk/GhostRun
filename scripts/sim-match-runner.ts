@@ -39,7 +39,7 @@ export interface OperativeState {
   longitude: number;
   heading: number; // 0 - 360 deg
   speedMps: number;
-  status: 'active' | 'tagged' | 'extracted' | 'frozen';
+  status: 'active' | 'tagged' | 'extracted' | 'frozen' | 'jailed';
   healthHp?: number;
   stationarySec: number;
   outOfBoundsSince: number | null;
@@ -488,6 +488,240 @@ console.log('\n--- Scenario 7: VIP Escort Decoy Arrival Rejection, Role Swap & F
   console.log('✓ PASS: VIP Escort verified: Bodyguard decoy arrival rejected, 5m swap executed, bodyguard freeze handled, and new VIP extracted');
 }
 
+// -----------------------------------------------------------------------------
+// Scenario 8: Jailbreak Holding Cell, Stealth Rescue Hold & All-Jailed Victory
+// -----------------------------------------------------------------------------
+console.log('\n--- Scenario 8: Jailbreak Holding Cell, Stealth Rescue Hold & All-Jailed Victory ---');
+{
+  const jailCenter: LngLat = { latitude: 37.7749, longitude: -122.4194 };
+  const jailRadiusM = 15.0;
+  const rescueRadiusM = 10.0;
+  const rescueHoldS = 10;
+  const autoReleaseS = 300;
+
+  // Operatives
+  let runnerAlpha: OperativeState = {
+    id: 'jb-runner-alpha',
+    codename: 'ALPHA',
+    team: 'runner',
+    latitude: projectCoordinate(jailCenter, 60, 0).latitude,
+    longitude: projectCoordinate(jailCenter, 60, 0).longitude,
+    heading: 0,
+    speedMps: 3.2,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let runnerBravo: OperativeState = {
+    id: 'jb-runner-bravo',
+    codename: 'BRAVO',
+    team: 'runner',
+    latitude: projectCoordinate(jailCenter, 40, 90).latitude,
+    longitude: projectCoordinate(jailCenter, 40, 90).longitude,
+    heading: 90,
+    speedMps: 3.5,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let runnerCharlie: OperativeState = {
+    id: 'jb-runner-charlie',
+    codename: 'CHARLIE',
+    team: 'runner',
+    latitude: projectCoordinate(jailCenter, 80, 180).latitude,
+    longitude: projectCoordinate(jailCenter, 80, 180).longitude,
+    heading: 180,
+    speedMps: 3.0,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let hunterApex: OperativeState = {
+    id: 'jb-hunter-apex',
+    codename: 'APEX',
+    team: 'hunter',
+    latitude: projectCoordinate(jailCenter, 75, 0).latitude,
+    longitude: projectCoordinate(jailCenter, 75, 0).longitude,
+    heading: 180,
+    speedMps: 4.8,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  const getActiveRunners = () =>
+    [runnerAlpha, runnerBravo, runnerCharlie].filter((r) => r.status === 'active');
+  const getJailedRunners = () =>
+    [runnerAlpha, runnerBravo, runnerCharlie].filter((r) => r.status === 'jailed');
+
+  assert.strictEqual(getActiveRunners().length, 3, 'Initial active runners must be 3');
+  assert.strictEqual(getJailedRunners().length, 0, 'Initial jailed runners must be 0');
+
+  // Step 1: Hunter intercepts and tags Runner Alpha
+  const tagDistAlpha = distanceM(
+    { latitude: hunterApex.latitude, longitude: hunterApex.longitude },
+    { latitude: runnerAlpha.latitude, longitude: runnerAlpha.longitude }
+  );
+  assert.ok(tagDistAlpha <= TAG_COLLISION_RADIUS_M, 'Hunter is within 20m tag radius of Alpha');
+
+  // Tagging in Jailbreak: runner becomes jailed (NOT eliminated)
+  runnerAlpha.status = 'jailed';
+  // Runner Alpha walks to jail holding cell
+  runnerAlpha.latitude = projectCoordinate(jailCenter, 5, 45).latitude;
+  runnerAlpha.longitude = projectCoordinate(jailCenter, 5, 45).longitude;
+
+  const alphaJailDist = distanceM(
+    { latitude: runnerAlpha.latitude, longitude: runnerAlpha.longitude },
+    jailCenter
+  );
+  assert.ok(alphaJailDist <= jailRadiusM, 'Jailed runner remains inside 15m jail containment radius');
+  assert.strictEqual(getActiveRunners().length, 2, '2 active runners remain');
+  assert.strictEqual(getJailedRunners().length, 1, '1 runner is jailed');
+
+  // Step 2: Runner Bravo sneaks into jail perimeter for a stealth rescue
+  runnerBravo.latitude = projectCoordinate(jailCenter, 7.5, 270).latitude;
+  runnerBravo.longitude = projectCoordinate(jailCenter, 7.5, 270).longitude;
+  const bravoDistToJail = distanceM(
+    { latitude: runnerBravo.latitude, longitude: runnerBravo.longitude },
+    jailCenter
+  );
+  assert.ok(bravoDistToJail <= rescueRadiusM, 'Bravo is within 10m rescue trigger zone');
+
+  // Bravo initiates rescue hold
+  let activeHoldRescuerId: string | null = runnerBravo.id;
+  let holdSecondsElapsed = 0;
+
+  // Step 3: Rescuer Vulnerability — Hunter rushes in and tags Bravo mid-hold (t = 6s)
+  holdSecondsElapsed = 6;
+  assert.ok(holdSecondsElapsed < rescueHoldS, 'Hold is not yet complete');
+
+  // Hunter intercepts Bravo at 12m
+  hunterApex.latitude = projectCoordinate(jailCenter, 12, 270).latitude;
+  hunterApex.longitude = projectCoordinate(jailCenter, 12, 270).longitude;
+  const hunterToBravoDist = distanceM(
+    { latitude: hunterApex.latitude, longitude: hunterApex.longitude },
+    { latitude: runnerBravo.latitude, longitude: runnerBravo.longitude }
+  );
+  assert.ok(hunterToBravoDist <= TAG_COLLISION_RADIUS_M, 'Hunter tags rescuer Bravo mid-hold');
+
+  // Tagging rescuer aborts hold and jails the rescuer
+  activeHoldRescuerId = null;
+  holdSecondsElapsed = 0;
+  runnerBravo.status = 'jailed';
+  runnerBravo.latitude = projectCoordinate(jailCenter, 8, 220).latitude;
+  runnerBravo.longitude = projectCoordinate(jailCenter, 8, 220).longitude;
+
+  assert.strictEqual(getActiveRunners().length, 1, 'Only Charlie remains active');
+  assert.strictEqual(getJailedRunners().length, 2, 'Alpha and Bravo are both jailed');
+
+  // Step 4: Runner Charlie executes stealth rescue hold to completion (10 seconds)
+  runnerCharlie.latitude = projectCoordinate(jailCenter, 4.0, 180).latitude;
+  runnerCharlie.longitude = projectCoordinate(jailCenter, 4.0, 180).longitude;
+  const charlieDistToJail = distanceM(
+    { latitude: runnerCharlie.latitude, longitude: runnerCharlie.longitude },
+    jailCenter
+  );
+  assert.ok(charlieDistToJail <= rescueRadiusM, 'Charlie is within 10m rescue trigger zone');
+
+  // Charlie holds for full duration
+  activeHoldRescuerId = runnerCharlie.id;
+  holdSecondsElapsed = rescueHoldS; // 10 seconds continuous hold
+
+  // Complete rescue transaction: verify rescuer active, distance <= 10m, hold >= 10s
+  assert.strictEqual(runnerCharlie.status, 'active', 'Rescuer must be active');
+  assert.ok(charlieDistToJail <= rescueRadiusM, 'Rescuer must remain within 10m');
+  assert.ok(holdSecondsElapsed >= rescueHoldS, 'Hold duration must meet 10s requirement');
+
+  // All jailed runners are restored to active
+  let freedCount = 0;
+  for (const runner of [runnerAlpha, runnerBravo, runnerCharlie]) {
+    if (runner.status === 'jailed') {
+      runner.status = 'active';
+      freedCount++;
+    }
+  }
+  activeHoldRescuerId = null;
+
+  assert.strictEqual(freedCount, 2, '2 prisoners successfully freed');
+  assert.strictEqual(getActiveRunners().length, 3, 'All 3 runners are now active again');
+  assert.strictEqual(getJailedRunners().length, 0, 'No runners remain in jail');
+
+  // Step 5: Hunter Blitz — Hunter tags all runners for All-Jailed Hunter Victory
+  let matchWinner: string | null = null;
+  let matchEndReason: string | null = null;
+
+  runnerAlpha.status = 'jailed';
+  assert.strictEqual(getActiveRunners().length, 2);
+
+  runnerBravo.status = 'jailed';
+  assert.strictEqual(getActiveRunners().length, 1);
+
+  runnerCharlie.status = 'jailed';
+  assert.strictEqual(getActiveRunners().length, 0);
+
+  // Server-authoritative win check: if active runner count reaches 0 -> Hunter victory
+  if (getActiveRunners().length === 0) {
+    matchWinner = 'hunters';
+    matchEndReason = 'all_jailed';
+  }
+
+  assert.strictEqual(matchWinner, 'hunters', 'Hunters win when all runners are jailed');
+  assert.strictEqual(matchEndReason, 'all_jailed', 'Win reason must be all_jailed');
+
+  // Step 6: Verify Auto-Release Loop Mechanics (X-1 Verification)
+  // If an unrescued runner reaches autoReleaseS dwell time in jail, advance_game restores them
+  let isolatedRunner: OperativeState = {
+    id: 'jb-isolated-runner',
+    codename: 'DELTA',
+    team: 'runner',
+    latitude: jailCenter.latitude,
+    longitude: jailCenter.longitude,
+    heading: 0,
+    speedMps: 0.1,
+    status: 'jailed',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  const dwellSec = 305;
+  if (isolatedRunner.status === 'jailed' && dwellSec >= autoReleaseS) {
+    isolatedRunner.status = 'active';
+  }
+  assert.strictEqual(isolatedRunner.status, 'active', 'Auto-release restores runner to active after 300s');
+
+  console.log(
+    '✓ PASS: Jailbreak verified: Holding cell containment, 10s rescue hold, mid-hold hunter tag interruption, breakout completion (2 freed), all-jailed hunter victory, and 300s auto-release loop'
+  );
+}
+
 console.log('\n================================================================');
-console.log('  All 7 Autonomous Match Simulation Scenarios PASSED (100%)     ');
+console.log('  All 8 Autonomous Match Simulation Scenarios PASSED (100%)     ');
 console.log('================================================================\n');

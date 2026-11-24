@@ -75,7 +75,8 @@ export const JailbreakRescueButton = memo(function JailbreakRescueButton({
   if (!jail || !ownFix) return null;
 
   const dist = distanceM(ownFix, { longitude: jail.longitude, latitude: jail.latitude });
-  const isNear = dist <= (state.game.mode_params?.jailbreak as any)?.release_radius_m || 10;
+  const releaseRadius = ((state.game.mode_params?.jailbreak as any)?.release_radius_m as number) ?? 10;
+  const isNear = dist <= releaseRadius;
   const jailedCount = state.players.filter((p) => p.team === 'runner' && p.status === 'jailed').length;
 
   if (jailedCount === 0 || !isNear) return null;
@@ -172,8 +173,9 @@ const styles = StyleSheet.create({
   },
   rescueText: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontFamily: 'Archivo-Bold',
     fontSize: 13,
+    letterSpacing: 0.5,
   },
   jailedBanner: {
     marginHorizontal: 16,
