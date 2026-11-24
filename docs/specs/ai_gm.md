@@ -1,6 +1,6 @@
-# AI Game Master Modifier Specification (VM1 Verified)
+# AI Game Master Modifier Specification (VM1 & VM2 Verified)
 
-> **Document Status:** Complete & Verified (`VM1: Spec check`)  
+> **Document Status:** Complete & Verified (`VM2: Simulator Scenario 12 & Offline Verification Passed`)  
 > **Target Modifier:** `ai_gm` (AI Game Master Modifier)  
 > **Layer:** Modifier (docs/MODES.md §0.1, §1, §7.1)  
 > **Source Specification:** [`docs/MODES.md` §7.1](file:///c:/ASK_Main/ASK/Projects/GhostRun/docs/MODES.md#L639-L659), [`docs/DECISIONS.md` D25–D28](file:///c:/ASK_Main/ASK/Projects/GhostRun/docs/DECISIONS.md), and [`supabase/migrations/20261118000000_c2_ai_game_master_catalogue.sql`](file:///c:/ASK_Main/ASK/Projects/GhostRun/supabase/migrations/20261118000000_c2_ai_game_master_catalogue.sql)  

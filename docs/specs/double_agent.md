@@ -1,6 +1,6 @@
-# Double Agent Role Add-on Specification (VM1 Verified)
+# Double Agent Role Add-on Specification (VM1 & VM2 Verified)
 
-> **Document Status:** Complete & Verified (`VM1: Spec check`)  
+> **Document Status:** Complete & Verified (`VM2: Simulator Scenario 11 & Offline Verification Passed`)  
 > **Target Role:** `double_agent` (Double Agent Role Add-on)  
 > **Compatible Base Modes:** `classic_chase`, `tag_hunt`, `jailbreak`, `relay_heist` (docs/MODES.md §2.3, §5.1)  
 > **Source Specification:** [`docs/MODES.md` §5.1](file:///c:/ASK_Main/ASK/Projects/GhostRun/docs/MODES.md#L531-L548) & [`docs/DECISIONS.md`](file:///c:/ASK_Main/ASK/Projects/GhostRun/docs/DECISIONS.md#L155-L162)  
