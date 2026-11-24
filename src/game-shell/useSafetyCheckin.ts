@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { triggerHaptic } from '../motion/haptics';
 
+export * from '../lib/safetyCheckinCore';
+
 interface UseSafetyCheckinOptions {
   gameId: string;
   isLive: boolean;

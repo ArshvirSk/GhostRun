@@ -18,6 +18,17 @@ export function computeHunterCount(totalPlayers: number): number {
 }
 
 /**
+ * Modes where team role rotation is applicable.
+ * Excludes solo duel and free-for-all contract modes like ghost_duel and assassin_ring.
+ */
+export const NON_ROTATABLE_MODES = new Set(['ghost_duel', 'assassin_ring']);
+
+export function isRoleRotationApplicable(modeId?: string | null): boolean {
+  if (!modeId) return true;
+  return !NON_ROTATABLE_MODES.has(modeId);
+}
+
+/**
  * Rotates roles systematically so previous hunters become runners,
  * and previous runners step into the hunter squad.
  */
@@ -54,4 +65,71 @@ export function rotatePlayerRoles(players: PlayerAssignment[]): PlayerAssignment
   }
 
   return result;
+}
+
+/**
+ * Randomizes team assignments while strictly maintaining the hunter ratio guard.
+ * Accepts an optional deterministic PRNG for test reproducibility.
+ */
+export function randomizeTeams(
+  players: PlayerAssignment[],
+  rng: () => number = Math.random
+): PlayerAssignment[] {
+  if (players.length === 0) return [];
+  const targetHunters = computeHunterCount(players.length);
+
+  // Fisher-Yates shuffle copy
+  const shuffled = [...players];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const temp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = temp;
+  }
+
+  const assigned = new Set<string>();
+  for (let i = 0; i < targetHunters; i++) {
+    assigned.add(shuffled[i].id);
+  }
+
+  return players.map((p) => ({
+    ...p,
+    team: assigned.has(p.id) ? 'hunter' : 'runner',
+  }));
+}
+
+/**
+ * Fair role rotation accounting for multi-round career hunter counts.
+ * Prioritizes players with the fewest historical rounds as hunter.
+ */
+export function rotatePlayerRolesWithHistory(
+  players: PlayerAssignment[],
+  hunterCountHistory: Record<string, number> = {}
+): PlayerAssignment[] {
+  if (players.length < 2) return players.map((p) => ({ ...p }));
+
+  const targetHunters = computeHunterCount(players.length);
+
+  // Sort candidates:
+  // 1. Current runners prioritized over current hunters
+  // 2. Lowest historical hunter count first
+  // 3. Stable ID tiebreak
+  const candidates = [...players].sort((a, b) => {
+    if (a.team !== b.team) {
+      return a.team === 'runner' ? -1 : 1;
+    }
+    const countA = hunterCountHistory[a.user_id] ?? 0;
+    const countB = hunterCountHistory[b.user_id] ?? 0;
+    if (countA !== countB) {
+      return countA - countB;
+    }
+    return a.id.localeCompare(b.id);
+  });
+
+  const nextHunterIds = new Set(candidates.slice(0, targetHunters).map((p) => p.id));
+
+  return players.map((p) => ({
+    ...p,
+    team: nextHunterIds.has(p.id) ? 'hunter' : 'runner',
+  }));
 }
