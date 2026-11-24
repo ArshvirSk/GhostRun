@@ -43,6 +43,20 @@ const BLOCKED_WORDS = [
 ];
 
 /**
+ * Finds a quick chip by ID.
+ */
+export function getRadioQuickChip(id: string): RadioQuickChip | undefined {
+  return RADIO_QUICK_CHIPS.find((c) => c.id === id);
+}
+
+/**
+ * Returns true if an ID matches an approved canonical tactical chip.
+ */
+export function isRadioQuickChip(id: string): boolean {
+  return RADIO_QUICK_CHIPS.some((c) => c.id === id);
+}
+
+/**
  * Checks if a message body passes sanity and basic moderation rules.
  */
 export function sanitizeRadioMessage(raw: string): {
@@ -133,4 +147,44 @@ export function filterBlockedMessages(
 ): TeamMessage[] {
   if (!blockedUserIds || blockedUserIds.size === 0) return messages;
   return messages.filter((m) => !blockedUserIds.has(m.sender_user_id));
+}
+
+/**
+ * Filters out messages that have been reported by the local user.
+ */
+export function filterReportedMessages(
+  messages: TeamMessage[],
+  reportedMessageIds: Set<string>
+): TeamMessage[] {
+  if (!reportedMessageIds || reportedMessageIds.size === 0) return messages;
+  return messages.filter((m) => !reportedMessageIds.has(m.id));
+}
+
+/**
+ * Builds a structured TeamMessage for a tactical quick chip.
+ */
+export function buildRadioChipMessage(params: {
+  gameId: string;
+  team: string;
+  playerId: string;
+  userId: string;
+  userName: string;
+  chipId: string;
+  id?: string;
+  createdAt?: string;
+}): TeamMessage | null {
+  const chip = getRadioQuickChip(params.chipId);
+  if (!chip) return null;
+
+  return {
+    id: params.id ?? `chip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    game_id: params.gameId,
+    team: params.team,
+    sender_player_id: params.playerId,
+    sender_user_id: params.userId,
+    sender_name: params.userName,
+    kind: 'chip',
+    body: chip.label,
+    created_at: params.createdAt ?? new Date().toISOString(),
+  };
 }

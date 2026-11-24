@@ -24,6 +24,73 @@ export interface RoundCardMetrics {
   shareTrailConsent: boolean;
 }
 
+export interface TrailEligibility {
+  eligible: boolean;
+  reason: 'consent_denied' | 'insufficient_points' | 'insufficient_distance' | 'ok';
+}
+
+export interface GeoBounds {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
+export interface PrivacyAuditSummary {
+  totalDistanceM: number;
+  trimmedDistanceM: number;
+  privacyBufferM: number;
+  isRedacted: boolean;
+  reason: string;
+}
+
+/**
+ * Checks whether a route path qualifies for sharing given user consent and total distance.
+ */
+export function isTrailEligibleForSharing(
+  path: LngLat[] | undefined | null,
+  shareTrailConsent: boolean
+): TrailEligibility {
+  if (!shareTrailConsent) {
+    return { eligible: false, reason: 'consent_denied' };
+  }
+  if (!path || path.length < 2) {
+    return { eligible: false, reason: 'insufficient_points' };
+  }
+
+  let totalDist = 0;
+  for (let i = 1; i < path.length; i++) {
+    totalDist += distanceM(path[i - 1], path[i]);
+  }
+
+  if (totalDist < MIN_SHAREABLE_DISTANCE_METERS) {
+    return { eligible: false, reason: 'insufficient_distance' };
+  }
+
+  return { eligible: true, reason: 'ok' };
+}
+
+/**
+ * Computes tight latitude/longitude bounding box for a path.
+ */
+export function calculateTrailGeoBounds(path: LngLat[]): GeoBounds | null {
+  if (!path || path.length === 0) return null;
+
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+
+  for (const pt of path) {
+    if (pt.latitude < minLat) minLat = pt.latitude;
+    if (pt.latitude > maxLat) maxLat = pt.latitude;
+    if (pt.longitude < minLng) minLng = pt.longitude;
+    if (pt.longitude > maxLng) maxLng = pt.longitude;
+  }
+
+  return { minLat, maxLat, minLng, maxLng };
+}
+
 /**
  * Trims the first and last `trimMeters` from a route path based on cumulative distance.
  */
@@ -70,6 +137,39 @@ export function trimTrailPrivacy(
     trimmedPath: trimmed,
     originalDistanceM: Math.round(totalDist),
     trimmedDistanceM: Math.round(Math.max(0, endCutoff - startCutoff)),
+  };
+}
+
+/**
+ * Generates an executive privacy report for UI inspection.
+ */
+export function generatePrivacyAuditSummary(
+  path: LngLat[],
+  shareTrailConsent: boolean,
+  trimMeters: number = PRIVACY_TRIM_METERS
+): PrivacyAuditSummary {
+  const eligibility = isTrailEligibleForSharing(path, shareTrailConsent);
+  if (!eligibility.eligible) {
+    const trimmed = trimTrailPrivacy(path, trimMeters);
+    return {
+      totalDistanceM: trimmed.originalDistanceM,
+      trimmedDistanceM: 0,
+      privacyBufferM: trimMeters,
+      isRedacted: true,
+      reason:
+        eligibility.reason === 'consent_denied'
+          ? 'Player withheld trail sharing consent (Confidential)'
+          : 'Total route length under 350m threshold (Redacted to prevent address inference)',
+    };
+  }
+
+  const result = trimTrailPrivacy(path, trimMeters);
+  return {
+    totalDistanceM: result.originalDistanceM,
+    trimmedDistanceM: result.trimmedDistanceM,
+    privacyBufferM: trimMeters,
+    isRedacted: false,
+    reason: `Initial and terminal ${trimMeters}m buffers trimmed for home/destination privacy`,
   };
 }
 

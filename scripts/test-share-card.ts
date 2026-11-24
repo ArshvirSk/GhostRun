@@ -1,6 +1,9 @@
 import {
   trimTrailPrivacy,
   formatRoundCardShareText,
+  isTrailEligibleForSharing,
+  calculateTrailGeoBounds,
+  generatePrivacyAuditSummary,
   PRIVACY_TRIM_METERS,
   MIN_SHAREABLE_DISTANCE_METERS,
 } from '../src/lib/roundCard';
@@ -55,7 +58,37 @@ assert(
   'Trimmed distance is strictly smaller than original distance'
 );
 
-// Test 4: Share text formatting (with trail consent)
+// Test 4: Trail eligibility for sharing
+assert(!isTrailEligibleForSharing(longPath, false).eligible, 'Ineligible when consent is false');
+assert(isTrailEligibleForSharing(longPath, false).reason === 'consent_denied', 'Reason is consent_denied');
+assert(!isTrailEligibleForSharing([], true).eligible, 'Ineligible with empty points');
+assert(isTrailEligibleForSharing([], true).reason === 'insufficient_points', 'Reason is insufficient_points');
+assert(!isTrailEligibleForSharing(shortPath, true).eligible, 'Ineligible when path < 350m');
+assert(isTrailEligibleForSharing(shortPath, true).reason === 'insufficient_distance', 'Reason is insufficient_distance');
+assert(isTrailEligibleForSharing(longPath, true).eligible, 'Eligible with long path and consent');
+assert(isTrailEligibleForSharing(longPath, true).reason === 'ok', 'Reason is ok');
+
+// Test 5: Geo bounds calculation
+const bounds = calculateTrailGeoBounds(longPath);
+assert(bounds !== null, 'Bounds calculated for valid path');
+assert(bounds?.minLat === 37.7749, 'minLat matches origin');
+assert(bounds?.maxLat === 37.7749 + 0.010, 'maxLat matches final point');
+assert(calculateTrailGeoBounds([]) === null, 'Empty path returns null bounds');
+
+// Test 6: Privacy audit summary
+const summaryRedacted = generatePrivacyAuditSummary(shortPath, true);
+assert(summaryRedacted.isRedacted, 'Short path marked as redacted');
+assert(summaryRedacted.reason.includes('350m threshold'), 'Mentions 350m threshold');
+
+const summaryConsentDenied = generatePrivacyAuditSummary(longPath, false);
+assert(summaryConsentDenied.isRedacted, 'No consent marked as redacted');
+assert(summaryConsentDenied.reason.includes('Confidential'), 'Mentions Confidential');
+
+const summaryApproved = generatePrivacyAuditSummary(longPath, true);
+assert(!summaryApproved.isRedacted, 'Long path with consent not redacted');
+assert(summaryApproved.trimmedDistanceM > 0, 'Trimmed distance is positive');
+
+// Test 7: Share text formatting (with trail consent)
 const textWithTrail = formatRoundCardShareText({
   modeName: 'Classic Chase',
   outcome: 'victorious',
@@ -72,7 +105,7 @@ assert(textWithTrail.includes('12:34'), 'Formats duration into mm:ss');
 assert(textWithTrail.includes('2.5 km'), 'Formats distance to 1 decimal km');
 assert(textWithTrail.includes('Privacy-trimmed (150m buffer)'), 'Includes privacy-trimmed notice');
 
-// Test 5: Share text formatting (without trail consent C3)
+// Test 8: Share text formatting (without trail consent C3)
 const textConfidential = formatRoundCardShareText({
   modeName: 'Tag Hunt',
   outcome: 'completed',

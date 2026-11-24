@@ -14,6 +14,78 @@ export const MAX_ACCURACY_THRESHOLD_M = 35;
 export const LIVE_REVEAL_PING_INTERVAL_MS = 5000;
 export const AUTO_TAG_THRESHOLD_SECONDS = 120;
 
+export interface BoundaryPenaltySpec {
+  id: BoundaryPenalty;
+  title: string;
+  subtitle: string;
+  severity: 'info' | 'warning' | 'critical';
+}
+
+export const BOUNDARY_PENALTY_SPECS: readonly BoundaryPenaltySpec[] = [
+  {
+    id: 'warn',
+    title: 'Advisory Warning',
+    subtitle: 'Vibration alert and UI banner only; no telemetry leaked to hunters.',
+    severity: 'info',
+  },
+  {
+    id: 'extra_ping',
+    title: 'Extra Ping Penalty',
+    subtitle: 'Releases a single immediate ping to hunters when grace period expires.',
+    severity: 'warning',
+  },
+  {
+    id: 'reveal_live',
+    title: 'Live Radar Reveal',
+    subtitle: 'Broadcasts continuous pings every 5s until runner re-enters boundary.',
+    severity: 'critical',
+  },
+  {
+    id: 'auto_tag',
+    title: 'Auto-Tag Elimination',
+    subtitle: 'Runners remaining outside the zone for 120s are eliminated.',
+    severity: 'critical',
+  },
+] as const;
+
+export function getBoundaryPenaltySpec(penalty: BoundaryPenalty): BoundaryPenaltySpec {
+  return (
+    BOUNDARY_PENALTY_SPECS.find((s) => s.id === penalty) ?? {
+      id: penalty,
+      title: penalty,
+      subtitle: 'Custom operational boundary rule',
+      severity: 'warning',
+    }
+  );
+}
+
+/**
+ * Calculates how many meters the player has breached past the perimeter and drift buffer.
+ * Returns 0 if within the permitted boundary envelope.
+ */
+export function calculateExcursionDistanceM(
+  distanceFromCenterM: number,
+  areaRadiusM: number,
+  bufferM: number = DRIFT_BUFFER_METERS
+): number {
+  const allowedEnvelope = areaRadiusM + bufferM;
+  return Math.max(0, Math.round(distanceFromCenterM - allowedEnvelope));
+}
+
+/**
+ * Returns true if player is approaching the outer boundary line within a safety margin.
+ */
+export function isApproachingPerimeter(
+  distanceFromCenterM: number,
+  areaRadiusM: number,
+  marginM: number = 15
+): boolean {
+  return (
+    distanceFromCenterM >= areaRadiusM - marginM &&
+    distanceFromCenterM <= areaRadiusM + DRIFT_BUFFER_METERS
+  );
+}
+
 export interface BoundaryEvaluation {
   isOutOfBounds: boolean;
   distanceFromCenterM: number;
@@ -24,6 +96,8 @@ export interface BoundaryEvaluation {
   shouldEmitLivePing: boolean;
   shouldAutoTag: boolean;
   isAccuracyGated: boolean;
+  excursionDistanceM: number;
+  isApproaching: boolean;
 }
 
 export interface EvaluateBoundaryParams {
@@ -62,11 +136,14 @@ export function evaluateBoundaryState({
     : DRIFT_BUFFER_METERS;
 
   const isOutOfBounds = dist > areaRadiusM + effectiveBuffer;
+  const roundedDist = Math.round(dist);
+  const excursionDistanceM = calculateExcursionDistanceM(dist, areaRadiusM, effectiveBuffer);
+  const isApproaching = isApproachingPerimeter(dist, areaRadiusM);
 
   if (!isOutOfBounds) {
     return {
       isOutOfBounds: false,
-      distanceFromCenterM: Math.round(dist),
+      distanceFromCenterM: roundedDist,
       areaRadiusM,
       secondsOutside: 0,
       graceRemainingS: boundaryGraceS,
@@ -74,6 +151,8 @@ export function evaluateBoundaryState({
       shouldEmitLivePing: false,
       shouldAutoTag: false,
       isAccuracyGated,
+      excursionDistanceM: 0,
+      isApproaching,
     };
   }
 
@@ -109,7 +188,7 @@ export function evaluateBoundaryState({
 
   return {
     isOutOfBounds: true,
-    distanceFromCenterM: Math.round(dist),
+    distanceFromCenterM: roundedDist,
     areaRadiusM,
     secondsOutside,
     graceRemainingS,
@@ -117,5 +196,7 @@ export function evaluateBoundaryState({
     shouldEmitLivePing,
     shouldAutoTag,
     isAccuracyGated,
+    excursionDistanceM,
+    isApproaching: false,
   };
 }
