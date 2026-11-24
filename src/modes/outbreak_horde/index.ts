@@ -5,7 +5,6 @@
  */
 
 import { ModeModule } from '../types';
-import { outbreakHordeWidgets } from './hud';
 
 export const outbreakHordeMode: ModeModule = {
   id: 'outbreak_horde',
@@ -116,5 +115,4 @@ export const outbreakHordeMode: ModeModule = {
       'Spending life seconds for Cloak can save you from a corner trap.',
     ],
   },
-  hudWidgets: outbreakHordeWidgets,
 };

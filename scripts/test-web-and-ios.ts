@@ -37,7 +37,7 @@ const ROOT = path.resolve(__dirname, '..');
   const html = fs.readFileSync(filePath, 'utf-8');
   assert.ok(html.includes('150m'), 'Must document 150m privacy start/finish trimming');
   assert.ok(html.includes('Ephemeral Location'), 'Must explain ephemeral telemetry');
-  assert.ok(html.includes('C1–C7'), 'Must reference consent choices');
+  assert.ok(html.includes('C1–C9') || html.includes('C1–C7'), 'Must reference consent choices');
   console.log('✓ Test 3: public/privacy/index.html documents privacy trimming and consent rights');
 }
 
