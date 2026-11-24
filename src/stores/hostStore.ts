@@ -163,6 +163,14 @@ export const useHostStore = create<HostState>((set, get) => ({
         release_hold_s: 10,
         release_radius_m: 10,
       };
+    } else if (modeId === 'pinpoint') {
+      nextModeParams.pinpoint = {
+        radius_meters: 500,
+        photo_source: 'scout_and_swap',
+        total_rounds: 3,
+        round_duration_s: 180,
+        drops: [],
+      };
     }
 
     set({

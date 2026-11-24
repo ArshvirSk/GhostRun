@@ -670,15 +670,27 @@ export default function HostAreaScreen() {
           },
         ]}
       >
-        <Button
-          title="Continue to Review"
-          variant="primary"
-          size="lg"
-          onPress={() => {
-            triggerHaptic('buttonTap');
-            router.push('/host/review' as any);
-          }}
-        />
+        {(() => {
+          const isPinpointHostDrop =
+            mode === 'pinpoint' &&
+            useHostStore.getState().modeParams.pinpoint?.photo_source === 'host_drop';
+
+          return (
+            <Button
+              title={isPinpointHostDrop ? 'Continue to Target Drops' : 'Continue to Review'}
+              variant="primary"
+              size="lg"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                if (isPinpointHostDrop) {
+                  router.push('/host/pinpoint-drops' as any);
+                } else {
+                  router.push('/host/review' as any);
+                }
+              }}
+            />
+          );
+        })()}
       </View>
     </View>
   );

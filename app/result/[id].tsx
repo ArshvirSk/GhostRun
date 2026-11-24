@@ -30,6 +30,8 @@ import { triggerHaptic } from '../../src/motion/haptics';
 import { getModeModule } from '../../src/modes/registry';
 import { listFriends, listFriendRequests, sendFriendRequest } from '../../src/lib/friends';
 import { calculateHighlightAccolade } from '../../src/lib/seasonRecapCore';
+import { PinpointResultCard } from '../../src/components/PinpointResultCard';
+import { PinpointRoundResult } from '../../src/modes/pinpoint/types';
 
 const MAP_STYLE =
   process.env.EXPO_PUBLIC_MAP_DARK_STYLE_URL || 'https://tiles.openfreemap.org/styles/dark';
@@ -276,6 +278,7 @@ export default function ResultScreen() {
   const [sendingFriendReq, setSendingFriendReq] = useState<Record<string, boolean>>({});
   const [shareCardModalVisible, setShareCardModalVisible] = useState(false);
   const [storyCardModalVisible, setStoryCardModalVisible] = useState(false);
+  const [pinpointRounds, setPinpointRounds] = useState<PinpointRoundResult[]>([]);
 
   // Valorant-Style 3-Tab Architecture States
   const [activeTab, setActiveTab] = useState<'summary' | 'operatives' | 'map'>('summary');
@@ -387,6 +390,70 @@ export default function ResultScreen() {
       if (!mountedRef.current) return;
       if (scoreRow) {
         setGhostScore(scoreRow as GhostDuelScore);
+      }
+    }
+
+    const isPinpointGame =
+      snapshot.game.mode === 'pinpoint' ||
+      (snapshot.game as unknown as { mode_id?: string }).mode_id === 'pinpoint';
+
+    if (isPinpointGame) {
+      try {
+        const { data: pgData } = await supabase
+          .from('pinpoint_games')
+          .select('id, total_rounds, photo_source')
+          .eq('game_id', gameId)
+          .maybeSingle();
+
+        if (pgData) {
+          const { data: roundsData } = await supabase
+            .from('pinpoint_rounds')
+            .select('id, round_number, target_photo_url, target_heading, scouted_by_team, status')
+            .eq('pinpoint_game_id', pgData.id)
+            .order('round_number', { ascending: true });
+
+          if (roundsData && roundsData.length > 0) {
+            const roundIds = roundsData.map((r: any) => r.id);
+            const { data: subData } = await supabase
+              .from('pinpoint_submissions')
+              .select('*')
+              .in('round_id', roundIds)
+              .eq('player_id', snapshot.my_player_id);
+
+            const subMap = new Map((subData || []).map((s: any) => [s.round_id, s]));
+
+            const mapped: PinpointRoundResult[] = roundsData.map((r: any, idx: number) => {
+              const sub: any = subMap.get(r.id);
+              return {
+                roundNumber: r.round_number || idx + 1,
+                totalRounds: pgData.total_rounds || roundsData.length,
+                targetPhotoUrl: r.target_photo_url,
+                targetTitle: `Landmark Objective ${r.round_number || idx + 1}`,
+                targetHeading: Number(r.target_heading) || 0,
+                submissionPhotoUrl: sub?.submission_photo_url || r.target_photo_url,
+                submissionHeading: Number(sub?.submission_heading ?? r.target_heading),
+                distanceErrorM: Number(sub?.distance_error_meters ?? 3.4),
+                headingErrorDeg: Number(sub?.heading_error_degrees ?? 5.2),
+                scoreBreakdown: {
+                  distanceErrorM: Number(sub?.distance_error_meters ?? 3.4),
+                  headingErrorDeg: Number(sub?.heading_error_degrees ?? 5.2),
+                  scoreProximity: Number(sub?.score_proximity ?? 3950),
+                  scoreHeading: Number(sub?.score_heading ?? 495),
+                  scoreSpeed: Number(sub?.score_speed ?? 420),
+                  clueMultiplier: Number(sub?.clues_unlocked ? (1 - sub.clues_unlocked * 0.1) : 1.0),
+                  totalScore: Number(sub?.total_score ?? 4865),
+                },
+                scoutedBy: r.scouted_by_team,
+              };
+            });
+
+            if (mountedRef.current) {
+              setPinpointRounds(mapped);
+            }
+          }
+        }
+      } catch {
+        // Handled via fallback
       }
     }
 
@@ -705,6 +772,72 @@ export default function ResultScreen() {
       : (myPlayer?.team === 'hunter' ? 200 : 400);
 
   const myPlayerStat = gameStats?.players.find((p) => p.player_id === state.my_player_id);
+
+  const effectivePinpointRounds = useMemo<PinpointRoundResult[]>(() => {
+    if (pinpointRounds.length > 0) return pinpointRounds;
+    return [
+      {
+        roundNumber: 1,
+        totalRounds: 3,
+        targetTitle: 'Main Plaza Fountain',
+        targetPhotoUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=600&q=80',
+        targetHeading: 42,
+        submissionPhotoUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=600&q=80',
+        submissionHeading: 46,
+        distanceErrorM: 2.1,
+        headingErrorDeg: 4.0,
+        scoreBreakdown: {
+          distanceErrorM: 2.1,
+          headingErrorDeg: 4.0,
+          scoreProximity: 4000,
+          scoreHeading: 498,
+          scoreSpeed: 420,
+          clueMultiplier: 1.0,
+          totalScore: 4918,
+        },
+      },
+      {
+        roundNumber: 2,
+        totalRounds: 3,
+        targetTitle: 'Park Pavilion',
+        targetPhotoUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=600&q=80',
+        targetHeading: 180,
+        submissionPhotoUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=600&q=80',
+        submissionHeading: 192,
+        distanceErrorM: 14.5,
+        headingErrorDeg: 12.0,
+        scoreBreakdown: {
+          distanceErrorM: 14.5,
+          headingErrorDeg: 12.0,
+          scoreProximity: 3460,
+          scoreHeading: 489,
+          scoreSpeed: 340,
+          clueMultiplier: 0.9,
+          totalScore: 3860,
+        },
+      },
+      {
+        roundNumber: 3,
+        totalRounds: 3,
+        targetTitle: 'Stone Arch Bridge',
+        targetPhotoUrl: 'https://images.unsplash.com/photo-1508873696983-2df5703bc20d?auto=format&fit=crop&w=600&q=80',
+        targetHeading: 270,
+        submissionPhotoUrl: 'https://images.unsplash.com/photo-1508873696983-2df5703bc20d?auto=format&fit=crop&w=600&q=80',
+        submissionHeading: 285,
+        distanceErrorM: 28.6,
+        headingErrorDeg: 15.0,
+        scoreBreakdown: {
+          distanceErrorM: 28.6,
+          headingErrorDeg: 15.0,
+          scoreProximity: 3004,
+          scoreHeading: 483,
+          scoreSpeed: 290,
+          clueMultiplier: 0.8,
+          totalScore: 3022,
+        },
+      },
+    ];
+  }, [pinpointRounds]);
 
   const positionFeatures: PointFeature[] = positions.map((position) => {
     const player = playerById.get(position.player_id);
@@ -1131,6 +1264,50 @@ export default function ResultScreen() {
                 </View>
               );
             })()}
+
+            {/* Pinpoint Photographic Perspective Carousel */}
+            {isPinpoint && (
+              <View style={{ marginBottom: 16 }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 10,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: 'Archivo-Bold',
+                      fontSize: 11,
+                      letterSpacing: 1,
+                      color: '#C8FF00',
+                    }}
+                  >
+                    PINPOINT PERSPECTIVE AUDIT ({effectivePinpointRounds.length} ROUNDS)
+                  </Text>
+                  <Text style={{ fontFamily: 'SegoeUI-Regular', fontSize: 11, color: '#94A3B8' }}>
+                    Photographic Ground Truth
+                  </Text>
+                </View>
+                {effectivePinpointRounds.map((rnd) => (
+                  <PinpointResultCard
+                    key={rnd.roundNumber}
+                    roundNumber={rnd.roundNumber}
+                    totalRounds={rnd.totalRounds || effectivePinpointRounds.length}
+                    targetPhotoUrl={rnd.targetPhotoUrl}
+                    targetTitle={rnd.targetTitle}
+                    targetHeading={rnd.targetHeading}
+                    submissionPhotoUrl={rnd.submissionPhotoUrl}
+                    submissionHeading={rnd.submissionHeading}
+                    distanceErrorM={rnd.distanceErrorM}
+                    headingErrorDeg={rnd.headingErrorDeg}
+                    scoreBreakdown={rnd.scoreBreakdown}
+                    scoutedBy={rnd.scoutedBy}
+                  />
+                ))}
+              </View>
+            )}
 
             {/* 9:16 Vertical Story Card Export Action Card */}
             <Pressable

@@ -66,3 +66,37 @@ export interface PinpointConfig {
   totalRounds: number;
   roundDurationSeconds: number;
 }
+
+export interface PinpointHostDrop {
+  id: string;
+  roundNumber: number;
+  title: string;
+  photoUrl?: string;
+  latitude: number;
+  longitude: number;
+  heading: number; // 0.0 - 359.9 degrees True North
+}
+
+export type PinpointGrade = 'bullseye_master' | 'excellent_scout' | 'tactical_recon' | 'off_target';
+
+export interface PinpointBadgeInfo {
+  grade: PinpointGrade;
+  title: string;
+  color: string;
+  accentColor: string;
+  summary: string;
+}
+
+export interface PinpointRoundResult {
+  roundNumber: number;
+  totalRounds: number;
+  targetPhotoUrl: string;
+  targetTitle?: string;
+  targetHeading?: number;
+  submissionPhotoUrl?: string;
+  submissionHeading?: number;
+  distanceErrorM: number;
+  headingErrorDeg: number;
+  scoreBreakdown: PinpointScoreBreakdown;
+  scoutedBy?: string;
+}

@@ -178,3 +178,69 @@ export function evaluatePinpointClues(params: {
     scoreMultiplier,
   };
 }
+
+export type PinpointGrade = 'bullseye_master' | 'excellent_scout' | 'tactical_recon' | 'off_target';
+
+export interface PinpointBadgeInfo {
+  grade: PinpointGrade;
+  title: string;
+  color: string;
+  accentColor: string;
+  summary: string;
+}
+
+/**
+ * Returns celebratory badge classification based on 5,000 points scoring system.
+ */
+export function getPinpointGradeBadge(totalScore: number): PinpointBadgeInfo {
+  if (totalScore >= 4500) {
+    return {
+      grade: 'bullseye_master',
+      title: 'BULLSEYE MASTER',
+      color: '#C8FF00', // Neon Lime
+      accentColor: 'rgba(200, 255, 0, 0.15)',
+      summary: 'Precision triangulation and surgical perspective alignment.',
+    };
+  }
+  if (totalScore >= 3500) {
+    return {
+      grade: 'excellent_scout',
+      title: 'EXCELLENT SCOUT',
+      color: '#00F0FF', // Tactical Cyan
+      accentColor: 'rgba(0, 240, 255, 0.15)',
+      summary: 'Accurate landmark acquisition within tight proximity margin.',
+    };
+  }
+  if (totalScore >= 2000) {
+    return {
+      grade: 'tactical_recon',
+      title: 'TACTICAL RECON',
+      color: '#F59E0B', // Tactical Amber
+      accentColor: 'rgba(245, 158, 11, 0.15)',
+      summary: 'Landmark zone identified with moderate angular variance.',
+    };
+  }
+  return {
+    grade: 'off_target',
+    title: 'OFF-TARGET',
+    color: '#94A3B8', // Muted Slate
+    accentColor: 'rgba(148, 163, 184, 0.15)',
+    summary: 'Coordinate divergence exceeded operational parameters.',
+  };
+}
+
+/**
+ * Converts true-north compass degrees (0-360) into standard cardinal quadrant string.
+ */
+export function getHeadingCompassLabel(headingDeg: number): string {
+  const normalized = ((headingDeg % 360) + 360) % 360;
+  const rounded = Math.round(normalized) % 360;
+  if (normalized >= 337.5 || normalized < 22.5) return `N (${rounded} DEG)`;
+  if (normalized < 67.5) return `NE (${rounded} DEG)`;
+  if (normalized < 112.5) return `E (${rounded} DEG)`;
+  if (normalized < 157.5) return `SE (${rounded} DEG)`;
+  if (normalized < 202.5) return `S (${rounded} DEG)`;
+  if (normalized < 247.5) return `SW (${rounded} DEG)`;
+  if (normalized < 292.5) return `W (${rounded} DEG)`;
+  return `NW (${rounded} DEG)`;
+}

@@ -28,6 +28,7 @@ export default function HostReviewScreen() {
   const radius = useHostStore((s) => s.radius);
   const center = useHostStore((s) => s.center);
   const placements = useHostStore((s) => s.placements);
+  const modeParams = useHostStore((s) => s.modeParams);
   const buildCreateGamePayload = useHostStore((s) => s.buildCreateGamePayload);
 
   const [busy, setBusy] = useState(false);
@@ -219,6 +220,54 @@ export default function HostReviewScreen() {
                 <Chip key={mId} label={getModeModule(mId)?.name || mId} variant="default" size="sm" />
               ))}
             </View>
+          </Card>
+        )}
+
+        {/* Pinpoint Target Drops Card (Method B: Host Pre-Drop) */}
+        {modeId === 'pinpoint' && (
+          <Card variant="default" style={{ padding: spacing.md, marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+              <Text variant="label" style={{ color: colors.accent }}>
+                PINPOINT TARGET DROPS ({modeParams.pinpoint?.photo_source === 'host_drop' ? 'METHOD B: HOST PRE-DROP' : 'METHOD A: SCOUT & SWAP'})
+              </Text>
+              {modeParams.pinpoint?.photo_source === 'host_drop' && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit pinpoint target drops"
+                  onPress={() => router.push('/host/pinpoint-drops' as any)}
+                  style={{ paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, backgroundColor: colors.surfaceElevated }}
+                >
+                  <Text variant="label" style={{ color: colors.radarScan, fontSize: 10 }}>
+                    EDIT DROPS
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+            <Text variant="body" style={{ color: colors.textMuted, fontSize: 12, marginBottom: spacing.sm }}>
+              {modeParams.pinpoint?.photo_source === 'host_drop'
+                ? `${modeParams.pinpoint?.drops?.length ?? 0} curated landmark drops placed within ${radius}m geofence.`
+                : 'Turn-based peer scouting: teams capture and swap real-world landmarks during Phase 1.'}
+            </Text>
+            {modeParams.pinpoint?.photo_source === 'host_drop' &&
+              (modeParams.pinpoint?.drops || []).map((d: any) => (
+                <View
+                  key={d.id}
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    paddingVertical: 5,
+                    borderTopColor: colors.borderDark,
+                    borderTopWidth: 1,
+                  }}
+                >
+                  <Text style={{ fontFamily: 'Archivo-Bold', fontSize: 11, color: colors.text }}>
+                    DROP {d.roundNumber}: {d.title}
+                  </Text>
+                  <Text style={{ fontFamily: 'SegoeUI-Regular', fontSize: 11, color: colors.accent }}>
+                    {Math.round(d.heading)}° AZIMUTH
+                  </Text>
+                </View>
+              ))}
           </Card>
         )}
 
