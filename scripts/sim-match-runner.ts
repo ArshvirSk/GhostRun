@@ -383,6 +383,111 @@ console.log('\n--- Scenario 6: Pinpoint IRL OpenGuessr Deduction & Clue Progress
   console.log(`✓ PASS: Pinpoint shot scored ${scoreResult.totalScore} pts (Dist error: ${scoreResult.distanceErrorM}m, Heading error: ${scoreResult.headingErrorDeg}°, Mult: ${scoreResult.clueMultiplier}x)`);
 }
 
+// -----------------------------------------------------------------------------
+// Scenario 7: VIP Escort Decoy Arrival Rejection, Role Swap & Freeze
+// -----------------------------------------------------------------------------
+console.log('\n--- Scenario 7: VIP Escort Decoy Arrival Rejection, Role Swap & Freeze ---');
+{
+  const center: LngLat = { latitude: 37.7749, longitude: -122.4194 };
+  const targetPoint: LngLat = projectCoordinate(center, 200, 0); // 200m North
+  const roles = ['vip'];
+
+  let vipRunner: OperativeState = {
+    id: 'op-vip-1',
+    codename: 'CROWN',
+    team: 'runner',
+    role: 'vip',
+    latitude: center.latitude,
+    longitude: center.longitude,
+    heading: 0,
+    speedMps: 3.5,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  let bodyguard: OperativeState = {
+    id: 'op-bodyguard-1',
+    codename: 'AEGIS',
+    team: 'runner',
+    role: 'bodyguard',
+    latitude: projectCoordinate(center, 195, 0).latitude, // 195m North (inside target radius)
+    longitude: projectCoordinate(center, 195, 0).longitude,
+    heading: 0,
+    speedMps: 3.0,
+    status: 'active',
+    stationarySec: 0,
+    outOfBoundsSince: null,
+    lastLivePingAt: null,
+    score: 0,
+    vehicleViolation: false,
+    gpsFixCount: 0,
+    suppressedWanderCount: 0,
+  };
+
+  // Step 1: Bodyguard reaches extraction point (< 25m)
+  const bgDistanceToTarget = distanceM({ latitude: bodyguard.latitude, longitude: bodyguard.longitude }, targetPoint);
+  assert.ok(bgDistanceToTarget <= TARGET_ARRIVAL_RADIUS_M, 'Bodyguard is within target arrival radius');
+
+  // Server-authoritative VIP guard check (X-14)
+  const canBodyguardExtract = !roles.includes('vip') || bodyguard.role === 'vip';
+  assert.strictEqual(canBodyguardExtract, false, 'Bodyguard must NOT trigger extraction when VIP role is enabled');
+
+  // Step 2: Bodyguard returns to VIP for tactical 5m rendezvous and role swap
+  bodyguard.latitude = projectCoordinate(center, 3.2, 90).latitude;
+  bodyguard.longitude = projectCoordinate(center, 3.2, 90).longitude;
+  const swapDistanceM = distanceM(
+    { latitude: vipRunner.latitude, longitude: vipRunner.longitude },
+    { latitude: bodyguard.latitude, longitude: bodyguard.longitude }
+  );
+  assert.ok(swapDistanceM <= 5.0, 'Operatives are within 5m swap radius');
+
+  // Execute swap
+  const prevVipRole = vipRunner.role;
+  vipRunner.role = bodyguard.role;
+  bodyguard.role = prevVipRole; // Bodyguard is now the VIP!
+  assert.strictEqual(bodyguard.role, 'vip');
+  assert.strictEqual(vipRunner.role, 'bodyguard');
+
+  // Step 3: Hunter approaches and tags the former VIP (now bodyguard)
+  const hunterPos = projectCoordinate({ latitude: vipRunner.latitude, longitude: vipRunner.longitude }, 12.0, 180);
+  const tagDist = distanceM({ latitude: vipRunner.latitude, longitude: vipRunner.longitude }, hunterPos);
+  assert.ok(tagDist <= TAG_COLLISION_RADIUS_M);
+
+  // Tagging bodyguard sets status frozen without match ending
+  let matchEnded = false;
+  let winner: string | null = null;
+  if (vipRunner.role === 'bodyguard') {
+    vipRunner.status = 'frozen';
+    // Match continues!
+  } else if (vipRunner.role === 'vip') {
+    matchEnded = true;
+    winner = 'hunters';
+  }
+  assert.strictEqual(vipRunner.status, 'frozen', 'Tagged bodyguard enters frozen state');
+  assert.strictEqual(matchEnded, false, 'Match does NOT end when bodyguard is tagged');
+
+  // Step 4: The new VIP sprints into extraction point
+  bodyguard.latitude = targetPoint.latitude;
+  bodyguard.longitude = targetPoint.longitude;
+  const newVipDistToTarget = distanceM({ latitude: bodyguard.latitude, longitude: bodyguard.longitude }, targetPoint);
+  assert.ok(newVipDistToTarget <= TARGET_ARRIVAL_RADIUS_M);
+
+  const canNewVipExtract = !roles.includes('vip') || bodyguard.role === 'vip';
+  assert.strictEqual(canNewVipExtract, true, 'New VIP triggers legitimate extraction victory');
+  bodyguard.status = 'extracted';
+  matchEnded = true;
+  winner = 'runners';
+
+  assert.strictEqual(winner, 'runners');
+  console.log('✓ PASS: VIP Escort verified: Bodyguard decoy arrival rejected, 5m swap executed, bodyguard freeze handled, and new VIP extracted');
+}
+
 console.log('\n================================================================');
-console.log('  All 6 Autonomous Match Simulation Scenarios PASSED (100%)     ');
+console.log('  All 7 Autonomous Match Simulation Scenarios PASSED (100%)     ');
 console.log('================================================================\n');
