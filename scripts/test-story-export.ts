@@ -79,6 +79,40 @@ console.log('=== Pillar 4: Story Card & 2D Animated Replay Telemetry Test Suite 
   assert.strictEqual(hunterApex.title, 'APEX PREDATOR • 4 CAPTURES');
   assert.strictEqual(hunterApex.badge, 'SECTOR SECURED');
 
+  // 2e. Pinpoint OpenGuessr Victory
+  const pinpointWin = computeGloryHeadline({
+    mode: 'pinpoint',
+    role: 'solo',
+    outcome: 'victorious',
+    durationSeconds: 154,
+    distanceMeters: 1450,
+  });
+  assert.ok(pinpointWin.title.includes('PINPOINT BULLSEYE'));
+  assert.strictEqual(pinpointWin.badge, 'OPENGUESSR APEX');
+  assert.strictEqual(pinpointWin.badgeColor, '#00F0FF');
+
+  // 2f. Territory Pulse Dominance
+  const territoryWin = computeGloryHeadline({
+    mode: 'territory_pulse',
+    role: 'runner',
+    outcome: 'victorious',
+    durationSeconds: 720,
+    distanceMeters: 2800,
+  });
+  assert.ok(territoryWin.title.includes('TERRITORY DOMINANCE'));
+  assert.strictEqual(territoryWin.badge, 'ZONE CONTROLLER');
+
+  // 2g. Ghost Duel Record Shattered
+  const ghostWin = computeGloryHeadline({
+    mode: 'ghost_duel',
+    role: 'runner',
+    outcome: 'victorious',
+    durationSeconds: 340,
+    distanceMeters: 1800,
+  });
+  assert.ok(ghostWin.title.includes('RECORD SHATTERED'));
+  assert.strictEqual(ghostWin.badge, 'SPECTRAL SLAYER');
+
   console.log('✓ Test 2: computeGloryHeadline generates high-contrast mode-aware badges & headlines');
 }
 

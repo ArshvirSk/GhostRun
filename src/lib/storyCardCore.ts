@@ -102,7 +102,64 @@ export function computeGloryHeadline(params: GloryHeadlineParams): GloryHeadline
   const opponents = Math.max(1, params.opponentCount ?? 1);
   const captures = params.capturesCount ?? 0;
   const isOutbreak = params.mode.toLowerCase().includes('outbreak') || params.mode.toLowerCase().includes('horde');
+  const isPinpoint = params.mode.toLowerCase().includes('pinpoint');
+  const isTerritory = params.mode.toLowerCase().includes('territory');
+  const isGhostDuel = params.mode.toLowerCase().includes('ghost_duel') || params.mode.toLowerCase().includes('ghost duel');
   const roleLower = params.role.toLowerCase();
+
+  // Pinpoint Mode (OpenGuessr Scavenger)
+  if (isPinpoint) {
+    if (isVictory) {
+      return {
+        title: `PINPOINT BULLSEYE // ${distKm} KM`,
+        subtitle: `PRECISION DEDUCTION IN ${timeFormatted} • VIEWPOINT ALIGNED`,
+        badge: 'OPENGUESSR APEX',
+        badgeColor: '#00F0FF',
+      };
+    }
+    return {
+      title: `FIELD SCOUT // ${timeFormatted}`,
+      subtitle: `NAVIGATED ${distKm} KM ACROSS TERRAIN`,
+      badge: 'LANDMARK LOCATED',
+      badgeColor: '#F59E0B',
+    };
+  }
+
+  // Territory Pulse
+  if (isTerritory) {
+    if (isVictory) {
+      return {
+        title: `TERRITORY DOMINANCE // ${distKm} KM`,
+        subtitle: `SECTOR CONTROL MAINTAINED FOR ${timeFormatted}`,
+        badge: 'ZONE CONTROLLER',
+        badgeColor: '#00F0FF',
+      };
+    }
+    return {
+      title: `SECTOR CONTESTED // ${distKm} KM`,
+      subtitle: `BATTLED FOR ${timeFormatted} IN PULSE ZONES`,
+      badge: 'CONTESTED FALL',
+      badgeColor: '#F59E0B',
+    };
+  }
+
+  // Ghost Duel
+  if (isGhostDuel) {
+    if (isVictory) {
+      return {
+        title: `RECORD SHATTERED // ${timeFormatted}`,
+        subtitle: `OUTPACED GHOST PROFILE OVER ${distKm} KM`,
+        badge: 'SPECTRAL SLAYER',
+        badgeColor: '#10B981',
+      };
+    }
+    return {
+      title: `CHASE CONCLUDED // ${timeFormatted}`,
+      subtitle: `TRAILED GHOST OVER ${distKm} KM`,
+      badge: 'MIRROR PURSUIT',
+      badgeColor: '#F59E0B',
+    };
+  }
 
   // Outbreak Horde
   if (isOutbreak) {

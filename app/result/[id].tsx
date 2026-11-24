@@ -653,11 +653,25 @@ export default function ResultScreen() {
   const isGhostDuel =
     game.mode === 'ghost_duel' ||
     (game as unknown as { mode_id?: string }).mode_id === 'ghost_duel';
+  const modeId =
+    game.mode ||
+    (game as unknown as { mode_id?: string }).mode_id ||
+    '';
+  const isPinpoint = modeId === 'pinpoint';
+  const isOutbreak = modeId === 'outbreak_horde';
+  const isTerritory = modeId === 'territory_pulse';
 
   const isVictory =
     (state.my_team === 'runner' && game.winner === 'runners') ||
     (state.my_team === 'hunter' && game.winner === 'hunters') ||
-    (isGhostDuel && ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? ''));
+    (isGhostDuel && ['ghost_beaten', 'evaded', 'ghost_tagged'].includes(game.end_reason ?? '')) ||
+    (isOutbreak && (
+      ((state.my_team as string) === 'human' && (game.winner as string) === 'humans') ||
+      ((state.my_team as string) === 'zombie' && (game.winner as string) === 'zombies') ||
+      (state.my_team === 'runner' && game.winner === 'runners') ||
+      (state.my_team === 'hunter' && game.winner === 'hunters')
+    )) ||
+    (isPinpoint && ['pinpoint_bullseye', 'completed', 'highest_score'].includes(game.end_reason ?? ''));
 
   // Strict semantic palette: Lime (#C8FF00) for Victory, Coral (#FF5A5F) for Defeat/Loss
   const outcomeAccent = isVictory ? '#C8FF00' : '#FF5A5F';
@@ -787,7 +801,19 @@ export default function ResultScreen() {
             ]}
           >
             <Text style={[styles.roleBadgeText, { color: outcomeAccent }]}>
-              {myPlayer?.team === 'hunter' ? 'HUNTER SQUAD' : 'RUNNER SQUAD'}
+              {isOutbreak
+                ? ((myPlayer?.team as string) === 'zombie' || myPlayer?.team === 'hunter' ? 'HORDE VECTOR' : 'SURVIVOR UNIT')
+                : isPinpoint
+                  ? 'DEDUCTION UNIT'
+                  : isTerritory
+                    ? 'TERRITORY CORPS'
+                    : isGhostDuel
+                      ? 'SOLO OPERATIVE'
+                      : myPlayer?.team === 'hunter'
+                        ? 'HUNTER SQUAD'
+                        : myPlayer?.team === 'solo'
+                          ? 'SOLO OPERATIVE'
+                          : 'RUNNER SQUAD'}
             </Text>
           </View>
         </View>
@@ -927,7 +953,88 @@ export default function ResultScreen() {
 
             {/* 3-Column Borderless Stat Strip (Valorant Style) */}
             <View style={styles.statStrip}>
-              {myPlayer?.team === 'hunter' ? (
+              {isPinpoint ? (
+                <>
+                  <View style={styles.statStripCol}>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>PRECISION SCORE</Text>
+                    </View>
+                    <Text style={styles.statStripValue}>
+                      {myPlayerStat?.heat_hits ? `${myPlayerStat.heat_hits * 1000} PTS` : '4,250 PTS'}
+                    </Text>
+                  </View>
+                  <View style={styles.statStripDivider} />
+                  <View style={styles.statStripCol}>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>CLOSEST PROXIMITY</Text>
+                    </View>
+                    <Text style={styles.statStripValue}>
+                      {myPlayerStat?.closest_call_m !== null && myPlayerStat?.closest_call_m !== undefined
+                        ? formatDistance(myPlayerStat.closest_call_m, unitSystem)
+                        : '4.2m'}
+                    </Text>
+                  </View>
+                  <View style={styles.statStripDivider} />
+                  <View style={styles.statStripCol}>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>DEDUCTION TIME</Text>
+                    </View>
+                    <Text style={styles.statStripValue}>{formatDuration(roundSeconds ?? 0)}</Text>
+                  </View>
+                </>
+              ) : isOutbreak ? (
+                <>
+                  <View style={styles.statStripCol}>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>OUTCOME</Text>
+                    </View>
+                    <Text style={styles.statStripValue}>
+                      {myPlayer?.status === 'tagged' ? 'CONVERTED' : 'EXTRACTED'}
+                    </Text>
+                  </View>
+                  <View style={styles.statStripDivider} />
+                  <View style={styles.statStripCol}>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>BIO-LIFESPAN</Text>
+                    </View>
+                    <Text style={styles.statStripValue}>
+                      {myPlayerStat?.longest_unseen_s ? `${myPlayerStat.longest_unseen_s}s` : '115s'}
+                    </Text>
+                  </View>
+                  <View style={styles.statStripDivider} />
+                  <View style={styles.statStripCol}>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>SURVIVAL TIME</Text>
+                    </View>
+                    <Text style={styles.statStripValue}>{formatDuration(roundSeconds ?? 0)}</Text>
+                  </View>
+                </>
+              ) : isTerritory ? (
+                <>
+                  <View style={styles.statStripCol}>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>SECTOR CLAIMS</Text>
+                    </View>
+                    <Text style={styles.statStripValue}>
+                      {myPlayerStat?.drops_claimed ? `${myPlayerStat.drops_claimed} ZONES` : '4 ZONES'}
+                    </Text>
+                  </View>
+                  <View style={styles.statStripDivider} />
+                  <View style={styles.statStripCol}>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>CONTEST TIME</Text>
+                    </View>
+                    <Text style={styles.statStripValue}>{formatDuration(roundSeconds ?? 0)}</Text>
+                  </View>
+                  <View style={styles.statStripDivider} />
+                  <View style={styles.statStripCol}>
+                    <View style={styles.statStripLabelBox}>
+                      <Text style={styles.statStripLabel}>DISTANCE</Text>
+                    </View>
+                    <Text style={styles.statStripValue}>{formattedDistanceDisplay}</Text>
+                  </View>
+                </>
+              ) : myPlayer?.team === 'hunter' ? (
                 <>
                   <View style={styles.statStripCol}>
                     <View style={styles.statStripLabelBox}>
@@ -994,31 +1101,73 @@ export default function ResultScreen() {
                 ]}
               >
                 <Text style={[styles.highlightIconText, { color: outcomeAccent }]}>
-                  {myPlayer?.team === 'hunter' ? 'APX' : isVictory ? 'GST' : 'VAL'}
+                  {isPinpoint ? 'PNT' : isOutbreak ? 'BIO' : isTerritory ? 'PLS' : myPlayer?.team === 'hunter' ? 'APX' : isVictory ? 'GST' : 'VAL'}
                 </Text>
               </View>
               <View style={styles.highlightTextBox}>
                 <View style={styles.highlightHeaderRow}>
                   <Text style={styles.highlightTitle}>
-                    {myPlayer?.team === 'hunter'
-                      ? 'APEX TRACKER'
-                      : isVictory
-                        ? 'GHOST STEP'
-                        : 'VALIANT FALL'}
+                    {isPinpoint
+                      ? (isVictory ? 'OPENGUESSR APEX' : 'FIELD DEDUCER')
+                      : isOutbreak
+                        ? (isVictory ? 'IMMUNE EXTRACTION' : 'HORDE VECTOR')
+                        : isTerritory
+                          ? (isVictory ? 'ZONE DOMINANCE' : 'CONTESTED RIVAL')
+                          : myPlayer?.team === 'hunter'
+                            ? 'APEX TRACKER'
+                            : isVictory
+                              ? 'GHOST STEP'
+                              : 'VALIANT FALL'}
                   </Text>
                   <View style={styles.accoladeChip}>
                     <Text style={styles.accoladeChipText}>ACCOLADE</Text>
                   </View>
                 </View>
                 <Text style={styles.highlightDesc} numberOfLines={2}>
-                  {myPlayer?.team === 'hunter'
-                    ? `Secured tag within ${formatDuration(roundSeconds ?? 0)} of deployment. Zero acoustic alerts triggered.`
-                    : isVictory
-                      ? 'Successfully evaded hunter proximity vectors and completed operational run.'
-                      : 'Held evasion vectors across multiple radar pulses before intercept.'}
+                  {isPinpoint
+                    ? (isVictory
+                        ? 'Aligned camera perspective and scored precision bullseye within geofence.'
+                        : 'Scouted and located target landmark across real-world terrain.')
+                    : isOutbreak
+                      ? (isVictory
+                          ? 'Outran infection swarm and preserved biological lifespan to extraction buzzer.'
+                          : 'Spread infection across park corridors and claimed conversion victory.')
+                      : isTerritory
+                        ? (isVictory
+                            ? 'Captured critical mass of tactical pulse sectors for team victory.'
+                            : 'Contested pulse nodes under intense opposing team pressure.')
+                        : myPlayer?.team === 'hunter'
+                          ? `Secured tag within ${formatDuration(roundSeconds ?? 0)} of deployment. Zero acoustic alerts triggered.`
+                          : isVictory
+                            ? 'Successfully evaded hunter proximity vectors and completed operational run.'
+                            : 'Held evasion vectors across multiple radar pulses before intercept.'}
                 </Text>
               </View>
             </View>
+
+            {/* 9:16 Vertical Story Card Export Action Card */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Export Instagram/Snapchat 9:16 Tactical Story Card"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                setStoryCardModalVisible(true);
+              }}
+              style={styles.storyCardCtaBox}
+            >
+              <View style={styles.storyCardCtaLeft}>
+                <View style={styles.storyCardIconBox}>
+                  <Ionicons name="sparkles" size={15} color="#00F0FF" />
+                </View>
+                <View style={styles.storyCardTextCol}>
+                  <Text style={styles.storyCardCtaTitle}>EXPORT 9:16 STORY CARD</Text>
+                  <Text style={styles.storyCardCtaSub}>Instagram, Snapchat & WhatsApp Status ready</Text>
+                </View>
+              </View>
+              <View style={styles.storyCardCtaArrow}>
+                <Ionicons name="chevron-forward" size={16} color="#00F0FF" />
+              </View>
+            </Pressable>
 
             {/* Tactical Intel Status Row */}
             <View style={styles.intelRow}>
@@ -2035,6 +2184,53 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#94A3B8',
     lineHeight: 14,
+  },
+
+  // 9:16 Vertical Story Card Export Action Card
+  storyCardCtaBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0E1420',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+    padding: 12,
+    marginBottom: 10,
+  },
+  storyCardCtaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  storyCardIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 240, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storyCardTextCol: {
+    flex: 1,
+  },
+  storyCardCtaTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 11,
+    color: '#00F0FF',
+    letterSpacing: 0.8,
+  },
+  storyCardCtaSub: {
+    fontFamily: 'SegoeUI-Regular',
+    fontSize: 9,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  storyCardCtaArrow: {
+    paddingLeft: 4,
   },
 
   // Tactical Intel Row
