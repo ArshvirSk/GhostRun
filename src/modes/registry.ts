@@ -7,6 +7,7 @@ import { relayHeistMode } from './relay_heist';
 import { territoryPulseMode } from './territory_pulse';
 import { ghostDuelMode } from './ghost_duel';
 import { outbreakHordeMode } from './outbreak_horde';
+import { pinpointMode } from './pinpoint';
 import { noiseMeterModifier } from './noise_meter';
 import { deadDropsModifier } from './dead_drops';
 import { hotColdModifier } from './hot_cold';
@@ -34,6 +35,7 @@ export const CLIENT_DENY_LIST: ReadonlySet<string> = new Set([
 ]);
 
 const ALL_BASE_MODES: ModeModule[] = [
+  pinpointMode,
   outbreakHordeMode,
   classicChaseMode,
   tagHuntMode,
