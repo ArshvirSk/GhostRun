@@ -3,6 +3,14 @@
     "name": "GhostRun",
     "slug": "ghostrun",
     "version": "2.9.23",
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 3000
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "scheme": "ghost-run",
     "icon": "./assets/icon.png",

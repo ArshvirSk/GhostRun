@@ -25,6 +25,7 @@ import { startLocationPrewarm } from '../../src/lib/locationCache';
 import { CipherEventModal } from '../../src/components/CipherEventModal';
 import { PrivacyDefaultsModal, PRIVACY_DEFAULTS_ACK_KEY } from '../../src/components/PrivacyDefaultsModal';
 import { WhatsNewModal, PATCH_NOTES_LAST_SEEN_KEY } from '../../src/components/WhatsNewModal';
+import { UpdateAvailableBanner } from '../../src/components/UpdateAvailableBanner';
 import { shouldDisplayPatchNotes, LOCAL_PATCH_NOTES, PatchNotesPayload } from '../../src/lib/patchNotesCore';
 import { fetchRemoteConfigFlags } from '../../src/lib/admin';
 import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
@@ -347,6 +348,9 @@ export function PlayContent() {
         </View>
 
         {/* Active Game Resume Banner (if round is in progress) */}
+        {/* In-App Tactical Update Notification Banner */}
+        <UpdateAvailableBanner />
+
         {activeGame && (
           <Pressable
             accessibilityRole="button"

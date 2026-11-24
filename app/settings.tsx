@@ -38,6 +38,7 @@ import { syncPushTokenWithServer } from '../src/lib/pushNotifications';
 import { FeedbackModal } from '../src/components/FeedbackModal';
 import { getAnalyticsOptIn, setAnalyticsOptIn } from '../src/lib/analytics';
 import { formatSupportEmailUrl, getPlayStoreReviewUrl, APP_VERSION } from '../src/lib/diagnostics';
+import { checkIsAdmin } from '../src/lib/admin';
 import {
   STORAGE_KEY_MINIMAP_CORNER,
   STORAGE_KEY_MINIMAP_ENABLED,
@@ -114,6 +115,7 @@ export default function SettingsScreen() {
   const [blocks, setBlocks] = useState<BlockItem[]>([]);
 
   // User session & UI state
+  const [isAdmin, setIsAdmin] = useState(false);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [busy, setBusy] = useState('');
@@ -215,6 +217,12 @@ export default function SettingsScreen() {
         if (supabase) {
           const { data } = await supabase.auth.getUser();
           if (data.user?.email) setUserEmail(data.user.email);
+          try {
+            const adminStatus = await checkIsAdmin();
+            setIsAdmin(adminStatus);
+          } catch {
+            // non-blocking
+          }
 
           // Sync server consents if available
           const { data: serverConsents } = await supabase.rpc('get_my_consents');
@@ -1831,6 +1839,45 @@ export default function SettingsScreen() {
             <Ionicons name="mail-outline" size={20} color={colors.primary} />
           </Pressable>
         </Card>
+
+        {/* Admin Command Console Entry (Admins Only) */}
+        {isAdmin && (
+          <Card
+            variant="elevated"
+            style={[
+              styles.card,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.primary,
+                borderWidth: 1.5,
+                marginTop: spacing.md,
+              },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open Command Console"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                router.push('/admin' as any);
+              }}
+              style={styles.settingRow}
+            >
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />
+                  <Text variant="title" style={{ color: colors.primary, fontSize: 15 }}>
+                    Command Console
+                  </Text>
+                </View>
+                <Text variant="caption" style={{ color: colors.textMuted }}>
+                  Level 4 clearance verified. Manage live remote config, kill-switches, and telemetry.
+                </Text>
+              </View>
+              <Ionicons name="terminal-outline" size={22} color={colors.primary} />
+            </Pressable>
+          </Card>
+        )}
 
         {/* 8. Session & Sign Out */}
         <Card variant="default" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderDark, marginTop: spacing.md }]}>
