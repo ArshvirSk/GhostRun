@@ -24,6 +24,9 @@ import { useHostStore } from '../../src/stores/hostStore';
 import { startLocationPrewarm } from '../../src/lib/locationCache';
 import { CipherEventModal } from '../../src/components/CipherEventModal';
 import { PrivacyDefaultsModal, PRIVACY_DEFAULTS_ACK_KEY } from '../../src/components/PrivacyDefaultsModal';
+import { WhatsNewModal, PATCH_NOTES_LAST_SEEN_KEY } from '../../src/components/WhatsNewModal';
+import { shouldDisplayPatchNotes, LOCAL_PATCH_NOTES, PatchNotesPayload } from '../../src/lib/patchNotesCore';
+import { fetchRemoteConfigFlags } from '../../src/lib/admin';
 import { TacticalPullRefreshScrollView } from '../../src/components/TacticalPullRefresh';
 import { TACTICAL_GOLD } from '../../src/theme/tokens';
 
@@ -54,17 +57,43 @@ export function PlayContent() {
   const [pendingRequestCount, setPendingRequestCount] = useState<number>(0);
   const [cipherModalVisible, setCipherModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const [whatsNewModalVisible, setWhatsNewModalVisible] = useState(false);
+  const [activePatchNotes, setActivePatchNotes] = useState<PatchNotesPayload>(LOCAL_PATCH_NOTES);
+
+  const checkPatchNotesAck = useCallback(async () => {
+    try {
+      const lastSeen = await AsyncStorage.getItem(PATCH_NOTES_LAST_SEEN_KEY);
+      const { flags } = await fetchRemoteConfigFlags();
+      const remoteNotes: PatchNotesPayload = flags?.latest_patch_notes || LOCAL_PATCH_NOTES;
+      setActivePatchNotes(remoteNotes);
+
+      if (
+        shouldDisplayPatchNotes({
+          currentVersion: remoteNotes.version,
+          lastSeenVersion: lastSeen,
+          patchNotes: remoteNotes,
+        })
+      ) {
+        setWhatsNewModalVisible(true);
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+  }, []);
 
   const checkPrivacyDefaultsAck = useCallback(async () => {
     try {
       const acknowledged = await AsyncStorage.getItem(PRIVACY_DEFAULTS_ACK_KEY);
       if (!acknowledged) {
         setPrivacyModalVisible(true);
+      } else {
+        // If privacy was already acknowledged, evaluate patch notes directive
+        void checkPatchNotesAck();
       }
     } catch {
       // Non-blocking fallback
     }
-  }, []);
+  }, [checkPatchNotesAck]);
 
   // Check whether operative has acknowledged privacy defaults directive
   useEffect(() => {
@@ -710,7 +739,18 @@ export function PlayContent() {
       {/* GhostRun Tactical Privacy Defaults Modal */}
       <PrivacyDefaultsModal
         visible={privacyModalVisible}
-        onClose={() => setPrivacyModalVisible(false)}
+        onClose={() => {
+          setPrivacyModalVisible(false);
+          // When privacy defaults is dismissed, evaluate patch notes display
+          void checkPatchNotesAck();
+        }}
+      />
+
+      {/* GhostRun Tactical What's New & Mission Patch Directive Modal */}
+      <WhatsNewModal
+        visible={whatsNewModalVisible}
+        onClose={() => setWhatsNewModalVisible(false)}
+        patchNotes={activePatchNotes}
       />
     </View>
   );

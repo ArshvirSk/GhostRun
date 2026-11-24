@@ -13,3 +13,4 @@ export { MatchDurationTimeline, type MatchDurationTimelineProps } from './MatchD
 export { AreaCompatibilityBadge, type AreaCompatibilityBadgeProps } from './AreaCompatibilityBadge';
 export { TacticalDivider, type TacticalDividerProps } from './TacticalDivider';
 export { TacticalMetricChip, type TacticalMetricChipProps, type MetricChipVariant, type MetricChipSize } from './TacticalMetricChip';
+export { WhatsNewModal, type WhatsNewModalProps, PATCH_NOTES_LAST_SEEN_KEY } from '../components/WhatsNewModal';
