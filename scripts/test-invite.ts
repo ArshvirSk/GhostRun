@@ -1,12 +1,18 @@
 import {
   buildInvitePayload,
+  buildQrPayload,
   parseInviteUrl,
   normalizeRoomCode,
   generateAssetLinksJson,
   generateFallbackLandingHtml,
   DEFAULT_INVITE_DOMAIN,
   DEFAULT_CUSTOM_SCHEME,
+  ALTERNATE_CUSTOM_SCHEME,
 } from '../src/lib/invite';
+import {
+  validatePromotionCredentials,
+  isAnonymousUser,
+} from '../src/lib/guestPromotionCore';
 
 let passed = 0;
 let failed = 0;
@@ -93,6 +99,63 @@ assert(html.includes('Jailbreak'), 'HTML renders the mode name');
 assert(html.includes('ghost-run://join?code=E4R7'), 'HTML provides direct deep link button');
 assert(html.includes('play.google.com'), 'HTML provides Play Store download button');
 assert(html.includes('window.location.href = "ghost-run://join?code=E4R7"'), 'HTML includes mobile auto-redirect script');
+
+// Test 12: Parse custom scheme alternate format without hyphen (ghostrun://)
+const altSchemePath = parseInviteUrl('ghostrun://join/w8x2');
+assert(altSchemePath.isValid && altSchemePath.code === 'W8X2' && altSchemePath.source === 'deepLink', 'Parses ghostrun://join/W8X2 without hyphen');
+
+const altSchemeQuery = parseInviteUrl('ghostrun://join?code=k3p9');
+assert(altSchemeQuery.isValid && altSchemeQuery.code === 'K3P9' && altSchemeQuery.source === 'deepLink', 'Parses ghostrun://join?code=K3P9 without hyphen');
+
+// Test 13: Parse Structured JSON QR Code payload
+const jsonQrRaw = JSON.stringify({
+  type: 'ghostrun_invite',
+  code: 'R7T9',
+  mode: 'Relay Heist',
+});
+const parsedJsonQr = parseInviteUrl(jsonQrRaw);
+assert(parsedJsonQr.isValid && parsedJsonQr.code === 'R7T9' && parsedJsonQr.source === 'code', 'Parses structured JSON QR invite payload');
+
+const simpleJsonQr = parseInviteUrl('{"lobby":"p4b8"}');
+assert(simpleJsonQr.isValid && simpleJsonQr.code === 'P4B8' && simpleJsonQr.source === 'code', 'Parses simple {"lobby":"P4B8"} QR payload');
+
+// Test 14: buildQrPayload JSON serialization round-trip
+const builtQr = buildQrPayload({ code: 'v2m6', modeName: 'Assassin Ring' });
+const parsedBuiltQr = parseInviteUrl(builtQr);
+assert(parsedBuiltQr.isValid && parsedBuiltQr.code === 'V2M6', 'buildQrPayload produces parseable QR payload');
+assert(builtQr.includes('"mode":"Assassin Ring"'), 'buildQrPayload includes match mode in QR payload');
+
+// Test 15: Guest Account Promotion Credential Validation
+const validCreds = validatePromotionCredentials('operative@ghostrun.app', 'hunter2026');
+assert(validCreds.valid, 'Valid email and 10-char password pass validation');
+
+const invalidEmail = validatePromotionCredentials('not-an-email', 'validpassword');
+assert(!invalidEmail.valid && Boolean(invalidEmail.error?.includes('valid email')), 'Rejects malformed email string');
+
+const shortPassword = validatePromotionCredentials('valid@ghostrun.app', '12345');
+assert(!shortPassword.valid && Boolean(shortPassword.error?.includes('at least 6 characters')), 'Rejects passwords under 6 characters');
+
+// Test 16: isAnonymousUser detection
+const anonUser = {
+  id: 'usr-anon-01',
+  app_metadata: { provider: 'anonymous' },
+  user_metadata: {},
+  aud: 'authenticated',
+  created_at: new Date().toISOString(),
+  is_anonymous: true,
+};
+assert(isAnonymousUser(anonUser as any) === true, 'Identifies anonymous guest user');
+
+const permanentUser = {
+  id: 'usr-perm-01',
+  email: 'agent@ghostrun.app',
+  app_metadata: { provider: 'email' },
+  user_metadata: {},
+  aud: 'authenticated',
+  created_at: new Date().toISOString(),
+  is_anonymous: false,
+};
+assert(isAnonymousUser(permanentUser as any) === false, 'Identifies permanent registered user');
 
 console.log(`\nTest results: ${passed} passed, ${failed} failed`);
 if (failed > 0) {

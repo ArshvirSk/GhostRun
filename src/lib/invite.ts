@@ -8,7 +8,15 @@
 
 export const DEFAULT_INVITE_DOMAIN = 'https://ghostrun.app';
 export const DEFAULT_CUSTOM_SCHEME = 'ghost-run';
+export const ALTERNATE_CUSTOM_SCHEME = 'ghostrun';
 export const LOBBY_CODE_LENGTH = 4;
+
+export interface QrInvitePayload {
+  type: 'ghostrun_invite';
+  code: string;
+  mode?: string;
+  url: string;
+}
 
 export interface BuildInviteOptions {
   code: string;
@@ -33,6 +41,20 @@ export interface ParsedInvite {
   code: string | null;
   isValid: boolean;
   source: 'code' | 'deepLink' | 'webLink' | 'unknown';
+}
+
+/**
+ * Builds a JSON QR code payload for host screen display or physical invite cards.
+ */
+export function buildQrPayload(options: BuildInviteOptions): string {
+  const payload = buildInvitePayload(options);
+  const data: QrInvitePayload = {
+    type: 'ghostrun_invite',
+    code: payload.code,
+    mode: payload.modeName,
+    url: payload.webLink,
+  };
+  return JSON.stringify(data);
 }
 
 /**
@@ -82,7 +104,7 @@ export function buildInvitePayload(options: BuildInviteOptions): InvitePayload {
 }
 
 /**
- * Parses user input (code, deep link, or web URL) to extract a valid 4-character lobby code.
+ * Parses user input (code, deep link, web URL, or JSON QR code) to extract a valid 4-character lobby code.
  */
 export function parseInviteUrl(input: string): ParsedInvite {
   if (!input || typeof input !== 'string') {
@@ -101,8 +123,28 @@ export function parseInviteUrl(input: string): ParsedInvite {
     };
   }
 
-  // 2. Custom scheme deep links (e.g. ghost-run://join?code=ABCD or ghost-run://join/ABCD)
-  const schemePattern = new RegExp(`^${DEFAULT_CUSTOM_SCHEME}:\\/\\/join(?:\\/([A-Za-z0-9]{4}))?(?:\\?.*code=([A-Za-z0-9]{4}))?`, 'i');
+  // 2. Structured JSON QR payload (e.g. {"code":"ABCD"} or {"type":"ghostrun_invite","code":"ABCD"})
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsedJson = JSON.parse(trimmed);
+      const candidate = parsedJson.code || parsedJson.lobby || parsedJson.room;
+      if (candidate && typeof candidate === 'string') {
+        const cleanCode = candidate.trim().toUpperCase().slice(0, LOBBY_CODE_LENGTH);
+        if (cleanCode.length === LOBBY_CODE_LENGTH) {
+          return {
+            code: cleanCode,
+            isValid: true,
+            source: 'code',
+          };
+        }
+      }
+    } catch {
+      // Non-fatal, proceed to URL matching
+    }
+  }
+
+  // 3. Custom scheme deep links (ghost-run:// or ghostrun://, path or query)
+  const schemePattern = /^(?:ghost-run|ghostrun):\/\/join(?:\/([A-Za-z0-9]{4}))?(?:\?.*code=([A-Za-z0-9]{4}))?/i;
   const schemeMatch = trimmed.match(schemePattern);
   if (schemeMatch) {
     const matchedCode = schemeMatch[1] || schemeMatch[2];
@@ -115,7 +157,7 @@ export function parseInviteUrl(input: string): ParsedInvite {
     }
   }
 
-  // 3. Web URLs (e.g. https://ghostrun.app/join/ABCD or https://ghostrun.app/join?code=ABCD)
+  // 4. Web URLs (e.g. https://ghostrun.app/join/ABCD or https://ghostrun.app/join?code=ABCD)
   const webPathMatch = trimmed.match(/\/join\/([A-Za-z0-9]{4})(?:[?#\/]|$)/i);
   if (webPathMatch && webPathMatch[1]) {
     return {

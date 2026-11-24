@@ -167,6 +167,34 @@ export default function JoinGameScreen() {
     setHasError(false);
 
     try {
+      // Ensure player has an active authenticated session (frictionless guest join fallback)
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
+        if (anonError) {
+          setErrorMessage(anonError.message);
+          setHasError(true);
+          triggerHaptic('error');
+          setBusy(false);
+          setIsScanning(false);
+          lastScannedRef.current = null;
+          setScanFeedback(null);
+          return;
+        }
+
+        if (anonData.user) {
+          const guestSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+          await supabase.from('profiles').upsert(
+            {
+              id: anonData.user.id,
+              display_name: `GUEST-${guestSuffix}`,
+              color: '#10B981',
+            },
+            { onConflict: 'id' }
+          );
+        }
+      }
+
       const { data, error } = await supabase.rpc('join_game', { code: normalized });
       if (error) {
         setErrorMessage(error.message);
