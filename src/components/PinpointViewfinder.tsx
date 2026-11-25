@@ -19,6 +19,7 @@ interface PinpointViewfinderProps {
   totalRounds: number;
   currentHeadingDeg: number;
   gpsAccuracyM?: number;
+  mode?: 'hunt' | 'scout';
   onClose: () => void;
   onSubmitShot: (opacityUsed: number) => void;
 }
@@ -30,6 +31,7 @@ export function PinpointViewfinder({
   totalRounds,
   currentHeadingDeg,
   gpsAccuracyM = 3.2,
+  mode = 'hunt',
   onClose,
   onSubmitShot,
 }: PinpointViewfinderProps) {
@@ -61,7 +63,9 @@ export function PinpointViewfinder({
       <View style={styles.headerBar}>
         <View style={styles.roundBadge}>
           <Text style={styles.roundBadgeText}>
-            PINPOINT • RD {roundNumber}/{totalRounds}
+            {mode === 'scout'
+              ? `SCOUT PHASE • RD ${roundNumber}/${totalRounds}`
+              : `PINPOINT • RD ${roundNumber}/${totalRounds}`}
           </Text>
         </View>
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -90,8 +94,8 @@ export function PinpointViewfinder({
           </View>
         )}
 
-        {/* Semi-transparent onion skin ghost image */}
-        {Boolean(targetPhotoUrl) && (
+        {/* Semi-transparent onion skin ghost image (hunt mode only) */}
+        {mode === 'hunt' && Boolean(targetPhotoUrl) && (
           <Image
             source={{ uri: targetPhotoUrl }}
             style={[styles.ghostImage, { opacity: ghostOpacity }]}
@@ -128,31 +132,33 @@ export function PinpointViewfinder({
         </View>
       </View>
 
-      {/* 4. Opacity Controls */}
-      <View style={styles.opacitySelectorRow}>
-        <Text style={styles.opacityTitle}>GHOST OVERLAY</Text>
-        <View style={styles.opacityButtonGroup}>
-          {[0.25, 0.5, 0.75, 1.0].map((val) => (
-            <TouchableOpacity
-              key={val}
-              style={[
-                styles.opacityBtn,
-                Math.abs(ghostOpacity - val) < 0.05 && styles.opacityBtnActive,
-              ]}
-              onPress={() => setGhostOpacity(val)}
-            >
-              <Text
+      {/* 4. Opacity Controls (hunt mode only) */}
+      {mode === 'hunt' && (
+        <View style={styles.opacitySelectorRow}>
+          <Text style={styles.opacityTitle}>GHOST OVERLAY</Text>
+          <View style={styles.opacityButtonGroup}>
+            {[0.25, 0.5, 0.75, 1.0].map((val) => (
+              <TouchableOpacity
+                key={val}
                 style={[
-                  styles.opacityBtnText,
-                  Math.abs(ghostOpacity - val) < 0.05 && styles.opacityBtnTextActive,
+                  styles.opacityBtn,
+                  Math.abs(ghostOpacity - val) < 0.05 && styles.opacityBtnActive,
                 ]}
+                onPress={() => setGhostOpacity(val)}
               >
-                {Math.round(val * 100)}%
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.opacityBtnText,
+                    Math.abs(ghostOpacity - val) < 0.05 && styles.opacityBtnTextActive,
+                  ]}
+                >
+                  {Math.round(val * 100)}%
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* 5. Shutter Action Button */}
       <View style={styles.shutterActionContainer}>
@@ -162,7 +168,9 @@ export function PinpointViewfinder({
           onPress={() => onSubmitShot(ghostOpacity)}
         >
           <View style={styles.shutterInnerRing}>
-            <Text style={styles.shutterButtonText}>PINPOINT SHOT</Text>
+            <Text style={styles.shutterButtonText}>
+              {mode === 'scout' ? 'LATCH SCOUT TARGET' : 'PINPOINT SHOT'}
+            </Text>
           </View>
         </TouchableOpacity>
       </View>

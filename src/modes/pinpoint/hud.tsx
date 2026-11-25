@@ -17,6 +17,7 @@ export const PinpointTopWidget = memo(function PinpointTopWidget({
 
   const roundNum = pp.current_round ?? 1;
   const totalRounds = pp.total_rounds ?? 3;
+  const phaseMode: 'scouting' | 'active' = pp.phase_mode === 'scouting' ? 'scouting' : 'active';
   const clueLevel = pp.clues_unlocked ?? 0;
   const sector = pp.sector_quadrant as ('NW' | 'NE' | 'SW' | 'SE' | null) ?? null;
   const bearing = pp.bearing_to_target_deg as number | null ?? null;
@@ -25,7 +26,9 @@ export const PinpointTopWidget = memo(function PinpointTopWidget({
     clueLevel === 1 ? '0.9x' : clueLevel === 2 ? '0.8x' : clueLevel >= 3 ? '0.7x' : '1.0x';
 
   let clueHeadline = 'CLUE 0: PURE SIGHT';
-  if (clueLevel === 1) {
+  if (phaseMode === 'scouting') {
+    clueHeadline = 'PHASE 1: SCOUT LANDMARK';
+  } else if (clueLevel === 1) {
     clueHeadline = 'CLUE 1: SONAR ACTIVE';
   } else if (clueLevel === 2) {
     clueHeadline = sector ? `CLUE 2: SECTOR ${sector}` : 'CLUE 2: SECTOR LOCK';
@@ -69,6 +72,7 @@ export const PinpointTargetThumbnailWidget = memo(function PinpointTargetThumbna
 }: HudWidgetProps) {
   const pp = (state as any).pinpoint || (state as any).game?.pinpoint;
   const targetPhoto = pp?.target_photo_url;
+  const isScouting = pp?.phase_mode === 'scouting';
   if (!pp) return null;
 
   const handleOpenViewfinder = () => {
@@ -77,7 +81,7 @@ export const PinpointTargetThumbnailWidget = memo(function PinpointTargetThumbna
 
   return (
     <View style={styles.actionRow}>
-      {Boolean(targetPhoto) && (
+      {!isScouting && Boolean(targetPhoto) && (
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={handleOpenViewfinder}
@@ -95,12 +99,14 @@ export const PinpointTargetThumbnailWidget = memo(function PinpointTargetThumbna
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={handleOpenViewfinder}
-        style={styles.captureFab}
+        style={[styles.captureFab, isScouting && { backgroundColor: '#00F0FF' }]}
         accessibilityRole="button"
-        accessibilityLabel="Open Pinpoint Camera Viewfinder"
+        accessibilityLabel={isScouting ? 'Scout Landmark Camera' : 'Open Pinpoint Camera Viewfinder'}
       >
         <Ionicons name="camera" size={16} color="#000000" />
-        <Text style={styles.captureFabText}>ALIGN & CAPTURE</Text>
+        <Text style={styles.captureFabText}>
+          {isScouting ? 'SCOUT LANDMARK' : 'ALIGN & CAPTURE'}
+        </Text>
       </TouchableOpacity>
     </View>
   );

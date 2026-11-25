@@ -97,6 +97,8 @@ import {
   buildPinpointRoundsFromParams,
   type LivePinpointRound,
 } from '../modes/pinpoint/liveHelpers';
+import { fetchMapPoiRounds } from '../modes/pinpoint/poiEngine';
+import { resolveSwappedTargetForTeam, type ScoutedDrop } from '../modes/pinpoint/scoutSwap';
 import type { PinpointScoreBreakdown } from '../modes/pinpoint/types';
 
 interface GameShellProps {
@@ -443,10 +445,15 @@ export function GameShell({ gameId }: GameShellProps) {
 
   const isOutbreakHorde = modeId === 'outbreak_horde';
   const isPinpoint = modeId === 'pinpoint';
+  const pinpointPhotoSource: string =
+    (state?.game?.mode_params as any)?.pinpoint?.photo_source ||
+    (state?.game?.mode_params as any)?.photo_source ||
+    'host_drop';
 
   // Pinpoint IRL OpenGuessr live state
   const [pinpointRounds, setPinpointRounds] = useState<LivePinpointRound[]>([]);
   const [pinpointRoundIndex, setPinpointRoundIndex] = useState<number>(0);
+  const [pinpointSubPhase, setPinpointSubPhase] = useState<'scouting' | 'active'>('active');
   const [pinpointRoundStartedAtMs, setPinpointRoundStartedAtMs] = useState<number>(() => Date.now());
   const [pinpointCumulativeScore, setPinpointCumulativeScore] = useState<number>(0);
   const [pinpointViewfinderOpen, setPinpointViewfinderOpen] = useState<boolean>(false);
@@ -457,11 +464,20 @@ export function GameShell({ gameId }: GameShellProps) {
     isFinalRound: boolean;
   } | null>(null);
 
-  // Hydrate Pinpoint rounds from Supabase or host mode_params
+  // Hydrate Pinpoint rounds from Supabase, Overpass OSM POIs (Method C), or host drops (Method B)
   useEffect(() => {
     if (!isPinpoint || !state?.game?.area || pinpointRounds.length > 0) return;
     let active = true;
     const area = state.game.area;
+    const ppCfg = (state.game.mode_params as any)?.pinpoint || state.game.mode_params || {};
+    const totalRounds = Math.min(5, Math.max(1, Number(ppCfg.total_rounds) || 3));
+    const roundDurationSec = Math.min(600, Math.max(60, Number(ppCfg.round_duration_s) || 180));
+
+    if (pinpointPhotoSource === 'scout_and_swap') {
+      setPinpointSubPhase('scouting');
+    } else {
+      setPinpointSubPhase('active');
+    }
 
     (async () => {
       if (supabase) {
@@ -494,7 +510,7 @@ export function GameShell({ gameId }: GameShellProps) {
                 latitude: fallbackRounds[idx]?.latitude ?? area.latitude,
                 longitude: fallbackRounds[idx]?.longitude ?? area.longitude,
                 heading: Number(r.target_heading ?? fallbackRounds[idx]?.heading ?? 0),
-                durationSec: pgData.round_duration_seconds || 180,
+                durationSec: pgData.round_duration_seconds || roundDurationSec,
               }));
               setPinpointRounds(hydrated);
               setPinpointRoundStartedAtMs(Date.now());
@@ -502,8 +518,23 @@ export function GameShell({ gameId }: GameShellProps) {
             }
           }
         } catch {
-          // Fall through to mode_params / deterministic fallback
+          // Fall through to Method C / Method B / deterministic fallback
         }
+      }
+
+      if (active && pinpointPhotoSource === 'map_poi') {
+        const poiRounds = await fetchMapPoiRounds({
+          centerLat: area.latitude,
+          centerLng: area.longitude,
+          radiusM: area.radius_m,
+          totalRounds,
+          roundDurationSec,
+        });
+        if (active) {
+          setPinpointRounds(poiRounds);
+          setPinpointRoundStartedAtMs(Date.now());
+        }
+        return;
       }
 
       if (active) {
@@ -521,13 +552,15 @@ export function GameShell({ gameId }: GameShellProps) {
     return () => {
       active = false;
     };
-  }, [isPinpoint, gameId, state?.game?.area, state?.game?.mode_params, pinpointRounds.length]);
+  }, [isPinpoint, pinpointPhotoSource, gameId, state?.game?.area, state?.game?.mode_params, pinpointRounds.length]);
 
   const activePinpointRound = pinpointRounds[pinpointRoundIndex] ?? null;
 
-  // Evaluate progressive Pinpoint clues (T+0:45 Sonar, T+1:30 Sector, T+2:15 Azimuth)
+  // Evaluate progressive Pinpoint clues (T+0:45 Sonar, T+1:30 Sector, T+2:15 Azimuth) during Hunt phase
   const pinpointClueState = useMemo(() => {
-    if (!isPinpoint || !activePinpointRound || !state?.game?.area) return null;
+    if (!isPinpoint || pinpointSubPhase === 'scouting' || !activePinpointRound || !state?.game?.area) {
+      return null;
+    }
     const area = state.game.area;
     const elapsedSec = Math.max(0, Math.floor((serverNow - pinpointRoundStartedAtMs) / 1000));
     return evaluatePinpointClues({
@@ -540,7 +573,15 @@ export function GameShell({ gameId }: GameShellProps) {
       centerLat: area.latitude,
       centerLng: area.longitude,
     });
-  }, [isPinpoint, activePinpointRound, state?.game?.area, serverNow, pinpointRoundStartedAtMs, ownFix]);
+  }, [
+    isPinpoint,
+    pinpointSubPhase,
+    activePinpointRound,
+    state?.game?.area,
+    serverNow,
+    pinpointRoundStartedAtMs,
+    ownFix,
+  ]);
 
   // Acoustic Hot/Cold Sonar Ping Loop (unlocks at Clue Level 1: T+0:45)
   useEffect(() => {
@@ -586,6 +627,42 @@ export function GameShell({ gameId }: GameShellProps) {
     const subLat = ownFix?.latitude ?? area.latitude;
     const subLng = ownFix?.longitude ?? area.longitude;
     const subHeading = userHeading ?? 0;
+
+    // Method A: Phase 1 (Scouting) -> Latch target and swap with rival team for Phase 2 (Hunt)
+    if (pinpointSubPhase === 'scouting') {
+      const myPlayer = selectMyPlayer(state);
+      const myScoutDrop: ScoutedDrop = {
+        team: state.my_team || 'runner',
+        playerId: myPlayer?.user_id || myPlayer?.id || 'local-player',
+        latitude: subLat,
+        longitude: subLng,
+        heading: subHeading,
+        photoUrl: activePinpointRound.targetPhotoUrl,
+        title: `Scouted Landmark #${activePinpointRound.roundNumber}`,
+        scoutedAtMs: Date.now(),
+      };
+
+      const swappedTarget = resolveSwappedTargetForTeam({
+        myTeam: state.my_team || 'runner',
+        scoutDrops: [myScoutDrop],
+        roundNumber: activePinpointRound.roundNumber,
+        durationSec: activePinpointRound.durationSec,
+        centerLat: area.latitude,
+        centerLng: area.longitude,
+        radiusM: area.radius_m,
+      });
+
+      setPinpointRounds((prev) =>
+        prev.map((r, idx) => (idx === pinpointRoundIndex ? swappedTarget : r))
+      );
+      setPinpointSubPhase('active');
+      setPinpointRoundStartedAtMs(Date.now());
+      setPinpointViewfinderOpen(false);
+      playSound('scan_success');
+      triggerHaptic('tagConfirmed');
+      return;
+    }
+
     const cluesUnlocked = pinpointClueState?.level ?? 0;
     const elapsedSec = Math.max(0, Math.floor((serverNow - pinpointRoundStartedAtMs) / 1000));
 
@@ -641,6 +718,7 @@ export function GameShell({ gameId }: GameShellProps) {
     serverNow,
     pinpointRoundStartedAtMs,
     pinpointRoundIndex,
+    pinpointSubPhase,
     pinpointRounds.length,
     actions,
   ]);
@@ -1068,6 +1146,7 @@ export function GameShell({ gameId }: GameShellProps) {
           ? {
               current_round: activePinpointRound.roundNumber,
               total_rounds: pinpointRounds.length,
+              phase_mode: pinpointSubPhase,
               target_photo_url: activePinpointRound.targetPhotoUrl,
               target_lat: activePinpointRound.latitude,
               target_lng: activePinpointRound.longitude,
@@ -1547,6 +1626,7 @@ export function GameShell({ gameId }: GameShellProps) {
       {isPinpoint && activePinpointRound && (
         <PinpointViewfinder
           visible={pinpointViewfinderOpen}
+          mode={pinpointSubPhase === 'scouting' ? 'scout' : 'hunt'}
           targetPhotoUrl={activePinpointRound.targetPhotoUrl}
           roundNumber={activePinpointRound.roundNumber}
           totalRounds={pinpointRounds.length}
@@ -1596,6 +1676,9 @@ export function GameShell({ gameId }: GameShellProps) {
                   router.replace({ pathname: '/result/[id]', params: { id: gameId } });
                 } else {
                   setPinpointRoundIndex((idx) => idx + 1);
+                  setPinpointSubPhase(
+                    pinpointPhotoSource === 'scout_and_swap' ? 'scouting' : 'active'
+                  );
                   setPinpointRoundStartedAtMs(Date.now());
                 }
               }}
