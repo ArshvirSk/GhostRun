@@ -87,6 +87,17 @@ import { getActiveHudWidgets } from '../modes/hud-registry';
 import { triggerHaptic } from '../motion/haptics';
 import { generateProceduralZones, haversineDistanceM, updateZonePhysics } from '../modes/outbreak_horde/zoneEngine';
 import { OUTBREAK_PRESETS, type DynamicZone } from '../modes/outbreak_horde/types';
+import { PinpointViewfinder } from '../components/PinpointViewfinder';
+import {
+  evaluatePinpointClues,
+  evaluatePinpointScore,
+  getPinpointGradeBadge,
+} from '../modes/pinpoint/engine';
+import {
+  buildPinpointRoundsFromParams,
+  type LivePinpointRound,
+} from '../modes/pinpoint/liveHelpers';
+import type { PinpointScoreBreakdown } from '../modes/pinpoint/types';
 
 interface GameShellProps {
   gameId: string;
@@ -207,6 +218,7 @@ export function GameShell({ gameId }: GameShellProps) {
     return {
       ...base,
       deductBioHealth: (hp: number) => setBioHealth((prev) => Math.max(0, prev - hp)),
+      openPinpointViewfinder: () => setPinpointViewfinderOpen(true),
     } as any;
   }, [gameId, loadState]);
 
@@ -430,6 +442,208 @@ export function GameShell({ gameId }: GameShellProps) {
   }, [fixLat, fixLng, posLat, posLng]);
 
   const isOutbreakHorde = modeId === 'outbreak_horde';
+  const isPinpoint = modeId === 'pinpoint';
+
+  // Pinpoint IRL OpenGuessr live state
+  const [pinpointRounds, setPinpointRounds] = useState<LivePinpointRound[]>([]);
+  const [pinpointRoundIndex, setPinpointRoundIndex] = useState<number>(0);
+  const [pinpointRoundStartedAtMs, setPinpointRoundStartedAtMs] = useState<number>(() => Date.now());
+  const [pinpointCumulativeScore, setPinpointCumulativeScore] = useState<number>(0);
+  const [pinpointViewfinderOpen, setPinpointViewfinderOpen] = useState<boolean>(false);
+  const [pinpointLastResult, setPinpointLastResult] = useState<{
+    roundNumber: number;
+    title: string;
+    breakdown: PinpointScoreBreakdown;
+    isFinalRound: boolean;
+  } | null>(null);
+
+  // Hydrate Pinpoint rounds from Supabase or host mode_params
+  useEffect(() => {
+    if (!isPinpoint || !state?.game?.area || pinpointRounds.length > 0) return;
+    let active = true;
+    const area = state.game.area;
+
+    (async () => {
+      if (supabase) {
+        try {
+          const { data: pgData } = await supabase
+            .from('pinpoint_games')
+            .select('id, round_duration_seconds')
+            .eq('game_id', gameId)
+            .maybeSingle();
+
+          if (pgData && active) {
+            const { data: rData } = await supabase
+              .from('pinpoint_rounds')
+              .select('id, round_number, target_photo_url, target_heading')
+              .eq('pinpoint_game_id', pgData.id)
+              .order('round_number', { ascending: true });
+
+            if (rData && rData.length > 0 && active) {
+              const fallbackRounds = buildPinpointRoundsFromParams({
+                centerLat: area.latitude,
+                centerLng: area.longitude,
+                radiusM: area.radius_m,
+                modeParams: state.game.mode_params,
+              });
+              const hydrated: LivePinpointRound[] = rData.map((r: any, idx: number) => ({
+                id: r.id,
+                roundNumber: r.round_number || idx + 1,
+                title: fallbackRounds[idx]?.title || `Landmark Objective ${r.round_number || idx + 1}`,
+                targetPhotoUrl: r.target_photo_url || fallbackRounds[idx]?.targetPhotoUrl || '',
+                latitude: fallbackRounds[idx]?.latitude ?? area.latitude,
+                longitude: fallbackRounds[idx]?.longitude ?? area.longitude,
+                heading: Number(r.target_heading ?? fallbackRounds[idx]?.heading ?? 0),
+                durationSec: pgData.round_duration_seconds || 180,
+              }));
+              setPinpointRounds(hydrated);
+              setPinpointRoundStartedAtMs(Date.now());
+              return;
+            }
+          }
+        } catch {
+          // Fall through to mode_params / deterministic fallback
+        }
+      }
+
+      if (active) {
+        const rounds = buildPinpointRoundsFromParams({
+          centerLat: area.latitude,
+          centerLng: area.longitude,
+          radiusM: area.radius_m,
+          modeParams: state.game.mode_params,
+        });
+        setPinpointRounds(rounds);
+        setPinpointRoundStartedAtMs(Date.now());
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [isPinpoint, gameId, state?.game?.area, state?.game?.mode_params, pinpointRounds.length]);
+
+  const activePinpointRound = pinpointRounds[pinpointRoundIndex] ?? null;
+
+  // Evaluate progressive Pinpoint clues (T+0:45 Sonar, T+1:30 Sector, T+2:15 Azimuth)
+  const pinpointClueState = useMemo(() => {
+    if (!isPinpoint || !activePinpointRound || !state?.game?.area) return null;
+    const area = state.game.area;
+    const elapsedSec = Math.max(0, Math.floor((serverNow - pinpointRoundStartedAtMs) / 1000));
+    return evaluatePinpointClues({
+      elapsedSec,
+      roundDurationSec: activePinpointRound.durationSec,
+      currentLat: ownFix?.latitude ?? area.latitude,
+      currentLng: ownFix?.longitude ?? area.longitude,
+      targetLat: activePinpointRound.latitude,
+      targetLng: activePinpointRound.longitude,
+      centerLat: area.latitude,
+      centerLng: area.longitude,
+    });
+  }, [isPinpoint, activePinpointRound, state?.game?.area, serverNow, pinpointRoundStartedAtMs, ownFix]);
+
+  // Acoustic Hot/Cold Sonar Ping Loop (unlocks at Clue Level 1: T+0:45)
+  useEffect(() => {
+    if (
+      !isPinpoint ||
+      state?.game?.status !== 'live' ||
+      !pinpointClueState ||
+      pinpointClueState.level < 1 ||
+      !pinpointClueState.sonarPingIntervalMs ||
+      sfxMuted ||
+      muted ||
+      pinpointViewfinderOpen ||
+      pinpointLastResult !== null
+    ) {
+      return;
+    }
+
+    const isHot =
+      pinpointClueState.sonarAuraColor === '#EF4444' ||
+      pinpointClueState.sonarAuraColor === '#F59E0B';
+
+    const interval = setInterval(() => {
+      playSound(isHot ? 'heat_hot' : 'heat_cold');
+      triggerHaptic('buttonTap');
+    }, pinpointClueState.sonarPingIntervalMs);
+
+    return () => clearInterval(interval);
+  }, [
+    isPinpoint,
+    state?.game?.status,
+    pinpointClueState?.level,
+    pinpointClueState?.sonarPingIntervalMs,
+    pinpointClueState?.sonarAuraColor,
+    sfxMuted,
+    muted,
+    pinpointViewfinderOpen,
+    pinpointLastResult,
+  ]);
+
+  const handleSubmitPinpointShot = useCallback(async () => {
+    if (!activePinpointRound || !state?.game?.area) return;
+    const area = state.game.area;
+    const subLat = ownFix?.latitude ?? area.latitude;
+    const subLng = ownFix?.longitude ?? area.longitude;
+    const subHeading = userHeading ?? 0;
+    const cluesUnlocked = pinpointClueState?.level ?? 0;
+    const elapsedSec = Math.max(0, Math.floor((serverNow - pinpointRoundStartedAtMs) / 1000));
+
+    const breakdown = evaluatePinpointScore({
+      target: {
+        id: activePinpointRound.id,
+        roundNumber: activePinpointRound.roundNumber,
+        photoUrl: activePinpointRound.targetPhotoUrl,
+        latitude: activePinpointRound.latitude,
+        longitude: activePinpointRound.longitude,
+        heading: activePinpointRound.heading,
+        status: 'active',
+      },
+      submissionLat: subLat,
+      submissionLng: subLng,
+      submissionHeading: subHeading,
+      cluesUnlocked,
+      elapsedSec,
+      roundDurationSec: activePinpointRound.durationSec,
+    });
+
+    playSound('scan_success');
+    triggerHaptic('tagConfirmed');
+    setPinpointViewfinderOpen(false);
+    setPinpointCumulativeScore((prev) => prev + breakdown.totalScore);
+    setPinpointLastResult({
+      roundNumber: activePinpointRound.roundNumber,
+      title: activePinpointRound.title,
+      breakdown,
+      isFinalRound: pinpointRoundIndex + 1 >= pinpointRounds.length,
+    });
+
+    // Non-blocking server-authoritative PostGIS submission
+    if (actions.submitPinpointShot) {
+      const myPlayer = selectMyPlayer(state);
+      void actions.submitPinpointShot({
+        roundId: activePinpointRound.id,
+        playerId: myPlayer?.user_id || myPlayer?.id || '',
+        team: state.my_team || 'solo',
+        submissionPhotoUrl: activePinpointRound.targetPhotoUrl,
+        lat: subLat,
+        lng: subLng,
+        heading: subHeading,
+        cluesUnlocked,
+      });
+    }
+  }, [
+    activePinpointRound,
+    state,
+    ownFix,
+    userHeading,
+    pinpointClueState,
+    serverNow,
+    pinpointRoundStartedAtMs,
+    pinpointRoundIndex,
+    pinpointRounds.length,
+    actions,
+  ]);
 
   // Outbreak Horde state
   const [dynamicZones, setDynamicZones] = useState<DynamicZone[]>([]);
@@ -847,6 +1061,25 @@ export function GameShell({ gameId }: GameShellProps) {
 
   const enrichedState = useMemo(() => {
     if (!state) return null;
+    if (isPinpoint) {
+      return {
+        ...state,
+        pinpoint: activePinpointRound
+          ? {
+              current_round: activePinpointRound.roundNumber,
+              total_rounds: pinpointRounds.length,
+              target_photo_url: activePinpointRound.targetPhotoUrl,
+              target_lat: activePinpointRound.latitude,
+              target_lng: activePinpointRound.longitude,
+              clues_unlocked: pinpointClueState?.level ?? 0,
+              sonar_aura_color: pinpointClueState?.sonarAuraColor ?? null,
+              sector_quadrant: pinpointClueState?.sectorQuadrant ?? null,
+              bearing_to_target_deg: pinpointClueState?.bearingToTargetDeg ?? null,
+              cumulative_score: pinpointCumulativeScore,
+            }
+          : null,
+      } as any;
+    }
     if (!isOutbreakHorde) return state;
     return {
       ...state,
@@ -860,7 +1093,18 @@ export function GameShell({ gameId }: GameShellProps) {
         },
       },
     };
-  }, [state, isOutbreakHorde, bioHealth, nearestAntidoteDistM, dynamicZones]);
+  }, [
+    state,
+    isPinpoint,
+    activePinpointRound,
+    pinpointRounds.length,
+    pinpointClueState,
+    pinpointCumulativeScore,
+    isOutbreakHorde,
+    bioHealth,
+    nearestAntidoteDistM,
+    dynamicZones,
+  ]);
 
   const widgetProps = useMemo(() => {
     if (!enrichedState) return null;
@@ -1298,6 +1542,72 @@ export function GameShell({ gameId }: GameShellProps) {
         onClose={() => setRadioVisible(false)}
         onUnreadChange={(delta) => setUnreadRadioCount((c) => c + delta)}
       />
+
+      {/* Pinpoint Live Onion-Skin Camera Viewfinder */}
+      {isPinpoint && activePinpointRound && (
+        <PinpointViewfinder
+          visible={pinpointViewfinderOpen}
+          targetPhotoUrl={activePinpointRound.targetPhotoUrl}
+          roundNumber={activePinpointRound.roundNumber}
+          totalRounds={pinpointRounds.length}
+          currentHeadingDeg={userHeading ?? 0}
+          gpsAccuracyM={fix?.accuracy ?? 3.5}
+          onClose={() => setPinpointViewfinderOpen(false)}
+          onSubmitShot={() => void handleSubmitPinpointShot()}
+        />
+      )}
+
+      {/* Pinpoint Mid-Match Celebratory Round Score Overlay */}
+      {isPinpoint && pinpointLastResult && (
+        <View style={styles.pinpointResultBackdrop}>
+          <View style={styles.pinpointResultCard}>
+            <Text style={styles.pinpointResultSub}>
+              ROUND {pinpointLastResult.roundNumber} COMPLETE // {pinpointLastResult.title.toUpperCase()}
+            </Text>
+            <Text
+              style={[
+                styles.pinpointResultBadge,
+                { color: getPinpointGradeBadge(pinpointLastResult.breakdown.totalScore).color },
+              ]}
+            >
+              {getPinpointGradeBadge(pinpointLastResult.breakdown.totalScore).title}
+            </Text>
+            <Text style={styles.pinpointResultScore}>
+              +{pinpointLastResult.breakdown.totalScore} PTS
+            </Text>
+            <View style={styles.pinpointResultMetrics}>
+              <Text style={styles.pinpointResultMetricText}>
+                DIST ERROR: {pinpointLastResult.breakdown.distanceErrorM.toFixed(1)}m
+              </Text>
+              <Text style={styles.pinpointResultMetricText}>
+                HEADING DELTA: {pinpointLastResult.breakdown.headingErrorDeg.toFixed(1)} DEG
+              </Text>
+              <Text style={styles.pinpointResultMetricText}>
+                MULT: {pinpointLastResult.breakdown.clueMultiplier.toFixed(1)}x
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                triggerHaptic('buttonTap');
+                const isFinal = pinpointLastResult.isFinalRound;
+                setPinpointLastResult(null);
+                if (isFinal) {
+                  router.replace({ pathname: '/result/[id]', params: { id: gameId } });
+                } else {
+                  setPinpointRoundIndex((idx) => idx + 1);
+                  setPinpointRoundStartedAtMs(Date.now());
+                }
+              }}
+              style={styles.pinpointResultBtn}
+            >
+              <Text style={styles.pinpointResultBtnText}>
+                {pinpointLastResult.isFinalRound ? 'VIEW FINAL RESULTS' : 'NEXT ROUND'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -1393,5 +1703,73 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 45,
     backgroundColor: 'transparent',
+  },
+  pinpointResultBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(10, 10, 14, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    zIndex: 999,
+  },
+  pinpointResultCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#16151D',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#C8FF00',
+    padding: 20,
+    alignItems: 'center',
+  },
+  pinpointResultSub: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 10,
+    letterSpacing: 1,
+    color: '#00F0FF',
+    marginBottom: 6,
+  },
+  pinpointResultBadge: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 18,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  pinpointResultScore: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 32,
+    color: '#C8FF00',
+    marginBottom: 12,
+  },
+  pinpointResultMetrics: {
+    width: '100%',
+    backgroundColor: '#1E1D2A',
+    borderRadius: 8,
+    padding: 10,
+    gap: 4,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  pinpointResultMetricText: {
+    fontFamily: 'SegoeUI-Bold',
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  pinpointResultBtn: {
+    width: '100%',
+    backgroundColor: '#C8FF00',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  pinpointResultBtnText: {
+    fontFamily: 'Archivo-Black',
+    fontSize: 13,
+    color: '#000000',
+    letterSpacing: 1,
   },
 });

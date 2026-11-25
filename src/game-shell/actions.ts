@@ -407,5 +407,26 @@ export function createShellActions(
         return { ok: false, error: err.message || 'Item usage failed' };
       }
     },
+
+    submitPinpointShot: async (params) => {
+      if (!supabase) return { ok: false, error: 'Database not initialized' };
+      try {
+        const { data, error } = await (supabase.rpc as any)('submit_pinpoint_shot', {
+          p_round_id: params.roundId,
+          p_player_id: params.playerId,
+          p_team: params.team,
+          p_submission_photo_url: params.submissionPhotoUrl,
+          p_lat: params.lat,
+          p_lng: params.lng,
+          p_heading: params.heading,
+          p_clues_unlocked: params.cluesUnlocked,
+        });
+        if (error) return { ok: false, error: error.message };
+        await onRefresh();
+        return { ok: true, data };
+      } catch (err: any) {
+        return { ok: false, error: err.message || 'Pinpoint submission failed' };
+      }
+    },
   };
 }

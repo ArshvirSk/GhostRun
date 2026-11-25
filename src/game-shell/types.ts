@@ -313,6 +313,18 @@ export interface ShellActions {
   castTribunalVote: (tribunalId: string, vote: boolean) => Promise<{ ok: boolean; error?: string }>;
   claimDrop: (dropId: string) => Promise<{ ok: boolean; error?: string }>;
   useItem: (itemId: string) => Promise<{ ok: boolean; error?: string }>;
+  // Pinpoint actions
+  submitPinpointShot?: (params: {
+    roundId: string;
+    playerId: string;
+    team: string;
+    submissionPhotoUrl: string;
+    lat: number;
+    lng: number;
+    heading: number;
+    cluesUnlocked: number;
+  }) => Promise<{ ok: boolean; data?: any; error?: string }>;
+  openPinpointViewfinder?: () => void;
 }
 
 export interface HudWidgetProps {
