@@ -123,14 +123,14 @@ export const TacticalPullRefreshScrollView = forwardRef<
   // Responsive gesture disambiguation:
   // 1. Must be idle and past 500ms post-refresh lockout (completely blocks momentum flings from re-opening)
   // 2. Must be at top of list (scrollY <= 1)
-  // 3. dy > 10: must be a clear downward pull before capturing from inner ScrollView
-  // 4. dy > |dx| * 1.8: strict vertical cone (~29 deg) so horizontal screen swipes pass to PagerView
+  // 3. dy > 6: fires just before Android ScrollView's ~8dp touchSlop locks the gesture
+  // 4. dy > |dx| * 1.8: strict vertical cone (~29 deg) so horizontal/diagonal screen swipes pass to PagerView
   const shouldStartPull = (gestureState: { dx: number; dy: number }) => {
     if (refreshStatusRef.current !== 'idle') return false;
     if (Date.now() - lastRefreshEndTimeRef.current < 500) return false;
     if (scrollYRef.current > 1) return false;
     return (
-      gestureState.dy > 10 &&
+      gestureState.dy > 6 &&
       gestureState.dy > Math.abs(gestureState.dx) * 1.8
     );
   };
