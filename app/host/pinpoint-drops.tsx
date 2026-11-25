@@ -739,10 +739,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   textInput: {
-    height: 38,
+    height: 44,
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 10,
+    paddingVertical: 0,
     backgroundColor: '#16151E',
     fontFamily: 'SegoeUI-Regular',
     fontSize: 13,

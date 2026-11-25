@@ -226,9 +226,9 @@ export default function HostReviewScreen() {
         {/* Pinpoint Target Drops Card (Method B: Host Pre-Drop) */}
         {modeId === 'pinpoint' && (
           <Card variant="default" style={{ padding: spacing.md, marginBottom: spacing.md }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
-              <Text variant="label" style={{ color: colors.accent }}>
-                PINPOINT TARGET DROPS ({modeParams.pinpoint?.photo_source === 'host_drop' ? 'METHOD B: HOST PRE-DROP' : 'METHOD A: SCOUT & SWAP'})
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs, gap: 8 }}>
+              <Text variant="label" style={{ color: colors.accent, flex: 1 }}>
+                PINPOINT TARGET DROPS ({modeParams.pinpoint?.photo_source === 'host_drop' ? 'METHOD B' : 'METHOD A'})
               </Text>
               {modeParams.pinpoint?.photo_source === 'host_drop' && (
                 <Pressable
