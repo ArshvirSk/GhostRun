@@ -123,18 +123,16 @@ export const TacticalPullRefreshScrollView = forwardRef<
   // Responsive gesture disambiguation:
   // 1. Must be idle and past 500ms post-refresh lockout (completely blocks momentum flings from re-opening)
   // 2. Must be at top of list (scrollY <= 1)
-  // 3. dy > 14: gives horizontal PagerView / tab swipes room to claim before vertical pull engages
-  // 4. dy > |dx| * 2.2 and vy > |vx| * 1.5: strict vertical cone so left/right screen swipes never trigger reload
-  const shouldStartPull = (gestureState: { dx: number; dy: number; vx: number; vy: number }) => {
+  // 3. dy > 10: must be a clear downward pull before capturing from inner ScrollView
+  // 4. dy > |dx| * 1.8: strict vertical cone (~29 deg) so horizontal screen swipes pass to PagerView
+  const shouldStartPull = (gestureState: { dx: number; dy: number }) => {
     if (refreshStatusRef.current !== 'idle') return false;
     if (Date.now() - lastRefreshEndTimeRef.current < 500) return false;
     if (scrollYRef.current > 1) return false;
-    if (gestureState.dy <= 14) return false;
-    if (gestureState.dy <= Math.abs(gestureState.dx) * 2.2) return false;
-    if (Math.abs(gestureState.vx) > 0.15 && gestureState.vy <= Math.abs(gestureState.vx) * 1.5) {
-      return false;
-    }
-    return true;
+    return (
+      gestureState.dy > 10 &&
+      gestureState.dy > Math.abs(gestureState.dx) * 1.8
+    );
   };
 
   const panResponder = useRef(
@@ -143,7 +141,7 @@ export const TacticalPullRefreshScrollView = forwardRef<
       onStartShouldSetPanResponderCapture: () => false,
 
       onMoveShouldSetPanResponder: (_, gestureState) => shouldStartPull(gestureState),
-      onMoveShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => shouldStartPull(gestureState),
 
       onPanResponderGrant: () => {
         refreshStatusRef.current = 'pulling';
