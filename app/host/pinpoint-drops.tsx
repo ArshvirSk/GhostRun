@@ -6,7 +6,11 @@ import {
   ScrollView,
   TextInput,
   Image,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { uploadPinpointPhoto } from '../../src/lib/pinpointUpload';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,6 +67,10 @@ export default function PinpointDropsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraRef>(null);
+  const hostSnapCameraRef = useRef<CameraView>(null);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [snapModalOpen, setSnapModalOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const center = useHostStore((s) => s.center);
   const radius = useHostStore((s) => s.radius);
@@ -557,7 +565,23 @@ export default function PinpointDropsScreen() {
 
             {/* Photo Reference Selection */}
             <View style={styles.photoPresetSection}>
-              <Text style={styles.fieldLabel}>REFERENCE PHOTO CLUE</Text>
+              <View style={styles.azimuthHeaderRow}>
+                <Text style={styles.fieldLabel}>REFERENCE PHOTO CLUE</Text>
+                <Pressable
+                  style={styles.snapPhotoBtn}
+                  onPress={async () => {
+                    triggerHaptic('buttonTap');
+                    if (!cameraPermission?.granted) {
+                      const res = await requestCameraPermission();
+                      if (!res.granted) return;
+                    }
+                    setSnapModalOpen(true);
+                  }}
+                >
+                  <Ionicons name="camera" size={14} color="#0A0A0F" />
+                  <Text style={styles.snapPhotoBtnText}>SNAP REAL PHOTO</Text>
+                </Pressable>
+              </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoPresetsRow}>
                 {SAMPLE_PHOTO_PRESETS.map((preset, idx) => {
                   const isSelected = activeDrop.photoUrl === preset.url;
@@ -603,6 +627,49 @@ export default function PinpointDropsScreen() {
           onPress={handleConfirmAndContinue}
         />
       </View>
+
+      <Modal visible={snapModalOpen} animationType="slide" transparent={false}>
+        <View style={styles.snapModalContainer}>
+          <CameraView ref={hostSnapCameraRef} style={styles.snapCamera} facing="back" />
+          <View style={styles.snapControls}>
+            <Pressable
+              style={styles.snapCancelBtn}
+              onPress={() => setSnapModalOpen(false)}
+              disabled={uploadingPhoto}
+            >
+              <Text style={styles.snapCancelText}>CANCEL</Text>
+            </Pressable>
+            <Pressable
+              style={styles.snapCaptureBtn}
+              disabled={uploadingPhoto}
+              onPress={async () => {
+                if (!hostSnapCameraRef.current || uploadingPhoto) return;
+                setUploadingPhoto(true);
+                try {
+                  const photo = await hostSnapCameraRef.current.takePictureAsync({ quality: 0.7 });
+                  if (photo?.uri) {
+                    const uploadRes = await uploadPinpointPhoto(photo.uri, {
+                      roundId: activeDrop?.id,
+                      kind: 'scout',
+                    });
+                    const finalUrl = uploadRes.ok && uploadRes.publicUrl ? uploadRes.publicUrl : photo.uri;
+                    handleSelectSamplePhoto(finalUrl);
+                    setSnapModalOpen(false);
+                  }
+                } finally {
+                  setUploadingPhoto(false);
+                }
+              }}
+            >
+              {uploadingPhoto ? (
+                <ActivityIndicator color="#0A0A0F" />
+              ) : (
+                <Text style={styles.snapCaptureText}>CAPTURE & UPLOAD</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -879,5 +946,61 @@ const styles = StyleSheet.create({
     right: 0,
     borderTopWidth: 1,
     zIndex: 20,
+  },
+  snapPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#C8FF00',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  snapPhotoBtnText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 10,
+    color: '#0A0A0F',
+    letterSpacing: 0.6,
+  },
+  snapModalContainer: {
+    flex: 1,
+    backgroundColor: '#0A0A0F',
+  },
+  snapCamera: {
+    flex: 1,
+  },
+  snapControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    gap: 12,
+    backgroundColor: '#0A0A0F',
+  },
+  snapCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  snapCancelText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  snapCaptureBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#00F0FF',
+    paddingVertical: 14,
+    borderRadius: 8,
+  },
+  snapCaptureText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 13,
+    color: '#0A0A0F',
+    letterSpacing: 0.8,
   },
 });

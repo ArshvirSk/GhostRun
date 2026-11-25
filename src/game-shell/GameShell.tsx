@@ -455,6 +455,7 @@ export function GameShell({ gameId }: GameShellProps) {
   const [pinpointRounds, setPinpointRounds] = useState<LivePinpointRound[]>([]);
   const [pinpointRoundIndex, setPinpointRoundIndex] = useState<number>(0);
   const [pinpointSubPhase, setPinpointSubPhase] = useState<'scouting' | 'active'>('active');
+  const [pinpointWaitingForRival, setPinpointWaitingForRival] = useState<boolean>(false);
   const [pinpointRoundStartedAtMs, setPinpointRoundStartedAtMs] = useState<number>(() => Date.now());
   const [pinpointCumulativeScore, setPinpointCumulativeScore] = useState<number>(0);
   const [pinpointViewfinderOpen, setPinpointViewfinderOpen] = useState<boolean>(false);
@@ -481,71 +482,61 @@ export function GameShell({ gameId }: GameShellProps) {
     }
 
     (async () => {
-      if (supabase) {
+      const mapDbRound = (r: any, idx: number, fallbackList: LivePinpointRound[], dur: number): LivePinpointRound => ({
+        id: r.id,
+        roundNumber: r.round_number || idx + 1,
+        title: fallbackList[idx]?.title || `Landmark Objective ${r.round_number || idx + 1}`,
+        targetPhotoUrl:
+          r.target_photo_url && r.target_photo_url !== 'pending://scout'
+            ? r.target_photo_url
+            : fallbackList[idx]?.targetPhotoUrl || '',
+        latitude: Number(r.latitude ?? fallbackList[idx]?.latitude ?? area.latitude),
+        longitude: Number(r.longitude ?? fallbackList[idx]?.longitude ?? area.longitude),
+        heading: Number(r.target_heading ?? fallbackList[idx]?.heading ?? 0),
+        durationSec: dur,
+      });
+
+      const seedRounds =
+        pinpointPhotoSource === 'map_poi'
+          ? await fetchMapPoiRounds({
+              centerLat: area.latitude,
+              centerLng: area.longitude,
+              radiusM: area.radius_m,
+              totalRounds,
+              roundDurationSec,
+            })
+          : buildPinpointRoundsFromParams({
+              centerLat: area.latitude,
+              centerLng: area.longitude,
+              radiusM: area.radius_m,
+              modeParams: state.game.mode_params,
+            });
+
+      if (!active) return;
+
+      if (actions.getPinpointRounds && actions.initPinpointGame) {
         try {
-          const { data: pgData } = await supabase
-            .from('pinpoint_games')
-            .select('id, round_duration_seconds')
-            .eq('game_id', gameId)
-            .maybeSingle();
-
-          if (pgData && active) {
-            const { data: rData } = await supabase
-              .from('pinpoint_rounds')
-              .select('id, round_number, target_photo_url, target_heading')
-              .eq('pinpoint_game_id', pgData.id)
-              .order('round_number', { ascending: true });
-
-            if (rData && rData.length > 0 && active) {
-              const fallbackRounds = buildPinpointRoundsFromParams({
-                centerLat: area.latitude,
-                centerLng: area.longitude,
-                radiusM: area.radius_m,
-                modeParams: state.game.mode_params,
-              });
-              const hydrated: LivePinpointRound[] = rData.map((r: any, idx: number) => ({
-                id: r.id,
-                roundNumber: r.round_number || idx + 1,
-                title: fallbackRounds[idx]?.title || `Landmark Objective ${r.round_number || idx + 1}`,
-                targetPhotoUrl: r.target_photo_url || fallbackRounds[idx]?.targetPhotoUrl || '',
-                latitude: fallbackRounds[idx]?.latitude ?? area.latitude,
-                longitude: fallbackRounds[idx]?.longitude ?? area.longitude,
-                heading: Number(r.target_heading ?? fallbackRounds[idx]?.heading ?? 0),
-                durationSec: pgData.round_duration_seconds || roundDurationSec,
-              }));
-              setPinpointRounds(hydrated);
-              setPinpointRoundStartedAtMs(Date.now());
-              return;
-            }
+          const existing = await actions.getPinpointRounds();
+          if (existing.ok && existing.exists && existing.rounds && existing.rounds.length > 0 && active) {
+            const dur = existing.roundDurationSeconds || roundDurationSec;
+            setPinpointRounds(existing.rounds.map((r: any, i: number) => mapDbRound(r, i, seedRounds, dur)));
+            setPinpointRoundStartedAtMs(Date.now());
+            return;
+          }
+          const created = await actions.initPinpointGame(seedRounds);
+          if (created.ok && created.rounds && created.rounds.length > 0 && active) {
+            const dur = created.roundDurationSeconds || roundDurationSec;
+            setPinpointRounds(created.rounds.map((r: any, i: number) => mapDbRound(r, i, seedRounds, dur)));
+            setPinpointRoundStartedAtMs(Date.now());
+            return;
           }
         } catch {
-          // Fall through to Method C / Method B / deterministic fallback
+          // Fall through to seedRounds if offline
         }
-      }
-
-      if (active && pinpointPhotoSource === 'map_poi') {
-        const poiRounds = await fetchMapPoiRounds({
-          centerLat: area.latitude,
-          centerLng: area.longitude,
-          radiusM: area.radius_m,
-          totalRounds,
-          roundDurationSec,
-        });
-        if (active) {
-          setPinpointRounds(poiRounds);
-          setPinpointRoundStartedAtMs(Date.now());
-        }
-        return;
       }
 
       if (active) {
-        const rounds = buildPinpointRoundsFromParams({
-          centerLat: area.latitude,
-          centerLng: area.longitude,
-          radiusM: area.radius_m,
-          modeParams: state.game.mode_params,
-        });
-        setPinpointRounds(rounds);
+        setPinpointRounds(seedRounds);
         setPinpointRoundStartedAtMs(Date.now());
       }
     })();
@@ -556,6 +547,51 @@ export function GameShell({ gameId }: GameShellProps) {
   }, [isPinpoint, pinpointPhotoSource, gameId, state?.game?.area, state?.game?.mode_params, pinpointRounds.length]);
 
   const activePinpointRound = pinpointRounds[pinpointRoundIndex] ?? null;
+
+  // Poll for rival team's scout drop when waiting in 2-team Method A (Scout & Swap)
+  useEffect(() => {
+    if (!isPinpoint || !pinpointWaitingForRival || !activePinpointRound || !actions.getPinpointRounds) {
+      return;
+    }
+    const myTeam = state?.my_team || 'runner';
+    const rivalTeam = myTeam === 'hunter' ? 'runner' : 'hunter';
+    let cancelled = false;
+
+    const checkRival = async () => {
+      const res = await actions.getPinpointRounds?.();
+      if (cancelled || !res?.ok || !res.rounds) return;
+      const dbRound = res.rounds.find((r: any) => r.id === activePinpointRound.id);
+      if (!dbRound) return;
+      const rivalDrop = Array.isArray(dbRound.scout_drops)
+        ? dbRound.scout_drops.find((sd: any) => sd.team === rivalTeam)
+        : null;
+      if (rivalDrop || dbRound.status === 'active') {
+        setPinpointRounds((prev) =>
+          prev.map((r) =>
+            r.id === activePinpointRound.id
+              ? {
+                  ...r,
+                  title: `Rival Scout Drop #${r.roundNumber}`,
+                  targetPhotoUrl: rivalDrop?.photo_url || dbRound.target_photo_url || r.targetPhotoUrl,
+                  latitude: Number(rivalDrop?.latitude ?? dbRound.latitude ?? r.latitude),
+                  longitude: Number(rivalDrop?.longitude ?? dbRound.longitude ?? r.longitude),
+                  heading: Number(rivalDrop?.heading ?? dbRound.target_heading ?? r.heading),
+                }
+              : r
+          )
+        );
+        setPinpointWaitingForRival(false);
+        setPinpointSubPhase('active');
+        setPinpointRoundStartedAtMs(Date.now());
+      }
+    };
+
+    const timer = setInterval(() => void checkRival(), 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [isPinpoint, pinpointWaitingForRival, activePinpointRound, state?.my_team, actions]);
 
   // Evaluate progressive Pinpoint clues (T+0:45 Sonar, T+1:30 Sector, T+2:15 Azimuth) during Hunt phase
   const pinpointClueState = useMemo(() => {
@@ -629,47 +665,58 @@ export function GameShell({ gameId }: GameShellProps) {
     const subLng = ownFix?.longitude ?? area.longitude;
     const subHeading = userHeading ?? 0;
 
-    // Method A: Phase 1 (Scouting) -> Latch target and swap with rival team for Phase 2 (Hunt)
+    // Method A: Phase 1 (Scouting) -> Capture real photo, upload to UploadThing, and latch target in Postgres
     if (pinpointSubPhase === 'scouting') {
-      const myPlayer = selectMyPlayer(state);
-      const myScoutDrop: ScoutedDrop = {
-        team: state.my_team || 'runner',
-        playerId: myPlayer?.user_id || myPlayer?.id || 'local-player',
-        latitude: subLat,
-        longitude: subLng,
-        heading: subHeading,
-        photoUrl: photoUri || activePinpointRound.targetPhotoUrl,
-        title: `Scouted Landmark #${activePinpointRound.roundNumber}`,
-        scoutedAtMs: Date.now(),
-      };
+      const roundId = activePinpointRound.id;
+      const myTeam = state.my_team || 'runner';
+      let finalTargetUrl = photoUri || activePinpointRound.targetPhotoUrl;
 
-      const swappedTarget = resolveSwappedTargetForTeam({
-        myTeam: state.my_team || 'runner',
-        scoutDrops: [myScoutDrop],
-        roundNumber: activePinpointRound.roundNumber,
-        durationSec: activePinpointRound.durationSec,
-        centerLat: area.latitude,
-        centerLng: area.longitude,
-        radiusM: area.radius_m,
-      });
-
-      setPinpointRounds((prev) =>
-        prev.map((r, idx) => (idx === pinpointRoundIndex ? swappedTarget : r))
-      );
-      setPinpointSubPhase('active');
-      setPinpointRoundStartedAtMs(Date.now());
       setPinpointViewfinderOpen(false);
       playSound('scan_success');
       triggerHaptic('tagConfirmed');
 
-      // Async background UploadThing upload for scouted JPEG
-      if (photoUri) {
-        void uploadPinpointPhoto(photoUri, {
-          gameId,
-          roundId: activePinpointRound.id,
-          kind: 'scout',
+      void (async () => {
+        if (photoUri) {
+          const uploadRes = await uploadPinpointPhoto(photoUri, {
+            gameId,
+            roundId,
+            kind: 'scout',
+          });
+          if (uploadRes.ok && uploadRes.publicUrl) {
+            finalTargetUrl = uploadRes.publicUrl;
+          }
+        }
+        const latchRes = await actions.latchPinpointScout?.({
+          roundId,
+          photoUrl: finalTargetUrl,
+          lat: subLat,
+          lng: subLng,
+          heading: subHeading,
+          team: myTeam,
         });
-      }
+        const d = latchRes?.data;
+        if (latchRes?.ok && d && d.swapped === false) {
+          setPinpointWaitingForRival(true);
+          return;
+        }
+        setPinpointWaitingForRival(false);
+        setPinpointRounds((prev) =>
+          prev.map((r, idx) =>
+            idx === pinpointRoundIndex
+              ? {
+                  ...r,
+                  title: `Scouted Landmark #${r.roundNumber}`,
+                  targetPhotoUrl: d?.target_photo_url || finalTargetUrl,
+                  latitude: Number(d?.latitude ?? subLat),
+                  longitude: Number(d?.longitude ?? subLng),
+                  heading: Number(d?.target_heading ?? subHeading),
+                }
+              : r
+          )
+        );
+        setPinpointSubPhase('active');
+        setPinpointRoundStartedAtMs(Date.now());
+      })();
       return;
     }
 
@@ -1177,6 +1224,7 @@ export function GameShell({ gameId }: GameShellProps) {
               current_round: activePinpointRound.roundNumber,
               total_rounds: pinpointRounds.length,
               phase_mode: pinpointSubPhase,
+              waiting_for_rival: pinpointWaitingForRival,
               target_photo_url: activePinpointRound.targetPhotoUrl,
               target_lat: activePinpointRound.latitude,
               target_lng: activePinpointRound.longitude,
@@ -1703,7 +1751,10 @@ export function GameShell({ gameId }: GameShellProps) {
                 const isFinal = pinpointLastResult.isFinalRound;
                 setPinpointLastResult(null);
                 if (isFinal) {
-                  router.replace({ pathname: '/result/[id]', params: { id: gameId } });
+                  void (async () => {
+                    await actions.finishPinpointMatch?.();
+                    router.replace({ pathname: '/result/[id]', params: { id: gameId } });
+                  })();
                 } else {
                   setPinpointRoundIndex((idx) => idx + 1);
                   setPinpointSubPhase(

@@ -325,6 +325,17 @@ export interface ShellActions {
     cluesUnlocked: number;
   }) => Promise<{ ok: boolean; data?: any; error?: string }>;
   openPinpointViewfinder?: () => void;
+  finishPinpointMatch?: () => Promise<{ ok: boolean; error?: string }>;
+  getPinpointRounds?: () => Promise<{ ok: boolean; exists?: boolean; roundDurationSeconds?: number; rounds?: any[]; error?: string }>;
+  initPinpointGame?: (rounds: any[]) => Promise<{ ok: boolean; roundDurationSeconds?: number; rounds?: any[]; error?: string }>;
+  latchPinpointScout?: (params: {
+    roundId: string;
+    photoUrl: string;
+    lat: number;
+    lng: number;
+    heading: number;
+    team: string;
+  }) => Promise<{ ok: boolean; data?: any; error?: string }>;
 }
 
 export interface HudWidgetProps {

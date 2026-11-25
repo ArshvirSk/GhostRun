@@ -49,7 +49,14 @@ export const PinpointTopWidget = memo(function PinpointTopWidget({
       </View>
 
       <View style={styles.badgeCenter}>
-        <Text style={styles.clueTitle}>{clueHeadline}</Text>
+        <Text
+          style={styles.clueTitle}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+        >
+          {clueHeadline}
+        </Text>
         <Text style={styles.scoreSubtext}>{totalScore} PTS BANKED</Text>
       </View>
 
@@ -73,9 +80,11 @@ export const PinpointTargetThumbnailWidget = memo(function PinpointTargetThumbna
   const pp = (state as any).pinpoint || (state as any).game?.pinpoint;
   const targetPhoto = pp?.target_photo_url;
   const isScouting = pp?.phase_mode === 'scouting';
+  const waitingForRival = Boolean(pp?.waiting_for_rival);
   if (!pp) return null;
 
   const handleOpenViewfinder = () => {
+    if (waitingForRival) return;
     actions.openPinpointViewfinder?.();
   };
 
@@ -97,15 +106,33 @@ export const PinpointTargetThumbnailWidget = memo(function PinpointTargetThumbna
       )}
 
       <TouchableOpacity
-        activeOpacity={0.85}
+        activeOpacity={waitingForRival ? 1 : 0.85}
+        disabled={waitingForRival}
         onPress={handleOpenViewfinder}
-        style={[styles.captureFab, isScouting && { backgroundColor: '#00F0FF' }]}
+        style={[
+          styles.captureFab,
+          isScouting && { backgroundColor: waitingForRival ? '#334155' : '#00F0FF' },
+        ]}
         accessibilityRole="button"
-        accessibilityLabel={isScouting ? 'Scout Landmark Camera' : 'Open Pinpoint Camera Viewfinder'}
+        accessibilityLabel={
+          waitingForRival
+            ? 'Waiting for rival team scout'
+            : isScouting
+            ? 'Scout Landmark Camera'
+            : 'Open Pinpoint Camera Viewfinder'
+        }
       >
-        <Ionicons name="camera" size={16} color="#000000" />
-        <Text style={styles.captureFabText}>
-          {isScouting ? 'SCOUT LANDMARK' : 'ALIGN & CAPTURE'}
+        <Ionicons
+          name={waitingForRival ? 'hourglass-outline' : 'camera'}
+          size={16}
+          color={waitingForRival ? '#E2E8F0' : '#000000'}
+        />
+        <Text style={[styles.captureFabText, waitingForRival && { color: '#E2E8F0' }]}>
+          {waitingForRival
+            ? 'WAITING FOR RIVAL...'
+            : isScouting
+            ? 'SCOUT LANDMARK'
+            : 'ALIGN & CAPTURE'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -240,12 +267,16 @@ const styles = StyleSheet.create({
   },
   badgeLeft: {
     alignItems: 'flex-start',
+    minWidth: 48,
   },
   badgeCenter: {
+    flex: 1,
     alignItems: 'center',
+    paddingHorizontal: 8,
   },
   badgeRight: {
     alignItems: 'flex-end',
+    minWidth: 56,
   },
   badgeLabel: {
     fontFamily: 'SegoeUI-Bold',

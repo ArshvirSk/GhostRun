@@ -6,6 +6,7 @@
  * captured JPEG directly to UploadThing CDN.
  */
 
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from './supabase';
 import {
   buildPinpointPhotoFilename,
@@ -28,9 +29,8 @@ export async function uploadPinpointPhoto(
   }
 
   try {
-    const fileRes = await fetch(localUri);
-    const blob = await fileRes.blob();
-    const fileSize = blob.size > 0 ? blob.size : 1024;
+    const info = await FileSystem.getInfoAsync(localUri);
+    const fileSize = info.exists && typeof info.size === 'number' && info.size > 0 ? info.size : 1024;
     const fileName = buildPinpointPhotoFilename(meta);
 
     const { data, error } = await supabase.functions.invoke('upload-pinpoint-photo', {
@@ -42,29 +42,27 @@ export async function uploadPinpointPhoto(
     });
 
     if (error || !data?.uploadUrl || !data?.publicUrl) {
+      const msg = error?.message || data?.error || 'Failed to prepare UploadThing upload';
+      console.warn('[pinpointUpload] invoke failed:', msg);
       return {
         ok: false,
-        error: error?.message || data?.error || 'Failed to prepare UploadThing upload',
+        error: msg,
       };
     }
 
-    const formData = new FormData();
-    formData.append('file', {
-      uri: localUri,
-      name: fileName,
-      type: 'image/jpeg',
-    } as any);
-
-    const uploadRes = await fetch(data.uploadUrl, {
-      method: 'PUT',
-      body: formData,
+    const uploadRes = await FileSystem.uploadAsync(data.uploadUrl, localUri, {
+      httpMethod: 'PUT',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType: 'image/jpeg',
     });
 
-    if (!uploadRes.ok) {
-      const errText = await uploadRes.text().catch(() => '');
+    if (uploadRes.status < 200 || uploadRes.status >= 300) {
+      const msg = `UploadThing ingest failed (${uploadRes.status}): ${uploadRes.body || ''}`;
+      console.warn('[pinpointUpload] ingest failed:', msg);
       return {
         ok: false,
-        error: `UploadThing ingest failed (${uploadRes.status}): ${errText}`,
+        error: msg,
       };
     }
 
@@ -74,9 +72,11 @@ export async function uploadPinpointPhoto(
       key: data.key,
     };
   } catch (err: any) {
+    const msg = err?.message || 'Pinpoint photo upload failed';
+    console.warn('[pinpointUpload] exception:', msg);
     return {
       ok: false,
-      error: err?.message || 'Pinpoint photo upload failed',
+      error: msg,
     };
   }
 }

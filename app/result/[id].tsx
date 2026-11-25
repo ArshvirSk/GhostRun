@@ -414,16 +414,21 @@ export default function ResultScreen() {
 
           if (roundsData && roundsData.length > 0) {
             const roundIds = roundsData.map((r: any) => r.id);
+            const myPlayerRow = (snapshot.players || []).find(
+              (p: any) => p.id === snapshot.my_player_id,
+            );
+            const myProfileId = myPlayerRow?.user_id || snapshot.my_player_id;
             const { data: subData } = await supabase
               .from('pinpoint_submissions')
               .select('*')
               .in('round_id', roundIds)
-              .eq('player_id', snapshot.my_player_id);
+              .eq('player_id', myProfileId);
 
             const subMap = new Map((subData || []).map((s: any) => [s.round_id, s]));
 
             const mapped: PinpointRoundResult[] = roundsData.map((r: any, idx: number) => {
               const sub: any = subMap.get(r.id);
+              const cluesUnlocked = Number(sub?.clues_unlocked ?? 0);
               return {
                 roundNumber: r.round_number || idx + 1,
                 totalRounds: pgData.total_rounds || roundsData.length,
@@ -432,16 +437,16 @@ export default function ResultScreen() {
                 targetHeading: Number(r.target_heading) || 0,
                 submissionPhotoUrl: sub?.submission_photo_url || r.target_photo_url,
                 submissionHeading: Number(sub?.submission_heading ?? r.target_heading),
-                distanceErrorM: Number(sub?.distance_error_meters ?? 3.4),
-                headingErrorDeg: Number(sub?.heading_error_degrees ?? 5.2),
+                distanceErrorM: Number(sub?.distance_error_meters ?? 0),
+                headingErrorDeg: Number(sub?.heading_error_degrees ?? 0),
                 scoreBreakdown: {
-                  distanceErrorM: Number(sub?.distance_error_meters ?? 3.4),
-                  headingErrorDeg: Number(sub?.heading_error_degrees ?? 5.2),
-                  scoreProximity: Number(sub?.score_proximity ?? 3950),
-                  scoreHeading: Number(sub?.score_heading ?? 495),
-                  scoreSpeed: Number(sub?.score_speed ?? 420),
-                  clueMultiplier: Number(sub?.clues_unlocked ? (1 - sub.clues_unlocked * 0.1) : 1.0),
-                  totalScore: Number(sub?.total_score ?? 4865),
+                  distanceErrorM: Number(sub?.distance_error_meters ?? 0),
+                  headingErrorDeg: Number(sub?.heading_error_degrees ?? 0),
+                  scoreProximity: Number(sub?.score_proximity ?? 0),
+                  scoreHeading: Number(sub?.score_heading ?? 0),
+                  scoreSpeed: Number(sub?.score_speed ?? 0),
+                  clueMultiplier: Number(cluesUnlocked ? 1 - cluesUnlocked * 0.1 : 1.0),
+                  totalScore: Number(sub?.total_score ?? 0),
                 },
                 scoutedBy: r.scouted_by_team,
               };
@@ -644,6 +649,72 @@ export default function ResultScreen() {
     return winner?.player_id ?? null;
   }, [state]);
 
+  const effectivePinpointRounds = useMemo<PinpointRoundResult[]>(() => {
+    if (pinpointRounds.length > 0) return pinpointRounds;
+    return [
+      {
+        roundNumber: 1,
+        totalRounds: 3,
+        targetTitle: 'Main Plaza Fountain',
+        targetPhotoUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=600&q=80',
+        targetHeading: 42,
+        submissionPhotoUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=600&q=80',
+        submissionHeading: 46,
+        distanceErrorM: 2.1,
+        headingErrorDeg: 4.0,
+        scoreBreakdown: {
+          distanceErrorM: 2.1,
+          headingErrorDeg: 4.0,
+          scoreProximity: 4000,
+          scoreHeading: 498,
+          scoreSpeed: 420,
+          clueMultiplier: 1.0,
+          totalScore: 4918,
+        },
+      },
+      {
+        roundNumber: 2,
+        totalRounds: 3,
+        targetTitle: 'Park Pavilion',
+        targetPhotoUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=600&q=80',
+        targetHeading: 180,
+        submissionPhotoUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=600&q=80',
+        submissionHeading: 192,
+        distanceErrorM: 14.5,
+        headingErrorDeg: 12.0,
+        scoreBreakdown: {
+          distanceErrorM: 14.5,
+          headingErrorDeg: 12.0,
+          scoreProximity: 3460,
+          scoreHeading: 489,
+          scoreSpeed: 340,
+          clueMultiplier: 0.9,
+          totalScore: 3860,
+        },
+      },
+      {
+        roundNumber: 3,
+        totalRounds: 3,
+        targetTitle: 'Stone Arch Bridge',
+        targetPhotoUrl: 'https://images.unsplash.com/photo-1508873696983-2df5703bc20d?auto=format&fit=crop&w=600&q=80',
+        targetHeading: 270,
+        submissionPhotoUrl: 'https://images.unsplash.com/photo-1508873696983-2df5703bc20d?auto=format&fit=crop&w=600&q=80',
+        submissionHeading: 285,
+        distanceErrorM: 28.6,
+        headingErrorDeg: 15.0,
+        scoreBreakdown: {
+          distanceErrorM: 28.6,
+          headingErrorDeg: 15.0,
+          scoreProximity: 3004,
+          scoreHeading: 483,
+          scoreSpeed: 290,
+          clueMultiplier: 0.8,
+          totalScore: 3022,
+        },
+      },
+    ];
+  }, [pinpointRounds]);
+
   if (!gameId) {
     return (
       <View
@@ -772,72 +843,6 @@ export default function ResultScreen() {
       : (myPlayer?.team === 'hunter' ? 200 : 400);
 
   const myPlayerStat = gameStats?.players.find((p) => p.player_id === state.my_player_id);
-
-  const effectivePinpointRounds = useMemo<PinpointRoundResult[]>(() => {
-    if (pinpointRounds.length > 0) return pinpointRounds;
-    return [
-      {
-        roundNumber: 1,
-        totalRounds: 3,
-        targetTitle: 'Main Plaza Fountain',
-        targetPhotoUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=600&q=80',
-        targetHeading: 42,
-        submissionPhotoUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=600&q=80',
-        submissionHeading: 46,
-        distanceErrorM: 2.1,
-        headingErrorDeg: 4.0,
-        scoreBreakdown: {
-          distanceErrorM: 2.1,
-          headingErrorDeg: 4.0,
-          scoreProximity: 4000,
-          scoreHeading: 498,
-          scoreSpeed: 420,
-          clueMultiplier: 1.0,
-          totalScore: 4918,
-        },
-      },
-      {
-        roundNumber: 2,
-        totalRounds: 3,
-        targetTitle: 'Park Pavilion',
-        targetPhotoUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=600&q=80',
-        targetHeading: 180,
-        submissionPhotoUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=600&q=80',
-        submissionHeading: 192,
-        distanceErrorM: 14.5,
-        headingErrorDeg: 12.0,
-        scoreBreakdown: {
-          distanceErrorM: 14.5,
-          headingErrorDeg: 12.0,
-          scoreProximity: 3460,
-          scoreHeading: 489,
-          scoreSpeed: 340,
-          clueMultiplier: 0.9,
-          totalScore: 3860,
-        },
-      },
-      {
-        roundNumber: 3,
-        totalRounds: 3,
-        targetTitle: 'Stone Arch Bridge',
-        targetPhotoUrl: 'https://images.unsplash.com/photo-1508873696983-2df5703bc20d?auto=format&fit=crop&w=600&q=80',
-        targetHeading: 270,
-        submissionPhotoUrl: 'https://images.unsplash.com/photo-1508873696983-2df5703bc20d?auto=format&fit=crop&w=600&q=80',
-        submissionHeading: 285,
-        distanceErrorM: 28.6,
-        headingErrorDeg: 15.0,
-        scoreBreakdown: {
-          distanceErrorM: 28.6,
-          headingErrorDeg: 15.0,
-          scoreProximity: 3004,
-          scoreHeading: 483,
-          scoreSpeed: 290,
-          clueMultiplier: 0.8,
-          totalScore: 3022,
-        },
-      },
-    ];
-  }, [pinpointRounds]);
 
   const positionFeatures: PointFeature[] = positions.map((position) => {
     const player = playerById.get(position.player_id);

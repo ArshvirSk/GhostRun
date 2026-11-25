@@ -240,9 +240,16 @@ export default function HostRulesScreen() {
         {/* Mode-Specific Parameters (From Registry) */}
         {modeModule && modeModule.params.length > 0 && (
           <Card variant="default" style={{ padding: spacing.md, marginBottom: spacing.lg }}>
-            <Text variant="label" style={{ color: colors.accent, marginBottom: spacing.sm }}>
-              {modeModule.name.toUpperCase()} PARAMETERS
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs }}>
+              <Text variant="label" style={{ color: colors.accent }}>
+                {modeModule.name.toUpperCase()} PARAMETERS
+              </Text>
+              {modeId === 'pinpoint' && (
+                <Text variant="mono" style={{ color: colors.textMuted, fontSize: 11 }}>
+                  {modeParams.pinpoint?.total_rounds ?? 3} RDS • {modeParams.pinpoint?.radius_meters ?? 500}M • {modeParams.pinpoint?.round_duration_s ?? 180}S
+                </Text>
+              )}
+            </View>
             {modeModule.params.map((p) => {
               const currentValue = modeParams[modeId]?.[p.key] !== undefined
                 ? modeParams[modeId][p.key]

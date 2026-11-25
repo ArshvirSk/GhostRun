@@ -25,6 +25,7 @@ export interface ParsedPoiCandidate {
   latitude: number;
   longitude: number;
   distanceFromCenterM: number;
+  tags?: Record<string, string>;
 }
 
 const POI_CATEGORY_PHOTOS: Record<ParsedPoiCandidate['category'], string> = {
@@ -119,6 +120,7 @@ export function parseOverpassPoiElements(
       latitude: lat,
       longitude: lng,
       distanceFromCenterM: Math.round(dist),
+      tags,
     });
   }
 
@@ -164,8 +166,83 @@ export function selectSpacedPois(
 }
 
 /**
- * Fetches OSM POIs via Overpass API with a 3.5s timeout and falls back
- * gracefully to deterministic in-bounds rounds when offline or empty.
+ * Resolves a real outdoor photograph for an OSM POI from OSM tags (`image`,
+ * `wikimedia_commons`, `wikipedia`) or Wikimedia Commons Geosearch (no API key
+ * required), falling back to category stock imagery only if none exist.
+ */
+export async function resolvePoiPhotoUrl(poi: ParsedPoiCandidate): Promise<string> {
+  const tags = poi.tags || {};
+
+  if (tags.image && tags.image.startsWith('https://')) {
+    return tags.image;
+  }
+
+  if (tags.wikimedia_commons) {
+    const file = tags.wikimedia_commons.replace(/^File:/i, '').trim();
+    if (file) {
+      return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=800`;
+    }
+  }
+
+  if (tags.wikipedia) {
+    try {
+      const [langRaw, ...titleParts] = tags.wikipedia.split(':');
+      const lang = titleParts.length > 0 ? langRaw : 'en';
+      const pageTitle = (titleParts.length > 0 ? titleParts.join(':') : langRaw).trim();
+      if (pageTitle) {
+        const res = await fetch(
+          `https://${encodeURIComponent(lang)}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`
+        );
+        if (res.ok) {
+          const summary = (await res.json()) as {
+            thumbnail?: { source?: string };
+            originalimage?: { source?: string };
+          };
+          const wikiUrl = summary.thumbnail?.source || summary.originalimage?.source;
+          if (wikiUrl && wikiUrl.startsWith('https://')) return wikiUrl;
+        }
+      }
+    } catch {
+      // Ignore and try geosearch
+    }
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const geoUrl =
+      `https://commons.wikimedia.org/w/api.php?action=query&generator=geosearch` +
+      `&ggscoord=${poi.latitude}|${poi.longitude}&ggsradius=250&ggsnamespace=6&ggslimit=3` +
+      `&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
+    const res = await fetch(geoUrl, { signal: controller.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const json = (await res.json()) as {
+        query?: {
+          pages?: Record<
+            string,
+            { imageinfo?: Array<{ thumburl?: string; url?: string }> }
+          >;
+        };
+      };
+      const pages = Object.values(json.query?.pages || {});
+      for (const page of pages) {
+        const imgUrl = page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url;
+        if (imgUrl && imgUrl.startsWith('https://') && /\.(jpe?g|png|webp)(\?|$)/i.test(imgUrl)) {
+          return imgUrl;
+        }
+      }
+    }
+  } catch {
+    // Offline or timeout -> fall back to category photo
+  }
+
+  return POI_CATEGORY_PHOTOS[poi.category];
+}
+
+/**
+ * Fetches OSM POIs via Overpass API with a 3.5s timeout and resolves real
+ * Wikimedia/OSM photos, falling back gracefully when offline or empty.
  */
 export async function fetchMapPoiRounds(params: {
   centerLat: number;
@@ -199,11 +276,12 @@ export async function fetchMapPoiRounds(params: {
       const picked = selectSpacedPois(parsed, params.totalRounds);
 
       if (picked.length > 0) {
+        const photoUrls = await Promise.all(picked.map((poi) => resolvePoiPhotoUrl(poi)));
         return picked.map((poi, idx) => ({
           id: poi.id,
           roundNumber: idx + 1,
           title: poi.title,
-          targetPhotoUrl: POI_CATEGORY_PHOTOS[poi.category],
+          targetPhotoUrl: photoUrls[idx] || POI_CATEGORY_PHOTOS[poi.category],
           latitude: poi.latitude,
           longitude: poi.longitude,
           heading: (idx * 90 + 30) % 360,

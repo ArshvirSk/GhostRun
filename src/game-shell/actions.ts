@@ -428,5 +428,73 @@ export function createShellActions(
         return { ok: false, error: err.message || 'Pinpoint submission failed' };
       }
     },
+
+    finishPinpointMatch: async () => {
+      if (!supabase) return { ok: false, error: 'Database not initialized' };
+      try {
+        const { error } = await (supabase.rpc as any)('finish_pinpoint_match', {
+          p_game_id: gameId,
+        });
+        if (error) return { ok: false, error: error.message };
+        await onRefresh();
+        return { ok: true };
+      } catch (err: any) {
+        return { ok: false, error: err.message || 'Failed to finish Pinpoint match' };
+      }
+    },
+
+    getPinpointRounds: async () => {
+      if (!supabase) return { ok: false, error: 'Database not initialized' };
+      try {
+        const { data, error } = await (supabase.rpc as any)('get_pinpoint_rounds', {
+          p_game_id: gameId,
+        });
+        if (error) return { ok: false, error: error.message };
+        return {
+          ok: true,
+          exists: Boolean(data?.exists),
+          roundDurationSeconds: data?.round_duration_seconds,
+          rounds: Array.isArray(data?.rounds) ? data.rounds : [],
+        };
+      } catch (err: any) {
+        return { ok: false, error: err.message || 'Failed to fetch Pinpoint rounds' };
+      }
+    },
+
+    initPinpointGame: async (rounds) => {
+      if (!supabase) return { ok: false, error: 'Database not initialized' };
+      try {
+        const { data, error } = await (supabase.rpc as any)('init_pinpoint_game', {
+          p_game_id: gameId,
+          p_rounds: rounds,
+        });
+        if (error) return { ok: false, error: error.message };
+        return {
+          ok: true,
+          roundDurationSeconds: data?.round_duration_seconds,
+          rounds: Array.isArray(data?.rounds) ? data.rounds : [],
+        };
+      } catch (err: any) {
+        return { ok: false, error: err.message || 'Failed to initialize Pinpoint rounds' };
+      }
+    },
+
+    latchPinpointScout: async (params) => {
+      if (!supabase) return { ok: false, error: 'Database not initialized' };
+      try {
+        const { data, error } = await (supabase.rpc as any)('latch_pinpoint_scout', {
+          p_round_id: params.roundId,
+          p_photo_url: params.photoUrl,
+          p_lat: params.lat,
+          p_lng: params.lng,
+          p_heading: params.heading,
+          p_team: params.team,
+        });
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, data };
+      } catch (err: any) {
+        return { ok: false, error: err.message || 'Failed to latch scout target' };
+      }
+    },
   };
 }
