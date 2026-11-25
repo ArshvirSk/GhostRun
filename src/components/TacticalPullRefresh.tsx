@@ -50,8 +50,8 @@ export const TacticalPullRefreshScrollView = forwardRef<
   const { height: windowHeight } = useWindowDimensions();
 
   const topInset = Math.max(insets?.top || 0, 24);
-  const restingHeight = topInset + 68;
-  const thresholdHeight = topInset + 92;
+  const restingHeight = topInset + 60;
+  const thresholdHeight = topInset + 64;
   // Extended pull range: allows deep pull-down just like Snapchat (up to 380dp)
   const maxPullHeight = Math.min((windowHeight || 800) * 0.48, 380);
 
@@ -123,15 +123,15 @@ export const TacticalPullRefreshScrollView = forwardRef<
   // Responsive gesture disambiguation:
   // 1. Must be idle and past 500ms post-refresh lockout (completely blocks momentum flings from re-opening)
   // 2. Must be at top of list (scrollY <= 1)
-  // 3. dy > 6: fires just before Android ScrollView's ~8dp touchSlop locks the gesture
-  // 4. dy > |dx| * 1.8: strict vertical cone (~29 deg) so horizontal/diagonal screen swipes pass to PagerView
+  // 3. dy > 4: catches before Android ScrollView's ~8dp touchSlop locks the gesture
+  // 4. dy > |dx| * 1.35: natural thumb-pull cone (~36.5 deg) while letting horizontal screen swipes pass
   const shouldStartPull = (gestureState: { dx: number; dy: number }) => {
     if (refreshStatusRef.current !== 'idle') return false;
     if (Date.now() - lastRefreshEndTimeRef.current < 500) return false;
     if (scrollYRef.current > 1) return false;
     return (
-      gestureState.dy > 6 &&
-      gestureState.dy > Math.abs(gestureState.dx) * 1.8
+      gestureState.dy > 4 &&
+      gestureState.dy > Math.abs(gestureState.dx) * 1.35
     );
   };
 
