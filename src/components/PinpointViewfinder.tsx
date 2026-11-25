@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -21,7 +21,7 @@ interface PinpointViewfinderProps {
   gpsAccuracyM?: number;
   mode?: 'hunt' | 'scout';
   onClose: () => void;
-  onSubmitShot: (opacityUsed: number) => void;
+  onSubmitShot: (opacityUsed: number, photoUri?: string) => void;
 }
 
 export function PinpointViewfinder({
@@ -37,6 +37,8 @@ export function PinpointViewfinder({
 }: PinpointViewfinderProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [ghostOpacity, setGhostOpacity] = useState<number>(0.5);
+  const [capturing, setCapturing] = useState<boolean>(false);
+  const cameraRef = useRef<CameraView>(null);
 
   if (!visible) return null;
 
@@ -77,7 +79,7 @@ export function PinpointViewfinder({
       <View style={styles.viewfinderFrame}>
         {/* Live Camera View with Simulated Fallback */}
         {permission?.granted ? (
-          <CameraView style={StyleSheet.absoluteFill} facing="back" />
+          <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
         ) : (
           <View style={styles.cameraBackground}>
             <View style={styles.reticleCrosshair}>
@@ -163,13 +165,33 @@ export function PinpointViewfinder({
       {/* 5. Shutter Action Button */}
       <View style={styles.shutterActionContainer}>
         <TouchableOpacity
-          style={styles.shutterButton}
+          style={[styles.shutterButton, capturing && { opacity: 0.6 }]}
           activeOpacity={0.8}
-          onPress={() => onSubmitShot(ghostOpacity)}
+          disabled={capturing}
+          onPress={async () => {
+            if (capturing) return;
+            setCapturing(true);
+            let photoUri: string | undefined;
+            try {
+              if (permission?.granted && cameraRef.current) {
+                const pic = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+                photoUri = pic?.uri;
+              }
+            } catch {
+              // Non-blocking fallback to coordinate/heading latch
+            } finally {
+              setCapturing(false);
+              onSubmitShot(ghostOpacity, photoUri);
+            }
+          }}
         >
           <View style={styles.shutterInnerRing}>
             <Text style={styles.shutterButtonText}>
-              {mode === 'scout' ? 'LATCH SCOUT TARGET' : 'PINPOINT SHOT'}
+              {capturing
+                ? 'LATCHING...'
+                : mode === 'scout'
+                  ? 'LATCH SCOUT TARGET'
+                  : 'PINPOINT SHOT'}
             </Text>
           </View>
         </TouchableOpacity>

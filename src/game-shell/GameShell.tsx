@@ -99,6 +99,7 @@ import {
 } from '../modes/pinpoint/liveHelpers';
 import { fetchMapPoiRounds } from '../modes/pinpoint/poiEngine';
 import { resolveSwappedTargetForTeam, type ScoutedDrop } from '../modes/pinpoint/scoutSwap';
+import { uploadPinpointPhoto } from '../lib/pinpointUpload';
 import type { PinpointScoreBreakdown } from '../modes/pinpoint/types';
 
 interface GameShellProps {
@@ -621,7 +622,7 @@ export function GameShell({ gameId }: GameShellProps) {
     pinpointLastResult,
   ]);
 
-  const handleSubmitPinpointShot = useCallback(async () => {
+  const handleSubmitPinpointShot = useCallback(async (photoUri?: string) => {
     if (!activePinpointRound || !state?.game?.area) return;
     const area = state.game.area;
     const subLat = ownFix?.latitude ?? area.latitude;
@@ -637,7 +638,7 @@ export function GameShell({ gameId }: GameShellProps) {
         latitude: subLat,
         longitude: subLng,
         heading: subHeading,
-        photoUrl: activePinpointRound.targetPhotoUrl,
+        photoUrl: photoUri || activePinpointRound.targetPhotoUrl,
         title: `Scouted Landmark #${activePinpointRound.roundNumber}`,
         scoutedAtMs: Date.now(),
       };
@@ -660,6 +661,15 @@ export function GameShell({ gameId }: GameShellProps) {
       setPinpointViewfinderOpen(false);
       playSound('scan_success');
       triggerHaptic('tagConfirmed');
+
+      // Async background UploadThing upload for scouted JPEG
+      if (photoUri) {
+        void uploadPinpointPhoto(photoUri, {
+          gameId,
+          roundId: activePinpointRound.id,
+          kind: 'scout',
+        });
+      }
       return;
     }
 
@@ -695,21 +705,41 @@ export function GameShell({ gameId }: GameShellProps) {
       isFinalRound: pinpointRoundIndex + 1 >= pinpointRounds.length,
     });
 
-    // Non-blocking server-authoritative PostGIS submission
+    // Non-blocking UploadThing photo upload + server-authoritative PostGIS submission
     if (actions.submitPinpointShot) {
       const myPlayer = selectMyPlayer(state);
-      void actions.submitPinpointShot({
-        roundId: activePinpointRound.id,
-        playerId: myPlayer?.user_id || myPlayer?.id || '',
-        team: state.my_team || 'solo',
-        submissionPhotoUrl: activePinpointRound.targetPhotoUrl,
-        lat: subLat,
-        lng: subLng,
-        heading: subHeading,
-        cluesUnlocked,
-      });
+      const submitAction = actions.submitPinpointShot;
+      const roundId = activePinpointRound.id;
+      const fallbackUrl = activePinpointRound.targetPhotoUrl;
+      const team = state.my_team || 'solo';
+      const playerId = myPlayer?.user_id || myPlayer?.id || '';
+
+      void (async () => {
+        let finalPhotoUrl = fallbackUrl;
+        if (photoUri) {
+          const uploadRes = await uploadPinpointPhoto(photoUri, {
+            gameId,
+            roundId,
+            kind: 'submission',
+          });
+          if (uploadRes.ok && uploadRes.publicUrl) {
+            finalPhotoUrl = uploadRes.publicUrl;
+          }
+        }
+        await submitAction({
+          roundId,
+          playerId,
+          team,
+          submissionPhotoUrl: finalPhotoUrl,
+          lat: subLat,
+          lng: subLng,
+          heading: subHeading,
+          cluesUnlocked,
+        });
+      })();
     }
   }, [
+    gameId,
     activePinpointRound,
     state,
     ownFix,
@@ -1633,7 +1663,7 @@ export function GameShell({ gameId }: GameShellProps) {
           currentHeadingDeg={userHeading ?? 0}
           gpsAccuracyM={fix?.accuracy ?? 3.5}
           onClose={() => setPinpointViewfinderOpen(false)}
-          onSubmitShot={() => void handleSubmitPinpointShot()}
+          onSubmitShot={(_opacity, photoUri) => void handleSubmitPinpointShot(photoUri)}
         />
       )}
 
