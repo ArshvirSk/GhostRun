@@ -484,6 +484,66 @@ export function PlayContent() {
           </View>
         )}
 
+        {/* Persistent City World Card (Zero-Lobby Daily Bounties & Crew Turf) */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="City World Daily Bounties"
+          onPress={() => {
+            triggerHaptic('buttonTap');
+            router.push('/city-world' as any);
+          }}
+          style={({ pressed }) => [
+            styles.cipherCard,
+            {
+              backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+              borderColor: '#00F0FF',
+              marginBottom: 12,
+            },
+            pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+          ]}
+        >
+          <View style={styles.cipherCardInner}>
+            <View
+              style={[
+                styles.cpTagBox,
+                {
+                  borderColor: '#00F0FF',
+                  backgroundColor: 'rgba(0, 240, 255, 0.14)',
+                },
+              ]}
+            >
+              <Text style={[styles.cpTagText, { color: '#00F0FF' }]}>
+                CW
+              </Text>
+            </View>
+            <View style={styles.cipherTextCol}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.cipherTitleText, { color: colors.text }]} numberOfLines={1}>
+                  CITY WORLD
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: 'rgba(0, 240, 255, 0.2)',
+                    borderColor: '#00F0FF',
+                    borderWidth: 1,
+                    paddingHorizontal: 5,
+                    paddingVertical: 1,
+                    borderRadius: 4,
+                  }}
+                >
+                  <Text style={{ color: '#00F0FF', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 }}>
+                    DAILY
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.cipherSubText, { color: colors.textMuted }]} numberOfLines={1}>
+                Zero-lobby solo bounties & Crew hex turf control
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#00F0FF" />
+          </View>
+        </Pressable>
+
         {/* Outbreak Horde Flagship Mode Card */}
         <Pressable
           accessibilityRole="button"
