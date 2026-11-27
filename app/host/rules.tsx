@@ -246,11 +246,13 @@ export default function HostRulesScreen() {
               </Text>
               {modeId === 'pinpoint' && (
                 <Text variant="mono" style={{ color: colors.textMuted, fontSize: 11 }}>
-                  {modeParams.pinpoint?.total_rounds ?? 3} RDS • {modeParams.pinpoint?.radius_meters ?? 500}M • {modeParams.pinpoint?.round_duration_s ?? 180}S
+                  {modeParams.pinpoint?.total_rounds ?? 3} RDS • {modeParams.pinpoint?.round_duration_s ?? 180}S/RD
                 </Text>
               )}
             </View>
-            {modeModule.params.map((p) => {
+            {modeModule.params
+              .filter((p) => !(modeId === 'pinpoint' && p.key === 'radius_meters'))
+              .map((p) => {
               const currentValue = modeParams[modeId]?.[p.key] !== undefined
                 ? modeParams[modeId][p.key]
                 : p.defaultValue;

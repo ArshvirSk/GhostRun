@@ -55,7 +55,18 @@ export default function HostAreaScreen() {
   const placements = useHostStore((s) => s.placements);
   const setCenter = useHostStore((s) => s.setCenter);
   const setRadius = useHostStore((s) => s.setRadius);
+  const setModeParam = useHostStore((s) => s.setModeParam);
   const setPlacement = useHostStore((s) => s.setPlacement);
+  const isPinpoint = mode === 'pinpoint';
+
+  useEffect(() => {
+    if (!isPinpoint) return;
+    const clamped = Math.min(750, Math.max(150, radius));
+    if (clamped !== radius) {
+      setRadius(clamped);
+    }
+    setModeParam('pinpoint', 'radius_meters', clamped);
+  }, [isPinpoint, radius, setRadius, setModeParam]);
 
   const [locating, setLocating] = useState(false);
   const [placementError, setPlacementError] = useState('');
@@ -598,14 +609,17 @@ export default function HostAreaScreen() {
             </View>
           )}
 
-          {/* Tactical Rangefinder Zone Selector (With 2.0km Hard Cap) */}
+          {/* Tactical Rangefinder Zone Selector (150-750m for Pinpoint, up to 2.0km otherwise) */}
           <TacticalRangeSelector
-            radiusM={radius}
-            minRadiusM={200}
-            maxRadiusM={2000}
-            stepM={100}
+            radiusM={isPinpoint ? Math.min(750, Math.max(150, radius)) : radius}
+            minRadiusM={isPinpoint ? 150 : 200}
+            maxRadiusM={isPinpoint ? 750 : 2000}
+            stepM={isPinpoint ? 50 : 100}
             onChange={(newRadius) => {
               setRadius(newRadius);
+              if (isPinpoint) {
+                setModeParam('pinpoint', 'radius_meters', newRadius);
+              }
             }}
             style={{ marginTop: spacing.xs }}
           />
